@@ -12,8 +12,19 @@ export interface Extra {
 
 export interface Barber {
   id: string;
-  name: string;
+  uid: string; // Auto-generated, unique, non-editable
+  firstName: string;
+  lastName: string;
+  phone: string;
+  commission: number; // 0-100 percentage
+  address?: string; // Optional
+  dni?: string; // Optional
   active: boolean;
+}
+
+// Helper to get display name
+export function getBarberDisplayName(barber: Barber): string {
+  return `${barber.firstName} ${barber.lastName}`.trim();
 }
 
 export interface Discount {

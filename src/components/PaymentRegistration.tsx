@@ -132,7 +132,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
 
     onSubmit({
       barberId: selectedBarber,
-      barberName: barber!.name,
+      barberName: `${barber!.firstName} ${barber!.lastName}`,
       serviceId: selectedService,
       serviceName: service!.name,
       servicePrice: service!.price,
@@ -271,7 +271,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
                 <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
                   <User className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <p className="font-medium text-center text-foreground">{barber.name}</p>
+                <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
               </button>
             ))}
           </div>
@@ -407,7 +407,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Barbero</span>
-                  <span className="font-medium">{barber?.name}</span>
+                  <span className="font-medium">{barber ? `${barber.firstName} ${barber.lastName}` : ''}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Servicio</span>
