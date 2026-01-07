@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Service, Extra, Barber, Discount } from '@/types/barbershop';
-
 interface ConfigurationPanelProps {
   services: Service[];
   extras: Extra[];
@@ -22,7 +21,6 @@ interface ConfigurationPanelProps {
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
 }
-
 export function ConfigurationPanel({
   services,
   extras,
@@ -36,10 +34,9 @@ export function ConfigurationPanel({
   onUpdateBarber,
   onAddDiscount,
   onUpdateDiscount,
-  onDeleteDiscount,
+  onDeleteDiscount
 }: ConfigurationPanelProps) {
-  return (
-    <div className="space-y-8 animate-fade-in">
+  return <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
         <p className="text-muted-foreground text-sm mt-1">Administra servicios, extras, staff y descuentos</p>
@@ -66,46 +63,27 @@ export function ConfigurationPanel({
         </TabsList>
 
         <TabsContent value="services" className="mt-6">
-          <ServicesList
-            services={services}
-            onAdd={onAddService}
-            onUpdate={onUpdateService}
-          />
+          <ServicesList services={services} onAdd={onAddService} onUpdate={onUpdateService} />
         </TabsContent>
 
         <TabsContent value="extras" className="mt-6">
-          <ExtrasList
-            extras={extras}
-            onAdd={onAddExtra}
-            onUpdate={onUpdateExtra}
-          />
+          <ExtrasList extras={extras} onAdd={onAddExtra} onUpdate={onUpdateExtra} />
         </TabsContent>
 
         <TabsContent value="staff" className="mt-6">
-          <StaffList
-            barbers={barbers}
-            onAdd={onAddBarber}
-            onUpdate={onUpdateBarber}
-          />
+          <StaffList barbers={barbers} onAdd={onAddBarber} onUpdate={onUpdateBarber} />
         </TabsContent>
 
         <TabsContent value="discounts" className="mt-6">
-          <DiscountsList
-            discounts={discounts}
-            onAdd={onAddDiscount}
-            onUpdate={onUpdateDiscount}
-            onDelete={onDeleteDiscount}
-          />
+          <DiscountsList discounts={discounts} onAdd={onAddDiscount} onUpdate={onUpdateDiscount} onDelete={onDeleteDiscount} />
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 }
-
 function ServicesList({
   services,
   onAdd,
-  onUpdate,
+  onUpdate
 }: {
   services: Service[];
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
@@ -116,101 +94,70 @@ function ServicesList({
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
-
   const activeServices = services.filter(s => s.active);
   const inactiveServices = services.filter(s => !s.active);
-
   const handleAdd = () => {
     if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
+      onAdd({
+        name: newName,
+        price: parseFloat(newPrice),
+        active: true
+      });
       setNewName('');
       setNewPrice('');
       setIsAdding(false);
     }
   };
-
   const handleUpdate = (id: string) => {
     if (newName && newPrice) {
-      onUpdate(id, { name: newName, price: parseFloat(newPrice) });
+      onUpdate(id, {
+        name: newName,
+        price: parseFloat(newPrice)
+      });
       setEditingId(null);
       setNewName('');
       setNewPrice('');
     }
   };
-
   const startEdit = (service: Service) => {
     setEditingId(service.id);
     setNewName(service.name);
     setNewPrice(service.price.toString());
   };
-
-  const renderServiceItem = (service: Service) => (
-    <div
-      key={service.id}
-      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-    >
-      {editingId === service.id ? (
-        <>
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1"
-          />
-          <Input
-            type="number"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            className="w-28"
-          />
+  const renderServiceItem = (service: Service) => <div key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+      {editingId === service.id ? <>
+          <Input value={newName} onChange={e => setNewName(e.target.value)} className="flex-1" />
+          <Input type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-28" />
           <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
             <Save className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
             <X className="h-4 w-4" />
           </Button>
-        </>
-      ) : (
-        <>
-          <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={service.uid}>
-            {service.uid}
-          </span>
+        </> : <>
+          
           <span className="flex-1 font-medium text-foreground">{service.name}</span>
           <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => startEdit(service)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-          >
+          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onUpdate(service.id, { active: !service.active })}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-            title={service.active ? 'Desactivar' : 'Activar'}
-          >
+          <Button size="icon" variant="ghost" onClick={() => onUpdate(service.id, {
+        active: !service.active
+      })} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8" title={service.active ? 'Desactivar' : 'Activar'}>
             {service.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
-        </>
-      )}
-    </div>
-  );
-
-  return (
-    <Card className="border border-border bg-card">
+        </>}
+    </div>;
+  return <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Servicios</CardTitle>
-        {!isAdding && activeSubTab === 'active' && (
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+        {!isAdding && activeSubTab === 'active' && <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
-          </Button>
-        )}
+          </Button>}
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+        <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as 'active' | 'inactive')}>
           <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
             <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
               Activos ({activeServices.length})
@@ -221,51 +168,32 @@ function ServicesList({
           </TabsList>
 
           <TabsContent value="active" className="mt-4 space-y-2">
-            {isAdding && (
-              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-                <Input
-                  placeholder="Nombre"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1"
-                />
-                <Input
-                  type="number"
-                  placeholder="Precio"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  className="w-28"
-                />
+            {isAdding && <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+                <Input placeholder="Nombre" value={newName} onChange={e => setNewName(e.target.value)} className="flex-1" />
+                <Input type="number" placeholder="Precio" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-28" />
                 <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
-            )}
+              </div>}
             {activeServices.map(renderServiceItem)}
-            {activeServices.length === 0 && !isAdding && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay servicios activos</p>
-            )}
+            {activeServices.length === 0 && !isAdding && <p className="text-sm text-muted-foreground text-center py-4">No hay servicios activos</p>}
           </TabsContent>
 
           <TabsContent value="inactive" className="mt-4 space-y-2">
             {inactiveServices.map(renderServiceItem)}
-            {inactiveServices.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay servicios inactivos</p>
-            )}
+            {inactiveServices.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay servicios inactivos</p>}
           </TabsContent>
         </Tabs>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
-
 function ExtrasList({
   extras,
   onAdd,
-  onUpdate,
+  onUpdate
 }: {
   extras: Extra[];
   onAdd: (extra: Omit<Extra, 'id' | 'uid'>) => void;
@@ -276,101 +204,72 @@ function ExtrasList({
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
-
   const activeExtras = extras.filter(e => e.active);
   const inactiveExtras = extras.filter(e => !e.active);
-
   const handleAdd = () => {
     if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
+      onAdd({
+        name: newName,
+        price: parseFloat(newPrice),
+        active: true
+      });
       setNewName('');
       setNewPrice('');
       setIsAdding(false);
     }
   };
-
   const handleUpdate = (id: string) => {
     if (newName && newPrice) {
-      onUpdate(id, { name: newName, price: parseFloat(newPrice) });
+      onUpdate(id, {
+        name: newName,
+        price: parseFloat(newPrice)
+      });
       setEditingId(null);
       setNewName('');
       setNewPrice('');
     }
   };
-
   const startEdit = (extra: Extra) => {
     setEditingId(extra.id);
     setNewName(extra.name);
     setNewPrice(extra.price.toString());
   };
-
-  const renderExtraItem = (extra: Extra) => (
-    <div
-      key={extra.id}
-      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-    >
-      {editingId === extra.id ? (
-        <>
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1"
-          />
-          <Input
-            type="number"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            className="w-28"
-          />
+  const renderExtraItem = (extra: Extra) => <div key={extra.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+      {editingId === extra.id ? <>
+          <Input value={newName} onChange={e => setNewName(e.target.value)} className="flex-1" />
+          <Input type="number" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-28" />
           <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90">
             <Save className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
             <X className="h-4 w-4" />
           </Button>
-        </>
-      ) : (
-        <>
+        </> : <>
           <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={extra.uid}>
             {extra.uid}
           </span>
           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
           <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => startEdit(extra)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-          >
+          <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onUpdate(extra.id, { active: !extra.active })}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-            title={extra.active ? 'Desactivar' : 'Activar'}
-          >
+          <Button size="icon" variant="ghost" onClick={() => onUpdate(extra.id, {
+        active: !extra.active
+      })} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8" title={extra.active ? 'Desactivar' : 'Activar'}>
             {extra.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
-        </>
-      )}
-    </div>
-  );
-
-  return (
-    <Card className="border border-border bg-card">
+        </>}
+    </div>;
+  return <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Extras</CardTitle>
-        {!isAdding && activeSubTab === 'active' && (
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+        {!isAdding && activeSubTab === 'active' && <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
-          </Button>
-        )}
+          </Button>}
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+        <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as 'active' | 'inactive')}>
           <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
             <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
               Activos ({activeExtras.length})
@@ -381,51 +280,32 @@ function ExtrasList({
           </TabsList>
 
           <TabsContent value="active" className="mt-4 space-y-2">
-            {isAdding && (
-              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-                <Input
-                  placeholder="Nombre"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1"
-                />
-                <Input
-                  type="number"
-                  placeholder="Precio"
-                  value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
-                  className="w-28"
-                />
+            {isAdding && <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+                <Input placeholder="Nombre" value={newName} onChange={e => setNewName(e.target.value)} className="flex-1" />
+                <Input type="number" placeholder="Precio" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="w-28" />
                 <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
-            )}
+              </div>}
             {activeExtras.map(renderExtraItem)}
-            {activeExtras.length === 0 && !isAdding && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay extras activos</p>
-            )}
+            {activeExtras.length === 0 && !isAdding && <p className="text-sm text-muted-foreground text-center py-4">No hay extras activos</p>}
           </TabsContent>
 
           <TabsContent value="inactive" className="mt-4 space-y-2">
             {inactiveExtras.map(renderExtraItem)}
-            {inactiveExtras.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay extras inactivos</p>
-            )}
+            {inactiveExtras.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay extras inactivos</p>}
           </TabsContent>
         </Tabs>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
-
 function StaffList({
   barbers,
   onAdd,
-  onUpdate,
+  onUpdate
 }: {
   barbers: Barber[];
   onAdd: (barber: Omit<Barber, 'id' | 'uid'>) => void;
@@ -434,7 +314,7 @@ function StaffList({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
-  
+
   // Form state - commission as string for free editing
   const [formData, setFormData] = useState({
     firstName: '',
@@ -442,13 +322,11 @@ function StaffList({
     phone: '',
     commission: '40',
     address: '',
-    dni: '',
+    dni: ''
   });
   const [commissionError, setCommissionError] = useState('');
-
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
-
   const resetForm = () => {
     setFormData({
       firstName: '',
@@ -456,11 +334,10 @@ function StaffList({
       phone: '',
       commission: '40',
       address: '',
-      dni: '',
+      dni: ''
     });
     setCommissionError('');
   };
-
   const validateCommission = (value: string): boolean => {
     const num = Number(value);
     if (value === '' || isNaN(num)) {
@@ -474,7 +351,6 @@ function StaffList({
     setCommissionError('');
     return true;
   };
-
   const handleAdd = () => {
     if (!formData.firstName || !formData.lastName || !formData.phone) {
       return;
@@ -489,12 +365,11 @@ function StaffList({
       commission: Number(formData.commission),
       address: formData.address || undefined,
       dni: formData.dni || undefined,
-      active: true,
+      active: true
     });
     resetForm();
     setIsAdding(false);
   };
-
   const handleUpdate = (id: string) => {
     if (!formData.firstName || !formData.lastName || !formData.phone) {
       return;
@@ -508,12 +383,11 @@ function StaffList({
       phone: formData.phone,
       commission: Number(formData.commission),
       address: formData.address || undefined,
-      dni: formData.dni || undefined,
+      dni: formData.dni || undefined
     });
     setEditingId(null);
     resetForm();
   };
-
   const startEdit = (barber: Barber) => {
     setEditingId(barber.id);
     setFormData({
@@ -522,91 +396,71 @@ function StaffList({
       phone: barber.phone,
       commission: String(barber.commission),
       address: barber.address || '',
-      dni: barber.dni || '',
+      dni: barber.dni || ''
     });
   };
-
   const cancelEdit = () => {
     setEditingId(null);
     setIsAdding(false);
     resetForm();
   };
-
-  const StaffForm = ({ isEdit, barberId }: { isEdit: boolean; barberId?: string }) => (
-    <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
+  const StaffForm = ({
+    isEdit,
+    barberId
+  }: {
+    isEdit: boolean;
+    barberId?: string;
+  }) => <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
       <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Nombre *"
-          value={formData.firstName}
-          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-        />
-        <Input
-          placeholder="Apellido *"
-          value={formData.lastName}
-          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-        />
+        <Input placeholder="Nombre *" value={formData.firstName} onChange={e => setFormData(prev => ({
+        ...prev,
+        firstName: e.target.value
+      }))} />
+        <Input placeholder="Apellido *" value={formData.lastName} onChange={e => setFormData(prev => ({
+        ...prev,
+        lastName: e.target.value
+      }))} />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Teléfono *"
-          value={formData.phone}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-        />
+        <Input placeholder="Teléfono *" value={formData.phone} onChange={e => setFormData(prev => ({
+        ...prev,
+        phone: e.target.value
+      }))} />
         <div>
-          <Input
-            type="text"
-            inputMode="numeric"
-            placeholder="Comisión % *"
-            value={formData.commission}
-            onChange={(e) => {
-              const value = e.target.value;
-              setFormData(prev => ({ ...prev, commission: value }));
-              if (value) validateCommission(value);
-            }}
-            onBlur={() => validateCommission(formData.commission)}
-            className={commissionError ? 'border-destructive' : ''}
-          />
-          {commissionError && (
-            <p className="text-xs text-destructive mt-1">{commissionError}</p>
-          )}
+          <Input type="text" inputMode="numeric" placeholder="Comisión % *" value={formData.commission} onChange={e => {
+          const value = e.target.value;
+          setFormData(prev => ({
+            ...prev,
+            commission: value
+          }));
+          if (value) validateCommission(value);
+        }} onBlur={() => validateCommission(formData.commission)} className={commissionError ? 'border-destructive' : ''} />
+          {commissionError && <p className="text-xs text-destructive mt-1">{commissionError}</p>}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Dirección (opcional)"
-          value={formData.address}
-          onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-        />
-        <Input
-          placeholder="DNI (opcional)"
-          value={formData.dni}
-          onChange={(e) => setFormData(prev => ({ ...prev, dni: e.target.value }))}
-        />
+        <Input placeholder="Dirección (opcional)" value={formData.address} onChange={e => setFormData(prev => ({
+        ...prev,
+        address: e.target.value
+      }))} />
+        <Input placeholder="DNI (opcional)" value={formData.dni} onChange={e => setFormData(prev => ({
+        ...prev,
+        dni: e.target.value
+      }))} />
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={cancelEdit}>
           <X className="h-4 w-4 mr-1" />
           Cancelar
         </Button>
-        <Button 
-          size="sm" 
-          onClick={() => isEdit && barberId ? handleUpdate(barberId) : handleAdd()}
-          className="bg-success hover:bg-success/90"
-          disabled={!formData.firstName || !formData.lastName || !formData.phone || !!commissionError}
-        >
+        <Button size="sm" onClick={() => isEdit && barberId ? handleUpdate(barberId) : handleAdd()} className="bg-success hover:bg-success/90" disabled={!formData.firstName || !formData.lastName || !formData.phone || !!commissionError}>
           <Save className="h-4 w-4 mr-1" />
           {isEdit ? 'Guardar' : 'Agregar'}
         </Button>
       </div>
-    </div>
-  );
-
-  const renderBarberItem = (barber: Barber) => (
-    <div key={barber.id}>
-      {editingId === barber.id ? (
-        <StaffForm isEdit={true} barberId={barber.id} />
-      ) : (
-        <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+    </div>;
+  const renderBarberItem = (barber: Barber) => <div key={barber.id}>
+      {editingId === barber.id ? <StaffForm isEdit={true} barberId={barber.id} /> : <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <span className="font-medium text-foreground">
@@ -617,21 +471,12 @@ function StaffList({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => startEdit(barber)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-              >
+              <Button size="icon" variant="ghost" onClick={() => startEdit(barber)} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
                 <Edit2 className="h-4 w-4" />
               </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => onUpdate(barber.id, { active: !barber.active })}
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                title={barber.active ? 'Desactivar' : 'Activar'}
-              >
+              <Button size="icon" variant="ghost" onClick={() => onUpdate(barber.id, {
+            active: !barber.active
+          })} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8" title={barber.active ? 'Desactivar' : 'Activar'}>
                 {barber.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
               </Button>
             </div>
@@ -642,24 +487,18 @@ function StaffList({
             {barber.address && <p>📍 {barber.address}</p>}
             {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
           </div>
-        </div>
-      )}
-    </div>
-  );
-
-  return (
-    <Card className="border border-border bg-card">
+        </div>}
+    </div>;
+  return <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Staff</CardTitle>
-        {!isAdding && !editingId && activeSubTab === 'active' && (
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+        {!isAdding && !editingId && activeSubTab === 'active' && <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
-          </Button>
-        )}
+          </Button>}
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+        <Tabs value={activeSubTab} onValueChange={v => setActiveSubTab(v as 'active' | 'inactive')}>
           <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
             <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
               Activos ({activeBarbers.length})
@@ -672,28 +511,22 @@ function StaffList({
           <TabsContent value="active" className="mt-4 space-y-3">
             {isAdding && <StaffForm isEdit={false} />}
             {activeBarbers.map(renderBarberItem)}
-            {activeBarbers.length === 0 && !isAdding && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay staff activo</p>
-            )}
+            {activeBarbers.length === 0 && !isAdding && <p className="text-sm text-muted-foreground text-center py-4">No hay staff activo</p>}
           </TabsContent>
 
           <TabsContent value="inactive" className="mt-4 space-y-3">
             {inactiveBarbers.map(renderBarberItem)}
-            {inactiveBarbers.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay staff inactivo</p>
-            )}
+            {inactiveBarbers.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay staff inactivo</p>}
           </TabsContent>
         </Tabs>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
-
 function DiscountsList({
   discounts,
   onAdd,
   onUpdate,
-  onDelete,
+  onDelete
 }: {
   discounts: Discount[];
   onAdd: (discount: Omit<Discount, 'id'>) => void;
@@ -704,129 +537,80 @@ function DiscountsList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newValue, setNewValue] = useState('');
-
   const handleAdd = () => {
     if (newLabel && newValue) {
-      onAdd({ label: newLabel, value: parseFloat(newValue) });
+      onAdd({
+        label: newLabel,
+        value: parseFloat(newValue)
+      });
       setNewLabel('');
       setNewValue('');
       setIsAdding(false);
     }
   };
-
   const handleUpdate = (id: string) => {
     if (newLabel && newValue) {
-      onUpdate(id, { label: newLabel, value: parseFloat(newValue) });
+      onUpdate(id, {
+        label: newLabel,
+        value: parseFloat(newValue)
+      });
       setEditingId(null);
       setNewLabel('');
       setNewValue('');
     }
   };
-
   const startEdit = (discount: Discount) => {
     setEditingId(discount.id);
     setNewLabel(discount.label);
     setNewValue(discount.value.toString());
   };
-
-  return (
-    <Card className="border border-border bg-card">
+  return <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Descuentos Predefinidos</CardTitle>
-        {!isAdding && (
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+        {!isAdding && <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
-          </Button>
-        )}
+          </Button>}
       </CardHeader>
       <CardContent className="space-y-2">
         <p className="text-sm text-muted-foreground mb-4">
           Configura los porcentajes de descuento que aparecerán al registrar un cobro.
         </p>
 
-        {isAdding && (
-          <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-            <Input
-              placeholder="Nombre (ej: Promo Amigo)"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1"
-            />
-            <Input
-              type="number"
-              placeholder="% (ej: 15)"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              className="w-24"
-              min="0"
-              max="100"
-            />
+        {isAdding && <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+            <Input placeholder="Nombre (ej: Promo Amigo)" value={newLabel} onChange={e => setNewLabel(e.target.value)} className="flex-1" />
+            <Input type="number" placeholder="% (ej: 15)" value={newValue} onChange={e => setNewValue(e.target.value)} className="w-24" min="0" max="100" />
             <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
               <Save className="h-4 w-4" />
             </Button>
             <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
               <X className="h-4 w-4" />
             </Button>
-          </div>
-        )}
+          </div>}
 
-        {discounts.map((discount) => (
-          <div
-            key={discount.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-          >
-            {editingId === discount.id ? (
-              <>
-                <Input
-                  value={newLabel}
-                  onChange={(e) => setNewLabel(e.target.value)}
-                  className="flex-1"
-                />
-                <Input
-                  type="number"
-                  value={newValue}
-                  onChange={(e) => setNewValue(e.target.value)}
-                  className="w-24"
-                  min="0"
-                  max="100"
-                />
+        {discounts.map(discount => <div key={discount.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+            {editingId === discount.id ? <>
+                <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} className="flex-1" />
+                <Input type="number" value={newValue} onChange={e => setNewValue(e.target.value)} className="w-24" min="0" max="100" />
                 <Button size="icon" onClick={() => handleUpdate(discount.id)} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </>
-            ) : (
-              <>
+              </> : <>
                 <span className="flex-1 font-medium text-foreground">{discount.label}</span>
                 <span className="text-muted-foreground">{discount.value}%</span>
-                {discount.id !== 'none' && (
-                  <>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => startEdit(discount)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                    >
+                {discount.id !== 'none' && <>
+                    <Button size="icon" variant="ghost" onClick={() => startEdit(discount)} className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => onDelete(discount.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
-                    >
+                    <Button size="icon" variant="ghost" onClick={() => onDelete(discount.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8">
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                  </>}
+              </>}
+          </div>)}
       </CardContent>
-    </Card>
-  );
+    </Card>;
 }
