@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Scissors, Sparkles, Users, Tag } from 'lucide-react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,15 +12,12 @@ interface ConfigurationPanelProps {
   extras: Extra[];
   barbers: Barber[];
   discounts: Discount[];
-  onAddService: (service: Omit<Service, 'id'>) => void;
+  onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdateService: (id: string, updates: Partial<Service>) => void;
-  onDeleteService: (id: string) => void;
-  onAddExtra: (extra: Omit<Extra, 'id'>) => void;
+  onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
   onUpdateExtra: (id: string, updates: Partial<Extra>) => void;
-  onDeleteExtra: (id: string) => void;
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
-  onDeleteBarber: (id: string) => void;
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
@@ -33,13 +30,10 @@ export function ConfigurationPanel({
   discounts,
   onAddService,
   onUpdateService,
-  onDeleteService,
   onAddExtra,
   onUpdateExtra,
-  onDeleteExtra,
   onAddBarber,
   onUpdateBarber,
-  onDeleteBarber,
   onAddDiscount,
   onUpdateDiscount,
   onDeleteDiscount,
@@ -76,7 +70,6 @@ export function ConfigurationPanel({
             services={services}
             onAdd={onAddService}
             onUpdate={onUpdateService}
-            onDelete={onDeleteService}
           />
         </TabsContent>
 
@@ -85,7 +78,6 @@ export function ConfigurationPanel({
             extras={extras}
             onAdd={onAddExtra}
             onUpdate={onUpdateExtra}
-            onDelete={onDeleteExtra}
           />
         </TabsContent>
 
@@ -94,7 +86,6 @@ export function ConfigurationPanel({
             barbers={barbers}
             onAdd={onAddBarber}
             onUpdate={onUpdateBarber}
-            onDelete={onDeleteBarber}
           />
         </TabsContent>
 
@@ -115,21 +106,23 @@ function ServicesList({
   services,
   onAdd,
   onUpdate,
-  onDelete,
 }: {
   services: Service[];
-  onAdd: (service: Omit<Service, 'id'>) => void;
+  onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
-  onDelete: (id: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+
+  const activeServices = services.filter(s => s.active);
+  const inactiveServices = services.filter(s => !s.active);
 
   const handleAdd = () => {
     if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice) });
+      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
       setNewName('');
       setNewPrice('');
       setIsAdding(false);
@@ -151,91 +144,119 @@ function ServicesList({
     setNewPrice(service.price.toString());
   };
 
+  const renderServiceItem = (service: Service) => (
+    <div
+      key={service.id}
+      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
+    >
+      {editingId === service.id ? (
+        <>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="flex-1"
+          />
+          <Input
+            type="number"
+            value={newPrice}
+            onChange={(e) => setNewPrice(e.target.value)}
+            className="w-28"
+          />
+          <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={service.uid}>
+            {service.uid}
+          </span>
+          <span className="flex-1 font-medium text-foreground">{service.name}</span>
+          <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => startEdit(service)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onUpdate(service.id, { active: !service.active })}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+            title={service.active ? 'Desactivar' : 'Activar'}
+          >
+            {service.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Servicios</CardTitle>
-        {!isAdding && (
+        {!isAdding && activeSubTab === 'active' && (
           <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-2">
-        {isAdding && (
-          <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-            <Input
-              placeholder="Nombre"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="flex-1"
-            />
-            <Input
-              type="number"
-              placeholder="Precio"
-              value={newPrice}
-              onChange={(e) => setNewPrice(e.target.value)}
-              className="w-28"
-            />
-            <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
-              <Save className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+      <CardContent className="space-y-4">
+        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+          <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+            <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
+              Activos ({activeServices.length})
+            </TabsTrigger>
+            <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
+              Inactivos ({inactiveServices.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {services.map((service) => (
-          <div
-            key={service.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-          >
-            {editingId === service.id ? (
-              <>
+          <TabsContent value="active" className="mt-4 space-y-2">
+            {isAdding && (
+              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
                 <Input
+                  placeholder="Nombre"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="flex-1"
                 />
                 <Input
                   type="number"
+                  placeholder="Precio"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                   className="w-28"
                 />
-                <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
+                <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+                <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 font-medium text-foreground">{service.name}</span>
-                <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => startEdit(service)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => onDelete(service.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
+              </div>
             )}
-          </div>
-        ))}
+            {activeServices.map(renderServiceItem)}
+            {activeServices.length === 0 && !isAdding && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay servicios activos</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="inactive" className="mt-4 space-y-2">
+            {inactiveServices.map(renderServiceItem)}
+            {inactiveServices.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay servicios inactivos</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -245,21 +266,23 @@ function ExtrasList({
   extras,
   onAdd,
   onUpdate,
-  onDelete,
 }: {
   extras: Extra[];
-  onAdd: (extra: Omit<Extra, 'id'>) => void;
+  onAdd: (extra: Omit<Extra, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Extra>) => void;
-  onDelete: (id: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+
+  const activeExtras = extras.filter(e => e.active);
+  const inactiveExtras = extras.filter(e => !e.active);
 
   const handleAdd = () => {
     if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice) });
+      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
       setNewName('');
       setNewPrice('');
       setIsAdding(false);
@@ -281,91 +304,119 @@ function ExtrasList({
     setNewPrice(extra.price.toString());
   };
 
+  const renderExtraItem = (extra: Extra) => (
+    <div
+      key={extra.id}
+      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
+    >
+      {editingId === extra.id ? (
+        <>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="flex-1"
+          />
+          <Input
+            type="number"
+            value={newPrice}
+            onChange={(e) => setNewPrice(e.target.value)}
+            className="w-28"
+          />
+          <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90">
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+            <X className="h-4 w-4" />
+          </Button>
+        </>
+      ) : (
+        <>
+          <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={extra.uid}>
+            {extra.uid}
+          </span>
+          <span className="flex-1 font-medium text-foreground">{extra.name}</span>
+          <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => startEdit(extra)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onUpdate(extra.id, { active: !extra.active })}
+            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+            title={extra.active ? 'Desactivar' : 'Activar'}
+          >
+            {extra.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Extras</CardTitle>
-        {!isAdding && (
+        {!isAdding && activeSubTab === 'active' && (
           <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-2">
-        {isAdding && (
-          <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-            <Input
-              placeholder="Nombre"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="flex-1"
-            />
-            <Input
-              type="number"
-              placeholder="Precio"
-              value={newPrice}
-              onChange={(e) => setNewPrice(e.target.value)}
-              className="w-28"
-            />
-            <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
-              <Save className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+      <CardContent className="space-y-4">
+        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+          <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+            <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
+              Activos ({activeExtras.length})
+            </TabsTrigger>
+            <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
+              Inactivos ({inactiveExtras.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {extras.map((extra) => (
-          <div
-            key={extra.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-          >
-            {editingId === extra.id ? (
-              <>
+          <TabsContent value="active" className="mt-4 space-y-2">
+            {isAdding && (
+              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
                 <Input
+                  placeholder="Nombre"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="flex-1"
                 />
                 <Input
                   type="number"
+                  placeholder="Precio"
                   value={newPrice}
                   onChange={(e) => setNewPrice(e.target.value)}
                   className="w-28"
                 />
-                <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90">
+                <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+                <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </>
-            ) : (
-              <>
-                <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-                <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => startEdit(extra)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => onDelete(extra.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
+              </div>
             )}
-          </div>
-        ))}
+            {activeExtras.map(renderExtraItem)}
+            {activeExtras.length === 0 && !isAdding && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay extras activos</p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="inactive" className="mt-4 space-y-2">
+            {inactiveExtras.map(renderExtraItem)}
+            {inactiveExtras.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay extras inactivos</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );
@@ -375,15 +426,14 @@ function StaffList({
   barbers,
   onAdd,
   onUpdate,
-  onDelete,
 }: {
   barbers: Barber[];
   onAdd: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Barber>) => void;
-  onDelete: (id: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   
   // Form state - commission as string for free editing
   const [formData, setFormData] = useState({
@@ -395,6 +445,9 @@ function StaffList({
     dni: '',
   });
   const [commissionError, setCommissionError] = useState('');
+
+  const activeBarbers = barbers.filter(b => b.active);
+  const inactiveBarbers = barbers.filter(b => !b.active);
 
   const resetForm = () => {
     setFormData({
@@ -548,71 +601,89 @@ function StaffList({
     </div>
   );
 
+  const renderBarberItem = (barber: Barber) => (
+    <div key={barber.id}>
+      {editingId === barber.id ? (
+        <StaffForm isEdit={true} barberId={barber.id} />
+      ) : (
+        <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <span className="font-medium text-foreground">
+                {barber.firstName} {barber.lastName}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
+                {barber.commission}% comisión
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => startEdit(barber)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onUpdate(barber.id, { active: !barber.active })}
+                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                title={barber.active ? 'Desactivar' : 'Activar'}
+              >
+                {barber.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+              </Button>
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p className="font-mono text-[10px] opacity-60">UID: {barber.uid}</p>
+            <p>📞 {barber.phone}</p>
+            {barber.address && <p>📍 {barber.address}</p>}
+            {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Staff</CardTitle>
-        {!isAdding && !editingId && (
+        {!isAdding && !editingId && activeSubTab === 'active' && (
           <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-3">
-        {isAdding && <StaffForm isEdit={false} />}
+      <CardContent className="space-y-4">
+        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+          <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+            <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
+              Activos ({activeBarbers.length})
+            </TabsTrigger>
+            <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
+              Inactivos ({inactiveBarbers.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {barbers.map((barber) => (
-          <div key={barber.id}>
-            {editingId === barber.id ? (
-              <StaffForm isEdit={true} barberId={barber.id} />
-            ) : (
-              <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">
-                      {barber.firstName} {barber.lastName}
-                    </span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
-                      {barber.commission}% comisión
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      {barber.active ? 'Activo' : 'Inactivo'}
-                    </span>
-                    <Switch
-                      checked={barber.active}
-                      onCheckedChange={(checked) => onUpdate(barber.id, { active: checked })}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => startEdit(barber)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => onDelete(barber.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p className="font-mono text-[10px] opacity-60">UID: {barber.uid}</p>
-                  <p>📞 {barber.phone}</p>
-                  {barber.address && <p>📍 {barber.address}</p>}
-                  {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
-                </div>
-              </div>
+          <TabsContent value="active" className="mt-4 space-y-3">
+            {isAdding && <StaffForm isEdit={false} />}
+            {activeBarbers.map(renderBarberItem)}
+            {activeBarbers.length === 0 && !isAdding && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay staff activo</p>
             )}
-          </div>
-        ))}
+          </TabsContent>
+
+          <TabsContent value="inactive" className="mt-4 space-y-3">
+            {inactiveBarbers.map(renderBarberItem)}
+            {inactiveBarbers.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay staff inactivo</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

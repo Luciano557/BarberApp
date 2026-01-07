@@ -1,13 +1,17 @@
 export interface Service {
   id: string;
+  uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  active: boolean;
 }
 
 export interface Extra {
   id: string;
+  uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  active: boolean;
 }
 
 export interface Barber {
