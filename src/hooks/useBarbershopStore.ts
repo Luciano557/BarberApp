@@ -64,21 +64,31 @@ export function useBarbershopStore() {
       }
 
       if (data) {
-        const mappedTransactions: Transaction[] = data.map((t) => ({
-          id: t.id,
-          barberId: t.barbero_id,
-          barberName: t.barbero_nombre,
-          serviceId: t.servicio_id,
-          serviceName: t.servicio_nombre,
-          servicePrice: Number(t.servicio_precio),
-          extras: (t.extras as { id: string; name: string; price: number }[]) || [],
-          discount: Number(t.descuento),
-          discountType: (t.tipo_descuento as 'fixed' | 'percentage') || 'percentage',
-          paymentMethod: t.metodo_pago as 'efectivo' | 'mercado_pago',
-          subtotal: Number(t.subtotal),
-          total: Number(t.total),
-          createdAt: new Date(t.created_at),
-        }));
+        const mappedTransactions: Transaction[] = data.map((t) => {
+          // Mapear extras - soportar tanto formato viejo (id) como nuevo (uid)
+          const rawExtras = (t.extras as { id?: string; uid?: string; name: string; price: number }[]) || [];
+          const mappedExtras = rawExtras.map(e => ({
+            uid: e.uid || e.id || '',
+            name: e.name,
+            price: e.price,
+          }));
+
+          return {
+            id: t.id,
+            barberId: t.barbero_id,
+            barberName: t.barbero_nombre,
+            serviceId: t.servicio_id,
+            serviceName: t.servicio_nombre,
+            servicePrice: Number(t.servicio_precio),
+            extras: mappedExtras,
+            discount: Number(t.descuento),
+            discountType: (t.tipo_descuento as 'fixed' | 'percentage') || 'percentage',
+            paymentMethod: t.metodo_pago as 'efectivo' | 'mercado_pago',
+            subtotal: Number(t.subtotal),
+            total: Number(t.total),
+            createdAt: new Date(t.created_at),
+          };
+        });
         setTransactions(mappedTransactions);
       }
     };
@@ -179,6 +189,13 @@ export function useBarbershopStore() {
       return null;
     }
 
+    const rawExtras = (data.extras as { id?: string; uid?: string; name: string; price: number }[]) || [];
+    const mappedExtras = rawExtras.map(e => ({
+      uid: e.uid || e.id || '',
+      name: e.name,
+      price: e.price,
+    }));
+
     const newTransaction: Transaction = {
       id: data.id,
       barberId: data.barbero_id,
@@ -186,7 +203,7 @@ export function useBarbershopStore() {
       serviceId: data.servicio_id,
       serviceName: data.servicio_nombre,
       servicePrice: Number(data.servicio_precio),
-      extras: (data.extras as { id: string; name: string; price: number }[]) || [],
+      extras: mappedExtras,
       discount: Number(data.descuento),
       discountType: (data.tipo_descuento as 'fixed' | 'percentage') || 'percentage',
       paymentMethod: data.metodo_pago as 'efectivo' | 'mercado_pago',
