@@ -10,27 +10,6 @@ function generateUID(prefix: string): string {
   return `${prefix}-${timestamp}-${randomPart}`.toUpperCase();
 }
 
-// Initial demo data
-const initialServices: Service[] = [
-  { id: '1', uid: generateUID('SVC'), name: 'Corte Clásico', price: 3500, active: true },
-  { id: '2', uid: generateUID('SVC'), name: 'Corte + Barba', price: 5000, active: true },
-  { id: '3', uid: generateUID('SVC'), name: 'Barba', price: 2000, active: true },
-  { id: '4', uid: generateUID('SVC'), name: 'Combo Premium', price: 6500, active: true },
-];
-
-const initialExtras: Extra[] = [
-  { id: '1', uid: generateUID('EXT'), name: 'Lavado', price: 500, active: true },
-  { id: '2', uid: generateUID('EXT'), name: 'Cejas', price: 300, active: true },
-  { id: '3', uid: generateUID('EXT'), name: 'Máscara Facial', price: 800, active: true },
-  { id: '4', uid: generateUID('EXT'), name: 'Tinte Barba', price: 1000, active: true },
-];
-
-const initialBarbers: Barber[] = [
-  { id: '1', uid: generateUID('STF'), firstName: 'Carlos', lastName: 'García', phone: '1122334455', commission: 40, active: true },
-  { id: '2', uid: generateUID('STF'), firstName: 'Miguel', lastName: 'López', phone: '1133445566', commission: 35, active: true },
-  { id: '3', uid: generateUID('STF'), firstName: 'Andrés', lastName: 'Martínez', phone: '1144556677', commission: 45, active: true },
-];
-
 const initialDiscounts: Discount[] = [
   { id: 'none', label: 'Sin descuento', value: 0 },
   { id: '10', label: '10%', value: 10 },
@@ -40,32 +19,68 @@ const initialDiscounts: Discount[] = [
 ];
 
 export function useBarbershopStore() {
-  const [services, setServices] = useState<Service[]>(initialServices);
-  const [extras, setExtras] = useState<Extra[]>(initialExtras);
-  const [barbers, setBarbers] = useState<Barber[]>(initialBarbers);
+  const [services, setServices] = useState<Service[]>([]);
+  const [extras, setExtras] = useState<Extra[]>([]);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Cargar transacciones de hoy desde Supabase al iniciar
+  // Cargar datos desde Supabase al iniciar
   useEffect(() => {
-    const loadTodayTransactions = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    const loadData = async () => {
+      setIsLoading(true);
       
-      const { data, error } = await supabase
-        .from('transacciones')
-        .select('*')
-        .gte('created_at', today.toISOString())
-        .order('created_at', { ascending: false });
+      // Cargar servicios, extras, barberos y transacciones en paralelo
+      const [servicesRes, extrasRes, barbersRes, transactionsRes] = await Promise.all([
+        supabase.from('servicios').select('*').order('created_at', { ascending: true }),
+        supabase.from('extras').select('*').order('created_at', { ascending: true }),
+        supabase.from('barberos').select('*').order('created_at', { ascending: true }),
+        supabase.from('transacciones').select('*')
+          .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+          .order('created_at', { ascending: false }),
+      ]);
 
-      if (error) {
-        console.error('Error loading transactions:', error);
-        return;
+      // Mapear servicios
+      if (servicesRes.data && servicesRes.data.length > 0) {
+        setServices(servicesRes.data.map(s => ({
+          id: s.id,
+          uid: s.uid,
+          name: s.name,
+          price: Number(s.price),
+          active: s.active,
+        })));
       }
 
-      if (data) {
-        const mappedTransactions: Transaction[] = data.map((t) => {
-          // Mapear extras - soportar tanto formato viejo (id) como nuevo (uid)
+      // Mapear extras
+      if (extrasRes.data && extrasRes.data.length > 0) {
+        setExtras(extrasRes.data.map(e => ({
+          id: e.id,
+          uid: e.uid,
+          name: e.name,
+          price: Number(e.price),
+          active: e.active,
+        })));
+      }
+
+      // Mapear barberos
+      if (barbersRes.data && barbersRes.data.length > 0) {
+        setBarbers(barbersRes.data.map(b => ({
+          id: b.id,
+          uid: b.uid,
+          firstName: b.first_name,
+          lastName: b.last_name,
+          phone: b.phone,
+          commission: Number(b.commission),
+          address: b.address || undefined,
+          dni: b.dni || undefined,
+          active: b.active,
+        })));
+      }
+
+      // Mapear transacciones
+      if (transactionsRes.data) {
+        const mappedTransactions: Transaction[] = transactionsRes.data.map((t) => {
           const rawExtras = (t.extras as { id?: string; uid?: string; name: string; price: number }[]) || [];
           const mappedExtras = rawExtras.map(e => ({
             uid: e.uid || e.id || '',
@@ -91,61 +106,145 @@ export function useBarbershopStore() {
         });
         setTransactions(mappedTransactions);
       }
+
+      setIsLoading(false);
     };
 
-    loadTodayTransactions();
+    loadData();
   }, []);
 
   // Services CRUD
-  const addService = useCallback((service: Omit<Service, 'id' | 'uid'>) => {
-    const newService = { 
+  const addService = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
+    const newService: Service = { 
       ...service, 
       id: crypto.randomUUID(),
       uid: generateUID('SVC'),
     };
+
+    const { error } = await supabase.from('servicios').insert({
+      id: newService.id,
+      uid: newService.uid,
+      name: newService.name,
+      price: newService.price,
+      active: newService.active,
+    });
+
+    if (error) {
+      console.error('Error adding service:', error);
+      toast.error('Error al agregar servicio');
+      return newService;
+    }
+
     setServices(prev => [...prev, newService]);
+    toast.success('Servicio agregado');
     return newService;
   }, []);
 
-  const updateService = useCallback((id: string, updates: Partial<Service>) => {
+  const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
+    const { error } = await supabase.from('servicios').update(updates).eq('id', id);
+
+    if (error) {
+      console.error('Error updating service:', error);
+      toast.error('Error al actualizar servicio');
+      return;
+    }
+
     setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, []);
 
   // Extras CRUD
-  const addExtra = useCallback((extra: Omit<Extra, 'id' | 'uid'>) => {
-    const newExtra = { 
+  const addExtra = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
+    const newExtra: Extra = { 
       ...extra, 
       id: crypto.randomUUID(),
       uid: generateUID('EXT'),
     };
+
+    const { error } = await supabase.from('extras').insert({
+      id: newExtra.id,
+      uid: newExtra.uid,
+      name: newExtra.name,
+      price: newExtra.price,
+      active: newExtra.active,
+    });
+
+    if (error) {
+      console.error('Error adding extra:', error);
+      toast.error('Error al agregar extra');
+      return newExtra;
+    }
+
     setExtras(prev => [...prev, newExtra]);
+    toast.success('Extra agregado');
     return newExtra;
   }, []);
 
-  const updateExtra = useCallback((id: string, updates: Partial<Extra>) => {
+  const updateExtra = useCallback(async (id: string, updates: Partial<Extra>) => {
+    const { error } = await supabase.from('extras').update(updates).eq('id', id);
+
+    if (error) {
+      console.error('Error updating extra:', error);
+      toast.error('Error al actualizar extra');
+      return;
+    }
+
     setExtras(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
   }, []);
 
   // Barbers CRUD
-  const addBarber = useCallback((barber: Omit<Barber, 'id' | 'uid'>) => {
-    const newBarber = { 
+  const addBarber = useCallback(async (barber: Omit<Barber, 'id' | 'uid'>) => {
+    const newBarber: Barber = { 
       ...barber, 
       id: crypto.randomUUID(),
       uid: generateUID('STF'),
     };
+
+    const { error } = await supabase.from('barberos').insert({
+      id: newBarber.id,
+      uid: newBarber.uid,
+      first_name: newBarber.firstName,
+      last_name: newBarber.lastName,
+      phone: newBarber.phone,
+      commission: newBarber.commission,
+      address: newBarber.address || null,
+      dni: newBarber.dni || null,
+      active: newBarber.active,
+    });
+
+    if (error) {
+      console.error('Error adding barber:', error);
+      toast.error('Error al agregar barbero');
+      return newBarber;
+    }
+
     setBarbers(prev => [...prev, newBarber]);
+    toast.success('Barbero agregado');
     return newBarber;
   }, []);
 
-  const updateBarber = useCallback((id: string, updates: Partial<Barber>) => {
+  const updateBarber = useCallback(async (id: string, updates: Partial<Barber>) => {
+    // Mapear camelCase a snake_case para Supabase
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
+    if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.commission !== undefined) dbUpdates.commission = updates.commission;
+    if (updates.address !== undefined) dbUpdates.address = updates.address;
+    if (updates.dni !== undefined) dbUpdates.dni = updates.dni;
+    if (updates.active !== undefined) dbUpdates.active = updates.active;
+
+    const { error } = await supabase.from('barberos').update(dbUpdates).eq('id', id);
+
+    if (error) {
+      console.error('Error updating barber:', error);
+      toast.error('Error al actualizar barbero');
+      return;
+    }
+
     setBarbers(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   }, []);
 
-  const deleteBarber = useCallback((id: string) => {
-    setBarbers(prev => prev.filter(b => b.id !== id));
-  }, []);
-
-  // Discounts CRUD
+  // Discounts CRUD (local only for now)
   const addDiscount = useCallback((discount: Omit<Discount, 'id'>) => {
     const newDiscount = { ...discount, id: crypto.randomUUID() };
     setDiscounts(prev => [...prev, newDiscount]);
@@ -157,14 +256,12 @@ export function useBarbershopStore() {
   }, []);
 
   const deleteDiscount = useCallback((id: string) => {
-    // Don't allow deleting "Sin descuento" option
     if (id === 'none') return;
     setDiscounts(prev => prev.filter(d => d.id !== id));
   }, []);
 
   // Transactions
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
-    // Guardar en Supabase
     const { data, error } = await supabase
       .from('transacciones')
       .insert({
@@ -243,6 +340,8 @@ export function useBarbershopStore() {
   }, [getTodayTransactions]);
 
   return {
+    // Loading state
+    isLoading,
     // Data - active items only for operations
     services: services.filter(s => s.active),
     allServices: services,

@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      barberos: {
+        Row: {
+          active: boolean
+          address: string | null
+          commission: number
+          created_at: string
+          dni: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone: string
+          uid: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          commission?: number
+          created_at?: string
+          dni?: string | null
+          first_name: string
+          id: string
+          last_name: string
+          phone: string
+          uid: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          commission?: number
+          created_at?: string
+          dni?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          phone?: string
+          uid?: string
+        }
+        Relationships: []
+      }
       Egresos: {
         Row: {
           Categoria: string | null
@@ -35,6 +74,33 @@ export type Database = {
           Fecha?: string | null
           id?: number
           Monto?: number | null
+        }
+        Relationships: []
+      }
+      extras: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          price: number
+          uid: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id: string
+          name: string
+          price: number
+          uid: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          uid?: string
         }
         Relationships: []
       }
@@ -185,6 +251,33 @@ export type Database = {
           ServiciosTotales?: number | null
           TasaDeOcupación?: number | null
           TicketPromedio?: number | null
+        }
+        Relationships: []
+      }
+      servicios: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          price: number
+          uid: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id: string
+          name: string
+          price: number
+          uid: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          uid?: string
         }
         Relationships: []
       }
