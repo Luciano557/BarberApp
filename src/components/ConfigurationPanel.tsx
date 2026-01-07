@@ -150,30 +150,33 @@ function ServicesList({
       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
     >
       {editingId === service.id ? (
-        <>
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1"
-          />
-          <Input
-            type="number"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            className="w-28"
-          />
-          <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
-            <Save className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
-            <X className="h-4 w-4" />
-          </Button>
-        </>
+        <div className="flex flex-col gap-2 w-full">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/80 px-2 py-1 rounded">
+            <span className="font-medium">UID:</span>
+            <span className="font-mono">{service.uid}</span>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              type="number"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              className="w-28"
+            />
+            <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       ) : (
         <>
-          <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={service.uid}>
-            {service.uid}
-          </span>
           <span className="flex-1 font-medium text-foreground">{service.name}</span>
           <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
           <Button
@@ -310,30 +313,33 @@ function ExtrasList({
       className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
     >
       {editingId === extra.id ? (
-        <>
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1"
-          />
-          <Input
-            type="number"
-            value={newPrice}
-            onChange={(e) => setNewPrice(e.target.value)}
-            className="w-28"
-          />
-          <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90">
-            <Save className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
-            <X className="h-4 w-4" />
-          </Button>
-        </>
+        <div className="flex flex-col gap-2 w-full">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/80 px-2 py-1 rounded">
+            <span className="font-medium">UID:</span>
+            <span className="font-mono">{extra.uid}</span>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="flex-1"
+            />
+            <Input
+              type="number"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              className="w-28"
+            />
+            <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90">
+              <Save className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       ) : (
         <>
-          <span className="font-mono text-[10px] text-muted-foreground opacity-60 w-32 truncate" title={extra.uid}>
-            {extra.uid}
-          </span>
           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
           <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
           <Button
