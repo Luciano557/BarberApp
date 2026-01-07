@@ -385,12 +385,12 @@ function StaffList({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   
-  // Form state
+  // Form state - commission as string for free editing
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     phone: '',
-    commission: 40,
+    commission: '40',
     address: '',
     dni: '',
   });
@@ -401,16 +401,21 @@ function StaffList({
       firstName: '',
       lastName: '',
       phone: '',
-      commission: 40,
+      commission: '40',
       address: '',
       dni: '',
     });
     setCommissionError('');
   };
 
-  const validateCommission = (value: number): boolean => {
-    if (value < 0 || value > 100) {
-      setCommissionError('La comisión debe estar entre 0 y 100');
+  const validateCommission = (value: string): boolean => {
+    const num = Number(value);
+    if (value === '' || isNaN(num)) {
+      setCommissionError('Ingresa un número válido');
+      return false;
+    }
+    if (num < 0 || num > 100) {
+      setCommissionError('Debe estar entre 0 y 100');
       return false;
     }
     setCommissionError('');
@@ -428,7 +433,7 @@ function StaffList({
       firstName: formData.firstName,
       lastName: formData.lastName,
       phone: formData.phone,
-      commission: formData.commission,
+      commission: Number(formData.commission),
       address: formData.address || undefined,
       dni: formData.dni || undefined,
       active: true,
@@ -448,7 +453,7 @@ function StaffList({
       firstName: formData.firstName,
       lastName: formData.lastName,
       phone: formData.phone,
-      commission: formData.commission,
+      commission: Number(formData.commission),
       address: formData.address || undefined,
       dni: formData.dni || undefined,
     });
@@ -462,7 +467,7 @@ function StaffList({
       firstName: barber.firstName,
       lastName: barber.lastName,
       phone: barber.phone,
-      commission: barber.commission,
+      commission: String(barber.commission),
       address: barber.address || '',
       dni: barber.dni || '',
     });
@@ -496,16 +501,16 @@ function StaffList({
         />
         <div>
           <Input
-            type="number"
+            type="text"
+            inputMode="numeric"
             placeholder="Comisión % *"
-            min={0}
-            max={100}
             value={formData.commission}
             onChange={(e) => {
-              const value = Number(e.target.value);
+              const value = e.target.value;
               setFormData(prev => ({ ...prev, commission: value }));
-              validateCommission(value);
+              if (value) validateCommission(value);
             }}
+            onBlur={() => validateCommission(formData.commission)}
             className={commissionError ? 'border-destructive' : ''}
           />
           {commissionError && (
