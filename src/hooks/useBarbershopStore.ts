@@ -18,10 +18,17 @@ const initialExtras: Extra[] = [
   { id: '4', name: 'Tinte Barba', price: 1000 },
 ];
 
+// Generate a unique UID for staff members
+function generateStaffUID(): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+  return `STF-${timestamp}-${randomPart}`.toUpperCase();
+}
+
 const initialBarbers: Barber[] = [
-  { id: '1', name: 'Carlos', active: true },
-  { id: '2', name: 'Miguel', active: true },
-  { id: '3', name: 'Andrés', active: true },
+  { id: '1', uid: generateStaffUID(), firstName: 'Carlos', lastName: 'García', phone: '1122334455', commission: 40, active: true },
+  { id: '2', uid: generateStaffUID(), firstName: 'Miguel', lastName: 'López', phone: '1133445566', commission: 35, active: true },
+  { id: '3', uid: generateStaffUID(), firstName: 'Andrés', lastName: 'Martínez', phone: '1144556677', commission: 45, active: true },
 ];
 
 const initialDiscounts: Discount[] = [
@@ -110,8 +117,12 @@ export function useBarbershopStore() {
   }, []);
 
   // Barbers CRUD
-  const addBarber = useCallback((barber: Omit<Barber, 'id'>) => {
-    const newBarber = { ...barber, id: crypto.randomUUID() };
+  const addBarber = useCallback((barber: Omit<Barber, 'id' | 'uid'>) => {
+    const newBarber = { 
+      ...barber, 
+      id: crypto.randomUUID(),
+      uid: generateStaffUID(),
+    };
     setBarbers(prev => [...prev, newBarber]);
     return newBarber;
   }, []);

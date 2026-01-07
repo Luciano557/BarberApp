@@ -34,7 +34,7 @@ export function DailySummary({ summary, barbers }: DailySummaryProps) {
     barbers.forEach(barber => {
       summaryMap.set(barber.id, {
         barberId: barber.id,
-        barberName: barber.name,
+        barberName: `${barber.firstName} ${barber.lastName}`,
         count: 0,
         totalEfectivo: 0,
         totalMercadoPago: 0,

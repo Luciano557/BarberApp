@@ -18,7 +18,7 @@ interface ConfigurationPanelProps {
   onAddExtra: (extra: Omit<Extra, 'id'>) => void;
   onUpdateExtra: (id: string, updates: Partial<Extra>) => void;
   onDeleteExtra: (id: string) => void;
-  onAddBarber: (barber: Omit<Barber, 'id'>) => void;
+  onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
   onDeleteBarber: (id: string) => void;
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
@@ -378,112 +378,233 @@ function StaffList({
   onDelete,
 }: {
   barbers: Barber[];
-  onAdd: (barber: Omit<Barber, 'id'>) => void;
+  onAdd: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Barber>) => void;
   onDelete: (id: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    commission: 40,
+    address: '',
+    dni: '',
+  });
+  const [commissionError, setCommissionError] = useState('');
+
+  const resetForm = () => {
+    setFormData({
+      firstName: '',
+      lastName: '',
+      phone: '',
+      commission: 40,
+      address: '',
+      dni: '',
+    });
+    setCommissionError('');
+  };
+
+  const validateCommission = (value: number): boolean => {
+    if (value < 0 || value > 100) {
+      setCommissionError('La comisión debe estar entre 0 y 100');
+      return false;
+    }
+    setCommissionError('');
+    return true;
+  };
 
   const handleAdd = () => {
-    if (newName) {
-      onAdd({ name: newName, active: true });
-      setNewName('');
-      setIsAdding(false);
+    if (!formData.firstName || !formData.lastName || !formData.phone) {
+      return;
     }
+    if (!validateCommission(formData.commission)) {
+      return;
+    }
+    onAdd({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      commission: formData.commission,
+      address: formData.address || undefined,
+      dni: formData.dni || undefined,
+      active: true,
+    });
+    resetForm();
+    setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
-    if (newName) {
-      onUpdate(id, { name: newName });
-      setEditingId(null);
-      setNewName('');
+    if (!formData.firstName || !formData.lastName || !formData.phone) {
+      return;
     }
+    if (!validateCommission(formData.commission)) {
+      return;
+    }
+    onUpdate(id, {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone,
+      commission: formData.commission,
+      address: formData.address || undefined,
+      dni: formData.dni || undefined,
+    });
+    setEditingId(null);
+    resetForm();
   };
 
   const startEdit = (barber: Barber) => {
     setEditingId(barber.id);
-    setNewName(barber.name);
+    setFormData({
+      firstName: barber.firstName,
+      lastName: barber.lastName,
+      phone: barber.phone,
+      commission: barber.commission,
+      address: barber.address || '',
+      dni: barber.dni || '',
+    });
   };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setIsAdding(false);
+    resetForm();
+  };
+
+  const StaffForm = ({ isEdit, barberId }: { isEdit: boolean; barberId?: string }) => (
+    <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          placeholder="Nombre *"
+          value={formData.firstName}
+          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+        />
+        <Input
+          placeholder="Apellido *"
+          value={formData.lastName}
+          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          placeholder="Teléfono *"
+          value={formData.phone}
+          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+        />
+        <div>
+          <Input
+            type="number"
+            placeholder="Comisión % *"
+            min={0}
+            max={100}
+            value={formData.commission}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setFormData(prev => ({ ...prev, commission: value }));
+              validateCommission(value);
+            }}
+            className={commissionError ? 'border-destructive' : ''}
+          />
+          {commissionError && (
+            <p className="text-xs text-destructive mt-1">{commissionError}</p>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          placeholder="Dirección (opcional)"
+          value={formData.address}
+          onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+        />
+        <Input
+          placeholder="DNI (opcional)"
+          value={formData.dni}
+          onChange={(e) => setFormData(prev => ({ ...prev, dni: e.target.value }))}
+        />
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={cancelEdit}>
+          <X className="h-4 w-4 mr-1" />
+          Cancelar
+        </Button>
+        <Button 
+          size="sm" 
+          onClick={() => isEdit && barberId ? handleUpdate(barberId) : handleAdd()}
+          className="bg-success hover:bg-success/90"
+          disabled={!formData.firstName || !formData.lastName || !formData.phone || !!commissionError}
+        >
+          <Save className="h-4 w-4 mr-1" />
+          {isEdit ? 'Guardar' : 'Agregar'}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Card className="border border-border bg-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-base font-medium">Staff</CardTitle>
-        {!isAdding && (
+        {!isAdding && !editingId && (
           <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Agregar
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-2">
-        {isAdding && (
-          <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-            <Input
-              placeholder="Nombre"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="flex-1"
-            />
-            <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
-              <Save className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+      <CardContent className="space-y-3">
+        {isAdding && <StaffForm isEdit={false} />}
 
         {barbers.map((barber) => (
-          <div
-            key={barber.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-          >
+          <div key={barber.id}>
             {editingId === barber.id ? (
-              <>
-                <Input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1"
-                />
-                <Button size="icon" onClick={() => handleUpdate(barber.id)} className="bg-success hover:bg-success/90">
-                  <Save className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </>
+              <StaffForm isEdit={true} barberId={barber.id} />
             ) : (
-              <>
-                <span className="flex-1 font-medium text-foreground">{barber.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {barber.active ? 'Activo' : 'Inactivo'}
-                  </span>
-                  <Switch
-                    checked={barber.active}
-                    onCheckedChange={(checked) => onUpdate(barber.id, { active: checked })}
-                  />
+              <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-foreground">
+                      {barber.firstName} {barber.lastName}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
+                      {barber.commission}% comisión
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {barber.active ? 'Activo' : 'Inactivo'}
+                    </span>
+                    <Switch
+                      checked={barber.active}
+                      onCheckedChange={(checked) => onUpdate(barber.id, { active: checked })}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => startEdit(barber)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => onDelete(barber.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => startEdit(barber)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => onDelete(barber.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive h-8 w-8"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p className="font-mono text-[10px] opacity-60">UID: {barber.uid}</p>
+                  <p>📞 {barber.phone}</p>
+                  {barber.address && <p>📍 {barber.address}</p>}
+                  {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
+                </div>
+              </div>
             )}
           </div>
         ))}
