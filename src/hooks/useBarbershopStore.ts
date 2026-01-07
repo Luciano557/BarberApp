@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Service, Extra, Barber, Discount, Transaction } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Initial demo data
 const initialServices: Service[] = [
@@ -37,6 +38,46 @@ export function useBarbershopStore() {
   const [barbers, setBarbers] = useState<Barber[]>(initialBarbers);
   const [discounts, setDiscounts] = useState<Discount[]>(initialDiscounts);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // Cargar transacciones de hoy desde Supabase al iniciar
+  useEffect(() => {
+    const loadTodayTransactions = async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const { data, error } = await supabase
+        .from('transacciones')
+        .select('*')
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading transactions:', error);
+        return;
+      }
+
+      if (data) {
+        const mappedTransactions: Transaction[] = data.map((t) => ({
+          id: t.id,
+          barberId: t.barbero_id,
+          barberName: t.barbero_nombre,
+          serviceId: t.servicio_id,
+          serviceName: t.servicio_nombre,
+          servicePrice: Number(t.servicio_precio),
+          extras: (t.extras as { id: string; name: string; price: number }[]) || [],
+          discount: Number(t.descuento),
+          discountType: (t.tipo_descuento as 'fixed' | 'percentage') || 'percentage',
+          paymentMethod: t.metodo_pago as 'efectivo' | 'mercado_pago',
+          subtotal: Number(t.subtotal),
+          total: Number(t.total),
+          createdAt: new Date(t.created_at),
+        }));
+        setTransactions(mappedTransactions);
+      }
+    };
+
+    loadTodayTransactions();
+  }, []);
 
   // Services CRUD
   const addService = useCallback((service: Omit<Service, 'id'>) => {
@@ -101,14 +142,48 @@ export function useBarbershopStore() {
   }, []);
 
   // Transactions
-  const addTransaction = useCallback((transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const newTransaction = {
-      ...transaction,
-      id: crypto.randomUUID(),
-      createdAt: new Date(),
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    // Guardar en Supabase
+    const { data, error } = await supabase
+      .from('transacciones')
+      .insert({
+        barbero_id: transaction.barberId,
+        barbero_nombre: transaction.barberName,
+        servicio_id: transaction.serviceId,
+        servicio_nombre: transaction.serviceName,
+        servicio_precio: transaction.servicePrice,
+        extras: transaction.extras,
+        descuento: transaction.discount,
+        tipo_descuento: transaction.discountType,
+        metodo_pago: transaction.paymentMethod,
+        subtotal: transaction.subtotal,
+        total: transaction.total,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error saving transaction:', error);
+      toast.error('Error al guardar el cobro');
+      return null;
+    }
+
+    const newTransaction: Transaction = {
+      id: data.id,
+      barberId: data.barbero_id,
+      barberName: data.barbero_nombre,
+      serviceId: data.servicio_id,
+      serviceName: data.servicio_nombre,
+      servicePrice: Number(data.servicio_precio),
+      extras: (data.extras as { id: string; name: string; price: number }[]) || [],
+      discount: Number(data.descuento),
+      discountType: (data.tipo_descuento as 'fixed' | 'percentage') || 'percentage',
+      paymentMethod: data.metodo_pago as 'efectivo' | 'mercado_pago',
+      subtotal: Number(data.subtotal),
+      total: Number(data.total),
+      createdAt: new Date(data.created_at),
     };
 
-    // Save to local state
     setTransactions(prev => [newTransaction, ...prev]);
     toast.success('Cobro registrado correctamente');
 

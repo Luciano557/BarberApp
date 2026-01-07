@@ -188,6 +188,54 @@ export type Database = {
         }
         Relationships: []
       }
+      transacciones: {
+        Row: {
+          barbero_id: string
+          barbero_nombre: string
+          created_at: string
+          descuento: number | null
+          extras: Json | null
+          id: string
+          metodo_pago: string
+          servicio_id: string
+          servicio_nombre: string
+          servicio_precio: number
+          subtotal: number
+          tipo_descuento: string | null
+          total: number
+        }
+        Insert: {
+          barbero_id: string
+          barbero_nombre: string
+          created_at?: string
+          descuento?: number | null
+          extras?: Json | null
+          id?: string
+          metodo_pago: string
+          servicio_id: string
+          servicio_nombre: string
+          servicio_precio: number
+          subtotal: number
+          tipo_descuento?: string | null
+          total: number
+        }
+        Update: {
+          barbero_id?: string
+          barbero_nombre?: string
+          created_at?: string
+          descuento?: number | null
+          extras?: Json | null
+          id?: string
+          metodo_pago?: string
+          servicio_id?: string
+          servicio_nombre?: string
+          servicio_precio?: number
+          subtotal?: number
+          tipo_descuento?: string | null
+          total?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
