@@ -10,19 +10,18 @@ const Index = () => {
 
   const {
     services,
+    allServices,
     extras,
+    allExtras,
     barbers,
     allBarbers,
     discounts,
     addService,
     updateService,
-    deleteService,
     addExtra,
     updateExtra,
-    deleteExtra,
     addBarber,
     updateBarber,
-    deleteBarber,
     addDiscount,
     updateDiscount,
     deleteDiscount,
@@ -56,19 +55,16 @@ const Index = () => {
 
           {activeTab === 'config' && (
             <ConfigurationPanel
-              services={services}
-              extras={extras}
+              services={allServices}
+              extras={allExtras}
               barbers={allBarbers}
               discounts={discounts}
               onAddService={addService}
               onUpdateService={updateService}
-              onDeleteService={deleteService}
               onAddExtra={addExtra}
               onUpdateExtra={updateExtra}
-              onDeleteExtra={deleteExtra}
               onAddBarber={addBarber}
               onUpdateBarber={updateBarber}
-              onDeleteBarber={deleteBarber}
               onAddDiscount={addDiscount}
               onUpdateDiscount={updateDiscount}
               onDeleteDiscount={deleteDiscount}

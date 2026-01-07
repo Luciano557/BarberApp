@@ -3,32 +3,32 @@ import { Service, Extra, Barber, Discount, Transaction } from '@/types/barbersho
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// Generate unique UIDs
+function generateUID(prefix: string): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+  return `${prefix}-${timestamp}-${randomPart}`.toUpperCase();
+}
+
 // Initial demo data
 const initialServices: Service[] = [
-  { id: '1', name: 'Corte Clásico', price: 3500 },
-  { id: '2', name: 'Corte + Barba', price: 5000 },
-  { id: '3', name: 'Barba', price: 2000 },
-  { id: '4', name: 'Combo Premium', price: 6500 },
+  { id: '1', uid: generateUID('SVC'), name: 'Corte Clásico', price: 3500, active: true },
+  { id: '2', uid: generateUID('SVC'), name: 'Corte + Barba', price: 5000, active: true },
+  { id: '3', uid: generateUID('SVC'), name: 'Barba', price: 2000, active: true },
+  { id: '4', uid: generateUID('SVC'), name: 'Combo Premium', price: 6500, active: true },
 ];
 
 const initialExtras: Extra[] = [
-  { id: '1', name: 'Lavado', price: 500 },
-  { id: '2', name: 'Cejas', price: 300 },
-  { id: '3', name: 'Máscara Facial', price: 800 },
-  { id: '4', name: 'Tinte Barba', price: 1000 },
+  { id: '1', uid: generateUID('EXT'), name: 'Lavado', price: 500, active: true },
+  { id: '2', uid: generateUID('EXT'), name: 'Cejas', price: 300, active: true },
+  { id: '3', uid: generateUID('EXT'), name: 'Máscara Facial', price: 800, active: true },
+  { id: '4', uid: generateUID('EXT'), name: 'Tinte Barba', price: 1000, active: true },
 ];
 
-// Generate a unique UID for staff members
-function generateStaffUID(): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-  return `STF-${timestamp}-${randomPart}`.toUpperCase();
-}
-
 const initialBarbers: Barber[] = [
-  { id: '1', uid: generateStaffUID(), firstName: 'Carlos', lastName: 'García', phone: '1122334455', commission: 40, active: true },
-  { id: '2', uid: generateStaffUID(), firstName: 'Miguel', lastName: 'López', phone: '1133445566', commission: 35, active: true },
-  { id: '3', uid: generateStaffUID(), firstName: 'Andrés', lastName: 'Martínez', phone: '1144556677', commission: 45, active: true },
+  { id: '1', uid: generateUID('STF'), firstName: 'Carlos', lastName: 'García', phone: '1122334455', commission: 40, active: true },
+  { id: '2', uid: generateUID('STF'), firstName: 'Miguel', lastName: 'López', phone: '1133445566', commission: 35, active: true },
+  { id: '3', uid: generateUID('STF'), firstName: 'Andrés', lastName: 'Martínez', phone: '1144556677', commission: 45, active: true },
 ];
 
 const initialDiscounts: Discount[] = [
@@ -87,8 +87,12 @@ export function useBarbershopStore() {
   }, []);
 
   // Services CRUD
-  const addService = useCallback((service: Omit<Service, 'id'>) => {
-    const newService = { ...service, id: crypto.randomUUID() };
+  const addService = useCallback((service: Omit<Service, 'id' | 'uid'>) => {
+    const newService = { 
+      ...service, 
+      id: crypto.randomUUID(),
+      uid: generateUID('SVC'),
+    };
     setServices(prev => [...prev, newService]);
     return newService;
   }, []);
@@ -97,13 +101,13 @@ export function useBarbershopStore() {
     setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, []);
 
-  const deleteService = useCallback((id: string) => {
-    setServices(prev => prev.filter(s => s.id !== id));
-  }, []);
-
   // Extras CRUD
-  const addExtra = useCallback((extra: Omit<Extra, 'id'>) => {
-    const newExtra = { ...extra, id: crypto.randomUUID() };
+  const addExtra = useCallback((extra: Omit<Extra, 'id' | 'uid'>) => {
+    const newExtra = { 
+      ...extra, 
+      id: crypto.randomUUID(),
+      uid: generateUID('EXT'),
+    };
     setExtras(prev => [...prev, newExtra]);
     return newExtra;
   }, []);
@@ -112,16 +116,12 @@ export function useBarbershopStore() {
     setExtras(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
   }, []);
 
-  const deleteExtra = useCallback((id: string) => {
-    setExtras(prev => prev.filter(e => e.id !== id));
-  }, []);
-
   // Barbers CRUD
   const addBarber = useCallback((barber: Omit<Barber, 'id' | 'uid'>) => {
     const newBarber = { 
       ...barber, 
       id: crypto.randomUUID(),
-      uid: generateStaffUID(),
+      uid: generateUID('STF'),
     };
     setBarbers(prev => [...prev, newBarber]);
     return newBarber;
@@ -226,9 +226,11 @@ export function useBarbershopStore() {
   }, [getTodayTransactions]);
 
   return {
-    // Data
-    services,
-    extras,
+    // Data - active items only for operations
+    services: services.filter(s => s.active),
+    allServices: services,
+    extras: extras.filter(e => e.active),
+    allExtras: extras,
     barbers: barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
@@ -236,15 +238,12 @@ export function useBarbershopStore() {
     // Services
     addService,
     updateService,
-    deleteService,
     // Extras
     addExtra,
     updateExtra,
-    deleteExtra,
     // Barbers
     addBarber,
     updateBarber,
-    deleteBarber,
     // Discounts
     addDiscount,
     updateDiscount,
