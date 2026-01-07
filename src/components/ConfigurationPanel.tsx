@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -538,79 +538,167 @@ function StaffList({
     resetForm();
   };
 
-  const StaffForm = ({ isEdit, barberId }: { isEdit: boolean; barberId?: string }) => (
-    <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Nombre *"
-          value={formData.firstName}
-          onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-        />
-        <Input
-          placeholder="Apellido *"
-          value={formData.lastName}
-          onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Teléfono *"
-          value={formData.phone}
-          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-        />
-        <div>
+  const StaffForm = React.memo(({ 
+    isEdit, 
+    barberId,
+    initialData,
+    onSave,
+    onCancel 
+  }: { 
+    isEdit: boolean; 
+    barberId?: string;
+    initialData: typeof formData;
+    onSave: (data: typeof formData) => void;
+    onCancel: () => void;
+  }) => {
+    // Local state to prevent parent re-renders on every keystroke
+    const [localData, setLocalData] = useState(initialData);
+    const [localCommissionError, setLocalCommissionError] = useState('');
+
+    const validateLocalCommission = (value: string): boolean => {
+      const num = Number(value);
+      if (value === '' || isNaN(num)) {
+        setLocalCommissionError('Ingresa un número válido');
+        return false;
+      }
+      if (num < 0 || num > 100) {
+        setLocalCommissionError('Debe estar entre 0 y 100');
+        return false;
+      }
+      setLocalCommissionError('');
+      return true;
+    };
+
+    const handleSubmit = () => {
+      if (!localData.firstName || !localData.lastName || !localData.phone) {
+        return;
+      }
+      if (!validateLocalCommission(localData.commission)) {
+        return;
+      }
+      onSave(localData);
+    };
+
+    return (
+      <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
+        <div className="grid grid-cols-2 gap-3">
           <Input
-            type="text"
-            inputMode="numeric"
-            placeholder="Comisión % *"
-            value={formData.commission}
-            onChange={(e) => {
-              const value = e.target.value;
-              setFormData(prev => ({ ...prev, commission: value }));
-              if (value) validateCommission(value);
-            }}
-            onBlur={() => validateCommission(formData.commission)}
-            className={commissionError ? 'border-destructive' : ''}
+            placeholder="Nombre *"
+            value={localData.firstName}
+            onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))}
+            autoComplete="off"
           />
-          {commissionError && (
-            <p className="text-xs text-destructive mt-1">{commissionError}</p>
-          )}
+          <Input
+            placeholder="Apellido *"
+            value={localData.lastName}
+            onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))}
+            autoComplete="off"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            placeholder="Teléfono *"
+            value={localData.phone}
+            onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))}
+            autoComplete="off"
+          />
+          <div>
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Comisión % *"
+              value={localData.commission}
+              onChange={(e) => {
+                const value = e.target.value;
+                setLocalData(prev => ({ ...prev, commission: value }));
+                if (value) validateLocalCommission(value);
+              }}
+              onBlur={() => validateLocalCommission(localData.commission)}
+              className={localCommissionError ? 'border-destructive' : ''}
+              autoComplete="off"
+            />
+            {localCommissionError && (
+              <p className="text-xs text-destructive mt-1">{localCommissionError}</p>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            placeholder="Dirección (opcional)"
+            value={localData.address}
+            onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))}
+            autoComplete="off"
+            name="staff-address-field"
+          />
+          <Input
+            placeholder="DNI (opcional)"
+            value={localData.dni}
+            onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))}
+            autoComplete="off"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={onCancel}>
+            <X className="h-4 w-4 mr-1" />
+            Cancelar
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={handleSubmit}
+            className="bg-success hover:bg-success/90"
+            disabled={!localData.firstName || !localData.lastName || !localData.phone || !!localCommissionError}
+          >
+            <Save className="h-4 w-4 mr-1" />
+            {isEdit ? 'Guardar' : 'Agregar'}
+          </Button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          placeholder="Dirección (opcional)"
-          value={formData.address}
-          onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-        />
-        <Input
-          placeholder="DNI (opcional)"
-          value={formData.dni}
-          onChange={(e) => setFormData(prev => ({ ...prev, dni: e.target.value }))}
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={cancelEdit}>
-          <X className="h-4 w-4 mr-1" />
-          Cancelar
-        </Button>
-        <Button 
-          size="sm" 
-          onClick={() => isEdit && barberId ? handleUpdate(barberId) : handleAdd()}
-          className="bg-success hover:bg-success/90"
-          disabled={!formData.firstName || !formData.lastName || !formData.phone || !!commissionError}
-        >
-          <Save className="h-4 w-4 mr-1" />
-          {isEdit ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
-    </div>
-  );
+    );
+  });
+
+  const handleFormSave = (data: typeof formData, barberId?: string) => {
+    if (barberId) {
+      onUpdate(barberId, {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        commission: Number(data.commission),
+        address: data.address || undefined,
+        dni: data.dni || undefined,
+      });
+      setEditingId(null);
+    } else {
+      onAdd({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        commission: Number(data.commission),
+        address: data.address || undefined,
+        dni: data.dni || undefined,
+        active: true,
+      });
+      setIsAdding(false);
+    }
+    resetForm();
+  };
 
   const renderBarberItem = (barber: Barber) => (
     <div key={barber.id}>
       {editingId === barber.id ? (
-        <StaffForm isEdit={true} barberId={barber.id} />
+        <StaffForm 
+          isEdit={true} 
+          barberId={barber.id}
+          initialData={{
+            firstName: barber.firstName,
+            lastName: barber.lastName,
+            phone: barber.phone,
+            commission: String(barber.commission),
+            address: barber.address || '',
+            dni: barber.dni || '',
+          }}
+          onSave={(data) => handleFormSave(data, barber.id)}
+          onCancel={cancelEdit}
+        />
       ) : (
         <div className="p-4 rounded-lg bg-muted/50 group hover:bg-muted transition-colors">
           <div className="flex items-center justify-between mb-2">
@@ -676,7 +764,14 @@ function StaffList({
           </TabsList>
 
           <TabsContent value="active" className="mt-4 space-y-3">
-            {isAdding && <StaffForm isEdit={false} />}
+            {isAdding && (
+              <StaffForm 
+                isEdit={false}
+                initialData={formData}
+                onSave={(data) => handleFormSave(data)}
+                onCancel={cancelEdit}
+              />
+            )}
             {activeBarbers.map(renderBarberItem)}
             {activeBarbers.length === 0 && !isAdding && (
               <p className="text-sm text-muted-foreground text-center py-4">No hay staff activo</p>
