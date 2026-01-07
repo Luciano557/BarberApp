@@ -15,7 +15,7 @@ interface PaymentRegistrationProps {
     serviceId: string;
     serviceName: string;
     servicePrice: number;
-    extras: { id: string; name: string; price: number }[];
+    extras: { uid: string; name: string; price: number }[];
     discount: number;
     discountType: DiscountType;
     paymentMethod: PaymentMethod;
@@ -133,10 +133,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     onSubmit({
       barberId: selectedBarber,
       barberName: `${barber!.firstName} ${barber!.lastName}`,
-      serviceId: selectedService,
+      serviceId: service!.uid,
       serviceName: service!.name,
       servicePrice: service!.price,
-      extras: selectedExtrasData,
+      extras: selectedExtrasData.map(e => ({ uid: e.uid, name: e.name, price: e.price })),
       discount: discountPercentage,
       discountType: 'percentage',
       paymentMethod,

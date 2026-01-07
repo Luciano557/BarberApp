@@ -44,7 +44,7 @@ export interface Transaction {
   serviceId: string;
   serviceName: string;
   servicePrice: number;
-  extras: { id: string; name: string; price: number }[];
+  extras: { uid: string; name: string; price: number }[];
   discount: number;
   discountType: 'fixed' | 'percentage';
   paymentMethod: 'efectivo' | 'mercado_pago';
