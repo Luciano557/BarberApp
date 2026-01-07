@@ -47,7 +47,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
 
   const currentStepIndex = STEPS.indexOf(currentStep);
   const service = useMemo(() => services.find(s => s.id === selectedService), [services, selectedService]);
-  const barber = useMemo(() => barbers.find(b => b.id === selectedBarber), [barbers, selectedBarber]);
+  const barber = useMemo(() => barbers.find(b => b.uid === selectedBarber), [barbers, selectedBarber]);
   const selectedExtrasData = useMemo(() =>
     extras.filter(e => selectedExtras.includes(e.id)),
     [extras, selectedExtras]
@@ -160,7 +160,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
         const index = parseInt(e.key) - 1;
 
         if (currentStep === 'barber' && barbers[index]) {
-          handleSelectBarber(barbers[index].id);
+          handleSelectBarber(barbers[index].uid);
         } else if (currentStep === 'service' && services[index]) {
           handleSelectService(services[index].id);
         } else if (currentStep === 'extras' && extras[index]) {
@@ -257,10 +257,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {barbers.map((barber, index) => (
               <button
-                key={barber.id}
-                onClick={() => handleSelectBarber(barber.id)}
+                key={barber.uid}
+                onClick={() => handleSelectBarber(barber.uid)}
                 className={`relative p-6 rounded-lg border transition-all hover:border-secondary ${
-                  selectedBarber === barber.id
+                  selectedBarber === barber.uid
                     ? 'border-secondary bg-secondary/5'
                     : 'border-border bg-card hover:bg-muted/50'
                 }`}
