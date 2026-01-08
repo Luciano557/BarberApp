@@ -25,20 +25,26 @@ interface VentaExtraInsert {
 export function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  // Cargar ventas del día desde Supabase
-  const loadTodayTransactions = useCallback(async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // Cargar ventas de una fecha específica desde Supabase
+  const loadTransactionsByDate = useCallback(async (date: Date) => {
+    setIsLoading(true);
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
 
     const { data: ventas, error } = await supabase
       .from('venta')
       .select('*')
-      .gte('fecha_hora', today.toISOString())
+      .gte('fecha_hora', startOfDay.toISOString())
+      .lte('fecha_hora', endOfDay.toISOString())
       .order('fecha_hora', { ascending: false });
 
     if (error) {
       console.error('Error loading ventas:', error);
+      setIsLoading(false);
       return;
     }
 
@@ -87,8 +93,8 @@ export function useTransactions() {
   }, []);
 
   useEffect(() => {
-    loadTodayTransactions();
-  }, [loadTodayTransactions]);
+    loadTransactionsByDate(selectedDate);
+  }, [selectedDate, loadTransactionsByDate]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     // Insertar venta principal
@@ -171,9 +177,11 @@ export function useTransactions() {
   return {
     transactions,
     isLoading,
+    selectedDate,
+    setSelectedDate,
     addTransaction,
     getTodayTransactions,
     getDailySummary,
-    refetch: loadTodayTransactions,
+    refetch: () => loadTransactionsByDate(selectedDate),
   };
 }
