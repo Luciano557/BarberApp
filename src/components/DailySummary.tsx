@@ -1,7 +1,10 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Transaction, Barber } from '@/types/barbershop';
-import { format } from 'date-fns';
+import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo } from 'react';
 
@@ -14,6 +17,8 @@ interface DailySummaryProps {
     transactions: Transaction[];
   };
   barbers: Barber[];
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
 interface BarberSummary {
@@ -25,7 +30,7 @@ interface BarberSummary {
   total: number;
 }
 
-export function DailySummary({ summary, barbers }: DailySummaryProps) {
+export function DailySummary({ summary, barbers, selectedDate, onDateChange }: DailySummaryProps) {
   // Calculate per-barber summaries
   const barberSummaries = useMemo(() => {
     const summaryMap = new Map<string, BarberSummary>();
@@ -69,13 +74,49 @@ export function DailySummary({ summary, barbers }: DailySummaryProps) {
     return Array.from(summaryMap.values()).filter(s => s.count > 0);
   }, [summary.transactions, barbers]);
 
+  const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
+  const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
+  const handleToday = () => onDateChange(new Date());
+
   return (
     <div className="space-y-8 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Cierre de Caja</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Cierre de Caja</h1>
+          <p className="text-muted-foreground text-sm mt-1 capitalize">
+            {format(selectedDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePreviousDay}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="min-w-[140px]">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, 'dd/MM/yyyy')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && onDateChange(date)}
+                locale={es}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(selectedDate)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          {!isToday(selectedDate) && (
+            <Button variant="secondary" size="sm" onClick={handleToday}>
+              Hoy
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* General Summary Cards */}

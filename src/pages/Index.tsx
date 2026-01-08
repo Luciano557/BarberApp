@@ -29,7 +29,7 @@ const Index = () => {
     deleteDiscount,
   } = useSupabaseData();
 
-  const { addTransaction, getDailySummary } = useTransactions();
+  const { addTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
 
   const summary = getDailySummary();
 
@@ -63,7 +63,12 @@ const Index = () => {
           )}
 
           {activeTab === 'resumen' && (
-            <DailySummary summary={summary} barbers={barbers} />
+            <DailySummary 
+              summary={summary} 
+              barbers={barbers} 
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+            />
           )}
 
           {activeTab === 'config' && (
