@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      descuentos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          nombre: string
+          tipo: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre: string
+          tipo: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: []
+      }
       Egresos: {
         Row: {
           Categoria: string | null
@@ -35,6 +65,33 @@ export type Database = {
           Fecha?: string | null
           id?: number
           Monto?: number | null
+        }
+        Relationships: []
+      }
+      extras: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          nombre: string
+          precio: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre: string
+          precio?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre?: string
+          precio?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -185,6 +242,33 @@ export type Database = {
           ServiciosTotales?: number | null
           TasaDeOcupación?: number | null
           TicketPromedio?: number | null
+        }
+        Relationships: []
+      }
+      servicios: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          nombre: string
+          precio: number
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre: string
+          precio?: number
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          nombre?: string
+          precio?: number
+          updated_at?: string
         }
         Relationships: []
       }
