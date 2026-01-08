@@ -31,6 +31,11 @@ interface BarberSummary {
 }
 
 export function DailySummary({ summary, barbers, selectedDate, onDateChange }: DailySummaryProps) {
+  // Ensure selectedDate is a valid Date
+  const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
+    ? selectedDate 
+    : new Date();
+
   // Calculate per-barber summaries
   const barberSummaries = useMemo(() => {
     const summaryMap = new Map<string, BarberSummary>();
@@ -74,8 +79,8 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
     return Array.from(summaryMap.values()).filter(s => s.count > 0);
   }, [summary.transactions, barbers]);
 
-  const handlePreviousDay = () => onDateChange(subDays(selectedDate, 1));
-  const handleNextDay = () => onDateChange(addDays(selectedDate, 1));
+  const handlePreviousDay = () => onDateChange(subDays(validDate, 1));
+  const handleNextDay = () => onDateChange(addDays(validDate, 1));
   const handleToday = () => onDateChange(new Date());
 
   return (
@@ -84,7 +89,7 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Cierre de Caja</h1>
           <p className="text-muted-foreground text-sm mt-1 capitalize">
-            {format(selectedDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
+            {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -95,23 +100,23 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
             <PopoverTrigger asChild>
               <Button variant="outline" className="min-w-[140px]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedDate, 'dd/MM/yyyy')}
+                {format(validDate, 'dd/MM/yyyy')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
                 mode="single"
-                selected={selectedDate}
+                selected={validDate}
                 onSelect={(date) => date && onDateChange(date)}
                 locale={es}
                 initialFocus
               />
             </PopoverContent>
           </Popover>
-          <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(selectedDate)}>
+          <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(validDate)}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          {!isToday(selectedDate) && (
+          {!isToday(validDate) && (
             <Button variant="secondary" size="sm" onClick={handleToday}>
               Hoy
             </Button>
