@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Transaction, Barber } from '@/types/barbershop';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 interface DailySummaryProps {
   summary: {
@@ -33,10 +34,26 @@ interface BarberSummary {
 }
 
 export function DailySummary({ summary, barbers, selectedDate, onDateChange }: DailySummaryProps) {
+  const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
+  
   // Ensure selectedDate is a valid Date
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
     : new Date();
+
+  // Get transactions for selected barber
+  const barberTransactions = useMemo(() => {
+    if (!closingBarber) return { efectivo: [], mercadoPago: [] };
+    
+    const efectivo = summary.transactions.filter(
+      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'efectivo'
+    );
+    const mercadoPago = summary.transactions.filter(
+      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'mercado_pago'
+    );
+    
+    return { efectivo, mercadoPago };
+  }, [closingBarber, summary.transactions]);
 
   // Calculate per-barber summaries with commissions
   const barberSummaries = useMemo(() => {
@@ -262,10 +279,7 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     <Button 
                       className="w-full" 
-                      onClick={() => {
-                        // TODO: Implement cash closing logic
-                        console.log('Cierre de caja para:', barber.barberName, 'Fecha:', format(validDate, 'yyyy-MM-dd'));
-                      }}
+                      onClick={() => setClosingBarber(barber)}
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Cerrar Caja
@@ -338,6 +352,112 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
           )}
         </CardContent>
       </Card>
+
+      {/* Cash Closing Dialog */}
+      <Dialog open={!!closingBarber} onOpenChange={(open) => !open && setClosingBarber(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Cierre de Caja - {closingBarber?.barberName}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground capitalize">
+              {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+                <p className="text-sm text-muted-foreground">Efectivo</p>
+                <p className="text-xl font-bold text-success">${closingBarber?.totalEfectivo.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">{barberTransactions.efectivo.length} servicios</p>
+              </div>
+              <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+                <p className="text-sm text-muted-foreground">Mercado Pago</p>
+                <p className="text-xl font-bold text-secondary">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">{barberTransactions.mercadoPago.length} servicios</p>
+              </div>
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <p className="text-sm text-muted-foreground">Comisión ({closingBarber?.commissionPct}%)</p>
+                <p className="text-xl font-bold text-primary">${closingBarber?.commissionAmount.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Efectivo Transactions */}
+            {barberTransactions.efectivo.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <Banknote className="h-4 w-4 text-success" />
+                  Efectivo ({barberTransactions.efectivo.length})
+                </h4>
+                <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
+                  {barberTransactions.efectivo.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div>
+                        <span className="font-medium text-sm">{tx.serviceName}</span>
+                        {tx.extras.length > 0 && (
+                          <span className="text-xs ml-2 text-muted-foreground">
+                            + {tx.extras.map(e => e.name).join(', ')}
+                          </span>
+                        )}
+                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                      </div>
+                      <span className="font-semibold text-success">${tx.total.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mercado Pago Transactions */}
+            {barberTransactions.mercadoPago.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-secondary" />
+                  Mercado Pago ({barberTransactions.mercadoPago.length})
+                </h4>
+                <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
+                  {barberTransactions.mercadoPago.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div>
+                        <span className="font-medium text-sm">{tx.serviceName}</span>
+                        {tx.extras.length > 0 && (
+                          <span className="text-xs ml-2 text-muted-foreground">
+                            + {tx.extras.map(e => e.name).join(', ')}
+                          </span>
+                        )}
+                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                      </div>
+                      <span className="font-semibold text-secondary">${tx.total.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Total Summary */}
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
+              <span className="font-medium">Total General</span>
+              <span className="text-2xl font-bold">${closingBarber?.total.toLocaleString()}</span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setClosingBarber(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => {
+              // TODO: Guardar cierre en DB
+              setClosingBarber(null);
+            }}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Confirmar Cierre
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
