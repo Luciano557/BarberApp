@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           activo: boolean
           apellido: string
+          comision: number
           created_at: string
           dni: string | null
           id: string
@@ -28,6 +29,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           apellido: string
+          comision?: number
           created_at?: string
           dni?: string | null
           id?: string
@@ -38,6 +40,7 @@ export type Database = {
         Update: {
           activo?: boolean
           apellido?: string
+          comision?: number
           created_at?: string
           dni?: string | null
           id?: string
