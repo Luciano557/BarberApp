@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -252,12 +252,24 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
                     <span className="text-sm font-medium text-foreground">Total</span>
                     <span className="text-lg font-bold text-foreground">${barber.total.toLocaleString()}</span>
                   </div>
-                  <div className="flex items-center justify-between pt-2 bg-primary/5 -mx-6 px-6 py-3 rounded-b-lg">
+                  <div className="flex items-center justify-between pt-2 bg-primary/5 -mx-6 px-6 py-3">
                     <span className="text-sm font-medium text-primary flex items-center gap-2">
                       <Percent className="h-4 w-4" />
                       Comisión ({barber.commissionPct}%)
                     </span>
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="-mx-6 px-6 pb-4 pt-3">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => {
+                        // TODO: Implement cash closing logic
+                        console.log('Cierre de caja para:', barber.barberName, 'Fecha:', format(validDate, 'yyyy-MM-dd'));
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Cerrar Caja
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
