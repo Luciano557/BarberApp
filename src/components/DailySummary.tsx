@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -28,6 +28,8 @@ interface BarberSummary {
   totalEfectivo: number;
   totalMercadoPago: number;
   total: number;
+  commissionPct: number;
+  commissionAmount: number;
 }
 
 export function DailySummary({ summary, barbers, selectedDate, onDateChange }: DailySummaryProps) {
@@ -36,11 +38,11 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
     ? selectedDate 
     : new Date();
 
-  // Calculate per-barber summaries
+  // Calculate per-barber summaries with commissions
   const barberSummaries = useMemo(() => {
     const summaryMap = new Map<string, BarberSummary>();
 
-    // Initialize all active barbers
+    // Initialize all active barbers with their commission percentage
     barbers.forEach(barber => {
       summaryMap.set(barber.id, {
         barberId: barber.id,
@@ -49,6 +51,8 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
         totalEfectivo: 0,
         totalMercadoPago: 0,
         total: 0,
+        commissionPct: barber.commission,
+        commissionAmount: 0,
       });
     });
 
@@ -65,6 +69,7 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
         }
       } else {
         // Handle transactions from barbers not in current list
+        const barberData = barbers.find(b => b.id === tx.barberId);
         summaryMap.set(tx.barberId, {
           barberId: tx.barberId,
           barberName: tx.barberName,
@@ -72,8 +77,15 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
           totalEfectivo: tx.paymentMethod === 'efectivo' ? tx.total : 0,
           totalMercadoPago: tx.paymentMethod === 'mercado_pago' ? tx.total : 0,
           total: tx.total,
+          commissionPct: barberData?.commission || 0,
+          commissionAmount: 0,
         });
       }
+    });
+
+    // Calculate commission amounts
+    summaryMap.forEach(summary => {
+      summary.commissionAmount = Math.round(summary.total * (summary.commissionPct / 100));
     });
 
     return Array.from(summaryMap.values()).filter(s => s.count > 0);
@@ -236,9 +248,16 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm font-medium text-foreground">Total</span>
                     <span className="text-lg font-bold text-foreground">${barber.total.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2 bg-primary/5 -mx-6 px-6 py-3 rounded-b-lg">
+                    <span className="text-sm font-medium text-primary flex items-center gap-2">
+                      <Percent className="h-4 w-4" />
+                      Comisión ({barber.commissionPct}%)
+                    </span>
+                    <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
