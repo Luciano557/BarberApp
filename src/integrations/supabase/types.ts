@@ -308,6 +308,105 @@ export type Database = {
         }
         Relationships: []
       }
+      venta: {
+        Row: {
+          barbero_id: string
+          barbero_nombre: string
+          created_at: string
+          descuento_pct: number | null
+          fecha_hora: string
+          id: string
+          metodo_pago: string
+          precio_servicio: number
+          servicio_id: string
+          servicio_nombre: string
+          total_final: number
+        }
+        Insert: {
+          barbero_id: string
+          barbero_nombre: string
+          created_at?: string
+          descuento_pct?: number | null
+          fecha_hora?: string
+          id?: string
+          metodo_pago: string
+          precio_servicio?: number
+          servicio_id: string
+          servicio_nombre: string
+          total_final?: number
+        }
+        Update: {
+          barbero_id?: string
+          barbero_nombre?: string
+          created_at?: string
+          descuento_pct?: number | null
+          fecha_hora?: string
+          id?: string
+          metodo_pago?: string
+          precio_servicio?: number
+          servicio_id?: string
+          servicio_nombre?: string
+          total_final?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venta_extra: {
+        Row: {
+          cantidad: number
+          extra_id: string
+          extra_nombre: string
+          id: string
+          precio_extra: number
+          venta_id: string
+        }
+        Insert: {
+          cantidad?: number
+          extra_id: string
+          extra_nombre: string
+          id?: string
+          precio_extra?: number
+          venta_id: string
+        }
+        Update: {
+          cantidad?: number
+          extra_id?: string
+          extra_nombre?: string
+          id?: string
+          precio_extra?: number
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_extra_extra_id_fkey"
+            columns: ["extra_id"]
+            isOneToOne: false
+            referencedRelation: "extras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_extra_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "venta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
