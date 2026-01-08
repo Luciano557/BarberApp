@@ -131,12 +131,12 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     }
 
     onSubmit({
-      barberId: selectedBarber,
+      barberId: barber!.id,
       barberName: `${barber!.firstName} ${barber!.lastName}`,
-      serviceId: service!.uid,
+      serviceId: service!.id,
       serviceName: service!.name,
       servicePrice: service!.price,
-      extras: selectedExtrasData.map(e => ({ uid: e.uid, name: e.name, price: e.price })),
+      extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
       discount: discountPercentage,
       discountType: 'percentage',
       paymentMethod,
