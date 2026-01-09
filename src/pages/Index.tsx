@@ -18,6 +18,8 @@ const Index = () => {
     barbers,
     allBarbers,
     discounts,
+    lines,
+    allLines,
     addService,
     updateService,
     addExtra,
@@ -27,6 +29,8 @@ const Index = () => {
     addDiscount,
     updateDiscount,
     deleteDiscount,
+    addLine,
+    updateLine,
   } = useSupabaseData();
 
   const { addTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
@@ -77,6 +81,7 @@ const Index = () => {
               extras={allExtras}
               barbers={allBarbers}
               discounts={discounts}
+              lines={allLines}
               onAddService={addService}
               onUpdateService={updateService}
               onAddExtra={addExtra}
@@ -86,6 +91,8 @@ const Index = () => {
               onAddDiscount={addDiscount}
               onUpdateDiscount={updateDiscount}
               onDeleteDiscount={deleteDiscount}
+              onAddLine={addLine}
+              onUpdateLine={updateLine}
             />
           )}
         </div>

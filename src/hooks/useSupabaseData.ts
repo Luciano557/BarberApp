@@ -1,15 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Service, Extra, Barber, Discount } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 
 // Transform database rows to app types
-function dbToService(row: any): Service {
+function dbToLine(row: any): Line {
   return {
     id: row.id,
-    uid: row.id, // Use the UUID as UID
+    name: row.nombre,
+    active: row.activo,
+  };
+}
+
+function dbToService(row: any, lines: Line[]): Service {
+  const line = lines.find(l => l.id === row.linea_id);
+  return {
+    id: row.id,
+    uid: row.id,
     name: row.nombre,
     price: Number(row.precio),
+    lineId: row.linea_id || undefined,
+    lineName: line?.name,
     active: row.activo,
   };
 }
@@ -51,12 +62,19 @@ export function useSupabaseData() {
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Fetch lines first since services depend on them
+      const linesRes = await supabase.from('lineas').select('*').order('nombre');
+      if (linesRes.error) throw linesRes.error;
+      const fetchedLines = linesRes.data.map(dbToLine);
+      setLines(fetchedLines);
+
       const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
@@ -69,7 +87,7 @@ export function useSupabaseData() {
       if (barbersRes.error) throw barbersRes.error;
       if (discountsRes.error) throw discountsRes.error;
 
-      setServices(servicesRes.data.map(dbToService));
+      setServices(servicesRes.data.map(row => dbToService(row, fetchedLines)));
       setExtras(extrasRes.data.map(dbToExtra));
       setBarbers(barbersRes.data.map(dbToBarber));
       
@@ -96,12 +114,18 @@ export function useSupabaseData() {
     try {
       const { data, error } = await supabase
         .from('servicios')
-        .insert({ nombre: service.name, precio: service.price, activo: service.active })
+        .insert({ 
+          nombre: service.name, 
+          precio: service.price, 
+          activo: service.active,
+          linea_id: service.lineId || null,
+        })
         .select()
         .single();
       
       if (error) throw error;
-      const newService = dbToService(data);
+      const line = lines.find(l => l.id === service.lineId);
+      const newService = dbToService(data, lines);
       setServices(prev => [...prev, newService]);
       toast.success('Servicio agregado');
       return newService;
@@ -110,7 +134,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar servicio');
       return null;
     }
-  }, []);
+  }, [lines]);
 
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
@@ -118,6 +142,7 @@ export function useSupabaseData() {
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
 
       const { error } = await supabase
         .from('servicios')
@@ -125,12 +150,19 @@ export function useSupabaseData() {
         .eq('id', id);
       
       if (error) throw error;
-      setServices(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      
+      // Update lineName if lineId changed
+      const updatedLine = updates.lineId ? lines.find(l => l.id === updates.lineId) : undefined;
+      const finalUpdates = updates.lineId !== undefined 
+        ? { ...updates, lineName: updatedLine?.name } 
+        : updates;
+      
+      setServices(prev => prev.map(s => s.id === id ? { ...s, ...finalUpdates } : s));
     } catch (error) {
       console.error('Error updating service:', error);
       toast.error('Error al actualizar servicio');
     }
-  }, []);
+  }, [lines]);
 
   // Extras CRUD
   const addExtra = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
@@ -287,6 +319,53 @@ export function useSupabaseData() {
     }
   }, []);
 
+  // Lines CRUD
+  const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('lineas')
+        .insert({ nombre: line.name, activo: line.active })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      const newLine = dbToLine(data);
+      setLines(prev => [...prev, newLine]);
+      toast.success('Línea agregada');
+      return newLine;
+    } catch (error) {
+      console.error('Error adding line:', error);
+      toast.error('Error al agregar línea');
+      return null;
+    }
+  }, []);
+
+  const updateLine = useCallback(async (id: string, updates: Partial<Line>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      const { error } = await supabase
+        .from('lineas')
+        .update(dbUpdates)
+        .eq('id', id);
+      
+      if (error) throw error;
+      setLines(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+      
+      // Also update lineName in services that reference this line
+      if (updates.name !== undefined) {
+        setServices(prev => prev.map(s => 
+          s.lineId === id ? { ...s, lineName: updates.name } : s
+        ));
+      }
+    } catch (error) {
+      console.error('Error updating line:', error);
+      toast.error('Error al actualizar línea');
+    }
+  }, []);
+
   return {
     // Loading state
     isLoading,
@@ -298,6 +377,8 @@ export function useSupabaseData() {
     barbers: barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
+    lines: lines.filter(l => l.active),
+    allLines: lines,
     // Services
     addService,
     updateService,
@@ -311,6 +392,9 @@ export function useSupabaseData() {
     addDiscount,
     updateDiscount,
     deleteDiscount,
+    // Lines
+    addLine,
+    updateLine,
     // Refresh
     refreshData: fetchData,
   };
