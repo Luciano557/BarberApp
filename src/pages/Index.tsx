@@ -69,7 +69,8 @@ const Index = () => {
           {activeTab === 'resumen' && (
             <DailySummary 
               summary={summary} 
-              barbers={barbers} 
+              barbers={barbers}
+              lines={lines}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
             />

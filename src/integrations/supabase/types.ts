@@ -149,6 +149,7 @@ export type Database = {
           mp: number | null
           perdida: number | null
           servicios_con_descuento: number | null
+          servicios_por_linea: Json | null
           servicios_sin_descuento: number | null
           sueldo: number | null
           total_facturado: number | null
@@ -172,6 +173,7 @@ export type Database = {
           mp?: number | null
           perdida?: number | null
           servicios_con_descuento?: number | null
+          servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
           sueldo?: number | null
           total_facturado?: number | null
@@ -195,6 +197,7 @@ export type Database = {
           mp?: number | null
           perdida?: number | null
           servicios_con_descuento?: number | null
+          servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
           sueldo?: number | null
           total_facturado?: number | null
