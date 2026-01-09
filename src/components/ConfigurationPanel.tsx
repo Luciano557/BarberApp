@@ -148,7 +148,7 @@ function ServicesList({
         name: newName, 
         price: parseFloat(newPrice), 
         active: true,
-        lineId: newLineId || undefined,
+        lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
         lineName: activeLines.find(l => l.id === newLineId)?.name,
       });
       setNewName('');
@@ -163,7 +163,7 @@ function ServicesList({
       onUpdate(id, { 
         name: newName, 
         price: parseFloat(newPrice),
-        lineId: editLineId || undefined,
+        lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
         lineName: activeLines.find(l => l.id === editLineId)?.name,
       });
       setEditingId(null);
@@ -231,7 +231,7 @@ function ServicesList({
                   <SelectValue placeholder="Línea" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin línea</SelectItem>
+                  <SelectItem value="none">Sin línea</SelectItem>
                   {activeLines.map(line => (
                     <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                   ))}
@@ -327,7 +327,7 @@ function ServicesList({
                         <SelectValue placeholder="Línea" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Sin línea</SelectItem>
+                        <SelectItem value="none">Sin línea</SelectItem>
                         {activeLines.map(line => (
                           <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                         ))}
