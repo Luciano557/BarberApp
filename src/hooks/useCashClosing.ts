@@ -27,6 +27,30 @@ export function useCashClosing() {
   const saveCashClosing = useCallback(async (data: CashClosingData) => {
     const { barber, transactions, date, lines } = data;
     
+    // Check for duplicate closing on same date for same barber
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const startOfDay = `${dateStr}T00:00:00.000Z`;
+    const endOfDay = `${dateStr}T23:59:59.999Z`;
+    
+    const { data: existingClosing, error: checkError } = await supabase
+      .from('ingresos')
+      .select('id')
+      .eq('barbero', barber.barberName)
+      .gte('created_at', startOfDay)
+      .lte('created_at', endOfDay)
+      .limit(1);
+    
+    if (checkError) {
+      console.error('Error checking for duplicates:', checkError);
+      toast.error('Error al verificar cierres existentes');
+      return false;
+    }
+    
+    if (existingClosing && existingClosing.length > 0) {
+      toast.error(`Ya existe un cierre de caja para ${barber.barberName} en esta fecha`);
+      return false;
+    }
+    
     // Filter transactions for this barber
     const barberTxs = transactions.filter(tx => tx.barberId === barber.barberId);
     
