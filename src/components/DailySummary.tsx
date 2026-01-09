@@ -1,13 +1,14 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Transaction, Barber } from '@/types/barbershop';
+import { Transaction, Barber, Line } from '@/types/barbershop';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo, useState } from 'react';
+import { useCashClosing } from '@/hooks/useCashClosing';
 
 interface DailySummaryProps {
   summary: {
@@ -18,6 +19,7 @@ interface DailySummaryProps {
     transactions: Transaction[];
   };
   barbers: Barber[];
+  lines: Line[];
   selectedDate: Date;
   onDateChange: (date: Date) => void;
 }
@@ -33,8 +35,10 @@ interface BarberSummary {
   commissionAmount: number;
 }
 
-export function DailySummary({ summary, barbers, selectedDate, onDateChange }: DailySummaryProps) {
+export function DailySummary({ summary, barbers, lines, selectedDate, onDateChange }: DailySummaryProps) {
   const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const { saveCashClosing } = useCashClosing();
   
   // Ensure selectedDate is a valid Date
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
@@ -445,15 +449,32 @@ export function DailySummary({ summary, barbers, selectedDate, onDateChange }: D
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setClosingBarber(null)}>
+            <Button variant="outline" onClick={() => setClosingBarber(null)} disabled={isSaving}>
               Cancelar
             </Button>
-            <Button onClick={() => {
-              // TODO: Guardar cierre en DB
-              setClosingBarber(null);
-            }}>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Confirmar Cierre
+            <Button 
+              disabled={isSaving}
+              onClick={async () => {
+                if (!closingBarber) return;
+                setIsSaving(true);
+                const success = await saveCashClosing({
+                  barber: closingBarber,
+                  transactions: summary.transactions,
+                  date: validDate,
+                  lines,
+                });
+                setIsSaving(false);
+                if (success) {
+                  setClosingBarber(null);
+                }
+              }}
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              {isSaving ? 'Guardando...' : 'Confirmar Cierre'}
             </Button>
           </DialogFooter>
         </DialogContent>
