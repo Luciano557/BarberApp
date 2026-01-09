@@ -123,7 +123,7 @@ export function ConfigurationPanel({
 }
 
 function LinesList({
-  lines,
+  lines = [],
   onAdd,
   onUpdate,
 }: {
@@ -265,8 +265,8 @@ function LinesList({
 }
 
 function ServicesList({
-  services,
-  lines,
+  services = [],
+  lines = [],
   onAdd,
   onUpdate,
 }: {
