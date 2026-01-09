@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown } from 'lucide-react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { OrganizationSettings } from './OrganizationSettings';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ConfigurationPanelProps {
   services: Service[];
@@ -46,15 +48,23 @@ export function ConfigurationPanel({
   onAddLine,
   onUpdateLine,
 }: ConfigurationPanelProps) {
+  const { isOwner } = useAuth();
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
-        <p className="text-muted-foreground text-sm mt-1">Administra servicios, extras, staff y descuentos</p>
+        <p className="text-muted-foreground text-sm mt-1">Administra tu negocio, servicios, extras, staff y descuentos</p>
       </div>
 
-      <Tabs defaultValue="services" className="w-full">
+      <Tabs defaultValue={isOwner ? "business" : "services"} className="w-full">
         <TabsList className="w-full h-11 bg-muted p-1 rounded-lg">
+          {isOwner && (
+            <TabsTrigger value="business" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
+              <Building2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Negocio</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="services" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
             <Scissors className="h-4 w-4" />
             <span className="hidden sm:inline">Servicios</span>
@@ -72,6 +82,12 @@ export function ConfigurationPanel({
             <span className="hidden sm:inline">Descuentos</span>
           </TabsTrigger>
         </TabsList>
+
+        {isOwner && (
+          <TabsContent value="business" className="mt-6">
+            <OrganizationSettings />
+          </TabsContent>
+        )}
 
         <TabsContent value="services" className="mt-6">
           <ServicesList

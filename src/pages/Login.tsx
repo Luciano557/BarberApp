@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Scissors } from 'lucide-react';
+import { Scissors, Store } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,6 +22,7 @@ export default function Login() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
+  const [businessName, setBusinessName] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +54,13 @@ export default function Login() {
       return;
     }
 
-    const { error } = await signUp(registerEmail, registerPassword, registerName);
+    if (!businessName.trim()) {
+      toast.error('Ingresá el nombre de tu barbería');
+      setIsLoading(false);
+      return;
+    }
+
+    const { error } = await signUp(registerEmail, registerPassword, registerName, businessName);
 
     if (error) {
       toast.error('Error al registrarse', { description: error.message });
@@ -116,7 +123,21 @@ export default function Login() {
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="register-name">Nombre completo</Label>
+                  <Label htmlFor="business-name" className="flex items-center gap-1">
+                    <Store className="w-3.5 h-3.5" />
+                    Nombre de tu barbería
+                  </Label>
+                  <Input
+                    id="business-name"
+                    type="text"
+                    placeholder="Ej: Sir Fausto, Barbería Premium..."
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-name">Tu nombre completo</Label>
                   <Input
                     id="register-name"
                     type="text"
@@ -150,8 +171,11 @@ export default function Login() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
+                  {isLoading ? 'Creando cuenta...' : 'Crear mi barbería'}
                 </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Al registrarte, se creará tu barbería con un plan gratuito
+                </p>
               </form>
             </TabsContent>
           </Tabs>
