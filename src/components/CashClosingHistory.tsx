@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X } from 'lucide-react';
+import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
+import { toast } from 'sonner';
 
 interface CashClosingRecord {
   id: number;
@@ -80,6 +82,22 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     setSelectedBarber('all');
     setStartDate(undefined);
     setEndDate(undefined);
+  };
+
+  const handleAnular = async (record: CashClosingRecord) => {
+    const { error } = await supabase
+      .from('ingresos')
+      .update({ estado: 'eliminado' })
+      .eq('id', record.id);
+
+    if (error) {
+      console.error('Error anulando cierre:', error);
+      toast.error('Error al anular el cierre de caja');
+      return;
+    }
+
+    toast.success(`Cierre de ${record.barbero} anulado correctamente`);
+    fetchRecords();
   };
 
   const hasFilters = selectedBarber !== 'all' || startDate || endDate;
@@ -200,9 +218,34 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
                         </p>
                       </div>
                     </div>
-                    <Badge variant={record.estado === 'activo' ? 'default' : 'secondary'}>
-                      {record.estado || 'activo'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={record.estado === 'activo' ? 'default' : 'secondary'}>
+                        {record.estado || 'activo'}
+                      </Badge>
+                      {record.estado !== 'eliminado' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Anular cierre de caja?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción marcará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} como eliminado. El registro no se borrará pero ya no se contabilizará.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleAnular(record)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Anular
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
