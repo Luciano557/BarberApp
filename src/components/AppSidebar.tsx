@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -13,6 +14,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
+  const { organization } = useOrganization();
 
   // Filter nav items based on permissions
   const navItems = [
@@ -30,6 +32,20 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const roleBadge = getRoleBadge();
 
+  const getPlanBadge = () => {
+    if (!organization) return null;
+    switch (organization.plan) {
+      case 'premium':
+        return { label: 'Premium', className: 'bg-amber-500/20 text-amber-600 border-amber-500/30' };
+      case 'basic':
+        return { label: 'Basic', className: 'bg-blue-500/20 text-blue-600 border-blue-500/30' };
+      default:
+        return { label: 'Free', className: 'bg-muted text-muted-foreground' };
+    }
+  };
+
+  const planBadge = getPlanBadge();
+
   return (
     <aside
       className={cn(
@@ -37,19 +53,28 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         collapsed ? "w-16" : "w-56"
       )}
     >
-      {/* Logo */}
+      {/* Logo & Organization */}
       <div className="h-14 flex items-center justify-between px-3 border-b border-sidebar-border">
         {!collapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-              <Scissors className="h-4 w-4 text-secondary-foreground" />
+              <Building2 className="h-4 w-4 text-secondary-foreground" />
             </div>
-            <span className="font-semibold text-sidebar-foreground text-sm">BarberPOS</span>
+            <div className="min-w-0 flex-1">
+              <span className="font-semibold text-sidebar-foreground text-sm block truncate">
+                {organization?.name || 'Barbería'}
+              </span>
+              {planBadge && (
+                <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", planBadge.className)}>
+                  {planBadge.label}
+                </Badge>
+              )}
+            </div>
           </div>
         )}
         {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center mx-auto">
-            <Scissors className="h-4 w-4 text-secondary-foreground" />
+            <Building2 className="h-4 w-4 text-secondary-foreground" />
           </div>
         )}
       </div>
