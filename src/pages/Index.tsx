@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
+import { SueldosPanel } from '@/components/SueldosPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserManagement } from '@/components/UserManagement';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -94,6 +95,10 @@ const Index = () => {
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
             />
+          )}
+
+          {activeTab === 'sueldos' && canManageConfig && (
+            <SueldosPanel barbers={barbers} />
           )}
 
           {activeTab === 'config' && canManageConfig && (

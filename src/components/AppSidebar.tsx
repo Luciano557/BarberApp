@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2 } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
     { id: 'resumen', label: 'Resumen', icon: BarChart3 },
+    ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
