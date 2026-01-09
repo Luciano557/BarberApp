@@ -338,6 +338,42 @@ export type Database = {
         }
         Relationships: []
       }
+      pagos_sueldos: {
+        Row: {
+          barbero_id: string
+          barbero_nombre: string
+          concepto: string | null
+          created_at: string
+          fecha: string
+          id: string
+          monto: number
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          barbero_id: string
+          barbero_nombre: string
+          concepto?: string | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          barbero_id?: string
+          barbero_nombre?: string
+          concepto?: string | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       plan_features: {
         Row: {
           can_export_reports: boolean | null
