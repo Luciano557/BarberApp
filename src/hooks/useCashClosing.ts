@@ -4,6 +4,7 @@ import { Transaction, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface BarberSummary {
   barberId: string;
@@ -24,7 +25,14 @@ interface CashClosingData {
 }
 
 export function useCashClosing() {
+  const { organization } = useOrganization();
+
   const saveCashClosing = useCallback(async (data: CashClosingData) => {
+    if (!organization) {
+      toast.error('Error: No se encontró la organización');
+      return false;
+    }
+
     const { barber, transactions, date, lines } = data;
     
     // Check for duplicate closing on same date for same barber
@@ -134,9 +142,10 @@ export function useCashClosing() {
       extras,
       identificador,
       estado: 'activo',
-      Usuario: 'Sistema', // TODO: Replace with actual user when auth is implemented
+      Usuario: 'Sistema',
       servicios_por_linea: serviciosPorLinea,
       created_at: new Date().toISOString(),
+      organization_id: organization.id,
     };
     
     const { error } = await supabase
@@ -151,7 +160,7 @@ export function useCashClosing() {
     
     toast.success(`Cierre de caja guardado para ${barber.barberName}`);
     return true;
-  }, []);
+  }, [organization]);
   
   return { saveCashClosing };
 }

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Transaction } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface VentaInsert {
   barbero_id: string;
@@ -12,6 +13,7 @@ interface VentaInsert {
   descuento_pct: number;
   metodo_pago: 'efectivo' | 'mercado_pago';
   total_final: number;
+  organization_id: string;
 }
 
 interface VentaExtraInsert {
@@ -23,6 +25,7 @@ interface VentaExtraInsert {
 }
 
 export function useTransactions() {
+  const { organization } = useOrganization();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -97,6 +100,11 @@ export function useTransactions() {
   }, [selectedDate, loadTransactionsByDate]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    if (!organization) {
+      toast.error('Error: No se encontró la organización');
+      return null;
+    }
+
     // Insertar venta principal
     const ventaData: VentaInsert = {
       barbero_id: transaction.barberId,
@@ -107,6 +115,7 @@ export function useTransactions() {
       descuento_pct: transaction.discount,
       metodo_pago: transaction.paymentMethod,
       total_final: transaction.total,
+      organization_id: organization.id,
     };
 
     const { data: venta, error: ventaError } = await supabase
@@ -150,7 +159,7 @@ export function useTransactions() {
     setTransactions(prev => [newTransaction, ...prev]);
     toast.success('Cobro registrado correctamente');
     return newTransaction;
-  }, []);
+  }, [organization]);
 
   const getTodayTransactions = useCallback(() => {
     return transactions;
