@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth, AppRole } from '@/contexts/AuthContext';
+import { ChangePasswordForm } from './ChangePasswordForm';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -8,6 +10,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { user, roles, isLoading } = useAuth();
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   if (isLoading) {
     return (
@@ -22,6 +25,13 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check if user needs to change password (invited users)
+  const mustChangePassword = user.user_metadata?.must_change_password === true;
+  
+  if (mustChangePassword && !passwordChanged) {
+    return <ChangePasswordForm onSuccess={() => setPasswordChanged(true)} />;
   }
 
   if (requiredRoles && requiredRoles.length > 0) {
