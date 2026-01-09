@@ -1,13 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
 import { AppSidebar } from '@/components/AppSidebar';
+import { UserManagement } from '@/components/UserManagement';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const [activeTab, setActiveTab] = useState('registro');
+  const { canManagePayments, canManageConfig, canManageUsers } = useAuth();
+  
+  // Set default tab based on permissions
+  const getDefaultTab = () => {
+    if (canManagePayments) return 'registro';
+    return 'resumen';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getDefaultTab);
+
+  // Update active tab if current tab becomes inaccessible
+  useEffect(() => {
+    if (activeTab === 'registro' && !canManagePayments) {
+      setActiveTab('resumen');
+    }
+    if (activeTab === 'config' && !canManageConfig) {
+      setActiveTab('resumen');
+    }
+  }, [activeTab, canManagePayments, canManageConfig]);
 
   const {
     isLoading,
@@ -56,7 +76,7 @@ const Index = () => {
       {/* Main Content */}
       <main className="flex-1 min-h-screen overflow-auto">
         <div className="max-w-4xl mx-auto p-8">
-          {activeTab === 'registro' && (
+          {activeTab === 'registro' && canManagePayments && (
             <PaymentRegistration
               services={services}
               extras={extras}
@@ -76,25 +96,32 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'config' && (
-            <ConfigurationPanel
-              services={allServices}
-              extras={allExtras}
-              barbers={allBarbers}
-              discounts={discounts}
-              lines={allLines}
-              onAddService={addService}
-              onUpdateService={updateService}
-              onAddExtra={addExtra}
-              onUpdateExtra={updateExtra}
-              onAddBarber={addBarber}
-              onUpdateBarber={updateBarber}
-              onAddDiscount={addDiscount}
-              onUpdateDiscount={updateDiscount}
-              onDeleteDiscount={deleteDiscount}
-              onAddLine={addLine}
-              onUpdateLine={updateLine}
-            />
+          {activeTab === 'config' && canManageConfig && (
+            <div className="space-y-8">
+              <ConfigurationPanel
+                services={allServices}
+                extras={allExtras}
+                barbers={allBarbers}
+                discounts={discounts}
+                lines={allLines}
+                onAddService={addService}
+                onUpdateService={updateService}
+                onAddExtra={addExtra}
+                onUpdateExtra={updateExtra}
+                onAddBarber={addBarber}
+                onUpdateBarber={updateBarber}
+                onAddDiscount={addDiscount}
+                onUpdateDiscount={updateDiscount}
+                onDeleteDiscount={deleteDiscount}
+                onAddLine={addLine}
+                onUpdateLine={updateLine}
+              />
+              
+              {/* User Management - only for owner */}
+              {canManageUsers && (
+                <UserManagement barbers={allBarbers} />
+              )}
+            </div>
           )}
         </div>
       </main>
