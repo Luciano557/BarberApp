@@ -23,6 +23,7 @@ export type Database = {
           dni: string | null
           id: string
           nombre: string
+          organization_id: string | null
           telefono: string | null
           updated_at: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           dni?: string | null
           id?: string
           nombre: string
+          organization_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -45,10 +47,19 @@ export type Database = {
           dni?: string | null
           id?: string
           nombre?: string
+          organization_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "barberos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       descuentos: {
         Row: {
@@ -56,6 +67,7 @@ export type Database = {
           created_at: string
           id: string
           nombre: string
+          organization_id: string | null
           tipo: string
           updated_at: string
           valor: number
@@ -65,6 +77,7 @@ export type Database = {
           created_at?: string
           id?: string
           nombre: string
+          organization_id?: string | null
           tipo: string
           updated_at?: string
           valor?: number
@@ -74,11 +87,20 @@ export type Database = {
           created_at?: string
           id?: string
           nombre?: string
+          organization_id?: string | null
           tipo?: string
           updated_at?: string
           valor?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "descuentos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       Egresos: {
         Row: {
@@ -87,6 +109,7 @@ export type Database = {
           Fecha: string | null
           id: number
           Monto: number | null
+          organization_id: string | null
         }
         Insert: {
           Categoria?: string | null
@@ -94,6 +117,7 @@ export type Database = {
           Fecha?: string | null
           id?: number
           Monto?: number | null
+          organization_id?: string | null
         }
         Update: {
           Categoria?: string | null
@@ -101,8 +125,17 @@ export type Database = {
           Fecha?: string | null
           id?: number
           Monto?: number | null
+          organization_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "Egresos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       extras: {
         Row: {
@@ -110,6 +143,7 @@ export type Database = {
           created_at: string
           id: string
           nombre: string
+          organization_id: string | null
           precio: number
           updated_at: string
         }
@@ -118,6 +152,7 @@ export type Database = {
           created_at?: string
           id?: string
           nombre: string
+          organization_id?: string | null
           precio?: number
           updated_at?: string
         }
@@ -126,10 +161,19 @@ export type Database = {
           created_at?: string
           id?: string
           nombre?: string
+          organization_id?: string | null
           precio?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "extras_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingresos: {
         Row: {
@@ -147,6 +191,7 @@ export type Database = {
           id: number
           identificador: string | null
           mp: number | null
+          organization_id: string | null
           perdida: number | null
           servicios_con_descuento: number | null
           servicios_por_linea: Json | null
@@ -171,6 +216,7 @@ export type Database = {
           id?: number
           identificador?: string | null
           mp?: number | null
+          organization_id?: string | null
           perdida?: number | null
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
@@ -195,6 +241,7 @@ export type Database = {
           id?: number
           identificador?: string | null
           mp?: number | null
+          organization_id?: string | null
           perdida?: number | null
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
@@ -204,7 +251,15 @@ export type Database = {
           total_sin_descuento?: number | null
           Usuario?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ingresos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lineas: {
         Row: {
@@ -212,6 +267,7 @@ export type Database = {
           created_at: string
           id: string
           nombre: string
+          organization_id: string | null
           updated_at: string
         }
         Insert: {
@@ -219,6 +275,7 @@ export type Database = {
           created_at?: string
           id?: string
           nombre: string
+          organization_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -226,7 +283,91 @@ export type Database = {
           created_at?: string
           id?: string
           nombre?: string
+          organization_id?: string | null
           updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lineas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          plan: string | null
+          plan_expires_at: string | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          plan?: string | null
+          plan_expires_at?: string | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          plan?: string | null
+          plan_expires_at?: string | null
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      plan_features: {
+        Row: {
+          can_export_reports: boolean | null
+          can_view_analytics: boolean | null
+          created_at: string | null
+          id: string
+          max_barbers: number | null
+          max_services: number | null
+          plan: string
+          price_monthly: number | null
+        }
+        Insert: {
+          can_export_reports?: boolean | null
+          can_view_analytics?: boolean | null
+          created_at?: string | null
+          id?: string
+          max_barbers?: number | null
+          max_services?: number | null
+          plan: string
+          price_monthly?: number | null
+        }
+        Update: {
+          can_export_reports?: boolean | null
+          can_view_analytics?: boolean | null
+          created_at?: string | null
+          id?: string
+          max_barbers?: number | null
+          max_services?: number | null
+          plan?: string
+          price_monthly?: number | null
         }
         Relationships: []
       }
@@ -237,6 +378,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          organization_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -245,6 +387,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          organization_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -253,6 +396,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          organization_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -261,6 +405,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -283,6 +434,7 @@ export type Database = {
           MargenBruto: number | null
           MargenBrutoPorcentual: number | null
           Mes: string | null
+          organization_id: string | null
           PromDiarioPorBarbero: number | null
           PuntoDeEquilibrioEnCortes: number | null
           Rentabilidad: number | null
@@ -308,6 +460,7 @@ export type Database = {
           MargenBruto?: number | null
           MargenBrutoPorcentual?: number | null
           Mes?: string | null
+          organization_id?: string | null
           PromDiarioPorBarbero?: number | null
           PuntoDeEquilibrioEnCortes?: number | null
           Rentabilidad?: number | null
@@ -333,6 +486,7 @@ export type Database = {
           MargenBruto?: number | null
           MargenBrutoPorcentual?: number | null
           Mes?: string | null
+          organization_id?: string | null
           PromDiarioPorBarbero?: number | null
           PuntoDeEquilibrioEnCortes?: number | null
           Rentabilidad?: number | null
@@ -341,7 +495,15 @@ export type Database = {
           TasaDeOcupación?: number | null
           TicketPromedio?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ReportesMensuales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       servicios: {
         Row: {
@@ -350,6 +512,7 @@ export type Database = {
           id: string
           linea_id: string | null
           nombre: string
+          organization_id: string | null
           precio: number
           updated_at: string
         }
@@ -359,6 +522,7 @@ export type Database = {
           id?: string
           linea_id?: string | null
           nombre: string
+          organization_id?: string | null
           precio?: number
           updated_at?: string
         }
@@ -368,6 +532,7 @@ export type Database = {
           id?: string
           linea_id?: string | null
           nombre?: string
+          organization_id?: string | null
           precio?: number
           updated_at?: string
         }
@@ -377,6 +542,13 @@ export type Database = {
             columns: ["linea_id"]
             isOneToOne: false
             referencedRelation: "lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -411,6 +583,7 @@ export type Database = {
           fecha_hora: string
           id: string
           metodo_pago: string
+          organization_id: string | null
           precio_servicio: number
           servicio_id: string
           servicio_nombre: string
@@ -424,6 +597,7 @@ export type Database = {
           fecha_hora?: string
           id?: string
           metodo_pago: string
+          organization_id?: string | null
           precio_servicio?: number
           servicio_id: string
           servicio_nombre: string
@@ -437,6 +611,7 @@ export type Database = {
           fecha_hora?: string
           id?: string
           metodo_pago?: string
+          organization_id?: string | null
           precio_servicio?: number
           servicio_id?: string
           servicio_nombre?: string
@@ -448,6 +623,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -506,13 +688,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_org_limit: {
+        Args: { _org_id: string; _resource: string }
+        Returns: boolean
+      }
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
+      get_user_organization_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_belongs_to_org: {
+        Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
     }
