@@ -68,7 +68,7 @@ export function useSupabaseData() {
     setIsLoading(true);
     try {
       const [linesRes, servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
-        supabase.from('lineas').select('*').order('nombre'),
+        supabase.from('lineas' as any).select('*').order('nombre'),
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
         supabase.from('barberos').select('*').order('nombre'),
@@ -107,11 +107,11 @@ export function useSupabaseData() {
   // Lines CRUD
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
     try {
-      const { data, error } = await supabase
-        .from('lineas')
+      const { data, error } = await (supabase
+        .from('lineas' as any)
         .insert({ nombre: line.name, activo: line.active })
         .select()
-        .single();
+        .single());
       
       if (error) throw error;
       const newLine = dbToLine(data);
@@ -131,10 +131,10 @@ export function useSupabaseData() {
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
 
-      const { error } = await supabase
-        .from('lineas')
+      const { error } = await (supabase
+        .from('lineas' as any)
         .update(dbUpdates)
-        .eq('id', id);
+        .eq('id', id));
       
       if (error) throw error;
       setLines(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
