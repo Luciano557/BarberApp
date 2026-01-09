@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2 } from 'lucide-react';
+import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -97,6 +97,22 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     }
 
     toast.success(`Cierre de ${record.barbero} anulado correctamente`);
+    fetchRecords();
+  };
+
+  const handleRestaurar = async (record: CashClosingRecord) => {
+    const { error } = await supabase
+      .from('ingresos')
+      .update({ estado: 'activo' })
+      .eq('id', record.id);
+
+    if (error) {
+      console.error('Error restaurando cierre:', error);
+      toast.error('Error al restaurar el cierre de caja');
+      return;
+    }
+
+    toast.success(`Cierre de ${record.barbero} restaurado correctamente`);
     fetchRecords();
   };
 
@@ -222,7 +238,29 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
                       <Badge variant={record.estado === 'activo' ? 'default' : 'secondary'}>
                         {record.estado || 'activo'}
                       </Badge>
-                      {record.estado !== 'eliminado' && (
+                      {record.estado === 'eliminado' ? (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary">
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Restaurar cierre de caja?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción restaurará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} y volverá a contabilizarse.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRestaurar(record)}>
+                                Restaurar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
