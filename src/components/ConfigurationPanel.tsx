@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, Layers } from 'lucide-react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount } from '@/types/barbershop';
 
 interface ConfigurationPanelProps {
-  lines: Line[];
   services: Service[];
   extras: Extra[];
   barbers: Barber[];
   discounts: Discount[];
-  onAddLine: (line: Omit<Line, 'id'>) => void;
-  onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdateService: (id: string, updates: Partial<Service>) => void;
   onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
@@ -28,13 +24,10 @@ interface ConfigurationPanelProps {
 }
 
 export function ConfigurationPanel({
-  lines,
   services,
   extras,
   barbers,
   discounts,
-  onAddLine,
-  onUpdateLine,
   onAddService,
   onUpdateService,
   onAddExtra,
@@ -49,15 +42,11 @@ export function ConfigurationPanel({
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
-        <p className="text-muted-foreground text-sm mt-1">Administra líneas, servicios, extras, staff y descuentos</p>
+        <p className="text-muted-foreground text-sm mt-1">Administra servicios, extras, staff y descuentos</p>
       </div>
 
-      <Tabs defaultValue="lines" className="w-full">
+      <Tabs defaultValue="services" className="w-full">
         <TabsList className="w-full h-11 bg-muted p-1 rounded-lg">
-          <TabsTrigger value="lines" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
-            <Layers className="h-4 w-4" />
-            <span className="hidden sm:inline">Líneas</span>
-          </TabsTrigger>
           <TabsTrigger value="services" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
             <Scissors className="h-4 w-4" />
             <span className="hidden sm:inline">Servicios</span>
@@ -76,18 +65,9 @@ export function ConfigurationPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="lines" className="mt-6">
-          <LinesList
-            lines={lines}
-            onAdd={onAddLine}
-            onUpdate={onUpdateLine}
-          />
-        </TabsContent>
-
         <TabsContent value="services" className="mt-6">
           <ServicesList
             services={services}
-            lines={lines}
             onAdd={onAddService}
             onUpdate={onUpdateService}
           />
@@ -122,156 +102,12 @@ export function ConfigurationPanel({
   );
 }
 
-function LinesList({
-  lines = [],
-  onAdd,
-  onUpdate,
-}: {
-  lines: Line[];
-  onAdd: (line: Omit<Line, 'id'>) => void;
-  onUpdate: (id: string, updates: Partial<Line>) => void;
-}) {
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
-
-  const activeLines = lines.filter(l => l.active);
-  const inactiveLines = lines.filter(l => !l.active);
-
-  const handleAdd = () => {
-    if (newName) {
-      onAdd({ name: newName, active: true });
-      setNewName('');
-      setIsAdding(false);
-    }
-  };
-
-  const handleUpdate = (id: string) => {
-    if (newName) {
-      onUpdate(id, { name: newName });
-      setEditingId(null);
-      setNewName('');
-    }
-  };
-
-  const startEdit = (line: Line) => {
-    setEditingId(line.id);
-    setNewName(line.name);
-  };
-
-  const renderLineItem = (line: Line) => (
-    <div
-      key={line.id}
-      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
-    >
-      {editingId === line.id ? (
-        <div className="flex gap-2 w-full">
-          <Input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="flex-1"
-          />
-          <Button size="icon" onClick={() => handleUpdate(line.id)} className="bg-success hover:bg-success/90">
-            <Save className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <>
-          <span className="flex-1 font-medium text-foreground">{line.name}</span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => startEdit(line)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-          >
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onUpdate(line.id, { active: !line.active })}
-            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
-            title={line.active ? 'Desactivar' : 'Activar'}
-          >
-            {line.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-          </Button>
-        </>
-      )}
-    </div>
-  );
-
-  return (
-    <Card className="border border-border bg-card">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-medium">Líneas de Servicios</CardTitle>
-        {!isAdding && activeSubTab === 'active' && (
-          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Agregar
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Las líneas agrupan servicios (ej: Essencial, Deluxe).
-        </p>
-        <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-          <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-            <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
-              Activas ({activeLines.length})
-            </TabsTrigger>
-            <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
-              Inactivas ({inactiveLines.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="active" className="mt-4 space-y-2">
-            {isAdding && (
-              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
-                <Input
-                  placeholder="Nombre de la línea (ej: Essencial)"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  className="flex-1"
-                />
-                <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
-                  <Save className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {activeLines.map(renderLineItem)}
-            {activeLines.length === 0 && !isAdding && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay líneas activas</p>
-            )}
-          </TabsContent>
-
-          <TabsContent value="inactive" className="mt-4 space-y-2">
-            {inactiveLines.map(renderLineItem)}
-            {inactiveLines.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay líneas inactivas</p>
-            )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
-  );
-}
-
 function ServicesList({
-  services = [],
-  lines = [],
+  services,
   onAdd,
   onUpdate,
 }: {
   services: Service[];
-  lines: Line[];
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
 }) {
@@ -279,44 +115,26 @@ function ServicesList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
-  const [newLineId, setNewLineId] = useState<string>('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
 
   const activeServices = services.filter(s => s.active);
   const inactiveServices = services.filter(s => !s.active);
-  const activeLines = lines.filter(l => l.active);
-
-  const getLineName = (lineId?: string) => {
-    if (!lineId) return null;
-    return lines.find(l => l.id === lineId)?.name;
-  };
 
   const handleAdd = () => {
     if (newName && newPrice) {
-      onAdd({ 
-        name: newName, 
-        price: parseFloat(newPrice), 
-        active: true,
-        lineId: newLineId || undefined,
-      });
+      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
       setNewName('');
       setNewPrice('');
-      setNewLineId('');
       setIsAdding(false);
     }
   };
 
   const handleUpdate = (id: string) => {
     if (newName && newPrice) {
-      onUpdate(id, { 
-        name: newName, 
-        price: parseFloat(newPrice),
-        lineId: newLineId || undefined,
-      });
+      onUpdate(id, { name: newName, price: parseFloat(newPrice) });
       setEditingId(null);
       setNewName('');
       setNewPrice('');
-      setNewLineId('');
     }
   };
 
@@ -324,7 +142,6 @@ function ServicesList({
     setEditingId(service.id);
     setNewName(service.name);
     setNewPrice(service.price.toString());
-    setNewLineId(service.lineId || '');
   };
 
   const renderServiceItem = (service: Service) => (
@@ -343,28 +160,13 @@ function ServicesList({
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               className="flex-1"
-              placeholder="Nombre"
             />
             <Input
               type="number"
               value={newPrice}
               onChange={(e) => setNewPrice(e.target.value)}
               className="w-28"
-              placeholder="Precio"
             />
-          </div>
-          <div className="flex gap-2">
-            <Select value={newLineId || "_none"} onValueChange={(v) => setNewLineId(v === "_none" ? "" : v)}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Sin línea" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">Sin línea</SelectItem>
-                {activeLines.map(line => (
-                  <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90">
               <Save className="h-4 w-4" />
             </Button>
@@ -375,14 +177,7 @@ function ServicesList({
         </div>
       ) : (
         <>
-          <div className="flex-1">
-            <span className="font-medium text-foreground">{service.name}</span>
-            {service.lineId && (
-              <span className="ml-2 text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">
-                {getLineName(service.lineId)}
-              </span>
-            )}
-          </div>
+          <span className="flex-1 font-medium text-foreground">{service.name}</span>
           <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
           <Button
             size="icon"
@@ -430,41 +225,26 @@ function ServicesList({
 
           <TabsContent value="active" className="mt-4 space-y-2">
             {isAdding && (
-              <div className="space-y-2 p-3 bg-muted rounded-lg animate-scale-in">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nombre"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Precio"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    className="w-28"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select value={newLineId || "_none"} onValueChange={(v) => setNewLineId(v === "_none" ? "" : v)}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar línea (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">Sin línea</SelectItem>
-                      {activeLines.map(line => (
-                        <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
-                    <Save className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+                <Input
+                  placeholder="Nombre"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  placeholder="Precio"
+                  value={newPrice}
+                  onChange={(e) => setNewPrice(e.target.value)}
+                  className="w-28"
+                />
+                <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
+                  <Save className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             )}
             {activeServices.map(renderServiceItem)}
