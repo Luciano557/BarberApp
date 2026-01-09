@@ -354,12 +354,12 @@ function ServicesList({
             />
           </div>
           <div className="flex gap-2">
-            <Select value={newLineId} onValueChange={setNewLineId}>
+            <Select value={newLineId || "_none"} onValueChange={(v) => setNewLineId(v === "_none" ? "" : v)}>
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Sin línea" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sin línea</SelectItem>
+                <SelectItem value="_none">Sin línea</SelectItem>
                 {activeLines.map(line => (
                   <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                 ))}
@@ -447,12 +447,12 @@ function ServicesList({
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Select value={newLineId} onValueChange={setNewLineId}>
+                  <Select value={newLineId || "_none"} onValueChange={(v) => setNewLineId(v === "_none" ? "" : v)}>
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Seleccionar línea (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sin línea</SelectItem>
+                      <SelectItem value="_none">Sin línea</SelectItem>
                       {activeLines.map(line => (
                         <SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>
                       ))}
