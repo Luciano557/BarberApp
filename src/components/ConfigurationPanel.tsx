@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { OrganizationSettings } from './OrganizationSettings';
+import { InviteUserDialog } from './InviteUserDialog';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ConfigurationPanelProps {
@@ -580,6 +581,7 @@ function StaffList({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
   
   // Form state - commission as string for free editing
   const [formData, setFormData] = useState({
@@ -850,12 +852,21 @@ function StaffList({
                 {barber.commission}% comisión
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setInviteBarber(barber)}
+                className="h-8 w-8"
+                title="Invitar a usar el sistema"
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => startEdit(barber)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                className="h-8 w-8"
               >
                 <Edit2 className="h-4 w-4" />
               </Button>
@@ -863,7 +874,7 @@ function StaffList({
                 size="icon"
                 variant="ghost"
                 onClick={() => onUpdate(barber.id, { active: !barber.active })}
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                className="h-8 w-8"
                 title={barber.active ? 'Desactivar' : 'Activar'}
               >
                 {barber.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
@@ -926,6 +937,13 @@ function StaffList({
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      {/* Invite User Dialog */}
+      <InviteUserDialog
+        open={!!inviteBarber}
+        onOpenChange={(open) => !open && setInviteBarber(null)}
+        barber={inviteBarber || undefined}
+      />
     </Card>
   );
 }
