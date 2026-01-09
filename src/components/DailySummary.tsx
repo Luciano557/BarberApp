@@ -9,6 +9,7 @@ import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo, useState } from 'react';
 import { useCashClosing } from '@/hooks/useCashClosing';
+import { CashClosingHistory } from './CashClosingHistory';
 
 interface DailySummaryProps {
   summary: {
@@ -154,6 +155,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
               Hoy
             </Button>
           )}
+          <CashClosingHistory barbers={barbers} />
         </div>
       </div>
 
