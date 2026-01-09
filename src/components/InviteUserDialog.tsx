@@ -77,6 +77,10 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
       }
 
       if (response.data?.error) {
+        // Handle specific error messages
+        if (response.data.error.includes('Ya existe un usuario')) {
+          throw new Error('Ya existe una cuenta con ese email. El usuario puede iniciar sesión directamente.');
+        }
         throw new Error(response.data.error);
       }
 
