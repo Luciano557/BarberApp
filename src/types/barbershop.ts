@@ -1,8 +1,16 @@
+export interface Line {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 export interface Service {
   id: string;
   uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  lineId?: string; // Reference to lineas table
+  lineName?: string; // Cached line name for display
   active: boolean;
 }
 
