@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Service, Extra, Barber, Discount } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 
 // Transform database rows to app types
+function dbToLine(row: any): Line {
+  return {
+    id: row.id,
+    name: row.nombre,
+    active: row.activo,
+  };
+}
+
 function dbToService(row: any): Service {
   return {
     id: row.id,
@@ -11,6 +19,7 @@ function dbToService(row: any): Service {
     name: row.nombre,
     price: Number(row.precio),
     active: row.activo,
+    lineId: row.linea_id || undefined,
   };
 }
 
@@ -47,6 +56,7 @@ function dbToDiscount(row: any): Discount {
 }
 
 export function useSupabaseData() {
+  const [lines, setLines] = useState<Line[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -57,18 +67,21 @@ export function useSupabaseData() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
+      const [linesRes, servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
+        supabase.from('lineas').select('*').order('nombre'),
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
         supabase.from('barberos').select('*').order('nombre'),
         supabase.from('descuentos').select('*').order('valor'),
       ]);
 
+      if (linesRes.error) throw linesRes.error;
       if (servicesRes.error) throw servicesRes.error;
       if (extrasRes.error) throw extrasRes.error;
       if (barbersRes.error) throw barbersRes.error;
       if (discountsRes.error) throw discountsRes.error;
 
+      setLines(linesRes.data.map(dbToLine));
       setServices(servicesRes.data.map(dbToService));
       setExtras(extrasRes.data.map(dbToExtra));
       setBarbers(barbersRes.data.map(dbToBarber));
@@ -91,12 +104,57 @@ export function useSupabaseData() {
     fetchData();
   }, [fetchData]);
 
+  // Lines CRUD
+  const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('lineas')
+        .insert({ nombre: line.name, activo: line.active })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      const newLine = dbToLine(data);
+      setLines(prev => [...prev, newLine]);
+      toast.success('Línea agregada');
+      return newLine;
+    } catch (error) {
+      console.error('Error adding line:', error);
+      toast.error('Error al agregar línea');
+      return null;
+    }
+  }, []);
+
+  const updateLine = useCallback(async (id: string, updates: Partial<Line>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      const { error } = await supabase
+        .from('lineas')
+        .update(dbUpdates)
+        .eq('id', id);
+      
+      if (error) throw error;
+      setLines(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+    } catch (error) {
+      console.error('Error updating line:', error);
+      toast.error('Error al actualizar línea');
+    }
+  }, []);
+
   // Services CRUD
   const addService = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
     try {
       const { data, error } = await supabase
         .from('servicios')
-        .insert({ nombre: service.name, precio: service.price, activo: service.active })
+        .insert({ 
+          nombre: service.name, 
+          precio: service.price, 
+          activo: service.active,
+          linea_id: service.lineId || null,
+        })
         .select()
         .single();
       
@@ -118,6 +176,7 @@ export function useSupabaseData() {
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
 
       const { error } = await supabase
         .from('servicios')
@@ -291,6 +350,8 @@ export function useSupabaseData() {
     // Loading state
     isLoading,
     // Data - active items only for operations
+    lines: lines.filter(l => l.active),
+    allLines: lines,
     services: services.filter(s => s.active),
     allServices: services,
     extras: extras.filter(e => e.active),
@@ -298,6 +359,9 @@ export function useSupabaseData() {
     barbers: barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
+    // Lines
+    addLine,
+    updateLine,
     // Services
     addService,
     updateService,
