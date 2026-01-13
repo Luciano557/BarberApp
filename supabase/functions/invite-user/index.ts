@@ -197,7 +197,8 @@ serve(async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         userId: newUser.user.id,
-        message: "Invitación enviada correctamente"
+        tempPassword: tempPassword, // Return temp password to show on screen
+        message: "Usuario creado correctamente"
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
