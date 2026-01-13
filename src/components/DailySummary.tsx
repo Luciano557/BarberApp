@@ -57,7 +57,8 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
   const [voidReason, setVoidReason] = useState<string>('');
-  const { user, profile } = useAuth();
+  const { user, profile, isOwner, isManager } = useAuth();
+  const canVoidClosure = isOwner || isManager;
   const { organization } = useOrganization();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
@@ -388,19 +389,26 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                   </div>
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberName) ? (
-                      <Button 
-                        variant="destructive"
-                        className="w-full" 
-                        onClick={() => {
-                          const closureData = closedBarbersData.get(barber.barberName);
-                          if (closureData) {
-                            setVoidingClosure(closureData);
-                          }
-                        }}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Anular Cierre
-                      </Button>
+                      canVoidClosure ? (
+                        <Button 
+                          variant="destructive"
+                          className="w-full" 
+                          onClick={() => {
+                            const closureData = closedBarbersData.get(barber.barberName);
+                            if (closureData) {
+                              setVoidingClosure(closureData);
+                            }
+                          }}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Anular Cierre
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="w-full justify-center py-2">
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Caja Cerrada
+                        </Badge>
+                      )
                     ) : (
                       <Button 
                         className="w-full" 
