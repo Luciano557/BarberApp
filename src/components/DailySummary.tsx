@@ -417,9 +417,9 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="icon"
-                                className={`h-8 w-8 ${canVoid ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10' : 'text-muted-foreground/50 cursor-not-allowed'}`}
+                                className={`h-8 w-8 border-destructive/30 ${canVoid ? 'text-destructive hover:text-destructive hover:bg-destructive/10' : 'text-muted-foreground/50 cursor-not-allowed opacity-50'}`}
                                 onClick={() => canVoid && setVoidingTransaction(tx)}
                                 disabled={!canVoid}
                               >
