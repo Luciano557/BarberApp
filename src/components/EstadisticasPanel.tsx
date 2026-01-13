@@ -7,9 +7,9 @@ import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parse
 import { es } from 'date-fns/locale';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area
+  LineChart, Line, AreaChart, Area, Legend
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface MonthlyData {
@@ -364,6 +364,7 @@ export function EstadisticasPanel() {
                   />
                 }
               />
+              <ChartLegend content={<ChartLegendContent />} />
               <Bar 
                 dataKey="efectivo" 
                 stackId="a"
