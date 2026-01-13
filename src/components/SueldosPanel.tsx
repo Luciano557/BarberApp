@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
@@ -27,6 +28,25 @@ interface BarberSalaryData {
   totalDevengadoHistorico: number;  // All time
   totalPagadoHistorico: number;     // All time
   saldo: number;                    // Historical: devengadoHistorico - pagadoHistorico
+  detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
+  detallePagos: PagoDetalle[];       // Individual payments for the period
+}
+
+interface IngresoDetalle {
+  id: number;
+  fecha: string;
+  dia: string;
+  totalFacturado: number;
+  sueldo: number;
+  efectivo: number;
+  mp: number;
+}
+
+interface PagoDetalle {
+  id: string;
+  fecha: string;
+  monto: number;
+  concepto: string | null;
 }
 
 interface PagoSueldo {
@@ -41,6 +61,115 @@ interface PagoSueldo {
 
 interface SueldosPanelProps {
   barbers: Barber[];
+}
+
+// Subcomponent for expandable barber detail row
+function BarberDetailRow({ 
+  barber, 
+  formatCurrency, 
+  getSaldoBadge 
+}: { 
+  barber: BarberSalaryData; 
+  formatCurrency: (amount: number) => string;
+  getSaldoBadge: (saldo: number) => React.ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <div className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
+          <div className="flex items-center gap-3">
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <span className="font-medium">{barber.barberName}</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Devengado</p>
+              <p className="font-medium">{formatCurrency(barber.totalDevengado)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Pagado</p>
+              <p className="font-medium text-green-600">{formatCurrency(barber.totalPagado)}</p>
+            </div>
+            <div className="text-right min-w-[140px]">
+              <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
+              {getSaldoBadge(barber.saldo)}
+            </div>
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="pl-8 pr-4 pb-4 space-y-4">
+          {/* Ingresos Detail */}
+          {barber.detalleIngresos.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Cierres de Caja</h4>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Día</TableHead>
+                      <TableHead className="text-right">Efectivo</TableHead>
+                      <TableHead className="text-right">MP</TableHead>
+                      <TableHead className="text-right">Total Facturado</TableHead>
+                      <TableHead className="text-right">Comisión</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {barber.detalleIngresos.map(ingreso => (
+                      <TableRow key={ingreso.id}>
+                        <TableCell>{format(new Date(ingreso.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
+                        <TableCell className="capitalize">{ingreso.dia}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(ingreso.efectivo)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(ingreso.mp)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(ingreso.totalFacturado)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(ingreso.sueldo)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {/* Pagos Detail */}
+          {barber.detallePagos.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-muted-foreground">Pagos Realizados</h4>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Concepto</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {barber.detallePagos.map(pago => (
+                      <TableRow key={pago.id}>
+                        <TableCell>{format(new Date(pago.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
+                        <TableCell className="text-muted-foreground">{pago.concepto || '-'}</TableCell>
+                        <TableCell className="text-right font-medium text-green-600">{formatCurrency(pago.monto)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {barber.detalleIngresos.length === 0 && barber.detallePagos.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay registros en el período seleccionado
+            </p>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
 export function SueldosPanel({ barbers }: SueldosPanelProps) {
@@ -73,12 +202,13 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       if (ingresosHistoricosError) throw ingresosHistoricosError;
 
-      // Fetch devengado filtered by period (if set)
+      // Fetch devengado filtered by period (if set) - with full details
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('barbero, sueldo, created_at')
+        .select('id, barbero, sueldo, total_facturado, efectivo, mp, dia, created_at')
         .eq('organization_id', organization.id)
-        .eq('estado', 'activo');
+        .eq('estado', 'activo')
+        .order('created_at', { ascending: false });
       
       // Apply period start date filter if set
       if (periodStartDate) {
@@ -157,6 +287,30 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         const totalPagado = pagadoFiltradoPorBarbero[nombreCompleto] || pagadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
         const totalPagadoHistorico = pagadoHistoricoPorBarbero[nombreCompleto] || pagadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
         
+        // Get detailed ingresos for this barber
+        const detalleIngresos: IngresoDetalle[] = (ingresosFiltrados || [])
+          .filter(i => i.barbero === nombreCompleto || i.barbero === barber.firstName.trim())
+          .map(i => ({
+            id: i.id,
+            fecha: i.created_at,
+            dia: i.dia || '',
+            totalFacturado: Number(i.total_facturado) || 0,
+            sueldo: Number(i.sueldo) || 0,
+            efectivo: Number(i.efectivo) || 0,
+            mp: Number(i.mp) || 0,
+          }));
+
+        // Get detailed pagos for this barber
+        const detallePagos: PagoDetalle[] = (pagosFiltrados || [])
+          .filter(p => p.barbero_nombre.replace(/\s+/g, ' ').trim() === nombreCompleto || 
+                       p.barbero_nombre.replace(/\s+/g, ' ').trim() === barber.firstName.trim())
+          .map(p => ({
+            id: p.id,
+            fecha: p.created_at,
+            monto: Number(p.monto) || 0,
+            concepto: p.concepto,
+          }));
+
         return {
           barberId: barber.id,
           barberName: nombreCompleto || barber.firstName.trim(),
@@ -164,7 +318,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           totalDevengadoHistorico,
           totalPagado,
           totalPagadoHistorico,
-          saldo: totalDevengadoHistorico - totalPagadoHistorico, // Saldo is always historical
+          saldo: totalDevengadoHistorico - totalPagadoHistorico,
+          detalleIngresos,
+          detallePagos,
         };
       });
 
@@ -446,41 +602,25 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         </Card>
       </div>
 
-      {/* Salary Table per Barber */}
+      {/* Salary Table per Barber with expandable details */}
       <Card>
         <CardHeader>
           <CardTitle>Resumen por Barbero</CardTitle>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Barbero</TableHead>
-                <TableHead className="text-right">Devengado</TableHead>
-                <TableHead className="text-right">Pagado</TableHead>
-                <TableHead className="text-right">Saldo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {salaryData.map(barber => (
-                <TableRow key={barber.barberId}>
-                  <TableCell className="font-medium">{barber.barberName}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(barber.totalDevengado)}</TableCell>
-                  <TableCell className="text-right text-green-600">{formatCurrency(barber.totalPagado)}</TableCell>
-                  <TableCell className="text-right">
-                    {getSaldoBadge(barber.saldo)}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {salaryData.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    No hay datos de sueldos registrados
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        <CardContent className="space-y-2">
+          {salaryData.map(barber => (
+            <BarberDetailRow 
+              key={barber.barberId} 
+              barber={barber} 
+              formatCurrency={formatCurrency}
+              getSaldoBadge={getSaldoBadge}
+            />
+          ))}
+          {salaryData.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No hay datos de sueldos registrados
+            </p>
+          )}
         </CardContent>
       </Card>
 
