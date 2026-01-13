@@ -25,7 +25,9 @@ interface BarberSalaryData {
   barberName: string;
   totalDevengado: number;           // Filtered by period
   totalPagado: number;              // Filtered by period
-  saldo: number;                    // Period: devengado - pagado
+  totalDevengadoHistorico: number;  // All time
+  totalPagadoHistorico: number;     // All time
+  saldo: number;                    // Historical: devengadoHistorico - pagadoHistorico
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
 }
@@ -91,7 +93,7 @@ function BarberDetailRow({
               <p className="font-medium text-green-600">{formatCurrency(barber.totalPagado)}</p>
             </div>
             <div className="text-right min-w-[140px]">
-              <p className="text-xs text-muted-foreground">Saldo</p>
+              <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
               {getSaldoBadge(barber.saldo)}
             </div>
           </div>
@@ -184,61 +186,106 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Date filter for devengado (period start)
-  // Default to start of current month
-  const [periodStartDate, setPeriodStartDate] = useState<Date>(startOfMonth(new Date()));
+  const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     if (!organization) return;
     
     setIsLoading(true);
     try {
-      // Fetch devengado filtered by period - with full details
-      const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
-      
-      const { data: ingresosFiltrados, error: ingresosFiltradosError } = await supabase
+      // Fetch ALL devengado from ingresos (historical - for saldo calculation)
+      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
+        .from('ingresos')
+        .select('barbero, sueldo')
+        .eq('organization_id', organization.id)
+        .eq('estado', 'activo');
+
+      if (ingresosHistoricosError) throw ingresosHistoricosError;
+
+      // Fetch devengado filtered by period (if set) - with full details
+      let ingresosQuery = supabase
         .from('ingresos')
         .select('id, barbero, sueldo, total_facturado, efectivo, mp, dia, created_at')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo')
-        .gte('created_at', `${startDateStr}T00:00:00`)
         .order('created_at', { ascending: false });
+      
+      // Apply period start date filter if set
+      if (periodStartDate) {
+        const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
+        ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
+      }
+
+      const { data: ingresosFiltrados, error: ingresosFiltradosError } = await ingresosQuery;
 
       if (ingresosFiltradosError) throw ingresosFiltradosError;
 
-      // Fetch pagos filtered by period
-      const { data: pagosFiltrados, error: pagosFiltradosError } = await supabase
+      // Fetch ALL pagos realizados (historical - for saldo calculation)
+      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
         .from('pagos_sueldos')
         .select('*')
         .eq('organization_id', organization.id)
-        .gte('created_at', `${startDateStr}T00:00:00`)
         .order('created_at', { ascending: false });
+
+      if (pagosHistoricosError) throw pagosHistoricosError;
+
+      setPagos(pagosHistoricos || []);
+
+      // Fetch pagos filtered by period (if set)
+      let pagosQuery = supabase
+        .from('pagos_sueldos')
+        .select('*')
+        .eq('organization_id', organization.id);
+      
+      if (periodStartDate) {
+        const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
+        pagosQuery = pagosQuery.gte('created_at', `${startDateStr}T00:00:00`);
+      }
+
+      const { data: pagosFiltrados, error: pagosFiltradosError } = await pagosQuery;
 
       if (pagosFiltradosError) throw pagosFiltradosError;
 
-      setPagos(pagosFiltrados || []);
-
-      // Calculate devengado per barber for period
-      const devengadoPorBarbero: Record<string, number> = {};
-      ingresosFiltrados?.forEach(ingreso => {
+      // Calculate historical devengado per barber
+      const devengadoHistoricoPorBarbero: Record<string, number> = {};
+      ingresosHistoricos?.forEach(ingreso => {
         const nombre = ingreso.barbero;
         if (nombre) {
-          devengadoPorBarbero[nombre] = (devengadoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+          devengadoHistoricoPorBarbero[nombre] = (devengadoHistoricoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
         }
       });
 
-      // Calculate pagado per barber for period
-      const pagadoPorBarbero: Record<string, number> = {};
+      // Calculate filtered devengado per barber
+      const devengadoFiltradoPorBarbero: Record<string, number> = {};
+      ingresosFiltrados?.forEach(ingreso => {
+        const nombre = ingreso.barbero;
+        if (nombre) {
+          devengadoFiltradoPorBarbero[nombre] = (devengadoFiltradoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+        }
+      });
+
+      // Calculate historical pagado per barber
+      const pagadoHistoricoPorBarbero: Record<string, number> = {};
+      pagosHistoricos?.forEach(pago => {
+        const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
+        pagadoHistoricoPorBarbero[nombre] = (pagadoHistoricoPorBarbero[nombre] || 0) + pago.monto;
+      });
+
+      // Calculate filtered pagado per barber
+      const pagadoFiltradoPorBarbero: Record<string, number> = {};
       pagosFiltrados?.forEach(pago => {
         const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
-        pagadoPorBarbero[nombre] = (pagadoPorBarbero[nombre] || 0) + pago.monto;
+        pagadoFiltradoPorBarbero[nombre] = (pagadoFiltradoPorBarbero[nombre] || 0) + pago.monto;
       });
 
       // Build salary data for active barbers
       const data: BarberSalaryData[] = barbers.map(barber => {
         // Normalize name by trimming and collapsing multiple spaces
         const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
-        const totalDevengado = devengadoPorBarbero[nombreCompleto] || devengadoPorBarbero[barber.firstName.trim()] || 0;
-        const totalPagado = pagadoPorBarbero[nombreCompleto] || pagadoPorBarbero[barber.firstName.trim()] || 0;
+        const totalDevengado = devengadoFiltradoPorBarbero[nombreCompleto] || devengadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
+        const totalDevengadoHistorico = devengadoHistoricoPorBarbero[nombreCompleto] || devengadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
+        const totalPagado = pagadoFiltradoPorBarbero[nombreCompleto] || pagadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
+        const totalPagadoHistorico = pagadoHistoricoPorBarbero[nombreCompleto] || pagadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
         
         // Get detailed ingresos for this barber
         const detalleIngresos: IngresoDetalle[] = (ingresosFiltrados || [])
@@ -268,8 +315,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           barberId: barber.id,
           barberName: nombreCompleto || barber.firstName.trim(),
           totalDevengado,
+          totalDevengadoHistorico,
           totalPagado,
-          saldo: totalDevengado - totalPagado,
+          totalPagadoHistorico,
+          saldo: totalDevengadoHistorico - totalPagadoHistorico,
           detalleIngresos,
           detallePagos,
         };
@@ -390,21 +439,28 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           {/* Period Presets */}
           <div className="flex items-center gap-1">
             <Button
-              variant={format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd') ? "default" : "outline"}
+              variant={!periodStartDate ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriodStartDate(undefined)}
+            >
+              Todo
+            </Button>
+            <Button
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd') ? "default" : "outline"}
               size="sm"
               onClick={() => setPeriodStartDate(startOfMonth(new Date()))}
             >
               Este mes
             </Button>
             <Button
-              variant={format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 15), 'yyyy-MM-dd') ? "default" : "outline"}
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 15), 'yyyy-MM-dd') ? "default" : "outline"}
               size="sm"
               onClick={() => setPeriodStartDate(subDays(new Date(), 15))}
             >
               Últimos 15 días
             </Button>
             <Button
-              variant={format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 30), 'yyyy-MM-dd') ? "default" : "outline"}
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 30), 'yyyy-MM-dd') ? "default" : "outline"}
               size="sm"
               onClick={() => setPeriodStartDate(subDays(new Date(), 30))}
             >
@@ -420,7 +476,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                 size="sm"
                 className={cn(
                   "w-[140px] justify-start text-left font-normal",
-                  ![
+                  periodStartDate && ![
                     format(startOfMonth(new Date()), 'yyyy-MM-dd'),
                     format(subDays(new Date(), 15), 'yyyy-MM-dd'),
                     format(subDays(new Date(), 30), 'yyyy-MM-dd')
@@ -435,7 +491,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
               <Calendar
                 mode="single"
                 selected={periodStartDate}
-                onSelect={(date) => date && setPeriodStartDate(date)}
+                onSelect={setPeriodStartDate}
                 locale={es}
                 initialFocus
                 className="pointer-events-auto"
