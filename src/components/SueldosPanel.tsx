@@ -96,13 +96,14 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       // Build salary data for active barbers
       const data: BarberSalaryData[] = barbers.map(barber => {
-        const nombreCompleto = `${barber.firstName} ${barber.lastName}`.trim();
-        const totalDevengado = devengadoPorBarbero[nombreCompleto] || devengadoPorBarbero[barber.firstName] || 0;
-        const totalPagado = pagadoPorBarbero[nombreCompleto] || pagadoPorBarbero[barber.firstName] || 0;
+        // Normalize name by trimming and collapsing multiple spaces
+        const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
+        const totalDevengado = devengadoPorBarbero[nombreCompleto] || devengadoPorBarbero[barber.firstName.trim()] || 0;
+        const totalPagado = pagadoPorBarbero[nombreCompleto] || pagadoPorBarbero[barber.firstName.trim()] || 0;
         
         return {
           barberId: barber.id,
-          barberName: nombreCompleto || barber.firstName,
+          barberName: nombreCompleto || barber.firstName.trim(),
           totalDevengado,
           totalPagado,
           saldo: totalDevengado - totalPagado,
