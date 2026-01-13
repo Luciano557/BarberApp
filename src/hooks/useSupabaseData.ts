@@ -55,7 +55,7 @@ function dbToDiscount(row: any): Discount {
     id: row.id,
     label: row.nombre,
     value: Number(row.valor),
-    type: row.tipo === 'nominal' ? 'fixed' : 'percentage',
+    type: row.tipo === 'monto' ? 'fixed' : 'percentage',
   };
 }
 
@@ -289,7 +289,7 @@ export function useSupabaseData() {
         .insert({
           nombre: discount.label,
           valor: discount.value,
-          tipo: discount.type === 'fixed' ? 'nominal' : 'porcentaje',
+          tipo: discount.type === 'fixed' ? 'monto' : 'porcentaje',
           activo: true,
           organization_id: organization.id,
         })
@@ -314,7 +314,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.label !== undefined) dbUpdates.nombre = updates.label;
       if (updates.value !== undefined) dbUpdates.valor = updates.value;
-      if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'nominal' : 'porcentaje';
+      if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'monto' : 'porcentaje';
 
       const { error } = await supabase
         .from('descuentos')
