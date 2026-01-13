@@ -74,16 +74,16 @@ export function EstadisticasPanel() {
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
 
-      // Fetch ventas for the period
-      const { data: ventas, error: ventasError } = await supabase
-        .from('venta')
-        .select('id, fecha_hora, total_final, metodo_pago, estado')
+      // Fetch ingresos (cierres de caja) for the period
+      const { data: ingresos, error: ingresosError } = await supabase
+        .from('ingresos')
+        .select('id, dia, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
         .eq('organization_id', organization.id)
-        .gte('fecha_hora', startDate.toISOString())
-        .lte('fecha_hora', endDate.toISOString())
-        .neq('estado', 'anulado');
+        .gte('dia', format(startDate, 'yyyy-MM-dd'))
+        .lte('dia', format(endDate, 'yyyy-MM-dd'))
+        .neq('estado', 'eliminado');
 
-      if (ventasError) throw ventasError;
+      if (ingresosError) throw ingresosError;
 
       // Fetch barberos activos
       const { data: barberos, error: barberosError } = await supabase
@@ -98,23 +98,23 @@ export function EstadisticasPanel() {
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
       
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
-        const monthStart = startOfMonth(monthDate);
-        const monthEnd = endOfMonth(monthDate);
+        const monthStart = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+        const monthEnd = format(endOfMonth(monthDate), 'yyyy-MM-dd');
         
-        const monthVentas = ventas?.filter(v => {
-          const ventaDate = parseISO(v.fecha_hora);
-          return ventaDate >= monthStart && ventaDate <= monthEnd;
+        const monthIngresos = ingresos?.filter(i => {
+          return i.dia && i.dia >= monthStart && i.dia <= monthEnd;
         }) || [];
 
-        const facturacion = monthVentas.reduce((sum, v) => sum + (v.total_final || 0), 0);
-        const efectivo = monthVentas.filter(v => v.metodo_pago === 'efectivo').reduce((sum, v) => sum + (v.total_final || 0), 0);
-        const mp = monthVentas.filter(v => v.metodo_pago === 'mercado_pago').reduce((sum, v) => sum + (v.total_final || 0), 0);
+        const facturacion = monthIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0);
+        const efectivo = monthIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
+        const mp = monthIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
+        const servicios = monthIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0);
 
         return {
           month: format(monthDate, 'yyyy-MM'),
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
           facturacion,
-          servicios: monthVentas.length,
+          servicios,
           efectivo,
           mp,
         };
