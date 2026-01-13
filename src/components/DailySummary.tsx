@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Transaction, Barber, Line } from '@/types/barbershop';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -54,6 +56,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string }>>(new Map());
   const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
+  const [voidReason, setVoidReason] = useState<string>('');
   const { user, profile } = useAuth();
   const { organization } = useOrganization();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
@@ -168,9 +171,16 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const handleNextDay = () => onDateChange(addDays(validDate, 1));
   const handleToday = () => onDateChange(new Date());
 
+  const VOID_REASONS = [
+    'Servicios duplicados o faltantes',
+    'Se registraron ventas después del cierre',
+    'Diferencia entre caja física y sistema detectada post-cierre',
+    'Falla del sistema durante el cierre',
+  ];
+
   // Handle voiding a cash closing
   const handleVoidClosure = async () => {
-    if (!voidingClosure || !user || !organization) return;
+    if (!voidingClosure || !user || !organization || !voidReason) return;
     
     setIsVoidingClosure(true);
     try {
@@ -182,7 +192,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
 
       if (updateError) throw updateError;
 
-      // Create anulacion record
+      // Create anulacion record with reason
       const { error: insertError } = await supabase
         .from('anulaciones_cierre')
         .insert({
@@ -193,12 +203,14 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
           anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
           anulado_por_email: user.email || '',
           organization_id: organization.id,
+          motivo: voidReason,
         });
 
       if (insertError) throw insertError;
 
       toast.success('Cierre de caja anulado correctamente');
       setVoidingClosure(null);
+      setVoidReason('');
       checkClosedBarbers(); // Refresh the closed barbers state
     } catch (error) {
       console.error('Error voiding closure:', error);
@@ -654,7 +666,12 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
       </Dialog>
 
       {/* Void Closure Confirmation Dialog */}
-      <Dialog open={!!voidingClosure} onOpenChange={(open) => !open && setVoidingClosure(null)}>
+      <Dialog open={!!voidingClosure} onOpenChange={(open) => {
+        if (!open) {
+          setVoidingClosure(null);
+          setVoidReason('');
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -667,24 +684,44 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
-              Al anular el cierre:
-            </p>
-            <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
-              <li>El registro se marcará como eliminado</li>
-              <li>Se guardará un registro de quién realizó la anulación</li>
-              <li>El barbero podrá realizar un nuevo cierre de caja</li>
-            </ul>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="void-reason" className="text-sm font-medium">
+                Motivo de la anulación <span className="text-destructive">*</span>
+              </Label>
+              <Select value={voidReason} onValueChange={setVoidReason}>
+                <SelectTrigger id="void-reason">
+                  <SelectValue placeholder="Selecciona un motivo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VOID_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-sm text-muted-foreground">
+                Al anular el cierre:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
+                <li>El registro se marcará como eliminado</li>
+                <li>Se guardará un registro de quién realizó la anulación</li>
+                <li>El barbero podrá realizar un nuevo cierre de caja</li>
+              </ul>
+            </div>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setVoidingClosure(null)} disabled={isVoidingClosure}>
+            <Button variant="outline" onClick={() => { setVoidingClosure(null); setVoidReason(''); }} disabled={isVoidingClosure}>
               Cancelar
             </Button>
             <Button 
               variant="destructive"
-              disabled={isVoidingClosure}
+              disabled={isVoidingClosure || !voidReason}
               onClick={handleVoidClosure}
             >
               {isVoidingClosure ? (
