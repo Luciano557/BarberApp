@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2, Mail } from 'lucide-react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2, Mail, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { OrganizationSettings } from './OrganizationSettings';
 import { InviteUserDialog } from './InviteUserDialog';
+import { PinConfigSection } from './PinConfigSection';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ConfigurationPanelProps {
@@ -82,6 +83,10 @@ export function ConfigurationPanel({
             <Tag className="h-4 w-4" />
             <span className="hidden sm:inline">Descuentos</span>
           </TabsTrigger>
+          <TabsTrigger value="security" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Seguridad</span>
+          </TabsTrigger>
         </TabsList>
 
         {isOwner && (
@@ -123,6 +128,10 @@ export function ConfigurationPanel({
             onUpdate={onUpdateDiscount}
             onDelete={onDeleteDiscount}
           />
+        </TabsContent>
+
+        <TabsContent value="security" className="mt-6">
+          <PinConfigSection />
         </TabsContent>
       </Tabs>
     </div>
