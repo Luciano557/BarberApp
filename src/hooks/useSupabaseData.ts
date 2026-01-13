@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 // Transform database rows to app types
 function dbToLine(row: any): Line {
@@ -58,6 +59,7 @@ function dbToDiscount(row: any): Discount {
 }
 
 export function useSupabaseData() {
+  const { organization } = useOrganization();
   const [services, setServices] = useState<Service[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -111,6 +113,10 @@ export function useSupabaseData() {
 
   // Services CRUD
   const addService = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('servicios')
@@ -119,12 +125,12 @@ export function useSupabaseData() {
           precio: service.price, 
           activo: service.active,
           linea_id: service.lineId || null,
+          organization_id: organization.id,
         })
         .select()
         .single();
       
       if (error) throw error;
-      const line = lines.find(l => l.id === service.lineId);
       const newService = dbToService(data, lines);
       setServices(prev => [...prev, newService]);
       toast.success('Servicio agregado');
@@ -134,7 +140,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar servicio');
       return null;
     }
-  }, [lines]);
+  }, [lines, organization]);
 
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
@@ -166,10 +172,19 @@ export function useSupabaseData() {
 
   // Extras CRUD
   const addExtra = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('extras')
-        .insert({ nombre: extra.name, precio: extra.price, activo: extra.active })
+        .insert({ 
+          nombre: extra.name, 
+          precio: extra.price, 
+          activo: extra.active,
+          organization_id: organization.id,
+        })
         .select()
         .single();
       
@@ -183,7 +198,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar extra');
       return null;
     }
-  }, []);
+  }, [organization]);
 
   const updateExtra = useCallback(async (id: string, updates: Partial<Extra>) => {
     try {
@@ -207,6 +222,10 @@ export function useSupabaseData() {
 
   // Barbers CRUD
   const addBarber = useCallback(async (barber: Omit<Barber, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('barberos')
@@ -217,6 +236,7 @@ export function useSupabaseData() {
           dni: barber.dni || null,
           comision: barber.commission,
           activo: barber.active,
+          organization_id: organization.id,
         })
         .select()
         .single();
@@ -231,7 +251,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar barbero');
       return null;
     }
-  }, []);
+  }, [organization]);
 
   const updateBarber = useCallback(async (id: string, updates: Partial<Barber>) => {
     try {
@@ -258,6 +278,10 @@ export function useSupabaseData() {
 
   // Discounts CRUD
   const addDiscount = useCallback(async (discount: Omit<Discount, 'id'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('descuentos')
@@ -266,6 +290,7 @@ export function useSupabaseData() {
           valor: discount.value,
           tipo: 'porcentaje',
           activo: true,
+          organization_id: organization.id,
         })
         .select()
         .single();
@@ -280,7 +305,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar descuento');
       return null;
     }
-  }, []);
+  }, [organization]);
 
   const updateDiscount = useCallback(async (id: string, updates: Partial<Discount>) => {
     if (id === 'none') return; // Don't update the "Sin descuento" option
@@ -321,10 +346,18 @@ export function useSupabaseData() {
 
   // Lines CRUD
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
     try {
       const { data, error } = await supabase
         .from('lineas')
-        .insert({ nombre: line.name, activo: line.active })
+        .insert({ 
+          nombre: line.name, 
+          activo: line.active,
+          organization_id: organization.id,
+        })
         .select()
         .single();
       
@@ -338,7 +371,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar línea');
       return null;
     }
-  }, []);
+  }, [organization]);
 
   const updateLine = useCallback(async (id: string, updates: Partial<Line>) => {
     try {
