@@ -108,31 +108,33 @@ const Index = () => {
           )}
 
           {activeTab === 'config' && canManageConfig && (
-            <div className="space-y-8">
-              <ConfigurationPanel
-                services={allServices}
-                extras={allExtras}
-                barbers={allBarbers}
-                discounts={discounts}
-                lines={allLines}
-                onAddService={addService}
-                onUpdateService={updateService}
-                onAddExtra={addExtra}
-                onUpdateExtra={updateExtra}
-                onAddBarber={addBarber}
-                onUpdateBarber={updateBarber}
-                onAddDiscount={addDiscount}
-                onUpdateDiscount={updateDiscount}
-                onDeleteDiscount={deleteDiscount}
-                onAddLine={addLine}
-                onUpdateLine={updateLine}
-              />
-              
-              {/* User Management - only for owner */}
-              {canManageUsers && (
-                <UserManagement barbers={allBarbers} />
-              )}
-            </div>
+            <PinProtectedSection sectionName="Configuración">
+              <div className="space-y-8">
+                <ConfigurationPanel
+                  services={allServices}
+                  extras={allExtras}
+                  barbers={allBarbers}
+                  discounts={discounts}
+                  lines={allLines}
+                  onAddService={addService}
+                  onUpdateService={updateService}
+                  onAddExtra={addExtra}
+                  onUpdateExtra={updateExtra}
+                  onAddBarber={addBarber}
+                  onUpdateBarber={updateBarber}
+                  onAddDiscount={addDiscount}
+                  onUpdateDiscount={updateDiscount}
+                  onDeleteDiscount={deleteDiscount}
+                  onAddLine={addLine}
+                  onUpdateLine={updateLine}
+                />
+                
+                {/* User Management - only for owner */}
+                {canManageUsers && (
+                  <UserManagement barbers={allBarbers} />
+                )}
+              </div>
+            </PinProtectedSection>
           )}
         </div>
       </main>
