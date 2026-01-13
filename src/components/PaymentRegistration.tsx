@@ -294,7 +294,12 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
                   {index + 1}
                 </span>
                 <div className="flex justify-between items-center pl-6">
-                  <span className="font-medium text-foreground">{service.name}</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-foreground">{service.name}</span>
+                    {service.lineName && (
+                      <span className="text-sm text-muted-foreground">{service.lineName}</span>
+                    )}
+                  </div>
                   <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
                 </div>
               </button>
