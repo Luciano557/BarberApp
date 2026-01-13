@@ -62,10 +62,12 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
       const { data, error } = await query.limit(100);
 
       if (error) {
-        console.error('Error fetching records:', error);
+        console.error('Error fetching cash closing records:', error);
+        toast.error('Error al cargar historial');
         return;
       }
 
+      console.log('Cash closing records loaded:', data?.length || 0, 'records');
       setRecords(data || []);
     } finally {
       setLoading(false);
