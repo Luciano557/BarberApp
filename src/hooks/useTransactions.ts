@@ -110,12 +110,16 @@ export function useTransactions() {
       return null;
     }
 
+    // Normalize names to avoid spacing issues
+    const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
+    const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
+
     // Insertar venta principal
     const ventaData: VentaInsert = {
       barbero_id: transaction.barberId,
-      barbero_nombre: transaction.barberName,
+      barbero_nombre: normalizedBarberName,
       servicio_id: transaction.serviceId,
-      servicio_nombre: transaction.serviceName,
+      servicio_nombre: normalizedServiceName,
       precio_servicio: transaction.servicePrice,
       descuento_pct: transaction.discount,
       metodo_pago: transaction.paymentMethod,

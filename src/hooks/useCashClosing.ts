@@ -35,6 +35,9 @@ export function useCashClosing() {
 
     const { barber, transactions, date, lines } = data;
     
+    // Normalize barber name to avoid spacing issues
+    const normalizedBarberName = barber.barberName.replace(/\s+/g, ' ').trim();
+    
     // Check for duplicate closing on same date for same barber
     const dateStr = format(date, 'yyyy-MM-dd');
     const startOfDay = `${dateStr}T00:00:00.000Z`;
@@ -43,7 +46,7 @@ export function useCashClosing() {
     const { data: existingClosing, error: checkError } = await supabase
       .from('ingresos')
       .select('id')
-      .eq('barbero', barber.barberName)
+      .eq('barbero', normalizedBarberName)
       .gte('created_at', startOfDay)
       .lte('created_at', endOfDay)
       .limit(1);
@@ -55,7 +58,7 @@ export function useCashClosing() {
     }
     
     if (existingClosing && existingClosing.length > 0) {
-      toast.error(`Ya existe un cierre de caja para ${barber.barberName} en esta fecha`);
+      toast.error(`Ya existe un cierre de caja para ${normalizedBarberName} en esta fecha`);
       return false;
     }
     
@@ -124,9 +127,9 @@ export function useCashClosing() {
     // Generate unique identifier for this day/barber combo
     const identificador = crypto.randomUUID();
     
-    // Prepare the insert data
+    // Prepare the insert data with normalized barber name
     const insertData = {
-      barbero: barber.barberName,
+      barbero: normalizedBarberName,
       mp,
       efectivo,
       total_facturado: totalFacturado,
@@ -158,7 +161,7 @@ export function useCashClosing() {
       return false;
     }
     
-    toast.success(`Cierre de caja guardado para ${barber.barberName}`);
+    toast.success(`Cierre de caja guardado para ${normalizedBarberName}`);
     return true;
   }, [organization]);
   
