@@ -49,6 +49,7 @@ export function useCashClosing() {
       .eq('barbero', normalizedBarberName)
       .gte('created_at', startOfDay)
       .lte('created_at', endOfDay)
+      .neq('estado', 'eliminado')
       .limit(1);
     
     if (checkError) {
