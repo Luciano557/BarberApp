@@ -119,10 +119,13 @@ export function useSupabaseData() {
       return null;
     }
     try {
+      // Normalize name to avoid spacing issues
+      const normalizedName = service.name.replace(/\s+/g, ' ').trim();
+      
       const { data, error } = await supabase
         .from('servicios')
         .insert({ 
-          nombre: service.name, 
+          nombre: normalizedName, 
           precio: service.price, 
           activo: service.active,
           linea_id: service.lineId || null,
@@ -146,7 +149,7 @@ export function useSupabaseData() {
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
       const dbUpdates: any = {};
-      if (updates.name !== undefined) dbUpdates.nombre = updates.name;
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
@@ -178,10 +181,13 @@ export function useSupabaseData() {
       return null;
     }
     try {
+      // Normalize name to avoid spacing issues
+      const normalizedName = extra.name.replace(/\s+/g, ' ').trim();
+      
       const { data, error } = await supabase
         .from('extras')
         .insert({ 
-          nombre: extra.name, 
+          nombre: normalizedName, 
           precio: extra.price, 
           activo: extra.active,
           organization_id: organization.id,
@@ -204,7 +210,7 @@ export function useSupabaseData() {
   const updateExtra = useCallback(async (id: string, updates: Partial<Extra>) => {
     try {
       const dbUpdates: any = {};
-      if (updates.name !== undefined) dbUpdates.nombre = updates.name;
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
 
@@ -228,11 +234,15 @@ export function useSupabaseData() {
       return null;
     }
     try {
+      // Normalize names to avoid spacing issues
+      const normalizedFirstName = barber.firstName.replace(/\s+/g, ' ').trim();
+      const normalizedLastName = barber.lastName.replace(/\s+/g, ' ').trim();
+      
       const { data, error } = await supabase
         .from('barberos')
         .insert({
-          nombre: barber.firstName,
-          apellido: barber.lastName,
+          nombre: normalizedFirstName,
+          apellido: normalizedLastName,
           telefono: barber.phone || null,
           dni: barber.dni || null,
           comision: barber.commission,
@@ -257,8 +267,8 @@ export function useSupabaseData() {
   const updateBarber = useCallback(async (id: string, updates: Partial<Barber>) => {
     try {
       const dbUpdates: any = {};
-      if (updates.firstName !== undefined) dbUpdates.nombre = updates.firstName;
-      if (updates.lastName !== undefined) dbUpdates.apellido = updates.lastName;
+      if (updates.firstName !== undefined) dbUpdates.nombre = updates.firstName.replace(/\s+/g, ' ').trim();
+      if (updates.lastName !== undefined) dbUpdates.apellido = updates.lastName.replace(/\s+/g, ' ').trim();
       if (updates.phone !== undefined) dbUpdates.telefono = updates.phone || null;
       if (updates.dni !== undefined) dbUpdates.dni = updates.dni || null;
       if (updates.commission !== undefined) dbUpdates.comision = updates.commission;
