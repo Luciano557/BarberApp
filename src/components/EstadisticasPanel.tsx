@@ -74,13 +74,13 @@ export function EstadisticasPanel() {
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
 
-      // Fetch ingresos (cierres de caja) for the period
+      // Fetch ingresos (cierres de caja) for the period - usando created_at que tiene la fecha real
       const { data: ingresos, error: ingresosError } = await supabase
         .from('ingresos')
-        .select('id, dia, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
+        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
         .eq('organization_id', organization.id)
-        .gte('dia', format(startDate, 'yyyy-MM-dd'))
-        .lte('dia', format(endDate, 'yyyy-MM-dd'))
+        .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
         .neq('estado', 'eliminado');
 
       if (ingresosError) throw ingresosError;
@@ -98,11 +98,13 @@ export function EstadisticasPanel() {
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
       
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
-        const monthStart = format(startOfMonth(monthDate), 'yyyy-MM-dd');
-        const monthEnd = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+        const monthStart = startOfMonth(monthDate);
+        const monthEnd = endOfMonth(monthDate);
         
         const monthIngresos = ingresos?.filter(i => {
-          return i.dia && i.dia >= monthStart && i.dia <= monthEnd;
+          if (!i.created_at) return false;
+          const ingresoDate = parseISO(i.created_at);
+          return ingresoDate >= monthStart && ingresoDate <= monthEnd;
         }) || [];
 
         const facturacion = monthIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0);
