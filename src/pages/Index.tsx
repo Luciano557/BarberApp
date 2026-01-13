@@ -3,6 +3,7 @@ import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
 import { SueldosPanel } from '@/components/SueldosPanel';
+import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserManagement } from '@/components/UserManagement';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
@@ -98,6 +99,12 @@ const Index = () => {
                 onDateChange={setSelectedDate}
                 onVoidTransaction={voidTransaction}
               />
+            </PinProtectedSection>
+          )}
+
+          {activeTab === 'estadisticas' && canManageConfig && (
+            <PinProtectedSection sectionName="Estadísticas">
+              <EstadisticasPanel />
             </PinProtectedSection>
           )}
 
