@@ -8,13 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Wallet, Plus, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface BarberSalaryData {
   barberId: string;
@@ -50,18 +53,29 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [monto, setMonto] = useState('');
   const [concepto, setConcepto] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Date filter for devengado (period start)
+  const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     if (!organization) return;
     
     setIsLoading(true);
     try {
-      // Fetch total devengado from ingresos (sueldos acumulados por barbero)
-      const { data: ingresosData, error: ingresosError } = await supabase
+      // Fetch total devengado from ingresos (with optional date filter)
+      let ingresosQuery = supabase
         .from('ingresos')
-        .select('barbero, sueldo')
+        .select('barbero, sueldo, created_at')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
+      
+      // Apply period start date filter if set
+      if (periodStartDate) {
+        const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
+        ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
+      }
+
+      const { data: ingresosData, error: ingresosError } = await ingresosQuery;
 
       if (ingresosError) throw ingresosError;
 
@@ -121,7 +135,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, periodStartDate]);
 
   const handleSubmitPago = async () => {
     if (!organization || !selectedBarberId || !monto) {
@@ -215,19 +229,58 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Wallet className="h-6 w-6 text-primary" />
           <h2 className="text-2xl font-bold">Sueldos</h2>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Registrar Pago
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          {/* Period Start Date Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Desde:</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[160px] justify-start text-left font-normal",
+                    !periodStartDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {periodStartDate ? format(periodStartDate, "dd/MM/yyyy") : "Todo"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={periodStartDate}
+                  onSelect={setPeriodStartDate}
+                  locale={es}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {periodStartDate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setPeriodStartDate(undefined)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Registrar Pago
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Registrar Pago de Sueldo</DialogTitle>
@@ -281,13 +334,16 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Devengado</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(histórico)'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
@@ -298,7 +354,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Pagado</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Pagado (histórico)</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">
@@ -309,7 +365,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Saldo Pendiente</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Saldo Pendiente (histórico)</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-destructive">
