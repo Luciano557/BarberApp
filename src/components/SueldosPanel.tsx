@@ -22,10 +22,11 @@ import { cn } from '@/lib/utils';
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
-  totalDevengado: number;       // Filtered by period
-  totalDevengadoHistorico: number; // All time (for saldo calculation)
-  totalPagado: number;
-  saldo: number;                // Historical: devengadoHistorico - pagado
+  totalDevengado: number;           // Filtered by period
+  totalPagado: number;              // Filtered by period
+  totalDevengadoHistorico: number;  // All time
+  totalPagadoHistorico: number;     // All time
+  saldo: number;                    // Historical: devengadoHistorico - pagadoHistorico
 }
 
 interface PagoSueldo {
@@ -89,16 +90,31 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       if (ingresosFiltradosError) throw ingresosFiltradosError;
 
-      // Fetch pagos realizados (always historical)
-      const { data: pagosData, error: pagosError } = await supabase
+      // Fetch ALL pagos realizados (historical - for saldo calculation)
+      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
         .from('pagos_sueldos')
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
 
-      if (pagosError) throw pagosError;
+      if (pagosHistoricosError) throw pagosHistoricosError;
 
-      setPagos(pagosData || []);
+      setPagos(pagosHistoricos || []);
+
+      // Fetch pagos filtered by period (if set)
+      let pagosQuery = supabase
+        .from('pagos_sueldos')
+        .select('*')
+        .eq('organization_id', organization.id);
+      
+      if (periodStartDate) {
+        const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
+        pagosQuery = pagosQuery.gte('created_at', `${startDateStr}T00:00:00`);
+      }
+
+      const { data: pagosFiltrados, error: pagosFiltradosError } = await pagosQuery;
+
+      if (pagosFiltradosError) throw pagosFiltradosError;
 
       // Calculate historical devengado per barber
       const devengadoHistoricoPorBarbero: Record<string, number> = {};
@@ -118,11 +134,18 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         }
       });
 
-      // Sum pagado from pagos_sueldos (normalize name to match)
-      const pagadoPorBarbero: Record<string, number> = {};
-      pagosData?.forEach(pago => {
+      // Calculate historical pagado per barber
+      const pagadoHistoricoPorBarbero: Record<string, number> = {};
+      pagosHistoricos?.forEach(pago => {
         const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
-        pagadoPorBarbero[nombre] = (pagadoPorBarbero[nombre] || 0) + pago.monto;
+        pagadoHistoricoPorBarbero[nombre] = (pagadoHistoricoPorBarbero[nombre] || 0) + pago.monto;
+      });
+
+      // Calculate filtered pagado per barber
+      const pagadoFiltradoPorBarbero: Record<string, number> = {};
+      pagosFiltrados?.forEach(pago => {
+        const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
+        pagadoFiltradoPorBarbero[nombre] = (pagadoFiltradoPorBarbero[nombre] || 0) + pago.monto;
       });
 
       // Build salary data for active barbers
@@ -131,7 +154,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
         const totalDevengado = devengadoFiltradoPorBarbero[nombreCompleto] || devengadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
         const totalDevengadoHistorico = devengadoHistoricoPorBarbero[nombreCompleto] || devengadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
-        const totalPagado = pagadoPorBarbero[nombreCompleto] || pagadoPorBarbero[barber.firstName.trim()] || 0;
+        const totalPagado = pagadoFiltradoPorBarbero[nombreCompleto] || pagadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
+        const totalPagadoHistorico = pagadoHistoricoPorBarbero[nombreCompleto] || pagadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
         
         return {
           barberId: barber.id,
@@ -139,7 +163,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           totalDevengado,
           totalDevengadoHistorico,
           totalPagado,
-          saldo: totalDevengadoHistorico - totalPagado, // Saldo is always historical
+          totalPagadoHistorico,
+          saldo: totalDevengadoHistorico - totalPagadoHistorico, // Saldo is always historical
         };
       });
 
@@ -398,7 +423,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Pagado (histórico)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(histórico)'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">
