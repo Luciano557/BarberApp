@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, UserPlus, Loader2 } from 'lucide-react';
+import { Mail, UserPlus, Loader2, Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -27,6 +27,9 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: InviteUserDialogProps) {
   const { organization } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   // Compute initial values based on barber prop
   const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
@@ -47,8 +50,20 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
         role: barber ? 'barber' : '',
       });
       setErrors({});
+      setCreatedCredentials(null);
+      setShowPassword(false);
+      setCopied(false);
     }
   }, [open, barber?.id, barberFullName]);
+
+  const copyCredentials = async () => {
+    if (!createdCredentials) return;
+    const text = `Email: ${createdCredentials.email}\nContraseña temporal: ${createdCredentials.password}`;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success('Credenciales copiadas');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,20 +109,28 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
 
       if (response.data?.error) {
         // Handle specific error messages
-        if (response.data.error.includes('Ya existe un usuario')) {
+        if (response.data.error.includes('Ya existe un usuario') || response.data.error.includes('already been registered')) {
           throw new Error('Ya existe una cuenta con ese email. El usuario puede iniciar sesión directamente.');
         }
         throw new Error(response.data.error);
       }
 
-      toast.success('¡Invitación enviada!', {
-        description: `Se envió un email a ${formData.email} con las credenciales de acceso`,
-      });
-
-      // Reset form
-      setFormData({ email: '', fullName: '', role: '' });
-      onOpenChange(false);
-      onSuccess?.();
+      // Show credentials on screen
+      if (response.data?.tempPassword) {
+        setCreatedCredentials({
+          email: formData.email.trim(),
+          password: response.data.tempPassword,
+        });
+        toast.success('¡Usuario creado!', {
+          description: 'Compartí las credenciales con el usuario',
+        });
+        onSuccess?.();
+      } else {
+        toast.success('¡Invitación enviada!');
+        setFormData({ email: '', fullName: '', role: '' });
+        onOpenChange(false);
+        onSuccess?.();
+      }
 
     } catch (error: any) {
       console.error('Invite error:', error);
@@ -123,9 +146,70 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
     if (!isLoading) {
       setFormData({ email: '', fullName: barber ? `${barber.firstName} ${barber.lastName}` : '', role: barber ? 'barber' : '' });
       setErrors({});
+      setCreatedCredentials(null);
+      setShowPassword(false);
+      setCopied(false);
       onOpenChange(false);
     }
   };
+
+  // Show success screen with credentials
+  if (createdCredentials) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Check className="w-5 h-5" />
+              ¡Usuario creado!
+            </DialogTitle>
+            <DialogDescription>
+              Compartí estas credenciales con {formData.fullName || 'el usuario'}. Deberá cambiar la contraseña en su primer inicio de sesión.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-muted rounded-lg p-4 space-y-3">
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase">Email</Label>
+                <p className="font-mono text-sm mt-1">{createdCredentials.email}</p>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase">Contraseña temporal</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm">
+                    {showPassword ? createdCredentials.password : '••••••••••'}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200">
+              ⚠️ <strong>Importante:</strong> Esta contraseña solo se muestra una vez. Asegurate de compartirla de forma segura.
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={copyCredentials}>
+              {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+              {copied ? 'Copiado' : 'Copiar credenciales'}
+            </Button>
+            <Button onClick={handleClose}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
