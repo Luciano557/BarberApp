@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { usePinProtection } from '@/hooks/usePinProtection';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -15,6 +16,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
   const { organization } = useOrganization();
+  const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
   // Filter nav items based on permissions
   const navItems = [
@@ -119,8 +121,24 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         </ul>
       </nav>
 
-      {/* Logout & Toggle */}
+      {/* Lock, Logout & Toggle */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        {/* Lock Button - only show when unlocked and PIN is required */}
+        {requiresPin && isUnlocked && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={lock}
+            className={cn(
+              "w-full h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 justify-start",
+              collapsed && "px-2 justify-center"
+            )}
+            title={collapsed ? `Bloquear (${unlockedBy})` : undefined}
+          >
+            <Lock className="h-4 w-4" />
+            {!collapsed && <span className="ml-2 text-xs">Bloquear</span>}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

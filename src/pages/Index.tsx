@@ -5,6 +5,7 @@ import { DailySummary } from '@/components/DailySummary';
 import { SueldosPanel } from '@/components/SueldosPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserManagement } from '@/components/UserManagement';
+import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,17 +89,21 @@ const Index = () => {
           )}
 
           {activeTab === 'resumen' && (
-            <DailySummary 
-              summary={summary} 
-              barbers={barbers}
-              lines={lines}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-            />
+            <PinProtectedSection sectionName="Resumen">
+              <DailySummary 
+                summary={summary} 
+                barbers={barbers}
+                lines={lines}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+              />
+            </PinProtectedSection>
           )}
 
           {activeTab === 'sueldos' && canManageConfig && (
-            <SueldosPanel barbers={barbers} />
+            <PinProtectedSection sectionName="Sueldos">
+              <SueldosPanel barbers={barbers} />
+            </PinProtectedSection>
           )}
 
           {activeTab === 'config' && canManageConfig && (

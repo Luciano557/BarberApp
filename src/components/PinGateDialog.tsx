@@ -1,0 +1,113 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+
+interface PinGateDialogProps {
+  open: boolean;
+  onValidate: (pin: string) => Promise<{ success: boolean; userName?: string }>;
+  sectionName?: string;
+}
+
+export function PinGateDialog({ open, onValidate, sectionName = 'esta sección' }: PinGateDialogProps) {
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsValidating(true);
+
+    try {
+      const result = await onValidate(pin);
+      if (!result.success) {
+        setError('PIN incorrecto. Intenta de nuevo.');
+        setPin('');
+      }
+    } catch {
+      setError('Error al validar el PIN.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPin(value);
+    setError(null);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-2">
+            <Lock className="h-6 w-6 text-primary" />
+          </div>
+          <DialogTitle className="text-center">Acceso protegido</DialogTitle>
+          <DialogDescription className="text-center">
+            Ingresa tu PIN para acceder a {sectionName}
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <Label htmlFor="pin">PIN de seguridad</Label>
+            <div className="relative">
+              <Input
+                id="pin"
+                type={showPin ? 'text' : 'password'}
+                value={pin}
+                onChange={handlePinChange}
+                placeholder="Ingresa tu PIN"
+                className="pr-10 text-center text-2xl tracking-widest"
+                maxLength={6}
+                autoFocus
+                disabled={isValidating}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowPin(!showPin)}
+              >
+                {showPin ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={pin.length < 4 || isValidating}
+          >
+            {isValidating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Validando...
+              </>
+            ) : (
+              'Desbloquear'
+            )}
+          </Button>
+        </form>
+
+        <p className="text-xs text-center text-muted-foreground mt-2">
+          El acceso se bloqueará automáticamente después de 30 minutos de inactividad
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
