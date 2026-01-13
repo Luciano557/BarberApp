@@ -29,7 +29,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
   const [isLoading, setIsLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
   
   // Compute initial values based on barber prop
   const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
@@ -52,18 +53,27 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
-      setCopied(false);
+      setCopiedEmail(false);
+      setCopiedPassword(false);
     }
   }, [open, barber?.id, barberFullName]);
 
-  const copyCredentials = async () => {
+  const copyEmail = async () => {
     if (!createdCredentials) return;
-    const text = `Email: ${createdCredentials.email}\nContraseña temporal: ${createdCredentials.password}`;
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success('Credenciales copiadas');
-    setTimeout(() => setCopied(false), 2000);
+    await navigator.clipboard.writeText(createdCredentials.email);
+    setCopiedEmail(true);
+    toast.success('Email copiado');
+    setTimeout(() => setCopiedEmail(false), 2000);
   };
+
+  const copyPassword = async () => {
+    if (!createdCredentials) return;
+    await navigator.clipboard.writeText(createdCredentials.password);
+    setCopiedPassword(true);
+    toast.success('Contraseña copiada');
+    setTimeout(() => setCopiedPassword(false), 2000);
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +158,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
-      setCopied(false);
+      setCopiedEmail(false);
+      setCopiedPassword(false);
       onOpenChange(false);
     }
   };
@@ -169,10 +180,23 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="bg-muted rounded-lg p-4 space-y-3">
+            <div className="bg-muted rounded-lg p-4 space-y-4">
               <div>
                 <Label className="text-xs text-muted-foreground uppercase">Email</Label>
-                <p className="font-mono text-sm mt-1">{createdCredentials.email}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm truncate">
+                    {createdCredentials.email}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={copyEmail}
+                    title="Copiar email"
+                  >
+                    {copiedEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground uppercase">Contraseña temporal</Label>
@@ -185,8 +209,18 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
                     variant="ghost"
                     size="icon"
                     onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? "Ocultar" : "Mostrar"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={copyPassword}
+                    title="Copiar contraseña"
+                  >
+                    {copiedPassword ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
@@ -197,11 +231,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={copyCredentials}>
-              {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-              {copied ? 'Copiado' : 'Copiar credenciales'}
-            </Button>
+          <DialogFooter>
             <Button onClick={handleClose}>
               Cerrar
             </Button>
