@@ -42,8 +42,13 @@ export function PinGateDialog({ open, onValidate, sectionName = 'esta sección' 
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+    <Dialog open={open} modal={false}>
+      <DialogContent 
+        className="sm:max-w-md" 
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        hideCloseButton
+      >
         <DialogHeader>
           <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-2">
             <Lock className="h-6 w-6 text-primary" />
@@ -105,7 +110,7 @@ export function PinGateDialog({ open, onValidate, sectionName = 'esta sección' 
         </form>
 
         <p className="text-xs text-center text-muted-foreground mt-2">
-          El acceso se bloqueará automáticamente después de 30 minutos de inactividad
+          El acceso se bloqueará automáticamente después de 4 minutos de inactividad
         </p>
       </DialogContent>
     </Dialog>
