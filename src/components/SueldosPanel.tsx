@@ -22,9 +22,10 @@ import { cn } from '@/lib/utils';
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
-  totalDevengado: number;
+  totalDevengado: number;       // Filtered by period
+  totalDevengadoHistorico: number; // All time (for saldo calculation)
   totalPagado: number;
-  saldo: number;
+  saldo: number;                // Historical: devengadoHistorico - pagado
 }
 
 interface PagoSueldo {
@@ -62,7 +63,16 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     
     setIsLoading(true);
     try {
-      // Fetch total devengado from ingresos (with optional date filter)
+      // Fetch ALL devengado from ingresos (historical - for saldo calculation)
+      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
+        .from('ingresos')
+        .select('barbero, sueldo')
+        .eq('organization_id', organization.id)
+        .eq('estado', 'activo');
+
+      if (ingresosHistoricosError) throw ingresosHistoricosError;
+
+      // Fetch devengado filtered by period (if set)
       let ingresosQuery = supabase
         .from('ingresos')
         .select('barbero, sueldo, created_at')
@@ -75,11 +85,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
       }
 
-      const { data: ingresosData, error: ingresosError } = await ingresosQuery;
+      const { data: ingresosFiltrados, error: ingresosFiltradosError } = await ingresosQuery;
 
-      if (ingresosError) throw ingresosError;
+      if (ingresosFiltradosError) throw ingresosFiltradosError;
 
-      // Fetch pagos realizados
+      // Fetch pagos realizados (always historical)
       const { data: pagosData, error: pagosError } = await supabase
         .from('pagos_sueldos')
         .select('*')
@@ -90,19 +100,26 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       setPagos(pagosData || []);
 
-      // Calculate salary data per barber
-      const devengadoPorBarbero: Record<string, number> = {};
-      const pagadoPorBarbero: Record<string, number> = {};
-
-      // Sum devengado from ingresos
-      ingresosData?.forEach(ingreso => {
+      // Calculate historical devengado per barber
+      const devengadoHistoricoPorBarbero: Record<string, number> = {};
+      ingresosHistoricos?.forEach(ingreso => {
         const nombre = ingreso.barbero;
         if (nombre) {
-          devengadoPorBarbero[nombre] = (devengadoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+          devengadoHistoricoPorBarbero[nombre] = (devengadoHistoricoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+        }
+      });
+
+      // Calculate filtered devengado per barber
+      const devengadoFiltradoPorBarbero: Record<string, number> = {};
+      ingresosFiltrados?.forEach(ingreso => {
+        const nombre = ingreso.barbero;
+        if (nombre) {
+          devengadoFiltradoPorBarbero[nombre] = (devengadoFiltradoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
         }
       });
 
       // Sum pagado from pagos_sueldos (normalize name to match)
+      const pagadoPorBarbero: Record<string, number> = {};
       pagosData?.forEach(pago => {
         const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
         pagadoPorBarbero[nombre] = (pagadoPorBarbero[nombre] || 0) + pago.monto;
@@ -112,15 +129,17 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       const data: BarberSalaryData[] = barbers.map(barber => {
         // Normalize name by trimming and collapsing multiple spaces
         const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
-        const totalDevengado = devengadoPorBarbero[nombreCompleto] || devengadoPorBarbero[barber.firstName.trim()] || 0;
+        const totalDevengado = devengadoFiltradoPorBarbero[nombreCompleto] || devengadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
+        const totalDevengadoHistorico = devengadoHistoricoPorBarbero[nombreCompleto] || devengadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
         const totalPagado = pagadoPorBarbero[nombreCompleto] || pagadoPorBarbero[barber.firstName.trim()] || 0;
         
         return {
           barberId: barber.id,
           barberName: nombreCompleto || barber.firstName.trim(),
           totalDevengado,
+          totalDevengadoHistorico,
           totalPagado,
-          saldo: totalDevengado - totalPagado,
+          saldo: totalDevengadoHistorico - totalPagado, // Saldo is always historical
         };
       });
 
