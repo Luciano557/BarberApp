@@ -10,12 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, X } from 'lucide-react';
+import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfMonth, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -235,44 +235,69 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           <h2 className="text-2xl font-bold">Sueldos</h2>
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Period Start Date Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">Desde:</span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-[160px] justify-start text-left font-normal",
-                    !periodStartDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {periodStartDate ? format(periodStartDate, "dd/MM/yyyy") : "Todo"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={periodStartDate}
-                  onSelect={setPeriodStartDate}
-                  locale={es}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            {periodStartDate && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setPeriodStartDate(undefined)}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Period Presets */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={!periodStartDate ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriodStartDate(undefined)}
+            >
+              Todo
+            </Button>
+            <Button
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd') ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriodStartDate(startOfMonth(new Date()))}
+            >
+              Este mes
+            </Button>
+            <Button
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 15), 'yyyy-MM-dd') ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriodStartDate(subDays(new Date(), 15))}
+            >
+              Últimos 15 días
+            </Button>
+            <Button
+              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 30), 'yyyy-MM-dd') ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriodStartDate(subDays(new Date(), 30))}
+            >
+              Últimos 30 días
+            </Button>
           </div>
+          
+          {/* Custom Date Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "w-[140px] justify-start text-left font-normal",
+                  periodStartDate && ![
+                    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+                    format(subDays(new Date(), 15), 'yyyy-MM-dd'),
+                    format(subDays(new Date(), 30), 'yyyy-MM-dd')
+                  ].includes(format(periodStartDate, 'yyyy-MM-dd')) && "border-primary"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                Personalizado
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={periodStartDate}
+                onSelect={setPeriodStartDate}
+                locale={es}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -281,59 +306,59 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                 Registrar Pago
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Registrar Pago de Sueldo</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="barber">Barbero *</Label>
-                <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar barbero" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {barbers.map(barber => (
-                      <SelectItem key={barber.id} value={barber.id}>
-                        {barber.firstName} {barber.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Registrar Pago de Sueldo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="barber">Barbero *</Label>
+                  <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar barbero" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {barbers.map(barber => (
+                        <SelectItem key={barber.id} value={barber.id}>
+                          {barber.firstName} {barber.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="monto">Monto *</Label>
+                  <Input
+                    id="monto"
+                    type="number"
+                    placeholder="0"
+                    value={monto}
+                    onChange={(e) => setMonto(e.target.value)}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="concepto">Concepto (opcional)</Label>
+                  <Textarea
+                    id="concepto"
+                    placeholder="Ej: Adelanto de sueldo, Pago quincenal..."
+                    value={concepto}
+                    onChange={(e) => setConcepto(e.target.value)}
+                  />
+                </div>
+                
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSubmitPago} disabled={isSubmitting}>
+                    {isSubmitting ? 'Registrando...' : 'Registrar Pago'}
+                  </Button>
+                </div>
               </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="monto">Monto *</Label>
-                <Input
-                  id="monto"
-                  type="number"
-                  placeholder="0"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="concepto">Concepto (opcional)</Label>
-                <Textarea
-                  id="concepto"
-                  placeholder="Ej: Adelanto de sueldo, Pago quincenal..."
-                  value={concepto}
-                  onChange={(e) => setConcepto(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSubmitPago} disabled={isSubmitting}>
-                  {isSubmitting ? 'Registrando...' : 'Registrar Pago'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
