@@ -9,7 +9,7 @@ const corsHeaders = {
 // Simple hash function for PIN (using Web Crypto API)
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(pin + Deno.env.get("PIN_SALT") || "barbershop_salt_2024");
+  const data = encoder.encode(pin + (Deno.env.get("PIN_SALT") || "barbershop_salt_2024"));
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -43,17 +43,30 @@ serve(async (req) => {
       );
     }
 
-    const { pin, action } = await req.json();
+    const { barbero_id, pin, action } = await req.json();
+
+    if (!barbero_id) {
+      return new Response(
+        JSON.stringify({ error: 'barbero_id es requerido' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use service role to update barbero PIN
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     if (action === 'delete') {
       // Delete existing PIN
-      const { error: deleteError } = await supabaseClient
-        .from('user_pins')
-        .delete()
-        .eq('user_id', user.id);
+      const { error: updateError } = await serviceClient
+        .from('barberos')
+        .update({ pin_hash: null })
+        .eq('id', barbero_id);
 
-      if (deleteError) {
-        throw deleteError;
+      if (updateError) {
+        throw updateError;
       }
 
       return new Response(
@@ -72,17 +85,14 @@ serve(async (req) => {
 
     const pinHash = await hashPin(pin);
 
-    // Upsert PIN
-    const { error: upsertError } = await supabaseClient
-      .from('user_pins')
-      .upsert({
-        user_id: user.id,
-        pin_hash: pinHash,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id' });
+    // Update barbero PIN
+    const { error: updateError } = await serviceClient
+      .from('barberos')
+      .update({ pin_hash: pinHash })
+      .eq('id', barbero_id);
 
-    if (upsertError) {
-      throw upsertError;
+    if (updateError) {
+      throw updateError;
     }
 
     return new Response(

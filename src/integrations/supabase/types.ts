@@ -62,6 +62,7 @@ export type Database = {
           id: string
           nombre: string
           organization_id: string | null
+          pin_hash: string | null
           telefono: string | null
           updated_at: string
         }
@@ -74,6 +75,7 @@ export type Database = {
           id?: string
           nombre: string
           organization_id?: string | null
+          pin_hash?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -86,6 +88,7 @@ export type Database = {
           id?: string
           nombre?: string
           organization_id?: string | null
+          pin_hash?: string | null
           telefono?: string | null
           updated_at?: string
         }
