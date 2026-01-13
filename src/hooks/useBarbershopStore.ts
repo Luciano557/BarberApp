@@ -10,11 +10,11 @@ function generateUID(prefix: string): string {
 }
 
 const initialDiscounts: Discount[] = [
-  { id: 'none', label: 'Sin descuento', value: 0 },
-  { id: '10', label: '10%', value: 10 },
-  { id: '20', label: '20%', value: 20 },
-  { id: '30', label: '30%', value: 30 },
-  { id: '50', label: '50%', value: 50 },
+  { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage' },
+  { id: '10', label: '10%', value: 10, type: 'percentage' },
+  { id: '20', label: '20%', value: 20, type: 'percentage' },
+  { id: '30', label: '30%', value: 30, type: 'percentage' },
+  { id: '50', label: '50%', value: 50, type: 'percentage' },
 ];
 
 export function useBarbershopStore() {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType } from '@/types/barbershop';
@@ -59,14 +59,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     return servicePrice + extrasTotal;
   }, [service, selectedExtrasData]);
 
-  const discountPercentage = useMemo(() => {
-    const option = discounts.find(d => d.id === selectedDiscount);
-    return option?.value || 0;
+  const selectedDiscountData = useMemo(() => {
+    return discounts.find(d => d.id === selectedDiscount);
   }, [discounts, selectedDiscount]);
 
   const discountAmount = useMemo(() => {
-    return Math.round(subtotal * (discountPercentage / 100));
-  }, [subtotal, discountPercentage]);
+    if (!selectedDiscountData || selectedDiscountData.value === 0) return 0;
+    if (selectedDiscountData.type === 'fixed') {
+      return selectedDiscountData.value;
+    }
+    // percentage
+    return Math.round(subtotal * (selectedDiscountData.value / 100));
+  }, [subtotal, selectedDiscountData]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
@@ -137,8 +141,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
       serviceName: service!.name,
       servicePrice: service!.price,
       extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
-      discount: discountPercentage,
-      discountType: 'percentage',
+      discount: selectedDiscountData?.value || 0,
+      discountType: selectedDiscountData?.type || 'percentage',
       paymentMethod,
       subtotal,
       total,
@@ -150,7 +154,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     });
 
     resetForm();
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, discountPercentage, subtotal, total, onSubmit, toast, resetForm]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -346,34 +350,42 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
         {/* Discount Step */}
         {currentStep === 'discount' && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {discounts.map((discount, index) => (
-              <button
-                key={discount.id}
-                onClick={() => handleSelectDiscount(discount.id)}
-                className={`relative p-6 rounded-lg border transition-all hover:border-secondary ${
-                  selectedDiscount === discount.id
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                  {index + 1}
-                </span>
-                <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
-                  {discount.value === 0 ? (
-                    <Check className="h-5 w-5 text-muted-foreground" />
-                  ) : (
-                    <Percent className="h-5 w-5 text-muted-foreground" />
+            {discounts.map((discount, index) => {
+              const calcAmount = discount.type === 'fixed' 
+                ? discount.value 
+                : Math.round(subtotal * (discount.value / 100));
+              
+              return (
+                <button
+                  key={discount.id}
+                  onClick={() => handleSelectDiscount(discount.id)}
+                  className={`relative p-6 rounded-lg border transition-all hover:border-secondary ${
+                    selectedDiscount === discount.id
+                      ? 'border-secondary bg-secondary/5'
+                      : 'border-border bg-card hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
+                    {discount.value === 0 ? (
+                      <Check className="h-5 w-5 text-muted-foreground" />
+                    ) : discount.type === 'fixed' ? (
+                      <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <Percent className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <p className="font-medium text-center text-foreground">{discount.label}</p>
+                  {discount.value > 0 && subtotal > 0 && (
+                    <p className="text-xs text-center text-muted-foreground mt-1">
+                      -${calcAmount.toLocaleString()}
+                    </p>
                   )}
-                </div>
-                <p className="font-medium text-center text-foreground">{discount.label}</p>
-                {discount.value > 0 && subtotal > 0 && (
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    -${Math.round(subtotal * (discount.value / 100)).toLocaleString()}
-                  </p>
-                )}
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -428,9 +440,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">${subtotal.toLocaleString()}</span>
                 </div>
-                {discountAmount > 0 && (
+                {discountAmount > 0 && selectedDiscountData && (
                   <div className="flex justify-between text-success">
-                    <span>Descuento ({discountPercentage}%)</span>
+                    <span>Descuento ({selectedDiscountData.type === 'fixed' ? `$${selectedDiscountData.value.toLocaleString()}` : `${selectedDiscountData.value}%`})</span>
                     <span className="font-medium">-${discountAmount.toLocaleString()}</span>
                   </div>
                 )}
