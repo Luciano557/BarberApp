@@ -88,9 +88,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         }
       });
 
-      // Sum pagado from pagos_sueldos
+      // Sum pagado from pagos_sueldos (normalize name to match)
       pagosData?.forEach(pago => {
-        const nombre = pago.barbero_nombre;
+        const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
         pagadoPorBarbero[nombre] = (pagadoPorBarbero[nombre] || 0) + pago.monto;
       });
 
@@ -143,11 +143,14 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
     setIsSubmitting(true);
     try {
+      // Normalize name to avoid spacing issues
+      const nombreNormalizado = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
+      
       const { error } = await supabase
         .from('pagos_sueldos')
         .insert({
           barbero_id: selectedBarberId,
-          barbero_nombre: `${barber.firstName} ${barber.lastName}`.trim() || barber.firstName,
+          barbero_nombre: nombreNormalizado,
           monto: montoNum,
           concepto: concepto || null,
           organization_id: organization.id,
