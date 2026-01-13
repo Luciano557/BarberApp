@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Clock, FileX } from 'lucide-react';
+import { History, Calendar as CalendarIcon, User, Clock, FileX, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
@@ -204,9 +204,15 @@ export function AnulacionesCierreHistory({ barbers }: AnulacionesCierreHistoryPr
                     </div>
                   </div>
                   {record.motivo && (
-                    <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-destructive/20">
-                      <span className="font-medium">Motivo:</span> {record.motivo}
-                    </p>
+                    <div className="mt-3 pt-3 border-t border-destructive/20">
+                      <p className="text-sm text-foreground flex items-start gap-2">
+                        <MessageSquare className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                        <span>
+                          <span className="font-medium text-destructive">Motivo:</span>{' '}
+                          {record.motivo}
+                        </span>
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
