@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,28 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: InviteUserDialogProps) {
   const { organization } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Compute initial values based on barber prop
+  const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
+  
   const [formData, setFormData] = useState({
     email: '',
-    fullName: barber ? `${barber.firstName} ${barber.lastName}` : '',
+    fullName: barberFullName,
     role: barber ? 'barber' : '' as 'barber' | 'manager' | '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Update form data when barber changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        email: '',
+        fullName: barberFullName,
+        role: barber ? 'barber' : '',
+      });
+      setErrors({});
+    }
+  }, [open, barber?.id, barberFullName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
