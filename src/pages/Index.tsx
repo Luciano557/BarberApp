@@ -55,7 +55,7 @@ const Index = () => {
     updateLine,
   } = useSupabaseData();
 
-  const { addTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
+  const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
 
   const summary = getDailySummary();
 
@@ -96,6 +96,7 @@ const Index = () => {
                 lines={lines}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
+                onVoidTransaction={voidTransaction}
               />
             </PinProtectedSection>
           )}

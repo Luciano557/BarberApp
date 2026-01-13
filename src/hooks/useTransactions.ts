@@ -3,6 +3,7 @@ import { Transaction } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { format } from 'date-fns';
 
 interface VentaInsert {
   barbero_id: string;
@@ -89,6 +90,10 @@ export function useTransactions() {
       subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
       total: Number(v.total_final),
       createdAt: new Date(v.fecha_hora),
+      estado: (v as any).estado || 'activo',
+      anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
+      anuladoPor: (v as any).anulado_por || undefined,
+      anuladoPorId: (v as any).anulado_por_id || undefined,
     }));
 
     setTransactions(txs);
@@ -161,25 +166,91 @@ export function useTransactions() {
     return newTransaction;
   }, [organization]);
 
+  // Anular una transacción (soft delete)
+  const voidTransaction = useCallback(async (
+    transactionId: string, 
+    voidedBy: string, 
+    voidedById: string
+  ): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('venta')
+        .update({
+          estado: 'anulado',
+          anulado_at: new Date().toISOString(),
+          anulado_por: voidedBy,
+          anulado_por_id: voidedById,
+        })
+        .eq('id', transactionId);
+
+      if (error) {
+        console.error('Error voiding transaction:', error);
+        toast.error('Error al anular la transacción');
+        return false;
+      }
+
+      // Actualizar estado local
+      setTransactions(prev => prev.map(tx => 
+        tx.id === transactionId 
+          ? { 
+              ...tx, 
+              estado: 'anulado' as const, 
+              anuladoAt: new Date(), 
+              anuladoPor: voidedBy,
+              anuladoPorId: voidedById 
+            } 
+          : tx
+      ));
+
+      return true;
+    } catch (error) {
+      console.error('Error voiding transaction:', error);
+      toast.error('Error al anular la transacción');
+      return false;
+    }
+  }, []);
+
+  // Verificar si un barbero tiene la caja cerrada para una fecha
+  const isBarberCashClosed = useCallback(async (barberId: string, barberName: string, date: Date): Promise<boolean> => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    const { data, error } = await supabase
+      .from('ingresos')
+      .select('id, estado')
+      .eq('barbero', barberName)
+      .gte('created_at', `${dateStr}T00:00:00`)
+      .lte('created_at', `${dateStr}T23:59:59`)
+      .neq('estado', 'eliminado')
+      .limit(1);
+
+    if (error) {
+      console.error('Error checking cash closing:', error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  }, []);
+
   const getTodayTransactions = useCallback(() => {
     return transactions;
   }, [transactions]);
 
   const getDailySummary = useCallback(() => {
-    const todayTx = transactions;
-    const totalEfectivo = todayTx
+    // Solo contar transacciones activas para el resumen
+    const activeTx = transactions.filter(t => t.estado !== 'anulado');
+    const totalEfectivo = activeTx
       .filter(t => t.paymentMethod === 'efectivo')
       .reduce((sum, t) => sum + t.total, 0);
-    const totalMercadoPago = todayTx
+    const totalMercadoPago = activeTx
       .filter(t => t.paymentMethod === 'mercado_pago')
       .reduce((sum, t) => sum + t.total, 0);
 
     return {
-      count: todayTx.length,
+      count: activeTx.length,
       totalEfectivo,
       totalMercadoPago,
       total: totalEfectivo + totalMercadoPago,
-      transactions: todayTx,
+      transactions: transactions, // Devolver todas para mostrar anuladas
     };
   }, [transactions]);
 
@@ -189,6 +260,8 @@ export function useTransactions() {
     selectedDate,
     setSelectedDate,
     addTransaction,
+    voidTransaction,
+    isBarberCashClosed,
     getTodayTransactions,
     getDailySummary,
     refetch: () => loadTransactionsByDate(selectedDate),

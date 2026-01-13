@@ -59,6 +59,11 @@ export interface Transaction {
   subtotal: number;
   total: number;
   createdAt: Date;
+  // Soft delete fields
+  estado?: 'activo' | 'anulado';
+  anuladoAt?: Date;
+  anuladoPor?: string;
+  anuladoPorId?: string;
 }
 
 export type PaymentMethod = 'efectivo' | 'mercado_pago';
