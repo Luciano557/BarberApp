@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
 
-const UNLOCK_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
+const UNLOCK_DURATION = 4 * 60 * 1000; // 4 minutes in milliseconds
 const SESSION_KEY = 'pin_unlock_state';
 
 interface UnlockState {
