@@ -52,6 +52,48 @@ export type Database = {
           },
         ]
       }
+      anulaciones_cierre: {
+        Row: {
+          anulado_at: string
+          anulado_por_email: string
+          anulado_por_id: string
+          anulado_por_nombre: string
+          barbero_nombre: string
+          created_at: string
+          fecha_cierre: string
+          id: string
+          ingreso_id: number
+          motivo: string | null
+          organization_id: string
+        }
+        Insert: {
+          anulado_at?: string
+          anulado_por_email: string
+          anulado_por_id: string
+          anulado_por_nombre: string
+          barbero_nombre: string
+          created_at?: string
+          fecha_cierre: string
+          id?: string
+          ingreso_id: number
+          motivo?: string | null
+          organization_id: string
+        }
+        Update: {
+          anulado_at?: string
+          anulado_por_email?: string
+          anulado_por_id?: string
+          anulado_por_nombre?: string
+          barbero_nombre?: string
+          created_at?: string
+          fecha_cierre?: string
+          id?: string
+          ingreso_id?: number
+          motivo?: string | null
+          organization_id?: string
+        }
+        Relationships: []
+      }
       barberos: {
         Row: {
           activo: boolean
