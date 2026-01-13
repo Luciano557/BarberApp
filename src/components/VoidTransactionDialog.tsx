@@ -91,14 +91,15 @@ export function VoidTransactionDialog({
               onChange={setPin}
               onComplete={handlePinComplete}
               disabled={isValidating}
+              inputMode="numeric"
             >
               <InputOTPGroup>
-                <InputOTPSlot index={0} />
-                <InputOTPSlot index={1} />
-                <InputOTPSlot index={2} />
-                <InputOTPSlot index={3} />
-                <InputOTPSlot index={4} />
-                <InputOTPSlot index={5} />
+                <InputOTPSlot index={0} mask className="text-xl" />
+                <InputOTPSlot index={1} mask className="text-xl" />
+                <InputOTPSlot index={2} mask className="text-xl" />
+                <InputOTPSlot index={3} mask className="text-xl" />
+                <InputOTPSlot index={4} mask className="text-xl" />
+                <InputOTPSlot index={5} mask className="text-xl" />
               </InputOTPGroup>
             </InputOTP>
           </div>
