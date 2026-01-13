@@ -1,19 +1,23 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Transaction, Barber, Line } from '@/types/barbershop';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo, useState, useCallback } from 'react';
 import { useCashClosing } from '@/hooks/useCashClosing';
 import { CashClosingHistory } from './CashClosingHistory';
+import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { toast } from 'sonner';
 
 interface DailySummaryProps {
   summary: {
@@ -47,8 +51,11 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const { saveCashClosing } = useCashClosing();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
-  
-  // Ensure selectedDate is a valid Date
+  const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string }>>(new Map());
+  const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
+  const [isVoidingClosure, setIsVoidingClosure] = useState(false);
+  const { user, profile } = useAuth();
+  const { organization } = useOrganization();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
     : new Date();
@@ -73,7 +80,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
     const dateStr = format(validDate, 'yyyy-MM-dd');
     const { data } = await supabase
       .from('ingresos')
-      .select('barbero')
+      .select('id, barbero')
       .gte('created_at', `${dateStr}T00:00:00`)
       .lte('created_at', `${dateStr}T23:59:59`)
       .neq('estado', 'eliminado');
@@ -81,6 +88,15 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
     if (data) {
       const closedNames = new Set(data.map(d => d.barbero));
       setClosedBarbers(closedNames);
+      
+      // Store the mapping of barber name to ingreso id for voiding
+      const dataMap = new Map<string, { id: number; barberName: string }>();
+      data.forEach(d => {
+        if (d.barbero) {
+          dataMap.set(d.barbero, { id: d.id, barberName: d.barbero });
+        }
+      });
+      setClosedBarbersData(dataMap);
     }
   }, [validDate]);
 
@@ -152,6 +168,46 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const handleNextDay = () => onDateChange(addDays(validDate, 1));
   const handleToday = () => onDateChange(new Date());
 
+  // Handle voiding a cash closing
+  const handleVoidClosure = async () => {
+    if (!voidingClosure || !user || !organization) return;
+    
+    setIsVoidingClosure(true);
+    try {
+      // Update ingreso status to 'eliminado'
+      const { error: updateError } = await supabase
+        .from('ingresos')
+        .update({ estado: 'eliminado' })
+        .eq('id', voidingClosure.id);
+
+      if (updateError) throw updateError;
+
+      // Create anulacion record
+      const { error: insertError } = await supabase
+        .from('anulaciones_cierre')
+        .insert({
+          ingreso_id: voidingClosure.id,
+          barbero_nombre: voidingClosure.barberName,
+          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
+          anulado_por_id: user.id,
+          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
+          anulado_por_email: user.email || '',
+          organization_id: organization.id,
+        });
+
+      if (insertError) throw insertError;
+
+      toast.success('Cierre de caja anulado correctamente');
+      setVoidingClosure(null);
+      checkClosedBarbers(); // Refresh the closed barbers state
+    } catch (error) {
+      console.error('Error voiding closure:', error);
+      toast.error('Error al anular el cierre de caja');
+    } finally {
+      setIsVoidingClosure(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -190,6 +246,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
               Hoy
             </Button>
           )}
+          <AnulacionesCierreHistory barbers={barbers} />
           <CashClosingHistory barbers={barbers} />
         </div>
       </div>
@@ -318,13 +375,29 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
                   <div className="-mx-6 px-6 pb-4 pt-3">
-                    <Button 
-                      className="w-full" 
-                      onClick={() => setClosingBarber(barber)}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Cerrar Caja
-                    </Button>
+                    {closedBarbers.has(barber.barberName) ? (
+                      <Button 
+                        variant="destructive"
+                        className="w-full" 
+                        onClick={() => {
+                          const closureData = closedBarbersData.get(barber.barberName);
+                          if (closureData) {
+                            setVoidingClosure(closureData);
+                          }
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Anular Cierre
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full" 
+                        onClick={() => setClosingBarber(barber)}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Cerrar Caja
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -565,6 +638,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                 setIsSaving(false);
                 if (success) {
                   setClosingBarber(null);
+                  checkClosedBarbers(); // Refresh to update button state
                 }
               }}
             >
@@ -574,6 +648,51 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
               {isSaving ? 'Guardando...' : 'Confirmar Cierre'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Void Closure Confirmation Dialog */}
+      <Dialog open={!!voidingClosure} onOpenChange={(open) => !open && setVoidingClosure(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <XCircle className="h-5 w-5" />
+              Anular Cierre de Caja
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción anulará el cierre de caja de <span className="font-semibold">{voidingClosure?.barberName}</span> para el día{' '}
+              <span className="font-semibold">{format(validDate, "d 'de' MMMM yyyy", { locale: es })}</span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Al anular el cierre:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
+              <li>El registro se marcará como eliminado</li>
+              <li>Se guardará un registro de quién realizó la anulación</li>
+              <li>El barbero podrá realizar un nuevo cierre de caja</li>
+            </ul>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setVoidingClosure(null)} disabled={isVoidingClosure}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive"
+              disabled={isVoidingClosure}
+              onClick={handleVoidClosure}
+            >
+              {isVoidingClosure ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <XCircle className="h-4 w-4 mr-2" />
+              )}
+              {isVoidingClosure ? 'Anulando...' : 'Confirmar Anulación'}
             </Button>
           </DialogFooter>
         </DialogContent>
