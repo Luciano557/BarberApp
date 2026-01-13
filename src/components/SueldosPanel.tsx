@@ -131,7 +131,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [organization, barbers]);
+  }, [organization, barbers, periodStartDate]);
 
   useEffect(() => {
     fetchData();
