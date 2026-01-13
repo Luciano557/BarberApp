@@ -43,6 +43,7 @@ export interface Discount {
   id: string;
   label: string;
   value: number;
+  type: 'percentage' | 'fixed'; // percentage = %, fixed = $
 }
 
 export interface Transaction {

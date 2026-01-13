@@ -55,6 +55,7 @@ function dbToDiscount(row: any): Discount {
     id: row.id,
     label: row.nombre,
     value: Number(row.valor),
+    type: row.tipo === 'nominal' ? 'fixed' : 'percentage',
   };
 }
 
@@ -96,7 +97,7 @@ export function useSupabaseData() {
       // Add "Sin descuento" option and map database discounts
       const dbDiscounts = discountsRes.data.map(dbToDiscount);
       setDiscounts([
-        { id: 'none', label: 'Sin descuento', value: 0 },
+        { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage' },
         ...dbDiscounts,
       ]);
     } catch (error) {
@@ -288,7 +289,7 @@ export function useSupabaseData() {
         .insert({
           nombre: discount.label,
           valor: discount.value,
-          tipo: 'porcentaje',
+          tipo: discount.type === 'fixed' ? 'nominal' : 'porcentaje',
           activo: true,
           organization_id: organization.id,
         })
@@ -313,6 +314,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.label !== undefined) dbUpdates.nombre = updates.label;
       if (updates.value !== undefined) dbUpdates.valor = updates.value;
+      if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'nominal' : 'porcentaje';
 
       const { error } = await supabase
         .from('descuentos')

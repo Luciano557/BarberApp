@@ -1012,22 +1012,25 @@ function DiscountsList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [newType, setNewType] = useState<'percentage' | 'fixed'>('percentage');
 
   const handleAdd = () => {
     if (newLabel && newValue) {
-      onAdd({ label: newLabel, value: parseFloat(newValue) });
+      onAdd({ label: newLabel, value: parseFloat(newValue), type: newType });
       setNewLabel('');
       setNewValue('');
+      setNewType('percentage');
       setIsAdding(false);
     }
   };
 
   const handleUpdate = (id: string) => {
     if (newLabel && newValue) {
-      onUpdate(id, { label: newLabel, value: parseFloat(newValue) });
+      onUpdate(id, { label: newLabel, value: parseFloat(newValue), type: newType });
       setEditingId(null);
       setNewLabel('');
       setNewValue('');
+      setNewType('percentage');
     }
   };
 
@@ -1035,6 +1038,7 @@ function DiscountsList({
     setEditingId(discount.id);
     setNewLabel(discount.label);
     setNewValue(discount.value.toString());
+    setNewType(discount.type || 'percentage');
   };
 
   return (
@@ -1050,25 +1054,34 @@ function DiscountsList({
       </CardHeader>
       <CardContent className="space-y-2">
         <p className="text-sm text-muted-foreground mb-4">
-          Configura los porcentajes de descuento que aparecerán al registrar un cobro.
+          Configura descuentos por porcentaje (%) o monto fijo ($) que aparecerán al registrar un cobro.
         </p>
 
         {isAdding && (
-          <div className="flex gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+          <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg animate-scale-in">
             <Input
               placeholder="Nombre (ej: Promo Amigo)"
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              className="flex-1"
+              className="flex-1 min-w-[120px]"
             />
+            <Select value={newType} onValueChange={(v) => setNewType(v as 'percentage' | 'fixed')}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="percentage">%</SelectItem>
+                <SelectItem value="fixed">$</SelectItem>
+              </SelectContent>
+            </Select>
             <Input
               type="number"
-              placeholder="% (ej: 15)"
+              placeholder={newType === 'percentage' ? '% (ej: 15)' : '$ (ej: 1000)'}
               value={newValue}
               onChange={(e) => setNewValue(e.target.value)}
-              className="w-24"
+              className="w-28"
               min="0"
-              max="100"
+              max={newType === 'percentage' ? 100 : undefined}
             />
             <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90">
               <Save className="h-4 w-4" />
@@ -1085,19 +1098,28 @@ function DiscountsList({
             className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group hover:bg-muted transition-colors"
           >
             {editingId === discount.id ? (
-              <>
+              <div className="flex flex-wrap gap-2 w-full">
                 <Input
                   value={newLabel}
                   onChange={(e) => setNewLabel(e.target.value)}
-                  className="flex-1"
+                  className="flex-1 min-w-[120px]"
                 />
+                <Select value={newType} onValueChange={(v) => setNewType(v as 'percentage' | 'fixed')}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">%</SelectItem>
+                    <SelectItem value="fixed">$</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Input
                   type="number"
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
-                  className="w-24"
+                  className="w-28"
                   min="0"
-                  max="100"
+                  max={newType === 'percentage' ? 100 : undefined}
                 />
                 <Button size="icon" onClick={() => handleUpdate(discount.id)} className="bg-success hover:bg-success/90">
                   <Save className="h-4 w-4" />
@@ -1105,11 +1127,13 @@ function DiscountsList({
                 <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}>
                   <X className="h-4 w-4" />
                 </Button>
-              </>
+              </div>
             ) : (
               <>
                 <span className="flex-1 font-medium text-foreground">{discount.label}</span>
-                <span className="text-muted-foreground">{discount.value}%</span>
+                <span className="text-muted-foreground">
+                  {discount.type === 'fixed' ? `$${discount.value.toLocaleString()}` : `${discount.value}%`}
+                </span>
                 {discount.id !== 'none' && (
                   <>
                     <Button
