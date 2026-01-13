@@ -677,10 +677,14 @@ export type Database = {
       }
       venta: {
         Row: {
+          anulado_at: string | null
+          anulado_por: string | null
+          anulado_por_id: string | null
           barbero_id: string
           barbero_nombre: string
           created_at: string
           descuento_pct: number | null
+          estado: string | null
           fecha_hora: string
           id: string
           metodo_pago: string
@@ -691,10 +695,14 @@ export type Database = {
           total_final: number
         }
         Insert: {
+          anulado_at?: string | null
+          anulado_por?: string | null
+          anulado_por_id?: string | null
           barbero_id: string
           barbero_nombre: string
           created_at?: string
           descuento_pct?: number | null
+          estado?: string | null
           fecha_hora?: string
           id?: string
           metodo_pago: string
@@ -705,10 +713,14 @@ export type Database = {
           total_final?: number
         }
         Update: {
+          anulado_at?: string | null
+          anulado_por?: string | null
+          anulado_por_id?: string | null
           barbero_id?: string
           barbero_nombre?: string
           created_at?: string
           descuento_pct?: number | null
+          estado?: string | null
           fecha_hora?: string
           id?: string
           metodo_pago?: string

@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2 } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -7,9 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Transaction, Barber, Line } from '@/types/barbershop';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useCashClosing } from '@/hooks/useCashClosing';
 import { CashClosingHistory } from './CashClosingHistory';
+import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DailySummaryProps {
   summary: {
@@ -23,6 +27,7 @@ interface DailySummaryProps {
   lines: Line[];
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  onVoidTransaction?: (transactionId: string, voidedBy: string, voidedById: string) => Promise<boolean>;
 }
 
 interface BarberSummary {
@@ -36,31 +41,60 @@ interface BarberSummary {
   commissionAmount: number;
 }
 
-export function DailySummary({ summary, barbers, lines, selectedDate, onDateChange }: DailySummaryProps) {
+export function DailySummary({ summary, barbers, lines, selectedDate, onDateChange, onVoidTransaction }: DailySummaryProps) {
   const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { saveCashClosing } = useCashClosing();
+  const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
+  const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   
   // Ensure selectedDate is a valid Date
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
     : new Date();
 
-  // Get transactions for selected barber
+  // Get transactions for selected barber (only active transactions)
   const barberTransactions = useMemo(() => {
     if (!closingBarber) return { efectivo: [], mercadoPago: [] };
     
-    const efectivo = summary.transactions.filter(
+    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    const efectivo = activeTransactions.filter(
       tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'efectivo'
     );
-    const mercadoPago = summary.transactions.filter(
+    const mercadoPago = activeTransactions.filter(
       tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'mercado_pago'
     );
     
     return { efectivo, mercadoPago };
   }, [closingBarber, summary.transactions]);
 
-  // Calculate per-barber summaries with commissions
+  // Check which barbers have their cash closed for the selected date
+  const checkClosedBarbers = useCallback(async () => {
+    const dateStr = format(validDate, 'yyyy-MM-dd');
+    const { data } = await supabase
+      .from('ingresos')
+      .select('barbero')
+      .gte('created_at', `${dateStr}T00:00:00`)
+      .lte('created_at', `${dateStr}T23:59:59`)
+      .neq('estado', 'eliminado');
+
+    if (data) {
+      const closedNames = new Set(data.map(d => d.barbero));
+      setClosedBarbers(closedNames);
+    }
+  }, [validDate]);
+
+  // Check closed barbers on date change
+  useMemo(() => {
+    checkClosedBarbers();
+  }, [checkClosedBarbers]);
+
+  // Check if a transaction can be voided (barber's cash not closed)
+  const canVoidTransaction = useCallback((tx: Transaction): boolean => {
+    return !closedBarbers.has(tx.barberName);
+  }, [closedBarbers]);
+
+  // Calculate per-barber summaries with commissions (only active transactions)
   const barberSummaries = useMemo(() => {
     const summaryMap = new Map<string, BarberSummary>();
 
@@ -78,8 +112,9 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
       });
     });
 
-    // Aggregate transactions
-    summary.transactions.forEach(tx => {
+    // Aggregate only active transactions
+    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    activeTransactions.forEach(tx => {
       const existing = summaryMap.get(tx.barberId);
       if (existing) {
         existing.count += 1;
@@ -314,50 +349,112 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
               <p className="text-sm mt-1">Los cobros aparecerán aquí</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {summary.transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <div className="flex-shrink-0">
-                    {tx.paymentMethod === 'efectivo' ? (
-                      <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
-                        <Banknote className="h-4 w-4 text-success" />
+            <TooltipProvider>
+              <div className="space-y-2">
+                {summary.transactions.map((tx) => {
+                  const isVoided = tx.estado === 'anulado';
+                  const canVoid = !isVoided && canVoidTransaction(tx);
+                  
+                  return (
+                    <div
+                      key={tx.id}
+                      className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                        isVoided 
+                          ? 'bg-destructive/10 border border-destructive/20' 
+                          : 'bg-muted/50 hover:bg-muted'
+                      }`}
+                    >
+                      <div className="flex-shrink-0">
+                        {isVoided ? (
+                          <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                            <Ban className="h-4 w-4 text-destructive" />
+                          </div>
+                        ) : tx.paymentMethod === 'efectivo' ? (
+                          <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
+                            <Banknote className="h-4 w-4 text-success" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                            <CreditCard className="h-4 w-4 text-secondary" />
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
-                        <CreditCard className="h-4 w-4 text-secondary" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-medium ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                            {tx.serviceName}
+                          </span>
+                          {tx.extras.length > 0 && (
+                            <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
+                              +{tx.extras.length}
+                            </span>
+                          )}
+                          {isVoided && (
+                            <Badge variant="destructive" className="text-xs">
+                              Anulado
+                            </Badge>
+                          )}
+                        </div>
+                        <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+                          {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
+                          {isVoided && tx.anuladoPor && (
+                            <span className="ml-2 text-destructive">• Anulado por {tx.anuladoPor}</span>
+                          )}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{tx.serviceName}</span>
-                      {tx.extras.length > 0 && (
-                        <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
-                          +{tx.extras.length}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className={`font-semibold ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                            ${tx.total.toLocaleString()}
+                          </p>
+                          {tx.discount > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              -{tx.discount}%
+                            </p>
+                          )}
+                        </div>
+                        {!isVoided && onVoidTransaction && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={`h-8 w-8 ${canVoid ? 'text-muted-foreground hover:text-destructive hover:bg-destructive/10' : 'text-muted-foreground/50 cursor-not-allowed'}`}
+                                onClick={() => canVoid && setVoidingTransaction(tx)}
+                                disabled={!canVoid}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {canVoid 
+                                ? 'Anular transacción' 
+                                : 'No se puede anular: caja cerrada'}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-foreground">${tx.total.toLocaleString()}</p>
-                    {tx.discount > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        -{tx.discount}%
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
         </CardContent>
       </Card>
+
+      {/* Void Transaction Dialog */}
+      <VoidTransactionDialog
+        open={!!voidingTransaction}
+        onOpenChange={(open) => !open && setVoidingTransaction(null)}
+        transaction={voidingTransaction}
+        onVoidComplete={async (transactionId, voidedBy, voidedById) => {
+          if (onVoidTransaction) {
+            await onVoidTransaction(transactionId, voidedBy, voidedById);
+            checkClosedBarbers(); // Refresh closed barbers
+          }
+        }}
+      />
 
       {/* Cash Closing Dialog */}
       <Dialog open={!!closingBarber} onOpenChange={(open) => !open && setClosingBarber(null)}>
