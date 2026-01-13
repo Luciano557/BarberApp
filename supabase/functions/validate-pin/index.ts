@@ -9,7 +9,7 @@ const corsHeaders = {
 // Same hash function as set-pin
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
-  const data = encoder.encode(pin + Deno.env.get("PIN_SALT") || "barbershop_salt_2024");
+  const data = encoder.encode(pin + (Deno.env.get("PIN_SALT") || "barbershop_salt_2024"));
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -61,40 +61,55 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    // Check if PIN matches the current user's PIN
-    const { data: userPin } = await supabaseClient
-      .from('user_pins')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('pin_hash', pinHash)
-      .single();
-
-    if (userPin) {
-      // PIN matches current user - log access
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    if (!profile?.organization_id) {
+      return new Response(
+        JSON.stringify({ valid: false, error: 'No se encontró la organización' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
 
+    // Use service role to check barbero PINs in the organization
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Find barbero with matching PIN in the same organization
+    const { data: barbero, error: barberoError } = await serviceClient
+      .from('barberos')
+      .select('id, nombre, apellido')
+      .eq('organization_id', profile.organization_id)
+      .eq('pin_hash', pinHash)
+      .eq('activo', true)
+      .maybeSingle();
+
+    if (barberoError) {
+      throw barberoError;
+    }
+
+    if (barbero) {
+      const barberoName = `${barbero.nombre} ${barbero.apellido}`;
+      
+      // Log access
       await serviceClient.from('access_logs').insert({
         user_id: user.id,
-        user_email: user.email || profile?.email || '',
-        user_name: profile?.full_name || null,
+        user_email: user.email || profile.email || '',
+        user_name: barberoName,
         section: 'protected',
-        organization_id: profile?.organization_id
+        organization_id: profile.organization_id
       });
 
       return new Response(
         JSON.stringify({ 
           valid: true, 
-          user_name: profile?.full_name || user.email,
-          user_id: user.id
+          user_name: barberoName,
+          barbero_id: barbero.id
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // PIN doesn't match
+    // PIN doesn't match any barbero
     return new Response(
       JSON.stringify({ valid: false, error: 'PIN incorrecto' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

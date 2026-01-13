@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2, Mail, Shield } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Edit2, Save, X, Scissors, Sparkles, Users, Tag, Power, PowerOff, Trash2, ChevronDown, Building2, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { OrganizationSettings } from './OrganizationSettings';
 import { InviteUserDialog } from './InviteUserDialog';
-import { PinConfigSection } from './PinConfigSection';
+import { StaffPinDialog } from './StaffPinDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ConfigurationPanelProps {
   services: Service[];
@@ -83,10 +84,6 @@ export function ConfigurationPanel({
             <Tag className="h-4 w-4" />
             <span className="hidden sm:inline">Descuentos</span>
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex-1 flex items-center justify-center gap-2 data-[state=active]:bg-card rounded-md text-xs sm:text-sm">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Seguridad</span>
-          </TabsTrigger>
         </TabsList>
 
         {isOwner && (
@@ -128,10 +125,6 @@ export function ConfigurationPanel({
             onUpdate={onUpdateDiscount}
             onDelete={onDeleteDiscount}
           />
-        </TabsContent>
-
-        <TabsContent value="security" className="mt-6">
-          <PinConfigSection />
         </TabsContent>
       </Tabs>
     </div>
@@ -591,6 +584,34 @@ function StaffList({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
+  const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
+  const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
+  
+  // Fetch PIN status for all barbers
+  const fetchPinStatus = useCallback(async () => {
+    if (barbers.length === 0) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('barberos')
+        .select('id, pin_hash')
+        .in('id', barbers.map(b => b.id));
+      
+      if (error) throw error;
+      
+      const status: Record<string, boolean> = {};
+      data?.forEach(b => {
+        status[b.id] = !!b.pin_hash;
+      });
+      setBarberPinStatus(status);
+    } catch (error) {
+      console.error('Error fetching PIN status:', error);
+    }
+  }, [barbers]);
+
+  useEffect(() => {
+    fetchPinStatus();
+  }, [fetchPinStatus]);
   
   // Form state - commission as string for free editing
   const [formData, setFormData] = useState({
@@ -865,6 +886,15 @@ function StaffList({
               <Button
                 size="icon"
                 variant="ghost"
+                onClick={() => setPinDialogBarber(barber)}
+                className={`h-8 w-8 ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
+                title={barberPinStatus[barber.id] ? 'PIN configurado - Clic para editar' : 'Configurar PIN de acceso'}
+              >
+                <Lock className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
                 onClick={() => setInviteBarber(barber)}
                 className="h-8 w-8"
                 title="Invitar a usar el sistema"
@@ -952,6 +982,16 @@ function StaffList({
         open={!!inviteBarber}
         onOpenChange={(open) => !open && setInviteBarber(null)}
         barber={inviteBarber || undefined}
+      />
+
+      {/* Staff PIN Dialog */}
+      <StaffPinDialog
+        open={!!pinDialogBarber}
+        onOpenChange={(open) => !open && setPinDialogBarber(null)}
+        barberId={pinDialogBarber?.id || ''}
+        barberName={pinDialogBarber ? `${pinDialogBarber.firstName} ${pinDialogBarber.lastName}` : ''}
+        hasPin={pinDialogBarber ? !!barberPinStatus[pinDialogBarber.id] : false}
+        onPinUpdated={fetchPinStatus}
       />
     </Card>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
 
 const UNLOCK_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -13,38 +14,40 @@ interface UnlockState {
 }
 
 export function usePinProtection() {
-  const { user, profile, canManageConfig } = useAuth();
+  const { user, canManageConfig } = useAuth();
+  const { organization } = useOrganization();
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
   const [unlockedBy, setUnlockedBy] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const activityListenerRef = useRef<(() => void) | null>(null);
 
-  // Check if user has PIN configured
-  const checkHasPin = useCallback(async () => {
-    if (!user) {
-      setHasPin(null);
+  // Check if any barbero in the organization has a PIN configured
+  const checkHasPinConfigured = useCallback(async () => {
+    if (!user || !organization) {
+      setHasPinConfigured(null);
       setIsLoading(false);
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from('user_pins')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .from('barberos')
+        .select('id, pin_hash')
+        .eq('organization_id', organization.id)
+        .eq('activo', true)
+        .not('pin_hash', 'is', null);
 
       if (error) throw error;
-      setHasPin(!!data);
+      setHasPinConfigured(data && data.length > 0);
     } catch (error) {
-      console.error('Error checking PIN:', error);
-      setHasPin(false);
+      console.error('Error checking PIN configuration:', error);
+      setHasPinConfigured(false);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, organization]);
 
   // Restore session from sessionStorage
   const restoreSession = useCallback(() => {
@@ -120,7 +123,7 @@ export function usePinProtection() {
       if (error) throw error;
 
       if (data.valid) {
-        const userName = data.user_name || profile?.full_name || user.email;
+        const userName = data.user_name;
         setIsUnlocked(true);
         setUnlockedBy(userName);
         saveSession(true, userName);
@@ -133,7 +136,7 @@ export function usePinProtection() {
       console.error('Error validating PIN:', error);
       return { success: false };
     }
-  }, [user, profile, saveSession, resetInactivityTimer]);
+  }, [user, saveSession, resetInactivityTimer]);
 
   // Setup activity listener
   useEffect(() => {
@@ -167,22 +170,22 @@ export function usePinProtection() {
 
   // Initialize
   useEffect(() => {
-    checkHasPin();
+    checkHasPinConfigured();
     restoreSession();
-  }, [checkHasPin, restoreSession]);
+  }, [checkHasPinConfigured, restoreSession]);
 
   // Determine if PIN protection is required
-  // Only required if user has canManageConfig permission AND has a PIN set
-  const requiresPin = canManageConfig && hasPin === true;
+  // Required if user can manage config AND there's at least one PIN configured in the org
+  const requiresPin = canManageConfig && hasPinConfigured === true;
 
   return {
     isUnlocked,
-    hasPin,
+    hasPin: hasPinConfigured,
     unlockedBy,
     isLoading,
     requiresPin,
     validatePin,
     lock,
-    checkHasPin
+    checkHasPin: checkHasPinConfigured
   };
 }
