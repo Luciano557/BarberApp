@@ -12,6 +12,7 @@ interface Organization {
   phone: string | null;
   address: string | null;
   is_active: boolean;
+  timezone: string;
 }
 
 interface PlanFeatures {

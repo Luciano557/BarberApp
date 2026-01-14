@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Scissors, Store } from 'lucide-react';
+import { Scissors, Store, Globe } from 'lucide-react';
+import { COUNTRIES } from '@/lib/dateUtils';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export default function Login() {
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [country, setCountry] = useState('AR');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +63,7 @@ export default function Login() {
       return;
     }
 
-    const { error } = await signUp(registerEmail, registerPassword, registerName, businessName);
+    const { error } = await signUp(registerEmail, registerPassword, registerName, businessName, country);
 
     if (error) {
       toast.error('Error al registrarse', { description: error.message });
@@ -122,6 +125,27 @@ export default function Login() {
 
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="flex items-center gap-1">
+                    <Globe className="w-3.5 h-3.5" />
+                    País
+                  </Label>
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger id="country">
+                      <SelectValue placeholder="Seleccionar país" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          <span className="flex items-center gap-2">
+                            <span>{c.flag}</span>
+                            <span>{c.name}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="business-name" className="flex items-center gap-1">
                     <Store className="w-3.5 h-3.5" />

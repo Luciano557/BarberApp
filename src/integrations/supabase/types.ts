@@ -401,6 +401,7 @@ export type Database = {
           plan: string | null
           plan_expires_at: string | null
           slug: string
+          timezone: string | null
           updated_at: string | null
         }
         Insert: {
@@ -414,6 +415,7 @@ export type Database = {
           plan?: string | null
           plan_expires_at?: string | null
           slug: string
+          timezone?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -427,6 +429,7 @@ export type Database = {
           plan?: string | null
           plan_expires_at?: string | null
           slug?: string
+          timezone?: string | null
           updated_at?: string | null
         }
         Relationships: []
