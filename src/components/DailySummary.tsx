@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
+import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
 interface DailySummaryProps {
   summary: {
@@ -81,12 +82,14 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
 
   // Check which barbers have their cash closed for the selected date
   const checkClosedBarbers = useCallback(async () => {
-    const dateStr = format(validDate, 'yyyy-MM-dd');
+    const startStr = getStartOfDayLocal(validDate);
+    const endStr = getEndOfDayLocal(validDate);
+    
     const { data } = await supabase
       .from('ingresos')
       .select('id, barbero')
-      .gte('created_at', `${dateStr}T00:00:00`)
-      .lte('created_at', `${dateStr}T23:59:59`)
+      .gte('created_at', startStr)
+      .lte('created_at', endStr)
       .neq('estado', 'eliminado');
 
     if (data) {

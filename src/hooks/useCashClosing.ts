@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
 interface BarberSummary {
   barberId: string;  // UUID del barbero
@@ -39,9 +40,9 @@ export function useCashClosing() {
     const normalizedBarberName = barber.barberName.replace(/\s+/g, ' ').trim();
     
     // Check for duplicate closing on same date for same barber
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const startOfDay = `${dateStr}T00:00:00.000Z`;
-    const endOfDay = `${dateStr}T23:59:59.999Z`;
+    // Usar funciones de fecha consistentes
+    const startOfDay = getStartOfDayLocal(date);
+    const endOfDay = getEndOfDayLocal(date);
     
     // Validar duplicados por barbero_id (UUID) - más confiable que texto
     const { data: existingClosing, error: checkError } = await supabase

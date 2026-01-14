@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { format } from 'date-fns';
+import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
 
 interface VentaInsert {
   barbero_id: string;
@@ -34,16 +35,16 @@ export function useTransactions() {
   // Cargar ventas de una fecha específica desde Supabase
   const loadTransactionsByDate = useCallback(async (date: Date) => {
     setIsLoading(true);
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Usar funciones de fecha consistentes que no dependen de toISOString()
+    const startStr = getStartOfDayLocal(date);
+    const endStr = getEndOfDayLocal(date);
 
     const { data: ventas, error } = await supabase
       .from('venta')
       .select('*')
-      .gte('fecha_hora', startOfDay.toISOString())
-      .lte('fecha_hora', endOfDay.toISOString())
+      .gte('fecha_hora', startStr)
+      .lte('fecha_hora', endStr)
       .order('fecha_hora', { ascending: false });
 
     if (error) {
@@ -216,14 +217,15 @@ export function useTransactions() {
 
   // Verificar si un barbero tiene la caja cerrada para una fecha
   const isBarberCashClosed = useCallback(async (barberId: string, barberName: string, date: Date): Promise<boolean> => {
-    const dateStr = format(date, 'yyyy-MM-dd');
+    const startStr = getStartOfDayLocal(date);
+    const endStr = getEndOfDayLocal(date);
     
     const { data, error } = await supabase
       .from('ingresos')
       .select('id, estado')
       .eq('barbero', barberName)
-      .gte('created_at', `${dateStr}T00:00:00`)
-      .lte('created_at', `${dateStr}T23:59:59`)
+      .gte('created_at', startStr)
+      .lte('created_at', endStr)
       .neq('estado', 'eliminado')
       .limit(1);
 
