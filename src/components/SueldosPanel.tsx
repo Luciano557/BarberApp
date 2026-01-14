@@ -36,11 +36,9 @@ interface IngresoRaw {
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
-  totalDevengado: number;           // Filtered by period
-  totalPagado: number;              // Filtered by period
-  totalDevengadoHistorico: number;  // All time
-  totalPagadoHistorico: number;     // All time
-  saldo: number;                    // Historical: devengadoHistorico - pagadoHistorico
+  totalDevengado: number;           // Filtered by period (or all time if no filter)
+  totalPagado: number;              // Filtered by period (or all time if no filter)
+  saldo: number;                    // devengado - pagado (same period)
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
 }
@@ -206,17 +204,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     
     setIsLoading(true);
     try {
-      // Fetch ALL devengado from ingresos (historical - for saldo calculation)
-      // Now using barbero_id for reliable matching
-      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
-        .from('ingresos')
-        .select('barbero, barbero_id, sueldo')
-        .eq('organization_id', organization.id)
-        .eq('estado', 'activo');
-
-      if (ingresosHistoricosError) throw ingresosHistoricosError;
-
-      // Fetch devengado filtered by period (if set) - with full details including barbero_id
+      // Build query for ingresos - filtered by period if set
       let ingresosQuery = supabase
         .from('ingresos')
         .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at')
@@ -234,22 +222,12 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       if (ingresosFiltradosError) throw ingresosFiltradosError;
 
-      // Fetch ALL pagos realizados (historical - for saldo calculation)
-      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
-        .from('pagos_sueldos')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('created_at', { ascending: false });
-
-      if (pagosHistoricosError) throw pagosHistoricosError;
-
-      setPagos(pagosHistoricos || []);
-
       // Fetch pagos filtered by period (if set)
       let pagosQuery = supabase
         .from('pagos_sueldos')
         .select('*')
-        .eq('organization_id', organization.id);
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
       
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
@@ -260,49 +238,31 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       if (pagosFiltradosError) throw pagosFiltradosError;
 
-      // Calculate historical devengado per barber BY barbero_id (UUID) - more reliable
-      const devengadoHistoricoPorBarberoId: Record<string, number> = {};
-      (ingresosHistoricos as IngresoRaw[] | null)?.forEach(ingreso => {
-        const barberoId = ingreso.barbero_id;
-        if (barberoId) {
-          devengadoHistoricoPorBarberoId[barberoId] = (devengadoHistoricoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
-        }
-      });
+      setPagos(pagosFiltrados || []);
 
-      // Calculate filtered devengado per barber BY barbero_id (UUID)
-      const devengadoFiltradoPorBarberoId: Record<string, number> = {};
+      // Calculate devengado per barber BY barbero_id (UUID)
+      const devengadoPorBarberoId: Record<string, number> = {};
       (ingresosFiltrados as IngresoRaw[] | null)?.forEach(ingreso => {
         const barberoId = ingreso.barbero_id;
         if (barberoId) {
-          devengadoFiltradoPorBarberoId[barberoId] = (devengadoFiltradoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
+          devengadoPorBarberoId[barberoId] = (devengadoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
         }
       });
 
-      // Calculate historical pagado per barber BY barbero_id (UUID)
-      const pagadoHistoricoPorBarberoId: Record<string, number> = {};
-      pagosHistoricos?.forEach(pago => {
-        const barberoId = pago.barbero_id;
-        if (barberoId) {
-          pagadoHistoricoPorBarberoId[barberoId] = (pagadoHistoricoPorBarberoId[barberoId] || 0) + pago.monto;
-        }
-      });
-
-      // Calculate filtered pagado per barber BY barbero_id (UUID)
-      const pagadoFiltradoPorBarberoId: Record<string, number> = {};
+      // Calculate pagado per barber BY barbero_id (UUID)
+      const pagadoPorBarberoId: Record<string, number> = {};
       pagosFiltrados?.forEach(pago => {
         const barberoId = pago.barbero_id;
         if (barberoId) {
-          pagadoFiltradoPorBarberoId[barberoId] = (pagadoFiltradoPorBarberoId[barberoId] || 0) + pago.monto;
+          pagadoPorBarberoId[barberoId] = (pagadoPorBarberoId[barberoId] || 0) + pago.monto;
         }
       });
 
       // Build salary data for active barbers - now using barbero_id (UUID)
       const data: BarberSalaryData[] = barbers.map(barber => {
         // Use barber.id (UUID) for matching - much more reliable than text
-        const totalDevengado = devengadoFiltradoPorBarberoId[barber.id] || 0;
-        const totalDevengadoHistorico = devengadoHistoricoPorBarberoId[barber.id] || 0;
-        const totalPagado = pagadoFiltradoPorBarberoId[barber.id] || 0;
-        const totalPagadoHistorico = pagadoHistoricoPorBarberoId[barber.id] || 0;
+        const totalDevengado = devengadoPorBarberoId[barber.id] || 0;
+        const totalPagado = pagadoPorBarberoId[barber.id] || 0;
         
         // Get detailed ingresos for this barber by barbero_id
         const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
@@ -334,10 +294,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           barberId: barber.id,
           barberName: nombreCompleto || barber.firstName.trim(),
           totalDevengado,
-          totalDevengadoHistorico,
           totalPagado,
-          totalPagadoHistorico,
-          saldo: totalDevengadoHistorico - totalPagadoHistorico,
+          saldo: totalDevengado - totalPagado,
           detalleIngresos,
           detallePagos,
         };
@@ -586,7 +544,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(histórico)'}
+              Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -599,7 +557,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(histórico)'}
+              Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -611,10 +569,16 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Saldo Pendiente (histórico)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Saldo {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">
+            <p className={cn(
+              "text-2xl font-bold",
+              salaryData.reduce((acc, b) => acc + b.saldo, 0) > 0 ? "text-destructive" : 
+              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-amber-500" : "text-muted-foreground"
+            )}>
               {formatCurrency(salaryData.reduce((acc, b) => acc + b.saldo, 0))}
             </p>
           </CardContent>
