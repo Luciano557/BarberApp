@@ -261,6 +261,7 @@ export type Database = {
       ingresos: {
         Row: {
           barbero: string | null
+          barbero_id: string | null
           cantidad_de_20_por: number | null
           cantidad_de_50_por: number | null
           cantidad_de_servicios: number | null
@@ -286,6 +287,7 @@ export type Database = {
         }
         Insert: {
           barbero?: string | null
+          barbero_id?: string | null
           cantidad_de_20_por?: number | null
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
@@ -311,6 +313,7 @@ export type Database = {
         }
         Update: {
           barbero?: string | null
+          barbero_id?: string | null
           cantidad_de_20_por?: number | null
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
@@ -335,6 +338,13 @@ export type Database = {
           Usuario?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ingresos_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ingresos_organization_id_fkey"
             columns: ["organization_id"]
