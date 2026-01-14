@@ -38,7 +38,7 @@ interface BarberSalaryData {
   barberName: string;
   totalDevengado: number;           // Filtered by period (or all time if no filter)
   totalPagado: number;              // Filtered by period (or all time if no filter)
-  saldo: number;                    // devengado - pagado (same period)
+  saldo: number;                    // ALWAYS historical: total devengado - total pagado (real debt)
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
 }
@@ -204,7 +204,40 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     
     setIsLoading(true);
     try {
-      // Build query for ingresos - filtered by period if set
+      // ALWAYS fetch ALL data for saldo calculation (historical)
+      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
+        .from('ingresos')
+        .select('barbero_id, sueldo')
+        .eq('organization_id', organization.id)
+        .eq('estado', 'activo');
+
+      if (ingresosHistoricosError) throw ingresosHistoricosError;
+
+      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
+        .from('pagos_sueldos')
+        .select('barbero_id, monto')
+        .eq('organization_id', organization.id);
+
+      if (pagosHistoricosError) throw pagosHistoricosError;
+
+      // Calculate HISTORICAL totals for saldo (real debt - never changes with filter)
+      const devengadoHistoricoPorId: Record<string, number> = {};
+      ingresosHistoricos?.forEach(ingreso => {
+        const barberoId = ingreso.barbero_id;
+        if (barberoId) {
+          devengadoHistoricoPorId[barberoId] = (devengadoHistoricoPorId[barberoId] || 0) + (ingreso.sueldo || 0);
+        }
+      });
+
+      const pagadoHistoricoPorId: Record<string, number> = {};
+      pagosHistoricos?.forEach(pago => {
+        const barberoId = pago.barbero_id;
+        if (barberoId) {
+          pagadoHistoricoPorId[barberoId] = (pagadoHistoricoPorId[barberoId] || 0) + pago.monto;
+        }
+      });
+
+      // Build query for ingresos - filtered by period if set (for display)
       let ingresosQuery = supabase
         .from('ingresos')
         .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at')
@@ -212,17 +245,15 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
       
-      // Apply period start date filter if set
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
       }
 
       const { data: ingresosFiltrados, error: ingresosFiltradosError } = await ingresosQuery;
-
       if (ingresosFiltradosError) throw ingresosFiltradosError;
 
-      // Fetch pagos filtered by period (if set)
+      // Fetch pagos filtered by period (for display)
       let pagosQuery = supabase
         .from('pagos_sueldos')
         .select('*')
@@ -235,34 +266,36 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       }
 
       const { data: pagosFiltrados, error: pagosFiltradosError } = await pagosQuery;
-
       if (pagosFiltradosError) throw pagosFiltradosError;
 
       setPagos(pagosFiltrados || []);
 
-      // Calculate devengado per barber BY barbero_id (UUID)
-      const devengadoPorBarberoId: Record<string, number> = {};
+      // Calculate FILTERED devengado per barber (for display)
+      const devengadoFiltradoPorId: Record<string, number> = {};
       (ingresosFiltrados as IngresoRaw[] | null)?.forEach(ingreso => {
         const barberoId = ingreso.barbero_id;
         if (barberoId) {
-          devengadoPorBarberoId[barberoId] = (devengadoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
+          devengadoFiltradoPorId[barberoId] = (devengadoFiltradoPorId[barberoId] || 0) + (ingreso.sueldo || 0);
         }
       });
 
-      // Calculate pagado per barber BY barbero_id (UUID)
-      const pagadoPorBarberoId: Record<string, number> = {};
+      // Calculate FILTERED pagado per barber (for display)
+      const pagadoFiltradoPorId: Record<string, number> = {};
       pagosFiltrados?.forEach(pago => {
         const barberoId = pago.barbero_id;
         if (barberoId) {
-          pagadoPorBarberoId[barberoId] = (pagadoPorBarberoId[barberoId] || 0) + pago.monto;
+          pagadoFiltradoPorId[barberoId] = (pagadoFiltradoPorId[barberoId] || 0) + pago.monto;
         }
       });
 
-      // Build salary data for active barbers - now using barbero_id (UUID)
+      // Build salary data for active barbers
       const data: BarberSalaryData[] = barbers.map(barber => {
-        // Use barber.id (UUID) for matching - much more reliable than text
-        const totalDevengado = devengadoPorBarberoId[barber.id] || 0;
-        const totalPagado = pagadoPorBarberoId[barber.id] || 0;
+        // FILTERED values for display (change with period filter)
+        const totalDevengado = devengadoFiltradoPorId[barber.id] || 0;
+        const totalPagado = pagadoFiltradoPorId[barber.id] || 0;
+        
+        // HISTORICAL saldo - real debt that NEVER changes with filter
+        const saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
         
         // Get detailed ingresos for this barber by barbero_id
         const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
@@ -295,7 +328,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           barberName: nombreCompleto || barber.firstName.trim(),
           totalDevengado,
           totalPagado,
-          saldo: totalDevengado - totalPagado,
+          saldo: saldoHistorico,  // Always historical
           detalleIngresos,
           detallePagos,
         };
@@ -570,7 +603,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Saldo {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+              Saldo Pendiente (histórico)
             </CardTitle>
           </CardHeader>
           <CardContent>
