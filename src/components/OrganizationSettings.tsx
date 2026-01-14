@@ -5,17 +5,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Phone, MapPin, Crown, Sparkles, Zap } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Building2, Phone, MapPin, Crown, Sparkles, Zap, Globe } from 'lucide-react';
 import { toast } from 'sonner';
+import { COUNTRIES, COUNTRY_TIMEZONES } from '@/lib/dateUtils';
 
 export function OrganizationSettings() {
   const { organization, planFeatures, updateOrganization } = useOrganization();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Find country code from current timezone
+  const getCurrentCountryCode = () => {
+    if (!organization?.timezone) return 'AR';
+    const entry = Object.entries(COUNTRY_TIMEZONES).find(([, tz]) => tz === organization.timezone);
+    return entry ? entry[0] : 'AR';
+  };
+  
   const [formData, setFormData] = useState({
     name: organization?.name || '',
     phone: organization?.phone || '',
     address: organization?.address || '',
+    country: getCurrentCountryCode(),
   });
 
   if (!organization) {
@@ -30,10 +41,12 @@ export function OrganizationSettings() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    const newTimezone = COUNTRY_TIMEZONES[formData.country as keyof typeof COUNTRY_TIMEZONES];
     const { error } = await updateOrganization({
       name: formData.name,
       phone: formData.phone || null,
       address: formData.address || null,
+      timezone: newTimezone,
     });
 
     if (error) {
@@ -50,6 +63,7 @@ export function OrganizationSettings() {
       name: organization.name,
       phone: organization.phone || '',
       address: organization.address || '',
+      country: getCurrentCountryCode(),
     });
     setIsEditing(false);
   };
@@ -122,6 +136,27 @@ export function OrganizationSettings() {
                   placeholder="Av. Corrientes 1234, CABA"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="org-country">País / Zona Horaria</Label>
+                <Select
+                  value={formData.country}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))}
+                >
+                  <SelectTrigger id="org-country">
+                    <SelectValue placeholder="Seleccionar país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        {country.flag} {country.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Esto determina la zona horaria para los cierres de caja
+                </p>
+              </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="ghost" onClick={handleCancel} disabled={isSaving}>
                   Cancelar
@@ -149,6 +184,13 @@ export function OrganizationSettings() {
                   <span>{organization.address}</span>
                 </div>
               )}
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-muted-foreground" />
+                <span>
+                  {COUNTRIES.find(c => COUNTRY_TIMEZONES[c.code as keyof typeof COUNTRY_TIMEZONES] === organization.timezone)?.flag}{' '}
+                  {COUNTRIES.find(c => COUNTRY_TIMEZONES[c.code as keyof typeof COUNTRY_TIMEZONES] === organization.timezone)?.name || 'Argentina'}
+                </span>
+              </div>
             </div>
           )}
         </CardContent>
