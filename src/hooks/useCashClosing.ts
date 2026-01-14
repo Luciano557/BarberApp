@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface BarberSummary {
-  barberId: string;
+  barberId: string;  // UUID del barbero
   barberName: string;
   count: number;
   totalEfectivo: number;
@@ -43,10 +43,11 @@ export function useCashClosing() {
     const startOfDay = `${dateStr}T00:00:00.000Z`;
     const endOfDay = `${dateStr}T23:59:59.999Z`;
     
+    // Validar duplicados por barbero_id (UUID) - más confiable que texto
     const { data: existingClosing, error: checkError } = await supabase
       .from('ingresos')
       .select('id')
-      .eq('barbero', normalizedBarberName)
+      .eq('barbero_id', barber.barberId)
       .gte('created_at', startOfDay)
       .lte('created_at', endOfDay)
       .neq('estado', 'eliminado')
@@ -128,9 +129,10 @@ export function useCashClosing() {
     // Generate unique identifier for this day/barber combo
     const identificador = crypto.randomUUID();
     
-    // Prepare the insert data with normalized barber name
+    // Prepare the insert data with barbero_id (UUID) as source of truth
     const insertData = {
-      barbero: normalizedBarberName,
+      barbero: normalizedBarberName,  // Mantener para display
+      barbero_id: barber.barberId,    // UUID - fuente de verdad para relaciones
       mp,
       efectivo,
       total_facturado: totalFacturado,

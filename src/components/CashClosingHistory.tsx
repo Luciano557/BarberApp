@@ -18,6 +18,7 @@ interface CashClosingRecord {
   id: number;
   created_at: string;
   barbero: string | null;
+  barbero_id: string | null;
   mp: number | null;
   efectivo: number | null;
   total_facturado: number | null;
@@ -44,11 +45,12 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     try {
       let query = supabase
         .from('ingresos')
-        .select('id, created_at, barbero, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado')
+        .select('id, created_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado')
         .order('created_at', { ascending: false });
 
+      // Filter by barbero_id (UUID) instead of text - more reliable
       if (selectedBarber !== 'all') {
-        query = query.eq('barbero', selectedBarber);
+        query = query.eq('barbero_id', selectedBarber);
       }
 
       if (startDate) {
@@ -120,11 +122,11 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
 
   const hasFilters = selectedBarber !== 'all' || startDate || endDate;
 
-  // Get unique barber names from records for filter dropdown
-  const uniqueBarbers = Array.from(new Set(records.map(r => r.barbero).filter(Boolean))) as string[];
-  const barberOptions = barbers.length > 0 
-    ? barbers.map(b => `${b.firstName} ${b.lastName}`)
-    : uniqueBarbers;
+  // Build barber options from the barbers prop - use id (UUID) as value
+  const barberOptions = barbers.map(b => ({
+    id: b.id,
+    name: `${b.firstName} ${b.lastName}`
+  }));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -156,8 +158,8 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los barberos</SelectItem>
-              {barberOptions.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
+              {barberOptions.map((barber) => (
+                <SelectItem key={barber.id} value={barber.id}>{barber.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -20,6 +20,19 @@ import { format, startOfMonth, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+// Define interface for raw ingresos data from Supabase
+interface IngresoRaw {
+  id: number;
+  barbero: string | null;
+  barbero_id: string | null;
+  sueldo: number | null;
+  total_facturado: number | null;
+  efectivo: number | null;
+  mp: number | null;
+  dia: string | null;
+  created_at: string;
+}
+
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
@@ -194,18 +207,19 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     setIsLoading(true);
     try {
       // Fetch ALL devengado from ingresos (historical - for saldo calculation)
+      // Now using barbero_id for reliable matching
       const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
         .from('ingresos')
-        .select('barbero, sueldo')
+        .select('barbero, barbero_id, sueldo')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
 
       if (ingresosHistoricosError) throw ingresosHistoricosError;
 
-      // Fetch devengado filtered by period (if set) - with full details
+      // Fetch devengado filtered by period (if set) - with full details including barbero_id
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, barbero, sueldo, total_facturado, efectivo, mp, dia, created_at')
+        .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
@@ -246,50 +260,53 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       if (pagosFiltradosError) throw pagosFiltradosError;
 
-      // Calculate historical devengado per barber
-      const devengadoHistoricoPorBarbero: Record<string, number> = {};
-      ingresosHistoricos?.forEach(ingreso => {
-        const nombre = ingreso.barbero;
-        if (nombre) {
-          devengadoHistoricoPorBarbero[nombre] = (devengadoHistoricoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+      // Calculate historical devengado per barber BY barbero_id (UUID) - more reliable
+      const devengadoHistoricoPorBarberoId: Record<string, number> = {};
+      (ingresosHistoricos as IngresoRaw[] | null)?.forEach(ingreso => {
+        const barberoId = ingreso.barbero_id;
+        if (barberoId) {
+          devengadoHistoricoPorBarberoId[barberoId] = (devengadoHistoricoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
         }
       });
 
-      // Calculate filtered devengado per barber
-      const devengadoFiltradoPorBarbero: Record<string, number> = {};
-      ingresosFiltrados?.forEach(ingreso => {
-        const nombre = ingreso.barbero;
-        if (nombre) {
-          devengadoFiltradoPorBarbero[nombre] = (devengadoFiltradoPorBarbero[nombre] || 0) + (ingreso.sueldo || 0);
+      // Calculate filtered devengado per barber BY barbero_id (UUID)
+      const devengadoFiltradoPorBarberoId: Record<string, number> = {};
+      (ingresosFiltrados as IngresoRaw[] | null)?.forEach(ingreso => {
+        const barberoId = ingreso.barbero_id;
+        if (barberoId) {
+          devengadoFiltradoPorBarberoId[barberoId] = (devengadoFiltradoPorBarberoId[barberoId] || 0) + (ingreso.sueldo || 0);
         }
       });
 
-      // Calculate historical pagado per barber
-      const pagadoHistoricoPorBarbero: Record<string, number> = {};
+      // Calculate historical pagado per barber BY barbero_id (UUID)
+      const pagadoHistoricoPorBarberoId: Record<string, number> = {};
       pagosHistoricos?.forEach(pago => {
-        const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
-        pagadoHistoricoPorBarbero[nombre] = (pagadoHistoricoPorBarbero[nombre] || 0) + pago.monto;
+        const barberoId = pago.barbero_id;
+        if (barberoId) {
+          pagadoHistoricoPorBarberoId[barberoId] = (pagadoHistoricoPorBarberoId[barberoId] || 0) + pago.monto;
+        }
       });
 
-      // Calculate filtered pagado per barber
-      const pagadoFiltradoPorBarbero: Record<string, number> = {};
+      // Calculate filtered pagado per barber BY barbero_id (UUID)
+      const pagadoFiltradoPorBarberoId: Record<string, number> = {};
       pagosFiltrados?.forEach(pago => {
-        const nombre = pago.barbero_nombre.replace(/\s+/g, ' ').trim();
-        pagadoFiltradoPorBarbero[nombre] = (pagadoFiltradoPorBarbero[nombre] || 0) + pago.monto;
+        const barberoId = pago.barbero_id;
+        if (barberoId) {
+          pagadoFiltradoPorBarberoId[barberoId] = (pagadoFiltradoPorBarberoId[barberoId] || 0) + pago.monto;
+        }
       });
 
-      // Build salary data for active barbers
+      // Build salary data for active barbers - now using barbero_id (UUID)
       const data: BarberSalaryData[] = barbers.map(barber => {
-        // Normalize name by trimming and collapsing multiple spaces
-        const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
-        const totalDevengado = devengadoFiltradoPorBarbero[nombreCompleto] || devengadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
-        const totalDevengadoHistorico = devengadoHistoricoPorBarbero[nombreCompleto] || devengadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
-        const totalPagado = pagadoFiltradoPorBarbero[nombreCompleto] || pagadoFiltradoPorBarbero[barber.firstName.trim()] || 0;
-        const totalPagadoHistorico = pagadoHistoricoPorBarbero[nombreCompleto] || pagadoHistoricoPorBarbero[barber.firstName.trim()] || 0;
+        // Use barber.id (UUID) for matching - much more reliable than text
+        const totalDevengado = devengadoFiltradoPorBarberoId[barber.id] || 0;
+        const totalDevengadoHistorico = devengadoHistoricoPorBarberoId[barber.id] || 0;
+        const totalPagado = pagadoFiltradoPorBarberoId[barber.id] || 0;
+        const totalPagadoHistorico = pagadoHistoricoPorBarberoId[barber.id] || 0;
         
-        // Get detailed ingresos for this barber
-        const detalleIngresos: IngresoDetalle[] = (ingresosFiltrados || [])
-          .filter(i => i.barbero === nombreCompleto || i.barbero === barber.firstName.trim())
+        // Get detailed ingresos for this barber by barbero_id
+        const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
+          .filter(i => i.barbero_id === barber.id)
           .map(i => ({
             id: i.id,
             fecha: i.created_at,
@@ -300,16 +317,18 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             mp: Number(i.mp) || 0,
           }));
 
-        // Get detailed pagos for this barber
+        // Get detailed pagos for this barber by barbero_id
         const detallePagos: PagoDetalle[] = (pagosFiltrados || [])
-          .filter(p => p.barbero_nombre.replace(/\s+/g, ' ').trim() === nombreCompleto || 
-                       p.barbero_nombre.replace(/\s+/g, ' ').trim() === barber.firstName.trim())
+          .filter(p => p.barbero_id === barber.id)
           .map(p => ({
             id: p.id,
             fecha: p.created_at,
             monto: Number(p.monto) || 0,
             concepto: p.concepto,
           }));
+
+        // Build display name for UI
+        const nombreCompleto = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
 
         return {
           barberId: barber.id,
