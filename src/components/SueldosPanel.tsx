@@ -196,8 +196,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [concepto, setConcepto] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Date filter for devengado (period start)
-  const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(undefined);
+  // Date filter for devengado (period start) - default to start of current month
+  const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
 
   const fetchData = useCallback(async () => {
     if (!organization) return;
