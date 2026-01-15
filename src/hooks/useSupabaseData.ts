@@ -57,6 +57,7 @@ function dbToDiscount(row: any): Discount {
     value: Number(row.valor),
     type: row.tipo === 'monto' ? 'fixed' : 'percentage',
     rounding: row.redondeo || 'cliente',
+    roundingUnit: Number(row.redondeo_unidad) || 100,
     paymentMethod: row.metodo_pago || 'todos',
   };
 }
@@ -99,7 +100,7 @@ export function useSupabaseData() {
       // Add "Sin descuento" option and map database discounts
       const dbDiscounts = discountsRes.data.map(dbToDiscount);
       setDiscounts([
-        { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage', rounding: 'cliente', paymentMethod: 'todos' },
+        { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
         ...dbDiscounts,
       ]);
     } catch (error) {
@@ -303,6 +304,7 @@ export function useSupabaseData() {
           valor: discount.value,
           tipo: discount.type === 'fixed' ? 'monto' : 'porcentaje',
           redondeo: discount.rounding || 'cliente',
+          redondeo_unidad: discount.roundingUnit || 100,
           metodo_pago: discount.paymentMethod || 'todos',
           activo: true,
           organization_id: organization.id,
@@ -330,6 +332,7 @@ export function useSupabaseData() {
       if (updates.value !== undefined) dbUpdates.valor = updates.value;
       if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'monto' : 'porcentaje';
       if (updates.rounding !== undefined) dbUpdates.redondeo = updates.rounding;
+      if (updates.roundingUnit !== undefined) dbUpdates.redondeo_unidad = updates.roundingUnit;
       if (updates.paymentMethod !== undefined) dbUpdates.metodo_pago = updates.paymentMethod;
 
       const { error } = await supabase

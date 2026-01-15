@@ -153,6 +153,7 @@ export type Database = {
           nombre: string
           organization_id: string | null
           redondeo: string | null
+          redondeo_unidad: number | null
           tipo: string
           updated_at: string
           valor: number
@@ -165,6 +166,7 @@ export type Database = {
           nombre: string
           organization_id?: string | null
           redondeo?: string | null
+          redondeo_unidad?: number | null
           tipo: string
           updated_at?: string
           valor?: number
@@ -177,6 +179,7 @@ export type Database = {
           nombre?: string
           organization_id?: string | null
           redondeo?: string | null
+          redondeo_unidad?: number | null
           tipo?: string
           updated_at?: string
           valor?: number
