@@ -1013,14 +1013,18 @@ function DiscountsList({
   const [newLabel, setNewLabel] = useState('');
   const [newValue, setNewValue] = useState('');
   const [newType, setNewType] = useState<'percentage' | 'fixed'>('percentage');
-  const [newRounding, setNewRounding] = useState<'cliente' | 'negocio'>('cliente');
+  const [newRounding, setNewRounding] = useState<'cliente' | 'negocio' | 'matematico'>('cliente');
+  const [newRoundingUnit, setNewRoundingUnit] = useState<number>(100);
   const [newPaymentMethod, setNewPaymentMethod] = useState<'todos' | 'efectivo' | 'mercado_pago'>('todos');
+
+  const ROUNDING_UNITS = [1, 10, 50, 100, 500, 1000];
 
   const resetForm = () => {
     setNewLabel('');
     setNewValue('');
     setNewType('percentage');
     setNewRounding('cliente');
+    setNewRoundingUnit(100);
     setNewPaymentMethod('todos');
   };
 
@@ -1031,6 +1035,7 @@ function DiscountsList({
         value: parseFloat(newValue), 
         type: newType,
         rounding: newRounding,
+        roundingUnit: newRoundingUnit,
         paymentMethod: newPaymentMethod,
       });
       resetForm();
@@ -1045,6 +1050,7 @@ function DiscountsList({
         value: parseFloat(newValue), 
         type: newType,
         rounding: newRounding,
+        roundingUnit: newRoundingUnit,
         paymentMethod: newPaymentMethod,
       });
       setEditingId(null);
@@ -1058,6 +1064,7 @@ function DiscountsList({
     setNewValue(discount.value.toString());
     setNewType(discount.type || 'percentage');
     setNewRounding(discount.rounding || 'cliente');
+    setNewRoundingUnit(discount.roundingUnit || 100);
     setNewPaymentMethod(discount.paymentMethod || 'todos');
   };
 
@@ -1069,8 +1076,14 @@ function DiscountsList({
     }
   };
 
-  const getRoundingLabel = (rounding: string) => {
-    return rounding === 'cliente' ? '↓ Cliente' : '↑ Negocio';
+  const getRoundingLabel = (rounding: string, unit?: number) => {
+    const unitLabel = unit && unit !== 1 ? ` (×${unit})` : '';
+    switch (rounding) {
+      case 'cliente': return `↓ Cliente${unitLabel}`;
+      case 'negocio': return `↑ Negocio${unitLabel}`;
+      case 'matematico': return `≈ Matemático${unitLabel}`;
+      default: return `↓ Cliente${unitLabel}`;
+    }
   };
 
   const DiscountForm = ({ isEdit = false, discountId = '' }: { isEdit?: boolean; discountId?: string }) => (
@@ -1110,18 +1123,36 @@ function DiscountsList({
           />
         </div>
         {newType === 'percentage' && (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Redondeo</label>
-            <Select value={newRounding} onValueChange={(v) => setNewRounding(v as 'cliente' | 'negocio')}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cliente">↓ Favor Cliente (redondea hacia abajo)</SelectItem>
-                <SelectItem value="negocio">↑ Favor Negocio (redondea hacia arriba)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Tipo de Redondeo</label>
+              <Select value={newRounding} onValueChange={(v) => setNewRounding(v as 'cliente' | 'negocio' | 'matematico')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cliente">↓ Favor Cliente (redondea hacia abajo)</SelectItem>
+                  <SelectItem value="negocio">↑ Favor Negocio (redondea hacia arriba)</SelectItem>
+                  <SelectItem value="matematico">≈ Al más cercano (redondeo matemático)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Unidad de Redondeo</label>
+              <Select value={newRoundingUnit.toString()} onValueChange={(v) => setNewRoundingUnit(parseInt(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROUNDING_UNITS.map(unit => (
+                    <SelectItem key={unit} value={unit.toString()}>
+                      {unit === 1 ? 'Sin redondeo (exacto)' : `A ${unit} (ej: ${unit * 12} → ${Math.round((unit * 12) / unit) * unit})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
         )}
         <div className="space-y-1.5 sm:col-span-2">
           <label className="text-xs font-medium text-muted-foreground">Aplica con método de pago</label>
@@ -1194,7 +1225,7 @@ function DiscountsList({
                     </span>
                     {discount.type === 'percentage' && discount.id !== 'none' && (
                       <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-                        {getRoundingLabel(discount.rounding)}
+                        {getRoundingLabel(discount.rounding, discount.roundingUnit)}
                       </span>
                     )}
                     {discount.paymentMethod !== 'todos' && discount.id !== 'none' && (

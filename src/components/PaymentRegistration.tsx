@@ -81,9 +81,27 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     // percentage with rounding
     const rawDiscount = subtotal * (selectedDiscountData.value / 100);
     const rounding = selectedDiscountData.rounding || 'cliente';
-    // cliente = favor cliente = floor (less discount taken)
-    // negocio = favor negocio = ceil (more discount taken)
-    return rounding === 'cliente' ? Math.floor(rawDiscount) : Math.ceil(rawDiscount);
+    const unit = selectedDiscountData.roundingUnit || 1;
+    
+    // Apply rounding based on type and unit
+    let roundedDiscount: number;
+    if (unit === 1) {
+      // No unit rounding, just apply direction
+      switch (rounding) {
+        case 'negocio': roundedDiscount = Math.ceil(rawDiscount); break;
+        case 'matematico': roundedDiscount = Math.round(rawDiscount); break;
+        default: roundedDiscount = Math.floor(rawDiscount); break;
+      }
+    } else {
+      // Apply unit-based rounding
+      switch (rounding) {
+        case 'negocio': roundedDiscount = Math.ceil(rawDiscount / unit) * unit; break;
+        case 'matematico': roundedDiscount = Math.round(rawDiscount / unit) * unit; break;
+        default: roundedDiscount = Math.floor(rawDiscount / unit) * unit; break;
+      }
+    }
+    
+    return roundedDiscount;
   }, [subtotal, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);

@@ -44,7 +44,8 @@ export interface Discount {
   label: string;
   value: number;
   type: 'percentage' | 'fixed'; // percentage = %, fixed = $
-  rounding: 'cliente' | 'negocio'; // cliente = favor cliente (floor), negocio = favor negocio (ceil)
+  rounding: 'cliente' | 'negocio' | 'matematico'; // cliente = floor, negocio = ceil, matematico = round
+  roundingUnit: number; // unidad de redondeo (100, 500, 1000, etc.)
   paymentMethod: 'todos' | 'efectivo' | 'mercado_pago'; // restricción de método de pago
 }
 
