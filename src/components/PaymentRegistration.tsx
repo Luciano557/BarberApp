@@ -63,14 +63,28 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     return discounts.find(d => d.id === selectedDiscount);
   }, [discounts, selectedDiscount]);
 
+  // Check if selected discount is valid for the payment method
+  const isDiscountValidForPayment = useMemo(() => {
+    if (!selectedDiscountData || !paymentMethod) return true;
+    if (selectedDiscountData.paymentMethod === 'todos') return true;
+    return selectedDiscountData.paymentMethod === paymentMethod;
+  }, [selectedDiscountData, paymentMethod]);
+
   const discountAmount = useMemo(() => {
     if (!selectedDiscountData || selectedDiscountData.value === 0) return 0;
+    // If discount doesn't apply to selected payment method, no discount
+    if (!isDiscountValidForPayment) return 0;
+    
     if (selectedDiscountData.type === 'fixed') {
       return selectedDiscountData.value;
     }
-    // percentage
-    return Math.round(subtotal * (selectedDiscountData.value / 100));
-  }, [subtotal, selectedDiscountData]);
+    // percentage with rounding
+    const rawDiscount = subtotal * (selectedDiscountData.value / 100);
+    const rounding = selectedDiscountData.rounding || 'cliente';
+    // cliente = favor cliente = floor (less discount taken)
+    // negocio = favor negocio = ceil (more discount taken)
+    return rounding === 'cliente' ? Math.floor(rawDiscount) : Math.ceil(rawDiscount);
+  }, [subtotal, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
@@ -351,9 +365,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
         {currentStep === 'discount' && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {discounts.map((discount, index) => {
-              const calcAmount = discount.type === 'fixed' 
+              const rounding = discount.rounding || 'cliente';
+              const rawCalc = discount.type === 'fixed' 
                 ? discount.value 
-                : Math.round(subtotal * (discount.value / 100));
+                : subtotal * (discount.value / 100);
+              const calcAmount = discount.type === 'fixed' 
+                ? rawCalc 
+                : rounding === 'cliente' ? Math.floor(rawCalc) : Math.ceil(rawCalc);
+              
+              const paymentRestriction = discount.paymentMethod !== 'todos' && discount.id !== 'none';
+              const paymentLabel = discount.paymentMethod === 'efectivo' ? 'Efectivo' : 
+                                   discount.paymentMethod === 'mercado_pago' ? 'MP' : '';
               
               return (
                 <button
@@ -368,6 +390,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
                   <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                     {index + 1}
                   </span>
+                  {paymentRestriction && (
+                    <span className="absolute top-3 right-3 text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
+                      Solo {paymentLabel}
+                    </span>
+                  )}
                   <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
                     {discount.value === 0 ? (
                       <Check className="h-5 w-5 text-muted-foreground" />
@@ -440,11 +467,25 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium">${subtotal.toLocaleString()}</span>
                 </div>
-                {discountAmount > 0 && selectedDiscountData && (
-                  <div className="flex justify-between text-success">
-                    <span>Descuento ({selectedDiscountData.type === 'fixed' ? `$${selectedDiscountData.value.toLocaleString()}` : `${selectedDiscountData.value}%`})</span>
-                    <span className="font-medium">-${discountAmount.toLocaleString()}</span>
-                  </div>
+                {selectedDiscountData && selectedDiscountData.value > 0 && (
+                  isDiscountValidForPayment ? (
+                    <div className="flex justify-between text-success">
+                      <span>Descuento ({selectedDiscountData.type === 'fixed' ? `$${selectedDiscountData.value.toLocaleString()}` : `${selectedDiscountData.value}%`})</span>
+                      <span className="font-medium">-${discountAmount.toLocaleString()}</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-destructive">
+                      <span className="text-xs">Descuento no aplica a este método</span>
+                      <span className="font-medium line-through text-muted-foreground">-${
+                        selectedDiscountData.type === 'fixed' 
+                          ? selectedDiscountData.value.toLocaleString()
+                          : (selectedDiscountData.rounding === 'cliente' 
+                              ? Math.floor(subtotal * selectedDiscountData.value / 100) 
+                              : Math.ceil(subtotal * selectedDiscountData.value / 100)
+                            ).toLocaleString()
+                      }</span>
+                    </div>
+                  )
                 )}
               </div>
 

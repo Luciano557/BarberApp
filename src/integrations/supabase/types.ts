@@ -149,8 +149,10 @@ export type Database = {
           activo: boolean
           created_at: string
           id: string
+          metodo_pago: string | null
           nombre: string
           organization_id: string | null
+          redondeo: string | null
           tipo: string
           updated_at: string
           valor: number
@@ -159,8 +161,10 @@ export type Database = {
           activo?: boolean
           created_at?: string
           id?: string
+          metodo_pago?: string | null
           nombre: string
           organization_id?: string | null
+          redondeo?: string | null
           tipo: string
           updated_at?: string
           valor?: number
@@ -169,8 +173,10 @@ export type Database = {
           activo?: boolean
           created_at?: string
           id?: string
+          metodo_pago?: string | null
           nombre?: string
           organization_id?: string | null
+          redondeo?: string | null
           tipo?: string
           updated_at?: string
           valor?: number
