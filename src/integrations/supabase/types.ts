@@ -355,6 +355,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ingresos_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ingresos_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -546,6 +553,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
             referencedColumns: ["id"]
           },
           {
@@ -803,6 +817,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "venta_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "venta_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -862,7 +883,47 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      barberos_safe: {
+        Row: {
+          activo: boolean | null
+          apellido: string | null
+          comision: number | null
+          created_at: string | null
+          id: string | null
+          nombre: string | null
+          organization_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          apellido?: string | null
+          comision?: number | null
+          created_at?: string | null
+          id?: string | null
+          nombre?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          apellido?: string | null
+          comision?: number | null
+          created_at?: string | null
+          id?: string | null
+          nombre?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barberos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       check_org_limit: {
