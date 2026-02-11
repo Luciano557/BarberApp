@@ -87,20 +87,20 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
     
     const { data } = await supabase
       .from('ingresos')
-      .select('id, barbero')
+      .select('id, barbero, barbero_id')
       .gte('created_at', startStr)
       .lte('created_at', endStr)
       .neq('estado', 'eliminado');
 
     if (data) {
-      const closedNames = new Set(data.map(d => d.barbero));
-      setClosedBarbers(closedNames);
+      const closedIds = new Set(data.map(d => d.barbero_id).filter(Boolean));
+      setClosedBarbers(closedIds as Set<string>);
       
-      // Store the mapping of barber name to ingreso id for voiding
+      // Store the mapping of barbero_id to ingreso id for voiding
       const dataMap = new Map<string, { id: number; barberName: string }>();
       data.forEach(d => {
-        if (d.barbero) {
-          dataMap.set(d.barbero, { id: d.id, barberName: d.barbero });
+        if (d.barbero_id) {
+          dataMap.set(d.barbero_id, { id: d.id, barberName: d.barbero || '' });
         }
       });
       setClosedBarbersData(dataMap);
@@ -114,7 +114,7 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
 
   // Check if a transaction can be voided (barber's cash not closed)
   const canVoidTransaction = useCallback((tx: Transaction): boolean => {
-    return !closedBarbers.has(tx.barberName);
+    return !closedBarbers.has(tx.barberId);
   }, [closedBarbers]);
 
   // Calculate per-barber summaries with commissions (only active transactions)
@@ -391,13 +391,13 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
                   <div className="-mx-6 px-6 pb-4 pt-3">
-                    {closedBarbers.has(barber.barberName) ? (
+                    {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
                         <Button 
                           variant="destructive"
                           className="w-full" 
                           onClick={() => {
-                            const closureData = closedBarbersData.get(barber.barberName);
+                            const closureData = closedBarbersData.get(barber.barberId);
                             if (closureData) {
                               setVoidingClosure(closureData);
                             }

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 interface CashClosingRecord {
   id: number;
   created_at: string;
+  closed_at: string | null;
   barbero: string | null;
   barbero_id: string | null;
   mp: number | null;
@@ -45,7 +46,7 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     try {
       let query = supabase
         .from('ingresos')
-        .select('id, created_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado')
+        .select('id, created_at, closed_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado')
         .order('created_at', { ascending: false });
 
       // Filter by barbero_id (UUID) instead of text - more reliable
@@ -236,6 +237,11 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
                         <p className="text-sm text-muted-foreground capitalize">
                           {record.dia} • {format(new Date(record.created_at), "d 'de' MMMM yyyy", { locale: es })}
                         </p>
+                        {record.closed_at && record.closed_at !== record.created_at && (
+                          <p className="text-xs text-muted-foreground/70">
+                            Registrado el {format(new Date(record.closed_at), "d 'de' MMMM yyyy 'a las' HH:mm", { locale: es })}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
