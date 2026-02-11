@@ -151,7 +151,8 @@ export function useCashClosing() {
       estado: 'activo',
       Usuario: 'Sistema',
       servicios_por_linea: serviciosPorLinea,
-      created_at: new Date().toISOString(),
+      created_at: getEndOfDayLocal(date),
+      closed_at: new Date().toISOString(),
       organization_id: organization.id,
     };
     

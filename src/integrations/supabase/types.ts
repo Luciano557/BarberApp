@@ -274,6 +274,7 @@ export type Database = {
           cantidad_de_20_por: number | null
           cantidad_de_50_por: number | null
           cantidad_de_servicios: number | null
+          closed_at: string | null
           created_at: string
           deluxe: number | null
           dia: string | null
@@ -300,6 +301,7 @@ export type Database = {
           cantidad_de_20_por?: number | null
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
+          closed_at?: string | null
           created_at: string
           deluxe?: number | null
           dia?: string | null
@@ -326,6 +328,7 @@ export type Database = {
           cantidad_de_20_por?: number | null
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
+          closed_at?: string | null
           created_at?: string
           deluxe?: number | null
           dia?: string | null
