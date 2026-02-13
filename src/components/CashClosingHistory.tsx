@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2, RotateCcw, CalendarDays } from 'lucide-react';
+import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -13,8 +13,6 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { getEndOfDayLocal } from '@/lib/dateUtils';
-import { cn } from '@/lib/utils';
 
 interface CashClosingRecord {
   id: number;
@@ -42,8 +40,6 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
   const [selectedBarber, setSelectedBarber] = useState<string>('all');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
-  const [changeDateRecordId, setChangeDateRecordId] = useState<number | null>(null);
-  const [newDate, setNewDate] = useState<Date | undefined>(undefined);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -122,45 +118,6 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     }
 
     toast.success(`Cierre de ${record.barbero} restaurado correctamente`);
-    fetchRecords();
-  };
-
-  const handleChangeDate = async (record: CashClosingRecord) => {
-    if (!newDate) return;
-
-    // Check for duplicate: same barbero_id, same target date, active status
-    const targetStart = format(newDate, 'yyyy-MM-dd') + 'T00:00:00';
-    const targetEnd = format(newDate, 'yyyy-MM-dd') + 'T23:59:59.999';
-
-    const { data: existing } = await supabase
-      .from('ingresos')
-      .select('id')
-      .eq('barbero_id', record.barbero_id!)
-      .eq('estado', 'activo')
-      .gte('created_at', targetStart)
-      .lte('created_at', targetEnd)
-      .neq('id', record.id);
-
-    if (existing && existing.length > 0) {
-      toast.error(`Ya existe un cierre activo de ${record.barbero} en esa fecha`);
-      return;
-    }
-
-    const newCreatedAt = getEndOfDayLocal(newDate);
-    const { error } = await supabase
-      .from('ingresos')
-      .update({ created_at: newCreatedAt })
-      .eq('id', record.id);
-
-    if (error) {
-      console.error('Error cambiando fecha:', error);
-      toast.error('Error al cambiar la fecha del cierre');
-      return;
-    }
-
-    toast.success(`Fecha del cierre de ${record.barbero} cambiada al ${format(newDate, "d 'de' MMMM", { locale: es })}`);
-    setChangeDateRecordId(null);
-    setNewDate(undefined);
     fetchRecords();
   };
 
@@ -314,71 +271,27 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
                           </AlertDialogContent>
                         </AlertDialog>
                       ) : (
-                        <>
-                          {/* Change date button */}
-                          <Popover 
-                            open={changeDateRecordId === record.id} 
-                            onOpenChange={(isOpen) => {
-                              setChangeDateRecordId(isOpen ? record.id : null);
-                              if (!isOpen) setNewDate(undefined);
-                            }}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                                <CalendarDays className="h-4 w-4" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="end">
-                              <div className="p-3 border-b border-border">
-                                <p className="text-sm font-medium">Cambiar fecha comercial</p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Actual: {format(new Date(record.created_at), "d 'de' MMMM yyyy", { locale: es })}
-                                </p>
-                              </div>
-                              <Calendar
-                                mode="single"
-                                selected={newDate}
-                                onSelect={setNewDate}
-                                locale={es}
-                                initialFocus
-                                className={cn("p-3 pointer-events-auto")}
-                              />
-                              {newDate && (
-                                <div className="p-3 border-t border-border flex justify-end gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => { setChangeDateRecordId(null); setNewDate(undefined); }}>
-                                    Cancelar
-                                  </Button>
-                                  <Button size="sm" onClick={() => handleChangeDate(record)}>
-                                    Confirmar
-                                  </Button>
-                                </div>
-                              )}
-                            </PopoverContent>
-                          </Popover>
-
-                          {/* Delete button */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>¿Anular cierre de caja?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Esta acción marcará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} como eliminado. El registro no se borrará pero ya no se contabilizará.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleAnular(record)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Anular
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Anular cierre de caja?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta acción marcará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} como eliminado. El registro no se borrará pero ya no se contabilizará.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleAnular(record)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Anular
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
                   </div>
