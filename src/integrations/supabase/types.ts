@@ -826,6 +826,7 @@ export type Database = {
           estado: string
           fecha_limite: string | null
           frecuencia_dias: number | null
+          hora: string | null
           id: string
           organization_id: string
           proxima_fecha: string | null
@@ -833,6 +834,10 @@ export type Database = {
           recurrencia_semana_del_mes: number | null
           recurrencia_tipo: string | null
           recurrente: boolean | null
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string | null
           tipo: string
           titulo: string
           updated_at: string
@@ -848,6 +853,7 @@ export type Database = {
           estado?: string
           fecha_limite?: string | null
           frecuencia_dias?: number | null
+          hora?: string | null
           id?: string
           organization_id: string
           proxima_fecha?: string | null
@@ -855,6 +861,10 @@ export type Database = {
           recurrencia_semana_del_mes?: number | null
           recurrencia_tipo?: string | null
           recurrente?: boolean | null
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string | null
           tipo?: string
           titulo: string
           updated_at?: string
@@ -870,6 +880,7 @@ export type Database = {
           estado?: string
           fecha_limite?: string | null
           frecuencia_dias?: number | null
+          hora?: string | null
           id?: string
           organization_id?: string
           proxima_fecha?: string | null
@@ -877,6 +888,10 @@ export type Database = {
           recurrencia_semana_del_mes?: number | null
           recurrencia_tipo?: string | null
           recurrente?: boolean | null
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string | null
           tipo?: string
           titulo?: string
           updated_at?: string

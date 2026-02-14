@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -24,8 +23,28 @@ export interface Tarea {
   dias_para_limite: number | null;
   proxima_fecha: string | null;
   fecha_limite: string | null;
+  hora: string | null;
+  repeat_preset: string | null;
+  repeat_frequency: string | null;
+  repeat_interval: number | null;
+  repeat_byweekday: number[] | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TareaInsert {
+  tipo: 'tarea' | 'peticion';
+  titulo: string;
+  descripcion?: string;
+  asignado_a_id?: string;
+  asignado_a_nombre?: string;
+  fecha_limite?: string;
+  hora?: string;
+  repeat_preset?: string;
+  repeat_frequency?: string;
+  repeat_interval?: number;
+  repeat_byweekday?: number[];
+  recurrente?: boolean;
 }
 
 export function useTareas() {
@@ -49,26 +68,13 @@ export function useTareas() {
   });
 
   const addTarea = useMutation({
-    mutationFn: async (tarea: {
-      tipo: 'tarea' | 'peticion';
-      titulo: string;
-      descripcion?: string;
-      asignado_a_id?: string;
-      asignado_a_nombre?: string;
-      recurrente?: boolean;
-      frecuencia_dias?: number;
-      recurrencia_tipo?: string;
-      recurrencia_dia_semana?: number;
-      recurrencia_semana_del_mes?: number;
-      dias_para_limite?: number;
-      proxima_fecha?: string;
-      fecha_limite?: string;
-    }) => {
+    mutationFn: async (tarea: TareaInsert) => {
       if (!organization?.id || !user?.id) throw new Error('No org or user');
       const { error } = await supabase.from('tareas').insert({
         organization_id: organization.id,
         creado_por_id: user.id,
         creado_por_nombre: profile?.full_name || profile?.email || '',
+        recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,
         ...tarea,
       });
       if (error) throw error;
