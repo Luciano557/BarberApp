@@ -3,6 +3,7 @@ import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Receipt, Trash2, ChevronLeft, ChevronRight, Plus, Webhook, Copy, Check } from 'lucide-react';
 import { useGastos } from '@/hooks/useGastos';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -237,13 +238,21 @@ export function GastosPanel() {
         </CardContent>
       </Card>
 
-      {/* Webhook Section */}
+      {/* Webhook Section - Collapsible */}
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between border-dashed">
+            <div className="flex items-center gap-2">
+              <Webhook className="h-4 w-4 text-primary" />
+              <span>Opciones avanzadas</span>
+            </div>
+            <ChevronRight className="h-4 w-4 transition-transform duration-200 [[data-state=open]>&]:rotate-90" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3">
       <Card className="border-dashed">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Webhook className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Webhook — Carga automática</CardTitle>
-          </div>
+          <CardTitle className="text-lg">Webhook — Carga automática</CardTitle>
           <CardDescription>
             Envía gastos automáticamente desde sistemas externos (n8n, Make, Zapier, etc.) mediante una petición POST.
           </CardDescription>
@@ -359,6 +368,8 @@ export function GastosPanel() {
           </div>
         </CardContent>
       </Card>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
