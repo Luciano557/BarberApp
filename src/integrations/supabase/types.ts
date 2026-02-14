@@ -822,12 +822,16 @@ export type Database = {
           creado_por_nombre: string | null
           created_at: string
           descripcion: string | null
+          dias_para_limite: number | null
           estado: string
           fecha_limite: string | null
           frecuencia_dias: number | null
           id: string
           organization_id: string
           proxima_fecha: string | null
+          recurrencia_dia_semana: number | null
+          recurrencia_semana_del_mes: number | null
+          recurrencia_tipo: string | null
           recurrente: boolean | null
           tipo: string
           titulo: string
@@ -840,12 +844,16 @@ export type Database = {
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
+          dias_para_limite?: number | null
           estado?: string
           fecha_limite?: string | null
           frecuencia_dias?: number | null
           id?: string
           organization_id: string
           proxima_fecha?: string | null
+          recurrencia_dia_semana?: number | null
+          recurrencia_semana_del_mes?: number | null
+          recurrencia_tipo?: string | null
           recurrente?: boolean | null
           tipo?: string
           titulo: string
@@ -858,12 +866,16 @@ export type Database = {
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
+          dias_para_limite?: number | null
           estado?: string
           fecha_limite?: string | null
           frecuencia_dias?: number | null
           id?: string
           organization_id?: string
           proxima_fecha?: string | null
+          recurrencia_dia_semana?: number | null
+          recurrencia_semana_del_mes?: number | null
+          recurrencia_tipo?: string | null
           recurrente?: boolean | null
           tipo?: string
           titulo?: string

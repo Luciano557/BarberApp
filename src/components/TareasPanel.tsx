@@ -27,11 +27,34 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [descripcion, setDescripcion] = useState('');
   const [asignadoId, setAsignadoId] = useState('');
   const [recurrente, setRecurrente] = useState(false);
+  const [recurrenciaTipo, setRecurrenciaTipo] = useState('dias');
   const [frecuenciaDias, setFrecuenciaDias] = useState('');
+  const [diaSemana, setDiaSemana] = useState('1'); // lunes default
+  const [semanaDelMes, setSemanaDelMes] = useState('1');
+  const [diasParaLimite, setDiasParaLimite] = useState('');
   const [fechaLimite, setFechaLimite] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
 
   const activeBarbers = barbers.filter(b => b.active);
+
+  const diasSemana = [
+    { value: '1', label: 'Lunes' },
+    { value: '2', label: 'Martes' },
+    { value: '3', label: 'Miércoles' },
+    { value: '4', label: 'Jueves' },
+    { value: '5', label: 'Viernes' },
+    { value: '6', label: 'Sábado' },
+    { value: '0', label: 'Domingo' },
+  ];
+
+  const calcularFechaLimite = (): string | undefined => {
+    if (!recurrente) return fechaLimite || undefined;
+    const dias = diasParaLimite ? parseInt(diasParaLimite) : undefined;
+    if (dias) {
+      return new Date(Date.now() + dias * 86400000).toISOString().split('T')[0];
+    }
+    return undefined;
+  };
 
   const handleSubmitTarea = () => {
     if (!titulo.trim()) return;
@@ -44,16 +67,24 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       asignado_a_id: asignadoId || undefined,
       asignado_a_nombre: barberName,
       recurrente,
-      frecuencia_dias: recurrente && frecuenciaDias ? parseInt(frecuenciaDias) : undefined,
-      fecha_limite: recurrente && frecuenciaDias
-        ? new Date(Date.now() + parseInt(frecuenciaDias) * 86400000).toISOString().split('T')[0]
-        : (fechaLimite || undefined),
+      recurrencia_tipo: recurrente ? recurrenciaTipo : undefined,
+      frecuencia_dias: recurrente && recurrenciaTipo === 'dias' && frecuenciaDias ? parseInt(frecuenciaDias) : undefined,
+      recurrencia_dia_semana: recurrente && recurrenciaTipo !== 'dias' ? parseInt(diaSemana) : undefined,
+      recurrencia_semana_del_mes: recurrente && (recurrenciaTipo === 'primer_dia_mes' || recurrenciaTipo === 'segundo_dia_mes')
+        ? (recurrenciaTipo === 'primer_dia_mes' ? 1 : 2)
+        : undefined,
+      dias_para_limite: recurrente && diasParaLimite ? parseInt(diasParaLimite) : undefined,
+      fecha_limite: calcularFechaLimite(),
     });
     setTitulo('');
     setDescripcion('');
     setAsignadoId('');
     setRecurrente(false);
+    setRecurrenciaTipo('dias');
     setFrecuenciaDias('');
+    setDiaSemana('1');
+    setSemanaDelMes('1');
+    setDiasParaLimite('');
     setFechaLimite('');
   };
 
@@ -112,7 +143,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             <TableCell>{getEstadoBadge(t.estado)}</TableCell>
             <TableCell>
               {t.recurrente ? (
-                <span className="text-xs text-muted-foreground">Cada {t.frecuencia_dias} días</span>
+                <span className="text-xs text-muted-foreground">
+                  {t.recurrencia_tipo === 'dias' && `Cada ${t.frecuencia_dias} días`}
+                  {t.recurrencia_tipo === 'semanal' && `Todos los ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][t.recurrencia_dia_semana || 0]}`}
+                  {t.recurrencia_tipo === 'quincenal_dia' && `${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][t.recurrencia_dia_semana || 0]} cada 15 días`}
+                  {t.recurrencia_tipo === 'primer_dia_mes' && `1er ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][t.recurrencia_dia_semana || 0]} del mes`}
+                  {t.recurrencia_tipo === 'segundo_dia_mes' && `2do ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][t.recurrencia_dia_semana || 0]} del mes`}
+                  {t.dias_para_limite ? ` (límite: ${t.dias_para_limite}d)` : ''}
+                </span>
               ) : '—'}
             </TableCell>
             <TableCell>
@@ -184,19 +222,55 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch checked={recurrente} onCheckedChange={setRecurrente} />
-              <Label className="text-sm">Recurrente</Label>
-            </div>
-            {recurrente && (
-              <div className="flex items-center gap-2">
-                <Label className="text-sm">Cada</Label>
-                <Input type="number" className="w-20" value={frecuenciaDias} onChange={e => setFrecuenciaDias(e.target.value)} min="1" />
-                <Label className="text-sm">días</Label>
-              </div>
-            )}
+          <div className="flex items-center gap-2 mb-2">
+            <Switch checked={recurrente} onCheckedChange={setRecurrente} />
+            <Label className="text-sm">Recurrente</Label>
           </div>
+          {recurrente && (
+            <div className="space-y-3 rounded-lg border border-border p-4 bg-muted/30">
+              <div>
+                <Label className="text-sm mb-1.5 block">Tipo de recurrencia</Label>
+                <Select value={recurrenciaTipo} onValueChange={setRecurrenciaTipo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dias">Cada X días</SelectItem>
+                    <SelectItem value="semanal">Todas las semanas un día</SelectItem>
+                    <SelectItem value="quincenal_dia">Cada 15 días un día</SelectItem>
+                    <SelectItem value="primer_dia_mes">El primer [día] del mes</SelectItem>
+                    <SelectItem value="segundo_dia_mes">El segundo [día] del mes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {recurrenciaTipo === 'dias' && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm">Cada</Label>
+                  <Input type="number" className="w-20" value={frecuenciaDias} onChange={e => setFrecuenciaDias(e.target.value)} min="1" />
+                  <Label className="text-sm">días</Label>
+                </div>
+              )}
+
+              {recurrenciaTipo !== 'dias' && (
+                <div>
+                  <Label className="text-sm mb-1.5 block">Día de la semana</Label>
+                  <Select value={diaSemana} onValueChange={setDiaSemana}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {diasSemana.map(d => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Fecha límite</Label>
+                <Input type="number" className="w-20" value={diasParaLimite} onChange={e => setDiasParaLimite(e.target.value)} min="1" placeholder="—" />
+                <Label className="text-sm">días después</Label>
+              </div>
+            </div>
+          )}
           <Button onClick={handleSubmitTarea} disabled={!titulo.trim() || addTarea.isPending}>
             <Plus className="h-4 w-4 mr-2" />
             Crear tarea

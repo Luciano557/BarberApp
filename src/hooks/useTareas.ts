@@ -18,6 +18,10 @@ export interface Tarea {
   creado_por_nombre: string | null;
   recurrente: boolean;
   frecuencia_dias: number | null;
+  recurrencia_tipo: string | null;
+  recurrencia_dia_semana: number | null;
+  recurrencia_semana_del_mes: number | null;
+  dias_para_limite: number | null;
   proxima_fecha: string | null;
   fecha_limite: string | null;
   created_at: string;
@@ -53,6 +57,10 @@ export function useTareas() {
       asignado_a_nombre?: string;
       recurrente?: boolean;
       frecuencia_dias?: number;
+      recurrencia_tipo?: string;
+      recurrencia_dia_semana?: number;
+      recurrencia_semana_del_mes?: number;
+      dias_para_limite?: number;
       proxima_fecha?: string;
       fecha_limite?: string;
     }) => {
