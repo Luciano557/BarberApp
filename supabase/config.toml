@@ -1,1 +1,4 @@
 project_id = "azqpyfoobpovqosbayvz"
+
+[functions.gastos-webhook]
+verify_jwt = false
