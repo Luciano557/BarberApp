@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet, Lock, TrendingUp } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet, Lock, TrendingUp, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     { id: 'resumen', label: 'Resumen', icon: BarChart3 },
     ...(canManageConfig ? [{ id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp }] : []),
     ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
+    ...(canManageConfig ? [{ id: 'gastos', label: 'Gastos', icon: Receipt }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 

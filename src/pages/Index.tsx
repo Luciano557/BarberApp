@@ -4,6 +4,7 @@ import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
 import { SueldosPanel } from '@/components/SueldosPanel';
 import { EstadisticasPanel } from '@/components/EstadisticasPanel';
+import { GastosPanel } from '@/components/GastosPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { UserManagement } from '@/components/UserManagement';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
@@ -112,6 +113,12 @@ const Index = () => {
           {activeTab === 'sueldos' && canManageConfig && (
             <PinProtectedSection sectionName="Sueldos">
               <SueldosPanel barbers={barbers} />
+            </PinProtectedSection>
+          )}
+
+          {activeTab === 'gastos' && canManageConfig && (
+            <PinProtectedSection sectionName="Gastos">
+              <GastosPanel />
             </PinProtectedSection>
           )}
 
