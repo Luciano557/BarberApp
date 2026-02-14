@@ -45,7 +45,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       asignado_a_nombre: barberName,
       recurrente,
       frecuencia_dias: recurrente && frecuenciaDias ? parseInt(frecuenciaDias) : undefined,
-      fecha_limite: fechaLimite || undefined,
+      fecha_limite: recurrente && frecuenciaDias
+        ? new Date(Date.now() + parseInt(frecuenciaDias) * 86400000).toISOString().split('T')[0]
+        : (fechaLimite || undefined),
     });
     setTitulo('');
     setDescripcion('');
@@ -175,10 +177,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-sm mb-1.5 block">Fecha límite</Label>
-              <Input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)} />
-            </div>
+            {!recurrente && (
+              <div>
+                <Label className="text-sm mb-1.5 block">Fecha límite</Label>
+                <Input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)} />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
