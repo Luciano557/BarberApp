@@ -269,6 +269,10 @@ export type Database = {
       }
       ingresos: {
         Row: {
+          backfill_note: string | null
+          backfill_reason: string | null
+          backfilled_at: string | null
+          backfilled_by: string | null
           barbero: string | null
           barbero_id: string | null
           cantidad_de_20_por: number | null
@@ -279,6 +283,7 @@ export type Database = {
           deluxe: number | null
           dia: string | null
           efectivo: number | null
+          entry_mode: string
           essencial: number | null
           estado: string | null
           extras: number | null
@@ -296,6 +301,10 @@ export type Database = {
           Usuario: string | null
         }
         Insert: {
+          backfill_note?: string | null
+          backfill_reason?: string | null
+          backfilled_at?: string | null
+          backfilled_by?: string | null
           barbero?: string | null
           barbero_id?: string | null
           cantidad_de_20_por?: number | null
@@ -306,6 +315,7 @@ export type Database = {
           deluxe?: number | null
           dia?: string | null
           efectivo?: number | null
+          entry_mode?: string
           essencial?: number | null
           estado?: string | null
           extras?: number | null
@@ -323,6 +333,10 @@ export type Database = {
           Usuario?: string | null
         }
         Update: {
+          backfill_note?: string | null
+          backfill_reason?: string | null
+          backfilled_at?: string | null
+          backfilled_by?: string | null
           barbero?: string | null
           barbero_id?: string | null
           cantidad_de_20_por?: number | null
@@ -333,6 +347,7 @@ export type Database = {
           deluxe?: number | null
           dia?: string | null
           efectivo?: number | null
+          entry_mode?: string
           essencial?: number | null
           estado?: string | null
           extras?: number | null
@@ -369,6 +384,94 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingresos_items: {
+        Row: {
+          barbero_id: string
+          created_at: string
+          id: string
+          ingreso_id: number
+          linea_id: string | null
+          organization_id: string
+          payment_method: string
+          qty: number
+          servicio_id: string | null
+          servicio_nombre: string
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          barbero_id: string
+          created_at?: string
+          id?: string
+          ingreso_id: number
+          linea_id?: string | null
+          organization_id: string
+          payment_method?: string
+          qty?: number
+          servicio_id?: string | null
+          servicio_nombre?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Update: {
+          barbero_id?: string
+          created_at?: string
+          id?: string
+          ingreso_id?: number
+          linea_id?: string | null
+          organization_id?: string
+          payment_method?: string
+          qty?: number
+          servicio_id?: string | null
+          servicio_nombre?: string
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingresos_items_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_items_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_items_ingreso_id_fkey"
+            columns: ["ingreso_id"]
+            isOneToOne: false
+            referencedRelation: "ingresos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_items_linea_id_fkey"
+            columns: ["linea_id"]
+            isOneToOne: false
+            referencedRelation: "lineas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingresos_items_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
             referencedColumns: ["id"]
           },
         ]
