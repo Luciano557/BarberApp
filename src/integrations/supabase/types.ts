@@ -814,6 +814,85 @@ export type Database = {
           },
         ]
       }
+      tareas: {
+        Row: {
+          asignado_a_id: string | null
+          asignado_a_nombre: string | null
+          creado_por_id: string
+          creado_por_nombre: string | null
+          created_at: string
+          descripcion: string | null
+          estado: string
+          fecha_limite: string | null
+          frecuencia_dias: number | null
+          id: string
+          organization_id: string
+          proxima_fecha: string | null
+          recurrente: boolean | null
+          tipo: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          asignado_a_id?: string | null
+          asignado_a_nombre?: string | null
+          creado_por_id: string
+          creado_por_nombre?: string | null
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fecha_limite?: string | null
+          frecuencia_dias?: number | null
+          id?: string
+          organization_id: string
+          proxima_fecha?: string | null
+          recurrente?: boolean | null
+          tipo?: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          asignado_a_id?: string | null
+          asignado_a_nombre?: string | null
+          creado_por_id?: string
+          creado_por_nombre?: string | null
+          created_at?: string
+          descripcion?: string | null
+          estado?: string
+          fecha_limite?: string | null
+          frecuencia_dias?: number | null
+          id?: string
+          organization_id?: string
+          proxima_fecha?: string | null
+          recurrente?: boolean | null
+          tipo?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tareas_asignado_a_id_fkey"
+            columns: ["asignado_a_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_asignado_a_id_fkey"
+            columns: ["asignado_a_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_pins: {
         Row: {
           created_at: string | null
