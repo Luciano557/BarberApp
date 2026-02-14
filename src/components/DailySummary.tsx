@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle, CalendarClock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -6,14 +6,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Transaction, Barber, Line } from '@/types/barbershop';
-import { format, addDays, subDays, isToday } from 'date-fns';
+import { Transaction, Barber, Service, Line } from '@/types/barbershop';
+import { format, addDays, subDays, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo, useState, useCallback } from 'react';
 import { useCashClosing } from '@/hooks/useCashClosing';
 import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { BackfillWizard } from './BackfillWizard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +32,7 @@ interface DailySummaryProps {
     transactions: Transaction[];
   };
   barbers: Barber[];
+  services: Service[];
   lines: Line[];
   selectedDate: Date;
   onDateChange: (date: Date) => void;
@@ -48,7 +50,7 @@ interface BarberSummary {
   commissionAmount: number;
 }
 
-export function DailySummary({ summary, barbers, lines, selectedDate, onDateChange, onVoidTransaction }: DailySummaryProps) {
+export function DailySummary({ summary, barbers, services, lines, selectedDate, onDateChange, onVoidTransaction }: DailySummaryProps) {
   const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { saveCashClosing } = useCashClosing();
@@ -58,8 +60,10 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
   const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
   const [voidReason, setVoidReason] = useState<string>('');
+  const [backfillOpen, setBackfillOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
   const canVoidClosure = isOwner || isManager;
+  const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
@@ -170,6 +174,15 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
 
     return Array.from(summaryMap.values()).filter(s => s.count > 0);
   }, [summary.transactions, barbers]);
+
+  // Check if selected date is in the past (for backfill CTA)
+  const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
+
+  // Check which barbers are missing closings (for backfill)
+  const barbersWithoutClosing = useMemo(() => 
+    barbers.filter(b => !closedBarbers.has(b.id)),
+    [barbers, closedBarbers]
+  );
 
   const handlePreviousDay = () => onDateChange(subDays(validDate, 1));
   const handleNextDay = () => onDateChange(addDays(validDate, 1));
@@ -428,6 +441,32 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
           </div>
         )}
       </div>
+
+      {/* Backfill CTA - show when past date and barbers without closing */}
+      {isPastDate && canBackfill && barbersWithoutClosing.length > 0 && (
+        <Card className="border border-dashed border-primary/40 bg-primary/5">
+          <CardContent className="py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CalendarClock className="h-6 w-6 text-primary" />
+                <div>
+                  <p className="font-medium text-foreground">
+                    {barbersWithoutClosing.length} barbero{barbersWithoutClosing.length > 1 ? 's' : ''} sin cierre de caja
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Podés cargar el cierre de forma diferida para este día
+                  </p>
+                </div>
+              </div>
+              <Button onClick={() => setBackfillOpen(true)}>
+                <CalendarClock className="h-4 w-4 mr-2" />
+                Regularizar día
+                <Badge variant="secondary" className="ml-2 text-xs">Diferido</Badge>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Transactions List */}
       <Card className="border border-border bg-card">
@@ -745,6 +784,18 @@ export function DailySummary({ summary, barbers, lines, selectedDate, onDateChan
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Backfill Wizard */}
+      <BackfillWizard
+        open={backfillOpen}
+        onOpenChange={setBackfillOpen}
+        date={validDate}
+        barbers={barbers}
+        services={services}
+        lines={lines}
+        closedBarberIds={closedBarbers}
+        onComplete={checkClosedBarbers}
+      />
     </div>
   );
 }

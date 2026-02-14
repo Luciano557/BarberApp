@@ -27,6 +27,9 @@ interface CashClosingRecord {
   sueldo: number | null;
   dia: string | null;
   estado: string | null;
+  entry_mode: string | null;
+  backfilled_at: string | null;
+  backfill_reason: string | null;
 }
 
 interface CashClosingHistoryProps {
@@ -46,7 +49,7 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
     try {
       let query = supabase
         .from('ingresos')
-        .select('id, created_at, closed_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado')
+        .select('id, created_at, closed_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado, entry_mode, backfilled_at, backfill_reason')
         .order('created_at', { ascending: false });
 
       // Filter by barbero_id (UUID) instead of text - more reliable
@@ -242,9 +245,20 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
                             Registrado el {format(new Date(record.closed_at), "d 'de' MMMM yyyy 'a las' HH:mm", { locale: es })}
                           </p>
                         )}
+                        {record.entry_mode === 'diferido' && record.backfilled_at && (
+                          <p className="text-xs text-primary/70">
+                            Diferido el {format(new Date(record.backfilled_at), "d 'de' MMMM yyyy 'a las' HH:mm", { locale: es })}
+                            {record.backfill_reason && ` • ${record.backfill_reason}`}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {record.entry_mode === 'diferido' && (
+                        <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                          Diferido
+                        </Badge>
+                      )}
                       <Badge variant={record.estado === 'activo' ? 'default' : 'secondary'}>
                         {record.estado || 'activo'}
                       </Badge>

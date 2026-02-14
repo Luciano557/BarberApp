@@ -94,6 +94,7 @@ const Index = () => {
               <DailySummary 
                 summary={summary} 
                 barbers={barbers}
+                services={services}
                 lines={lines}
                 selectedDate={selectedDate}
                 onDateChange={setSelectedDate}
