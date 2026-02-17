@@ -123,10 +123,8 @@ const Index = () => {
             </PinProtectedSection>
           )}
 
-          {activeTab === 'tareas' && canManageConfig && (
-            <PinProtectedSection sectionName="Tareas">
-              <TareasPanel barbers={allBarbers} />
-            </PinProtectedSection>
+          {activeTab === 'tareas' && (
+            <TareasPanel barbers={allBarbers} />
           )}
 
           {activeTab === 'config' && canManageConfig && (

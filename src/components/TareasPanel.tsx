@@ -14,6 +14,7 @@ import { Barber } from '@/types/barbershop';
 import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TareasPanelProps {
   barbers: Barber[];
@@ -23,6 +24,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const { canManageConfig } = useAuth();
 
   const tareasFiltradas = tareas.filter(t => {
     if (filtroEstado === 'todos') return true;
@@ -138,10 +140,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-foreground">Tareas y Peticiones</h1>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva tarea
-        </Button>
+        {canManageConfig && (
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva tarea
+          </Button>
+        )}
       </div>
 
       <TareaFormDialog
