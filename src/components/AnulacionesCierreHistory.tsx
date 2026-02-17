@@ -26,10 +26,14 @@ interface AnulacionRecord {
 
 interface AnulacionesCierreHistoryProps {
   barbers: Barber[];
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
 }
 
-export function AnulacionesCierreHistory({ barbers }: AnulacionesCierreHistoryProps) {
-  const [open, setOpen] = useState(false);
+export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpenChange }: AnulacionesCierreHistoryProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onExternalOpenChange || setInternalOpen;
   const [records, setRecords] = useState<AnulacionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedBarber, setSelectedBarber] = useState<string>('all');
@@ -88,12 +92,14 @@ export function AnulacionesCierreHistory({ barbers }: AnulacionesCierreHistoryPr
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <FileX className="h-4 w-4" />
-          Anulaciones
-        </Button>
-      </DialogTrigger>
+      {externalOpen === undefined && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <FileX className="h-4 w-4" />
+            Anulaciones
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

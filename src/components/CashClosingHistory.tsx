@@ -34,10 +34,14 @@ interface CashClosingRecord {
 
 interface CashClosingHistoryProps {
   barbers: Barber[];
+  externalOpen?: boolean;
+  onExternalOpenChange?: (open: boolean) => void;
 }
 
-export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
-  const [open, setOpen] = useState(false);
+export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange }: CashClosingHistoryProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = onExternalOpenChange || setInternalOpen;
   const [records, setRecords] = useState<CashClosingRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedBarber, setSelectedBarber] = useState<string>('all');
@@ -134,12 +138,14 @@ export function CashClosingHistory({ barbers }: CashClosingHistoryProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <History className="h-4 w-4 mr-2" />
-          Historial
-        </Button>
-      </DialogTrigger>
+      {externalOpen === undefined && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <History className="h-4 w-4 mr-2" />
+            Historial
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
