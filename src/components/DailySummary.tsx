@@ -64,10 +64,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [pinGateOpen, setPinGateOpen] = useState(false);
-  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | null>(null);
+  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | 'history' | 'anulacionesHistory' | null>(null);
   const [pendingClosingBarber, setPendingClosingBarber] = useState<BarberSummary | null>(null);
   const [pendingVoidClosure, setPendingVoidClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
   const { requiresPin, validatePin } = usePinProtection();
   const canVoidClosure = isOwner || isManager;
@@ -238,6 +240,25 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     }
   }, [requiresPin]);
 
+  // PIN-gated history views
+  const handleHistoryClick = useCallback(() => {
+    if (requiresPin) {
+      setPinAction('history');
+      setPinGateOpen(true);
+    } else {
+      setHistoryOpen(true);
+    }
+  }, [requiresPin]);
+
+  const handleAnulacionesHistoryClick = useCallback(() => {
+    if (requiresPin) {
+      setPinAction('anulacionesHistory');
+      setPinGateOpen(true);
+    } else {
+      setAnulacionesHistoryOpen(true);
+    }
+  }, [requiresPin]);
+
   // Handle PIN validation result
   const handlePinValidate = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string }> => {
     const result = await validatePin(pin);
@@ -252,6 +273,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       } else if (pinAction === 'pastDate' && pendingDate) {
         onDateChange(pendingDate);
         setPendingDate(null);
+      } else if (pinAction === 'history') {
+        setHistoryOpen(true);
+      } else if (pinAction === 'anulacionesHistory') {
+        setAnulacionesHistoryOpen(true);
       }
       setPinAction(null);
     }
@@ -345,8 +370,16 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               Hoy
             </Button>
           )}
-          <AnulacionesCierreHistory barbers={barbers} />
-          <CashClosingHistory barbers={barbers} />
+          <Button variant="outline" size="sm" className="gap-2" onClick={handleAnulacionesHistoryClick}>
+            <Ban className="h-4 w-4" />
+            Anulaciones
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleHistoryClick}>
+            <Clock className="h-4 w-4 mr-2" />
+            Historial
+          </Button>
+          <AnulacionesCierreHistory barbers={barbers} externalOpen={anulacionesHistoryOpen} onExternalOpenChange={setAnulacionesHistoryOpen} />
+          <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
         </div>
       </div>
 
@@ -882,6 +915,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           pinAction === 'closing' ? 'el cierre de caja' :
           pinAction === 'voidClosure' ? 'anular el cierre' :
           pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
+          pinAction === 'history' ? 'el historial de cierres' :
+          pinAction === 'anulacionesHistory' ? 'el historial de anulaciones' :
           'esta acción'
         }
       />
