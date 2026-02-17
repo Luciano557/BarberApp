@@ -370,15 +370,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               Hoy
             </Button>
           )}
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleAnulacionesHistoryClick}>
-            <Ban className="h-4 w-4" />
-            Anulaciones
-          </Button>
+          <AnulacionesCierreHistory barbers={barbers} />
           <Button variant="outline" size="sm" onClick={handleHistoryClick}>
             <Clock className="h-4 w-4 mr-2" />
             Historial
           </Button>
-          <AnulacionesCierreHistory barbers={barbers} externalOpen={anulacionesHistoryOpen} onExternalOpenChange={setAnulacionesHistoryOpen} />
+          <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
           <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
         </div>
       </div>
