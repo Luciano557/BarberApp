@@ -15,11 +15,13 @@ import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { BackfillWizard } from './BackfillWizard';
+import { PinGateDialog } from './PinGateDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { usePinProtection } from '@/hooks/usePinProtection';
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
@@ -61,7 +63,13 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
   const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
+  const [pinGateOpen, setPinGateOpen] = useState(false);
+  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | null>(null);
+  const [pendingClosingBarber, setPendingClosingBarber] = useState<BarberSummary | null>(null);
+  const [pendingVoidClosure, setPendingVoidClosure] = useState<{ id: number; barberName: string } | null>(null);
+  const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const { user, profile, isOwner, isManager } = useAuth();
+  const { requiresPin, validatePin } = usePinProtection();
   const canVoidClosure = isOwner || isManager;
   const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
@@ -184,9 +192,71 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     [barbers, closedBarbers]
   );
 
-  const handlePreviousDay = () => onDateChange(subDays(validDate, 1));
-  const handleNextDay = () => onDateChange(addDays(validDate, 1));
+  // PIN-gated date navigation: require PIN for past dates
+  const navigateToDate = useCallback((date: Date) => {
+    if (isToday(date)) {
+      onDateChange(date);
+    } else if (requiresPin) {
+      setPendingDate(date);
+      setPinAction('pastDate');
+      setPinGateOpen(true);
+    } else {
+      onDateChange(date);
+    }
+  }, [onDateChange, requiresPin]);
+
+  const handlePreviousDay = () => navigateToDate(subDays(validDate, 1));
+  const handleNextDay = () => {
+    const next = addDays(validDate, 1);
+    if (isToday(next)) {
+      onDateChange(next);
+    } else {
+      navigateToDate(next);
+    }
+  };
   const handleToday = () => onDateChange(new Date());
+
+  // PIN-gated cash closing
+  const handleClosingClick = useCallback((barber: BarberSummary) => {
+    if (requiresPin) {
+      setPendingClosingBarber(barber);
+      setPinAction('closing');
+      setPinGateOpen(true);
+    } else {
+      setClosingBarber(barber);
+    }
+  }, [requiresPin]);
+
+  // PIN-gated void closure
+  const handleVoidClosureClick = useCallback((closureData: { id: number; barberName: string }) => {
+    if (requiresPin) {
+      setPendingVoidClosure(closureData);
+      setPinAction('voidClosure');
+      setPinGateOpen(true);
+    } else {
+      setVoidingClosure(closureData);
+    }
+  }, [requiresPin]);
+
+  // Handle PIN validation result
+  const handlePinValidate = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string }> => {
+    const result = await validatePin(pin);
+    if (result.success) {
+      setPinGateOpen(false);
+      if (pinAction === 'closing' && pendingClosingBarber) {
+        setClosingBarber(pendingClosingBarber);
+        setPendingClosingBarber(null);
+      } else if (pinAction === 'voidClosure' && pendingVoidClosure) {
+        setVoidingClosure(pendingVoidClosure);
+        setPendingVoidClosure(null);
+      } else if (pinAction === 'pastDate' && pendingDate) {
+        onDateChange(pendingDate);
+        setPendingDate(null);
+      }
+      setPinAction(null);
+    }
+    return result;
+  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, onDateChange]);
 
   const VOID_REASONS = [
     'Servicios duplicados o faltantes',
@@ -261,7 +331,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               <Calendar
                 mode="single"
                 selected={validDate}
-                onSelect={(date) => date && onDateChange(date)}
+                onSelect={(date) => date && navigateToDate(date)}
                 locale={es}
                 initialFocus
               />
@@ -412,7 +482,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           onClick={() => {
                             const closureData = closedBarbersData.get(barber.barberId);
                             if (closureData) {
-                              setVoidingClosure(closureData);
+                              handleVoidClosureClick(closureData);
                             }
                           }}
                         >
@@ -428,7 +498,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     ) : (
                       <Button 
                         className="w-full" 
-                        onClick={() => setClosingBarber(barber)}
+                        onClick={() => handleClosingClick(barber)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Cerrar Caja
@@ -795,6 +865,25 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         lines={lines}
         closedBarberIds={closedBarbers}
         onComplete={checkClosedBarbers}
+      />
+
+      {/* PIN Gate Dialog */}
+      <PinGateDialog
+        open={pinGateOpen}
+        onValidate={handlePinValidate}
+        onClose={() => {
+          setPinGateOpen(false);
+          setPinAction(null);
+          setPendingClosingBarber(null);
+          setPendingVoidClosure(null);
+          setPendingDate(null);
+        }}
+        sectionName={
+          pinAction === 'closing' ? 'el cierre de caja' :
+          pinAction === 'voidClosure' ? 'anular el cierre' :
+          pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
+          'esta acción'
+        }
       />
     </div>
   );

@@ -8,10 +8,11 @@ import { Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 interface PinGateDialogProps {
   open: boolean;
   onValidate: (pin: string) => Promise<{ success: boolean; userName?: string }>;
+  onClose?: () => void;
   sectionName?: string;
 }
 
-export function PinGateDialog({ open, onValidate, sectionName = 'esta sección' }: PinGateDialogProps) {
+export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta sección' }: PinGateDialogProps) {
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -42,12 +43,12 @@ export function PinGateDialog({ open, onValidate, sectionName = 'esta sección' 
   };
 
   return (
-    <Dialog open={open} modal={false}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o && onClose) onClose(); }}>
       <DialogContent 
         className="sm:max-w-md" 
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        hideCloseButton
+        onPointerDownOutside={(e) => !onClose && e.preventDefault()}
+        onEscapeKeyDown={(e) => !onClose && e.preventDefault()}
+        hideCloseButton={!onClose}
       >
         <DialogHeader>
           <div className="mx-auto bg-primary/10 p-3 rounded-full w-fit mb-2">

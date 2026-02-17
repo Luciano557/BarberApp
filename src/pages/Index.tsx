@@ -92,17 +92,15 @@ const Index = () => {
           )}
 
           {activeTab === 'resumen' && (
-            <PinProtectedSection sectionName="Resumen">
-              <DailySummary 
-                summary={summary} 
-                barbers={barbers}
-                services={services}
-                lines={lines}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                onVoidTransaction={voidTransaction}
-              />
-            </PinProtectedSection>
+            <DailySummary 
+              summary={summary} 
+              barbers={barbers}
+              services={services}
+              lines={lines}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              onVoidTransaction={voidTransaction}
+            />
           )}
 
           {activeTab === 'estadisticas' && canManageConfig && (
