@@ -1,88 +1,80 @@
 
 
-# Registro de Gastos (Egresos)
+# Rediseno de Configuracion - Organizado por Secciones
 
-## Resumen
+## Idea principal
 
-Crear la seccion "Gastos" para registrar y consultar egresos del negocio, usando la tabla `Egresos` que ya existe en Supabase con soporte multi-tenant (`organization_id`) y RLS configurado.
+Reorganizar Configuracion para que refleje los apartados del sidebar. En vez de tabs genericos (Servicios, Extras, Staff, Descuentos), agrupar las configuraciones segun a que seccion del sistema pertenecen.
 
-**No se requieren cambios en la base de datos.** La tabla ya tiene todo lo necesario.
+## Estructura propuesta
 
-## Que se va a construir
+El menu principal de Configuracion mostrara tarjetas clickeables:
 
-### 1. Hook de datos: `useGastos.ts`
-- Obtiene `organization.id` del `OrganizationContext` (mismo patron que los demas hooks)
-- Funciones: cargar gastos por rango de fecha, agregar gasto (con `organization_id`), eliminar gasto
-- Todas las inserciones incluyen `organization_id` para garantizar aislamiento multi-tenant
-- Feedback con toasts de sonner
+```text
++------------------------------------------+
+|  Configuracion                           |
++------------------------------------------+
+|                                          |
+|  [Building2] Negocio                >    |
+|  Info del negocio, staff, usuarios       |
+|                                          |
+|  [Scissors] Cobrar                  >    |
+|  Servicios, extras, descuentos           |
+|                                          |
+|  [Shield] PIN de Seguridad          >    |
+|  Acceso a secciones protegidas           |
+|                                          |
++------------------------------------------+
+```
 
-### 2. Componente: `GastosPanel.tsx`
-- **Formulario de registro** con:
-  - Categoria (selector: Alquiler, Servicios, Insumos, Impuestos, Sueldos fijos, Marketing, Mantenimiento, Otros)
-  - Monto (input numerico)
-  - Descripcion (textarea opcional)
-  - Fecha (date picker, default hoy)
-- **Historial** con:
-  - Tabla: Fecha, Categoria, Descripcion, Monto, boton eliminar
-  - Filtro por mes/anio
-  - Total del periodo al pie
+Las secciones Resumen, Estadisticas, Sueldos, Gastos y Tareas no tienen configuraciones propias por ahora, asi que no aparecen en la lista. Si en el futuro se agregan, se van sumando dinamicamente.
 
-### 3. Navegacion e integracion
-- Agregar item "Gastos" en el sidebar (icono Receipt, visible solo para owner/manager)
-- Agregar tab en Index.tsx envuelto en PinProtectedSection
+### Dentro de "Negocio"
 
-## Archivos involucrados
+Tiene sub-pestanas:
+- **Mi Negocio**: info de la organizacion y plan (lo que ya existe en OrganizationSettings)
+- **Staff**: lista de barberos con sus comisiones, datos, PIN
+- **Usuarios**: gestion de roles y permisos (solo visible para duenos)
 
-| Archivo | Accion |
-|---------|--------|
-| `src/hooks/useGastos.ts` | Crear (nuevo) |
-| `src/components/GastosPanel.tsx` | Crear (nuevo) |
-| `src/components/AppSidebar.tsx` | Modificar: agregar 1 item en navItems |
-| `src/pages/Index.tsx` | Modificar: agregar bloque de renderizado del tab |
+### Dentro de "Cobrar"
 
-## Seguridad
-- RLS ya activo: solo owner y manager tienen acceso a la tabla Egresos
-- PIN protection via PinProtectedSection
-- `organization_id` incluido en todas las operaciones de escritura
+Tiene sub-pestanas:
+- **Servicios**: lista de servicios con lineas
+- **Extras**: lista de extras
+- **Descuentos**: lista de descuentos
+
+### PIN de Seguridad
+
+Se mantiene como seccion independiente ya que es transversal (no pertenece a un apartado especifico).
+
+## Navegacion
+
+Al tocar una tarjeta del menu, se muestra esa seccion con un boton "Volver" arriba para regresar al menu principal. Dentro de cada seccion, las sub-pestanas funcionan como tabs normales.
+
+## Mejoras de usabilidad
+
+- Botones de Editar/Desactivar siempre visibles (sin depender de hover)
+- Formularios de agregar/editar en Dialogs en vez de inline
+- Mejor formato tipo lista
 
 ## Detalle tecnico
 
-El hook `useGastos` seguira el mismo patron que `SueldosPanel` usa internamente: importar `useOrganization()` para obtener el ID de la organizacion, y pasarlo en cada insert:
+### Archivos nuevos
+- `src/components/config/ConfigMenu.tsx` - Menu principal con tarjetas (Negocio, Cobrar, PIN)
+- `src/components/config/NegocioConfig.tsx` - Seccion Negocio con tabs: Mi Negocio, Staff, Usuarios
+- `src/components/config/CobrarConfig.tsx` - Seccion Cobrar con tabs: Servicios, Extras, Descuentos
+- `src/components/config/ServicesConfig.tsx` - Componente extraido para servicios
+- `src/components/config/ExtrasConfig.tsx` - Componente extraido para extras
+- `src/components/config/StaffConfig.tsx` - Componente extraido para staff
+- `src/components/config/DiscountsConfig.tsx` - Componente extraido para descuentos
 
-```text
-const { organization } = useOrganization();
+### Archivos modificados
+- `src/components/ConfigurationPanel.tsx` - Refactorizado: maneja estado `activeSection` ('menu' | 'negocio' | 'cobrar' | 'pin') y renderiza el componente correspondiente
+- `src/pages/Index.tsx` - Se mueve UserManagement y PinConfigSection dentro de ConfigurationPanel (ya no estan separados afuera)
 
-// Insert
-await supabase.from('Egresos').insert({
-  Categoria: categoria,
-  Monto: monto,
-  Descripcion: descripcion,
-  Fecha: fecha,
-  organization_id: organization.id
-});
+### Patron de navegacion
+`ConfigurationPanel` tendra un estado `activeSection`. Cuando es `'menu'` muestra las tarjetas. Al seleccionar una, cambia el estado y muestra la sub-seccion con boton "Volver".
 
-// Query
-await supabase.from('Egresos')
-  .select('*')
-  .eq('organization_id', organization.id)
-  .gte('Fecha', startDate)
-  .lte('Fecha', endDate)
-  .order('Fecha', { ascending: false });
-```
-
-En el sidebar, se agrega entre "Sueldos" y "Configuracion":
-
-```text
-...(canManageConfig ? [{ id: 'gastos', label: 'Gastos', icon: Receipt }] : []),
-```
-
-En Index.tsx:
-
-```text
-{activeTab === 'gastos' && canManageConfig && (
-  <PinProtectedSection sectionName="Gastos">
-    <GastosPanel />
-  </PinProtectedSection>
-)}
-```
+### Acciones siempre visibles
+Se elimina `opacity-0 group-hover:opacity-100` de todos los botones de accion en items de servicios, extras, staff y descuentos.
 
