@@ -251,32 +251,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Pending Tasks Bubble */}
-      {showTasksBubble && pendingTasks.length > 0 && (
-        <div className="relative flex items-center gap-3 rounded-xl border-2 border-destructive/60 bg-destructive/10 p-4 animate-enter shadow-lg shadow-destructive/10">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-destructive text-destructive-foreground shrink-0">
-            <ClipboardList className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ring-2 ring-background pulse">
-              {pendingTasks.length}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-destructive">
-              ⚠️ Tenés {pendingTasks.length} tarea{pendingTasks.length > 1 ? 's' : ''} pendiente{pendingTasks.length > 1 ? 's' : ''}
-            </p>
-            <p className="text-xs text-muted-foreground truncate mt-0.5">
-              {pendingTasks.slice(0, 2).map(t => t.titulo).join(', ')}
-              {pendingTasks.length > 2 ? ` y ${pendingTasks.length - 2} más` : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => setShowTasksBubble(false)}
-            className="shrink-0 p-1 rounded-md hover:bg-destructive/20 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
 
       {/* Header */}
       <div>
@@ -566,6 +540,33 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
           <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Volver
           </Button>
+        </div>
+      )}
+
+      {/* Pending Tasks Bubble */}
+      {showTasksBubble && pendingTasks.length > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 p-3 animate-fade-in">
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 shrink-0">
+            <ClipboardList className="h-4 w-4 text-primary" />
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+              {pendingTasks.length}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              Tenés {pendingTasks.length} tarea{pendingTasks.length > 1 ? 's' : ''} pendiente{pendingTasks.length > 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {pendingTasks.slice(0, 2).map(t => t.titulo).join(', ')}
+              {pendingTasks.length > 2 ? ` y ${pendingTasks.length - 2} más` : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowTasksBubble(false)}
+            className="shrink-0 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>
