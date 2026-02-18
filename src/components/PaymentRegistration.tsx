@@ -50,7 +50,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
   const [showTasksBubble, setShowTasksBubble] = useState(true);
 
   const pendingTasks = useMemo(() => 
-    tareas.filter(t => t.estado === 'pendiente'),
+    tareas.filter(t => t.estado === 'pendiente' && t.tipo === 'tarea'),
     [tareas]
   );
 
