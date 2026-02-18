@@ -88,6 +88,7 @@ const Index = () => {
               barbers={barbers}
               discounts={discounts}
               onSubmit={addTransaction}
+              onNavigateToTareas={() => setActiveTab('tareas')}
             />
           )}
 
