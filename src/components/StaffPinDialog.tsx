@@ -35,6 +35,8 @@ export function StaffPinDialog({
   hasPin,
   onPinUpdated 
 }: StaffPinDialogProps) {
+  const [currentPin, setCurrentPin] = useState('');
+  const [showCurrentPin, setShowCurrentPin] = useState(false);
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -50,6 +52,11 @@ export function StaffPinDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (hasPin && currentPin.length < 4) {
+      toast.error('Ingresá el PIN actual');
+      return;
+    }
+
     if (pin !== confirmPin) {
       toast.error('Los PINs no coinciden');
       return;
@@ -64,13 +71,14 @@ export function StaffPinDialog({
 
     try {
       const { data, error } = await supabase.functions.invoke('set-pin', {
-        body: { barbero_id: barberId, pin }
+        body: { barbero_id: barberId, pin, ...(hasPin ? { currentPin } : {}) }
       });
 
       if (error) throw error;
 
       if (data.success) {
         toast.success('PIN configurado correctamente');
+        setCurrentPin('');
         setPin('');
         setConfirmPin('');
         onPinUpdated();
@@ -86,17 +94,23 @@ export function StaffPinDialog({
   };
 
   const handleDelete = async () => {
+    if (hasPin && currentPin.length < 4) {
+      toast.error('Ingresá el PIN actual para eliminarlo');
+      return;
+    }
+
     setIsDeleting(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('set-pin', {
-        body: { barbero_id: barberId, action: 'delete' }
+        body: { barbero_id: barberId, action: 'delete', currentPin }
       });
 
       if (error) throw error;
 
       if (data.success) {
         toast.success('PIN eliminado correctamente');
+        setCurrentPin('');
         onPinUpdated();
         onOpenChange(false);
       } else {
@@ -110,6 +124,7 @@ export function StaffPinDialog({
   };
 
   const handleClose = () => {
+    setCurrentPin('');
     setPin('');
     setConfirmPin('');
     onOpenChange(false);
@@ -129,6 +144,37 @@ export function StaffPinDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+          {hasPin && (
+            <div className="space-y-2">
+              <Label htmlFor="staff-current-pin">PIN actual</Label>
+              <div className="relative">
+                <Input
+                  id="staff-current-pin"
+                  type={showCurrentPin ? 'text' : 'password'}
+                  value={currentPin}
+                  onChange={(e) => handlePinChange(e, setCurrentPin)}
+                  placeholder="Ingresá el PIN actual"
+                  className="pr-10"
+                  maxLength={6}
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowCurrentPin(!showCurrentPin)}
+                >
+                  {showCurrentPin ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="staff-pin">{hasPin ? 'Nuevo PIN' : 'PIN'}</Label>
@@ -141,7 +187,7 @@ export function StaffPinDialog({
                   placeholder="4-6 dígitos"
                   className="pr-10"
                   maxLength={6}
-                  autoFocus
+                  autoFocus={!hasPin}
                 />
                 <Button
                   type="button"
@@ -196,7 +242,7 @@ export function StaffPinDialog({
             {hasPin && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" type="button" disabled={isDeleting} className="mr-auto">
+                  <Button variant="destructive" type="button" disabled={isDeleting || currentPin.length < 4} className="mr-auto">
                     {isDeleting ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
@@ -224,7 +270,7 @@ export function StaffPinDialog({
             
             <Button 
               type="submit" 
-              disabled={pin.length < 4 || pin !== confirmPin || isSaving}
+              disabled={pin.length < 4 || pin !== confirmPin || isSaving || (hasPin && currentPin.length < 4)}
             >
               {isSaving ? (
                 <>
