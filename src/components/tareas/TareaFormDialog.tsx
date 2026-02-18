@@ -47,6 +47,9 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
   const [showRepeatPicker, setShowRepeatPicker] = useState(false);
   const [showCustomRepeat, setShowCustomRepeat] = useState(false);
 
+  // Vencimiento (peticiones)
+  const [vencimientoDias, setVencimientoDias] = useState(60);
+
   const isPeticion = tipo === 'peticion';
   const activeBarbers = barbers.filter(b => b.active);
 
@@ -62,6 +65,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
     setRepeatFrequency('weekly');
     setRepeatInterval(1);
     setRepeatByweekday([]);
+    setVencimientoDias(60);
   };
 
   const handleConfirm = () => {
@@ -73,6 +77,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
         titulo: titulo.trim(),
         descripcion: descripcion.trim() || undefined,
         creado_por_nombre: creadorNombre,
+        vencimiento_dias: vencimientoDias,
       };
       onSubmit(tarea);
     } else {
@@ -177,6 +182,47 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                 className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
               />
             </div>
+
+            {/* Vencimiento (peticiones) */}
+            {isPeticion && (
+              <div className="rounded-xl border border-border overflow-hidden bg-card p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Vencimiento</p>
+                    <p className="text-xs text-muted-foreground">Días hasta que la petición expire</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[15, 30, 60, 90].map(d => (
+                    <Button
+                      key={d}
+                      type="button"
+                      variant={vencimientoDias === d ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setVencimientoDias(d)}
+                    >
+                      {d} días
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-muted-foreground shrink-0">Personalizado:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={vencimientoDias}
+                    onChange={e => setVencimientoDias(parseInt(e.target.value) || 60)}
+                    className="w-20 h-7 text-xs"
+                  />
+                  <span className="text-xs text-muted-foreground">días</span>
+                </div>
+              </div>
+            )}
 
             {/* Tarea-only fields */}
             {!isPeticion && (

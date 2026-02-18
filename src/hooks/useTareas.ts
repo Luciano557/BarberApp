@@ -28,6 +28,7 @@ export interface Tarea {
   repeat_frequency: string | null;
   repeat_interval: number | null;
   repeat_byweekday: number[] | null;
+  vencimiento_dias: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,7 @@ export interface TareaInsert {
   repeat_interval?: number;
   repeat_byweekday?: number[];
   recurrente?: boolean;
+  vencimiento_dias?: number;
 }
 
 export function useTareas() {

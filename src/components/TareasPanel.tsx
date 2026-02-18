@@ -15,7 +15,7 @@ import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
+
 import { PinGateDialog } from './PinGateDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -29,7 +29,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
-  const { organization, updateOrganization } = useOrganization();
+  
   const [activeTab, setActiveTab] = useState('tareas');
 
   // PIN flow for creating peticiones
@@ -40,18 +40,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showActionPinDialog, setShowActionPinDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ tareaId: string; action: string } | null>(null);
 
-  const vencimientoDias = organization?.peticiones_vencimiento_dias ?? 60;
-
-  const getPeticionVencimiento = (createdAt: string) => {
-    const diasTranscurridos = differenceInDays(new Date(), new Date(createdAt));
-    const diasRestantes = vencimientoDias - diasTranscurridos;
+  const getPeticionVencimiento = (t: typeof tareas[0]) => {
+    const dias = t.vencimiento_dias ?? 60;
+    const diasTranscurridos = differenceInDays(new Date(), new Date(t.created_at));
+    const diasRestantes = dias - diasTranscurridos;
     return { diasTranscurridos, diasRestantes, vencida: diasRestantes <= 0 };
   };
 
   const tareasFiltradas = tareas.filter(t => {
     if (filtroEstado === 'todos') return true;
     if (filtroEstado === 'vencida') {
-      return t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t.created_at).vencida;
+      return t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
     }
     return t.estado === filtroEstado;
   });
@@ -62,9 +61,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const isTareasTab = activeTab === 'tareas';
   const titulo = isTareasTab ? 'Tareas' : 'Peticiones';
 
-  const getEstadoBadge = (estado: string, createdAt?: string) => {
-    if (createdAt && estado === 'pendiente') {
-      const { vencida, diasRestantes } = getPeticionVencimiento(createdAt);
+  const getEstadoBadge = (estado: string, tarea?: typeof tareas[0]) => {
+    if (tarea && tarea.tipo === 'peticion' && estado === 'pendiente') {
+      const { vencida, diasRestantes } = getPeticionVencimiento(tarea);
       if (vencida) {
         return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50"><AlertTriangle className="w-3 h-3 mr-1" />Vencida</Badge>;
       }
@@ -244,7 +243,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </TableCell>
           </TableRow>
         ) : items.map(t => {
-          const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t.created_at) : null;
+          const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t) : null;
           return (
             <TableRow key={t.id} className={venc?.vencida ? 'opacity-60' : ''}>
               <TableCell>
@@ -254,7 +253,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 </div>
               </TableCell>
               <TableCell>{t.creado_por_nombre || '—'}</TableCell>
-              <TableCell>{getEstadoBadge(t.estado, t.tipo === 'peticion' ? t.created_at : undefined)}</TableCell>
+              <TableCell>{getEstadoBadge(t.estado, t)}</TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {t.estado === 'pendiente' && venc ? (
                   venc.vencida 
@@ -349,36 +348,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             <SelectItem value="en_progreso">En progreso</SelectItem>
             <SelectItem value="completada">Completada</SelectItem>
             <SelectItem value="rechazada">Rechazada</SelectItem>
-            {!isTareasTab && <SelectItem value="vencida">Vencida</SelectItem>}
+        {!isTareasTab && <SelectItem value="vencida">Vencida</SelectItem>}
           </SelectContent>
         </Select>
-        {!isTareasTab && canManageConfig && (
-          <div className="flex items-center gap-2 ml-2">
-            <span className="text-xs text-muted-foreground">Vencimiento:</span>
-            <div className="flex items-center gap-1">
-              {[15, 30, 60, 90].map(d => (
-                <Button
-                  key={d}
-                  variant={vencimientoDias === d ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={async () => {
-                    const { error } = await updateOrganization({ peticiones_vencimiento_dias: d });
-                    if (error) toast.error('Error al guardar');
-                    else toast.success(`Vencimiento: ${d} días`);
-                  }}
-                >
-                  {d}d
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-        {!isTareasTab && !canManageConfig && (
-          <span className="text-xs text-muted-foreground ml-2">
-            Vencimiento: {vencimientoDias} días
-          </span>
-        )}
       </div>
 
       {/* Tabs */}
