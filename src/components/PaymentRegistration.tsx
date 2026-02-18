@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType } from '@/types/barbershop';
+import { useTareas } from '@/hooks/useTareas';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -38,12 +39,19 @@ const STEP_INFO = {
 
 export function PaymentRegistration({ services, extras, barbers, discounts, onSubmit }: PaymentRegistrationProps) {
   const { toast } = useToast();
+  const { tareas } = useTareas();
   const [currentStep, setCurrentStep] = useState<Step>('barber');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [selectedService, setSelectedService] = useState('');
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [selectedDiscount, setSelectedDiscount] = useState('none');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [showTasksBubble, setShowTasksBubble] = useState(true);
+
+  const pendingTasks = useMemo(() => 
+    tareas.filter(t => t.estado === 'pendiente'),
+    [tareas]
+  );
 
   const currentStepIndex = STEPS.indexOf(currentStep);
   const service = useMemo(() => services.find(s => s.id === selectedService), [services, selectedService]);
@@ -243,6 +251,30 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Pending Tasks Bubble */}
+      {showTasksBubble && pendingTasks.length > 0 && (
+        <div className="relative flex items-center gap-3 rounded-lg border border-accent bg-accent/10 p-3 animate-fade-in">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-accent text-accent-foreground shrink-0">
+            <ClipboardList className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              Tenés {pendingTasks.length} tarea{pendingTasks.length > 1 ? 's' : ''} pendiente{pendingTasks.length > 1 ? 's' : ''}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {pendingTasks.slice(0, 2).map(t => t.titulo).join(', ')}
+              {pendingTasks.length > 2 ? ` y ${pendingTasks.length - 2} más` : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowTasksBubble(false)}
+            className="shrink-0 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
