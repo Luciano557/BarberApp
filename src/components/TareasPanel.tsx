@@ -15,6 +15,8 @@ import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { PinGateDialog } from './PinGateDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TareasPanelProps {
   barbers: Barber[];
@@ -25,6 +27,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
+  const [activeTab, setActiveTab] = useState('tareas');
+
+  // PIN flow for peticiones
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
   const tareasFiltradas = tareas.filter(t => {
     if (filtroEstado === 'todos') return true;
@@ -33,6 +40,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const tareasAdmin = tareasFiltradas.filter(t => t.tipo === 'tarea');
   const peticiones = tareasFiltradas.filter(t => t.tipo === 'peticion');
+
+  const isTareasTab = activeTab === 'tareas';
+  const titulo = isTareasTab ? 'Tareas' : 'Peticiones';
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -55,12 +65,33 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       return getCustomRepeatLabel(t.repeat_frequency, t.repeat_interval, t.repeat_byweekday);
     }
     if (t.repeat_preset) return getRepeatLabel(t.repeat_preset);
-    // Legacy fallback
     if (t.recurrencia_tipo === 'dias') return `Cada ${t.frecuencia_dias} días`;
     return 'Recurrente';
   };
 
-  const renderTable = (items: typeof tareas) => (
+  const handleNuevaPeticion = () => {
+    setShowPinDialog(true);
+  };
+
+  const handlePinValidate = async (pin: string): Promise<{ success: boolean; userName?: string }> => {
+    const { data, error } = await supabase.functions.invoke('validate-pin', {
+      body: { pin },
+    });
+    if (error || !data?.valid) {
+      return { success: false };
+    }
+    setPeticionCreador({ nombre: data.user_name, barberoId: data.barbero_id });
+    setShowPinDialog(false);
+    setShowForm(true);
+    return { success: true, userName: data.user_name };
+  };
+
+  const handleNuevaTarea = () => {
+    setPeticionCreador(null);
+    setShowForm(true);
+  };
+
+  const renderTareasTable = (items: typeof tareas) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -116,14 +147,67 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                     <CheckCircle className="h-4 w-4" />
                   </Button>
                 )}
-                {t.tipo === 'peticion' && t.estado === 'pendiente' && (
+                {canManageConfig && (
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
+  const renderPeticionesTable = (items: typeof tareas) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Título</TableHead>
+          <TableHead>Creado por</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead>Fecha</TableHead>
+          <TableHead className="text-right">Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              No hay peticiones
+            </TableCell>
+          </TableRow>
+        ) : items.map(t => (
+          <TableRow key={t.id}>
+            <TableCell>
+              <div>
+                <p className="font-medium">{t.titulo}</p>
+                {t.descripcion && <p className="text-xs text-muted-foreground mt-1">{t.descripcion}</p>}
+              </div>
+            </TableCell>
+            <TableCell>{t.creado_por_nombre || '—'}</TableCell>
+            <TableCell>{getEstadoBadge(t.estado)}</TableCell>
+            <TableCell className="text-xs text-muted-foreground">
+              {format(new Date(t.created_at), 'dd/MM/yy', { locale: es })}
+            </TableCell>
+            <TableCell className="text-right">
+              <div className="flex items-center justify-end gap-1">
+                {t.estado === 'pendiente' && canManageConfig && (
+                  <Button size="sm" variant="ghost" className="text-green-600" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                )}
+                {t.estado === 'pendiente' && canManageConfig && (
                   <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updateTarea.mutate({ id: t.id, estado: 'rechazada' })} title="Rechazar">
                     <XCircle className="h-4 w-4" />
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canManageConfig && (
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </TableCell>
           </TableRow>
@@ -133,17 +217,24 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   );
 
   if (isLoading) {
-    return <div className="text-center py-8 text-muted-foreground">Cargando tareas...</div>;
+    return <div className="text-center py-8 text-muted-foreground">Cargando...</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Tareas y Peticiones</h1>
-        {canManageConfig && (
-          <Button onClick={() => setShowForm(true)}>
+        <h1 className="text-3xl font-bold text-foreground">{titulo}</h1>
+        {isTareasTab ? (
+          canManageConfig && (
+            <Button onClick={handleNuevaTarea}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva tarea
+            </Button>
+          )
+        ) : (
+          <Button onClick={handleNuevaPeticion}>
             <Plus className="h-4 w-4 mr-2" />
-            Nueva tarea
+            Nueva petición
           </Button>
         )}
       </div>
@@ -154,6 +245,15 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         barbers={barbers}
         onSubmit={tarea => addTarea.mutate(tarea)}
         isPending={addTarea.isPending}
+        tipo={isTareasTab ? 'tarea' : 'peticion'}
+        creadorNombre={peticionCreador?.nombre}
+      />
+
+      <PinGateDialog
+        open={showPinDialog}
+        onValidate={handlePinValidate}
+        onClose={() => setShowPinDialog(false)}
+        sectionName="crear una petición"
       />
 
       {/* Filtro de estado */}
@@ -172,7 +272,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="tareas">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
@@ -180,14 +280,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         <TabsContent value="tareas">
           <Card>
             <CardContent className="p-0">
-              {renderTable(tareasAdmin)}
+              {renderTareasTable(tareasAdmin)}
             </CardContent>
           </Card>
         </TabsContent>
         <TabsContent value="peticiones">
           <Card>
             <CardContent className="p-0">
-              {renderTable(peticiones)}
+              {renderPeticionesTable(peticiones)}
             </CardContent>
           </Card>
         </TabsContent>
