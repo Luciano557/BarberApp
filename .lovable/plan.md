@@ -1,80 +1,93 @@
 
+# Separar Tareas y Peticiones
 
-# Rediseno de Configuracion - Organizado por Secciones
+## Resumen
 
-## Idea principal
+Dividir la seccion actual "Tareas y Peticiones" en dos tabs claras dentro del panel, donde cada una tiene su propio titulo, boton de accion y logica de permisos. Las peticiones podran ser creadas por cualquier persona (incluidos barberos) usando su PIN para identificarse.
 
-Reorganizar Configuracion para que refleje los apartados del sidebar. En vez de tabs genericos (Servicios, Extras, Staff, Descuentos), agrupar las configuraciones segun a que seccion del sistema pertenecen.
+## Cambios principales
 
-## Estructura propuesta
+### 1. Titulo y tabs dinamicos
 
-El menu principal de Configuracion mostrara tarjetas clickeables:
+- El titulo principal cambia segun la tab activa: "Tareas" o "Peticiones"
+- El boton de accion cambia: "Nueva tarea" (solo owners/managers) o "Nueva peticion" (cualquiera)
+- El mensaje vacio tambien cambia: "No hay tareas" / "No hay peticiones"
 
-```text
-+------------------------------------------+
-|  Configuracion                           |
-+------------------------------------------+
-|                                          |
-|  [Building2] Negocio                >    |
-|  Info del negocio, staff, usuarios       |
-|                                          |
-|  [Scissors] Cobrar                  >    |
-|  Servicios, extras, descuentos           |
-|                                          |
-|  [Shield] PIN de Seguridad          >    |
-|  Acceso a secciones protegidas           |
-|                                          |
-+------------------------------------------+
-```
+### 2. Flujo de nueva peticion con PIN
 
-Las secciones Resumen, Estadisticas, Sueldos, Gastos y Tareas no tienen configuraciones propias por ahora, asi que no aparecen en la lista. Si en el futuro se agregan, se van sumando dinamicamente.
+Cuando alguien toca "Nueva peticion":
+1. Se abre el dialogo de PIN (reutilizando `PinGateDialog` existente)
+2. La persona ingresa su PIN
+3. El sistema identifica quien es (via `validate-pin` que ya devuelve `barbero_id` y `user_name`)
+4. Se abre el formulario de peticion con el campo "Creado por" ya completado con el nombre del barbero
+5. El formulario de peticion es mas simple: solo titulo y descripcion (sin asignar a, sin fecha, sin repetir)
 
-### Dentro de "Negocio"
+### 3. Formulario de peticion simplificado
 
-Tiene sub-pestanas:
-- **Mi Negocio**: info de la organizacion y plan (lo que ya existe en OrganizationSettings)
-- **Staff**: lista de barberos con sus comisiones, datos, PIN
-- **Usuarios**: gestion de roles y permisos (solo visible para duenos)
+El `TareaFormDialog` recibira un prop `tipo` para adaptar su contenido:
+- Tipo `tarea`: formulario completo (como esta ahora) - titulo, descripcion, asignar a, fecha, hora, repetir
+- Tipo `peticion`: formulario simple - solo titulo y descripcion. El `creado_por` se setea automaticamente con los datos del PIN
 
-### Dentro de "Cobrar"
+### 4. Columnas de la tabla adaptadas
 
-Tiene sub-pestanas:
-- **Servicios**: lista de servicios con lineas
-- **Extras**: lista de extras
-- **Descuentos**: lista de descuentos
+La tabla de peticiones mostrara columnas relevantes:
+- Titulo (con descripcion)
+- Creado por (quien hizo la peticion)
+- Estado
+- Fecha de creacion
+- Acciones
 
-### PIN de Seguridad
-
-Se mantiene como seccion independiente ya que es transversal (no pertenece a un apartado especifico).
-
-## Navegacion
-
-Al tocar una tarjeta del menu, se muestra esa seccion con un boton "Volver" arriba para regresar al menu principal. Dentro de cada seccion, las sub-pestanas funcionan como tabs normales.
-
-## Mejoras de usabilidad
-
-- Botones de Editar/Desactivar siempre visibles (sin depender de hover)
-- Formularios de agregar/editar en Dialogs en vez de inline
-- Mejor formato tipo lista
+La tabla de tareas mantiene las columnas actuales.
 
 ## Detalle tecnico
 
-### Archivos nuevos
-- `src/components/config/ConfigMenu.tsx` - Menu principal con tarjetas (Negocio, Cobrar, PIN)
-- `src/components/config/NegocioConfig.tsx` - Seccion Negocio con tabs: Mi Negocio, Staff, Usuarios
-- `src/components/config/CobrarConfig.tsx` - Seccion Cobrar con tabs: Servicios, Extras, Descuentos
-- `src/components/config/ServicesConfig.tsx` - Componente extraido para servicios
-- `src/components/config/ExtrasConfig.tsx` - Componente extraido para extras
-- `src/components/config/StaffConfig.tsx` - Componente extraido para staff
-- `src/components/config/DiscountsConfig.tsx` - Componente extraido para descuentos
-
 ### Archivos modificados
-- `src/components/ConfigurationPanel.tsx` - Refactorizado: maneja estado `activeSection` ('menu' | 'negocio' | 'cobrar' | 'pin') y renderiza el componente correspondiente
-- `src/pages/Index.tsx` - Se mueve UserManagement y PinConfigSection dentro de ConfigurationPanel (ya no estan separados afuera)
 
-### Patron de navegacion
-`ConfigurationPanel` tendra un estado `activeSection`. Cuando es `'menu'` muestra las tarjetas. Al seleccionar una, cambia el estado y muestra la sub-seccion con boton "Volver".
+**`src/components/TareasPanel.tsx`**
+- Cambiar el titulo de "Tareas y Peticiones" a que sea dinamico segun la tab activa
+- Mover el boton "Nueva tarea"/"Nueva peticion" para que cambie segun la tab
+- En la tab "Peticiones", mostrar el boton "Nueva peticion" a todos (sin restriccion de `canManageConfig`)
+- Agregar estado para manejar el flujo de PIN antes de abrir el formulario de peticion
+- Integrar `PinGateDialog` para identificar al creador de la peticion
+- Adaptar `renderTable` para que las peticiones muestren "Creado por" en vez de "Asignado a"
 
-### Acciones siempre visibles
-Se elimina `opacity-0 group-hover:opacity-100` de todos los botones de accion en items de servicios, extras, staff y descuentos.
+**`src/components/tareas/TareaFormDialog.tsx`**
+- Agregar prop `tipo: 'tarea' | 'peticion'`
+- Agregar prop `creadorNombre?: string` (viene del PIN)
+- Cuando `tipo === 'peticion'`: ocultar los campos de "Asignar a", "Fecha", "Hora" y "Repetir"
+- Cambiar el titulo del header a "Nueva tarea" o "Nueva peticion" segun el tipo
+- Al confirmar, setear `tipo: 'peticion'` y `creado_por_nombre` con el nombre del barbero identificado
 
+**`src/hooks/useTareas.ts`**
+- Actualizar `TareaInsert` para aceptar `creado_por_nombre` opcional
+- En el `addTarea` mutation, permitir que venga `creado_por_nombre` desde fuera (para peticiones creadas por barberos via PIN)
+
+### Flujo de datos para peticiones
+
+```text
+Usuario toca "Nueva peticion"
+    |
+    v
+PinGateDialog se abre
+    |
+    v
+Ingresa PIN -> validate-pin devuelve { barbero_id, user_name }
+    |
+    v
+Se guarda barbero_id y user_name en estado local
+    |
+    v
+Se abre TareaFormDialog con tipo='peticion' y creadorNombre=user_name
+    |
+    v
+Usuario llena titulo y descripcion
+    |
+    v
+Se crea la tarea con tipo='peticion', creado_por_nombre=user_name
+```
+
+### Permisos
+
+- "Nueva tarea": solo visible para owners y managers (como ahora)
+- "Nueva peticion": visible para todos, pero requiere PIN para identificarse
+- Eliminar/gestionar tareas y peticiones: sigue restringido a owners y managers (las RLS policies ya lo manejan)
