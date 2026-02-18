@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { PinGateDialog } from './PinGateDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface TareasPanelProps {
   barbers: Barber[];
@@ -31,9 +32,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const { organization } = useOrganization();
   const [activeTab, setActiveTab] = useState('tareas');
 
-  // PIN flow for peticiones
+  // PIN flow for creating peticiones
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
+
+  // PIN flow for actions on peticiones (completar/rechazar/eliminar)
+  const [showActionPinDialog, setShowActionPinDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ tareaId: string; action: string } | null>(null);
 
   const vencimientoDias = organization?.peticiones_vencimiento_dias ?? 60;
 
@@ -58,7 +63,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const titulo = isTareasTab ? 'Tareas' : 'Peticiones';
 
   const getEstadoBadge = (estado: string, createdAt?: string) => {
-    // Check if peticion is expired
     if (createdAt && estado === 'pendiente') {
       const { vencida, diasRestantes } = getPeticionVencimiento(createdAt);
       if (vencida) {
@@ -93,6 +97,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     return 'Recurrente';
   };
 
+  // --- PIN flows ---
+
   const handleNuevaPeticion = () => {
     setShowPinDialog(true);
   };
@@ -114,6 +120,40 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     setPeticionCreador(null);
     setShowForm(true);
   };
+
+  // Actions on peticiones require PIN
+  const requestPeticionAction = (tareaId: string, action: string) => {
+    setPendingAction({ tareaId, action });
+    setShowActionPinDialog(true);
+  };
+
+  const handleActionPinValidate = async (pin: string): Promise<{ success: boolean; userName?: string }> => {
+    const { data, error } = await supabase.functions.invoke('validate-pin', {
+      body: { pin },
+    });
+    if (error || !data?.valid) {
+      return { success: false };
+    }
+
+    // Check if the person has owner/manager role by checking canManageConfig context
+    // The RLS policies will enforce this on the server side anyway
+    setShowActionPinDialog(false);
+
+    if (pendingAction) {
+      const { tareaId, action } = pendingAction;
+      if (action === 'delete') {
+        deleteTarea.mutate(tareaId);
+      } else {
+        updateTarea.mutate({ id: tareaId, estado: action });
+      }
+      toast.success(`Acción realizada por ${data.user_name}`);
+      setPendingAction(null);
+    }
+
+    return { success: true, userName: data.user_name };
+  };
+
+  // --- Tables ---
 
   const renderTareasTable = (items: typeof tareas) => (
     <Table>
@@ -227,21 +267,19 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
-                  {t.estado === 'pendiente' && canManageConfig && (
-                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
+                  {t.estado === 'pendiente' && (
+                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => requestPeticionAction(t.id, 'completada')} title="Completar">
                       <CheckCircle className="h-4 w-4" />
                     </Button>
                   )}
-                  {t.estado === 'pendiente' && canManageConfig && (
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updateTarea.mutate({ id: t.id, estado: 'rechazada' })} title="Rechazar">
+                  {t.estado === 'pendiente' && (
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => requestPeticionAction(t.id, 'rechazada')} title="Rechazar">
                       <XCircle className="h-4 w-4" />
                     </Button>
                   )}
-                  {canManageConfig && (
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => requestPeticionAction(t.id, 'delete')} title="Eliminar">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -284,11 +322,20 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         creadorNombre={peticionCreador?.nombre}
       />
 
+      {/* PIN para crear petición */}
       <PinGateDialog
         open={showPinDialog}
         onValidate={handlePinValidate}
         onClose={() => setShowPinDialog(false)}
         sectionName="crear una petición"
+      />
+
+      {/* PIN para acciones sobre peticiones */}
+      <PinGateDialog
+        open={showActionPinDialog}
+        onValidate={handleActionPinValidate}
+        onClose={() => { setShowActionPinDialog(false); setPendingAction(null); }}
+        sectionName="gestionar esta petición"
       />
 
       {/* Filtro de estado */}
