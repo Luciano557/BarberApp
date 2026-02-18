@@ -7,14 +7,15 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTareas } from '@/hooks/useTareas';
-import { Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
 import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { PinGateDialog } from './PinGateDialog';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,14 +28,26 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
+  const { organization } = useOrganization();
   const [activeTab, setActiveTab] = useState('tareas');
 
   // PIN flow for peticiones
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
+  const vencimientoDias = organization?.peticiones_vencimiento_dias ?? 60;
+
+  const getPeticionVencimiento = (createdAt: string) => {
+    const diasTranscurridos = differenceInDays(new Date(), new Date(createdAt));
+    const diasRestantes = vencimientoDias - diasTranscurridos;
+    return { diasTranscurridos, diasRestantes, vencida: diasRestantes <= 0 };
+  };
+
   const tareasFiltradas = tareas.filter(t => {
     if (filtroEstado === 'todos') return true;
+    if (filtroEstado === 'vencida') {
+      return t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t.created_at).vencida;
+    }
     return t.estado === filtroEstado;
   });
 
@@ -44,7 +57,18 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const isTareasTab = activeTab === 'tareas';
   const titulo = isTareasTab ? 'Tareas' : 'Peticiones';
 
-  const getEstadoBadge = (estado: string) => {
+  const getEstadoBadge = (estado: string, createdAt?: string) => {
+    // Check if peticion is expired
+    if (createdAt && estado === 'pendiente') {
+      const { vencida, diasRestantes } = getPeticionVencimiento(createdAt);
+      if (vencida) {
+        return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50"><AlertTriangle className="w-3 h-3 mr-1" />Vencida</Badge>;
+      }
+      if (diasRestantes <= 7) {
+        return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="w-3 h-3 mr-1" />Vence en {diasRestantes}d</Badge>;
+      }
+    }
+
     switch (estado) {
       case 'pendiente':
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>;
@@ -167,6 +191,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
           <TableHead>Título</TableHead>
           <TableHead>Creado por</TableHead>
           <TableHead>Estado</TableHead>
+          <TableHead>Vence</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead className="text-right">Acciones</TableHead>
         </TableRow>
@@ -174,44 +199,54 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       <TableBody>
         {items.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
               No hay peticiones
             </TableCell>
           </TableRow>
-        ) : items.map(t => (
-          <TableRow key={t.id}>
-            <TableCell>
-              <div>
-                <p className="font-medium">{t.titulo}</p>
-                {t.descripcion && <p className="text-xs text-muted-foreground mt-1">{t.descripcion}</p>}
-              </div>
-            </TableCell>
-            <TableCell>{t.creado_por_nombre || '—'}</TableCell>
-            <TableCell>{getEstadoBadge(t.estado)}</TableCell>
-            <TableCell className="text-xs text-muted-foreground">
-              {format(new Date(t.created_at), 'dd/MM/yy', { locale: es })}
-            </TableCell>
-            <TableCell className="text-right">
-              <div className="flex items-center justify-end gap-1">
-                {t.estado === 'pendiente' && canManageConfig && (
-                  <Button size="sm" variant="ghost" className="text-green-600" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
-                )}
-                {t.estado === 'pendiente' && canManageConfig && (
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updateTarea.mutate({ id: t.id, estado: 'rechazada' })} title="Rechazar">
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                )}
-                {canManageConfig && (
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
+        ) : items.map(t => {
+          const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t.created_at) : null;
+          return (
+            <TableRow key={t.id} className={venc?.vencida ? 'opacity-60' : ''}>
+              <TableCell>
+                <div>
+                  <p className="font-medium">{t.titulo}</p>
+                  {t.descripcion && <p className="text-xs text-muted-foreground mt-1">{t.descripcion}</p>}
+                </div>
+              </TableCell>
+              <TableCell>{t.creado_por_nombre || '—'}</TableCell>
+              <TableCell>{getEstadoBadge(t.estado, t.tipo === 'peticion' ? t.created_at : undefined)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {t.estado === 'pendiente' && venc ? (
+                  venc.vencida 
+                    ? <span className="text-orange-600 font-medium">Vencida</span>
+                    : <span>{venc.diasRestantes}d restantes</span>
+                ) : '—'}
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">
+                {format(new Date(t.created_at), 'dd/MM/yy', { locale: es })}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  {t.estado === 'pendiente' && canManageConfig && (
+                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {t.estado === 'pendiente' && canManageConfig && (
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updateTarea.mutate({ id: t.id, estado: 'rechazada' })} title="Rechazar">
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canManageConfig && (
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)} title="Eliminar">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );
@@ -267,8 +302,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             <SelectItem value="en_progreso">En progreso</SelectItem>
             <SelectItem value="completada">Completada</SelectItem>
             <SelectItem value="rechazada">Rechazada</SelectItem>
+            {!isTareasTab && <SelectItem value="vencida">Vencida</SelectItem>}
           </SelectContent>
         </Select>
+        {!isTareasTab && (
+          <span className="text-xs text-muted-foreground ml-2">
+            Vencimiento: {vencimientoDias} días
+          </span>
+        )}
       </div>
 
       {/* Tabs */}

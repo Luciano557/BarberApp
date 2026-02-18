@@ -5,9 +5,10 @@ import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { ConfigMenu } from './config/ConfigMenu';
 import { NegocioConfig } from './config/NegocioConfig';
 import { CobrarConfig } from './config/CobrarConfig';
+import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
 
-type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin';
+type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin' | 'tareas';
 
 interface ConfigurationPanelProps {
   services: Service[];
@@ -33,6 +34,7 @@ const sectionTitles: Record<ConfigSection, string> = {
   negocio: 'Negocio',
   cobrar: 'Cobrar',
   pin: 'PIN de Seguridad',
+  tareas: 'Tareas y Peticiones',
 };
 
 export function ConfigurationPanel({
@@ -86,6 +88,10 @@ export function ConfigurationPanel({
 
       {activeSection === 'pin' && (
         <PinConfigSection />
+      )}
+
+      {activeSection === 'tareas' && (
+        <TareasConfig />
       )}
     </div>
   );

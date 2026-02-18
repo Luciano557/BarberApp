@@ -519,6 +519,7 @@ export type Database = {
           is_active: boolean | null
           logo_url: string | null
           name: string
+          peticiones_vencimiento_dias: number
           phone: string | null
           plan: string | null
           plan_expires_at: string | null
@@ -533,6 +534,7 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name: string
+          peticiones_vencimiento_dias?: number
           phone?: string | null
           plan?: string | null
           plan_expires_at?: string | null
@@ -547,6 +549,7 @@ export type Database = {
           is_active?: boolean | null
           logo_url?: string | null
           name?: string
+          peticiones_vencimiento_dias?: number
           phone?: string | null
           plan?: string | null
           plan_expires_at?: string | null
