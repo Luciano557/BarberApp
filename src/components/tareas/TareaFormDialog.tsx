@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,9 +21,11 @@ interface TareaFormDialogProps {
   barbers: Barber[];
   onSubmit: (tarea: TareaInsert) => void;
   isPending?: boolean;
+  tipo: 'tarea' | 'peticion';
+  creadorNombre?: string;
 }
 
-export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPending }: TareaFormDialogProps) {
+export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPending, tipo, creadorNombre }: TareaFormDialogProps) {
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [asignadoId, setAsignadoId] = useState('');
@@ -45,6 +47,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
   const [showRepeatPicker, setShowRepeatPicker] = useState(false);
   const [showCustomRepeat, setShowCustomRepeat] = useState(false);
 
+  const isPeticion = tipo === 'peticion';
   const activeBarbers = barbers.filter(b => b.active);
 
   const resetForm = () => {
@@ -63,32 +66,41 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
 
   const handleConfirm = () => {
     if (!titulo.trim()) return;
-    const barber = activeBarbers.find(b => b.id === asignadoId);
-    const barberName = barber ? getBarberDisplayName(barber) : undefined;
 
-    const tarea: TareaInsert = {
-      tipo: 'tarea',
-      titulo: titulo.trim(),
-      descripcion: descripcion.trim() || undefined,
-      asignado_a_id: asignadoId || undefined,
-      asignado_a_nombre: barberName,
-      fecha_limite: hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
-      hora: hasTime ? selectedTime : undefined,
-      repeat_preset: repeatPreset,
-      repeat_frequency: repeatPreset === 'custom' ? repeatFrequency : undefined,
-      repeat_interval: repeatPreset === 'custom' ? repeatInterval : undefined,
-      repeat_byweekday: repeatPreset === 'custom' && repeatFrequency === 'weekly' ? repeatByweekday : undefined,
-      recurrente: repeatPreset !== 'never',
-    };
+    if (isPeticion) {
+      const tarea: TareaInsert = {
+        tipo: 'peticion',
+        titulo: titulo.trim(),
+        descripcion: descripcion.trim() || undefined,
+        creado_por_nombre: creadorNombre,
+      };
+      onSubmit(tarea);
+    } else {
+      const barber = activeBarbers.find(b => b.id === asignadoId);
+      const barberName = barber ? getBarberDisplayName(barber) : undefined;
+      const tarea: TareaInsert = {
+        tipo: 'tarea',
+        titulo: titulo.trim(),
+        descripcion: descripcion.trim() || undefined,
+        asignado_a_id: asignadoId || undefined,
+        asignado_a_nombre: barberName,
+        fecha_limite: hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
+        hora: hasTime ? selectedTime : undefined,
+        repeat_preset: repeatPreset,
+        repeat_frequency: repeatPreset === 'custom' ? repeatFrequency : undefined,
+        repeat_interval: repeatPreset === 'custom' ? repeatInterval : undefined,
+        repeat_byweekday: repeatPreset === 'custom' && repeatFrequency === 'weekly' ? repeatByweekday : undefined,
+        recurrente: repeatPreset !== 'never',
+      };
+      onSubmit(tarea);
+    }
 
-    onSubmit(tarea);
     resetForm();
     onOpenChange(false);
   };
 
   const handleRepeatChange = (value: string) => {
     setRepeatPreset(value);
-    // Auto-enable date when setting repeat
     if (value !== 'never' && !hasDate) {
       setHasDate(true);
       if (!selectedDate) setSelectedDate(new Date());
@@ -127,7 +139,9 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
             <Button variant="ghost" size="icon" onClick={() => { resetForm(); onOpenChange(false); }}>
               <X className="h-5 w-5" />
             </Button>
-            <span className="font-semibold text-base">Nueva tarea</span>
+            <span className="font-semibold text-base">
+              {isPeticion ? 'Nueva petición' : 'Nueva tarea'}
+            </span>
             <Button
               variant="ghost"
               size="icon"
@@ -140,10 +154,17 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
           </div>
 
           <div className="p-4 space-y-4">
+            {/* Creado por (peticiones) */}
+            {isPeticion && creadorNombre && (
+              <div className="text-sm text-muted-foreground">
+                Creado por: <span className="font-medium text-foreground">{creadorNombre}</span>
+              </div>
+            )}
+
             {/* Title & Description */}
             <div className="space-y-3">
               <Input
-                placeholder="Título de la tarea"
+                placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
                 value={titulo}
                 onChange={e => setTitulo(e.target.value)}
                 className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
@@ -157,122 +178,131 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
               />
             </div>
 
-            {/* Assign */}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Asignar a</Label>
-              <Select value={asignadoId} onValueChange={setAsignadoId}>
-                <SelectTrigger className="border-0 border-b border-border rounded-none px-0">
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeBarbers.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Tarea-only fields */}
+            {!isPeticion && (
+              <>
+                {/* Assign */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Asignar a</Label>
+                  <Select value={asignadoId} onValueChange={setAsignadoId}>
+                    <SelectTrigger className="border-0 border-b border-border rounded-none px-0">
+                      <SelectValue placeholder="Sin asignar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeBarbers.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Date/Time/Repeat cards */}
-            <div className="rounded-xl border border-border overflow-hidden divide-y divide-border bg-card">
-              {/* Date row */}
-              <div className="px-4">
-                <div className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                      <CalendarIcon className="h-4 w-4 text-destructive" />
+                {/* Date/Time/Repeat cards */}
+                <div className="rounded-xl border border-border overflow-hidden divide-y divide-border bg-card">
+                  {/* Date row */}
+                  <div className="px-4">
+                    <div className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                          <CalendarIcon className="h-4 w-4 text-destructive" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Fecha</p>
+                          {hasDate && <p className="text-xs text-muted-foreground">{dateSubtext()}</p>}
+                        </div>
+                      </div>
+                      <Switch checked={hasDate} onCheckedChange={handleDateToggle} />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">Fecha</p>
-                      {hasDate && <p className="text-xs text-muted-foreground">{dateSubtext()}</p>}
-                    </div>
+                    {hasDate && (
+                      <div className="pb-3">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={setSelectedDate}
+                          locale={es}
+                          className="p-0 pointer-events-auto mx-auto"
+                        />
+                      </div>
+                    )}
                   </div>
-                  <Switch checked={hasDate} onCheckedChange={handleDateToggle} />
-                </div>
-                {hasDate && (
-                  <div className="pb-3">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      locale={es}
-                      className="p-0 pointer-events-auto mx-auto"
-                    />
-                  </div>
-                )}
-              </div>
 
-              {/* Time row */}
-              <div className="px-4">
-                <div className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-blue-500" />
+                  {/* Time row */}
+                  <div className="px-4">
+                    <div className="flex items-center justify-between py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <Clock className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <p className="text-sm font-medium">Hora</p>
+                      </div>
+                      <Switch checked={hasTime} onCheckedChange={setHasTime} />
                     </div>
-                    <p className="text-sm font-medium">Hora</p>
+                    {hasTime && (
+                      <div className="pb-3">
+                        <Input
+                          type="time"
+                          value={selectedTime}
+                          onChange={e => setSelectedTime(e.target.value)}
+                          className="w-32"
+                        />
+                      </div>
+                    )}
                   </div>
-                  <Switch checked={hasTime} onCheckedChange={setHasTime} />
-                </div>
-                {hasTime && (
-                  <div className="pb-3">
-                    <Input
-                      type="time"
-                      value={selectedTime}
-                      onChange={e => setSelectedTime(e.target.value)}
-                      className="w-32"
-                    />
-                  </div>
-                )}
-              </div>
 
-              {/* Repeat row */}
-              <button
-                className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors"
-                onClick={() => setShowRepeatPicker(true)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                    <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">Repetir</p>
+                  {/* Repeat row */}
+                  <button
+                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors"
+                    onClick={() => setShowRepeatPicker(true)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                        <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium">Repetir</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <span className="text-sm">{getRepeatDisplayLabel()}</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </div>
+                  </button>
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <span className="text-sm">{getRepeatDisplayLabel()}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </div>
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </SheetContent>
       </Sheet>
 
-      <RepeatPicker
-        open={showRepeatPicker}
-        onOpenChange={setShowRepeatPicker}
-        value={repeatPreset}
-        onChange={handleRepeatChange}
-        onCustom={() => {
-          setShowRepeatPicker(false);
-          setShowCustomRepeat(true);
-        }}
-      />
+      {!isPeticion && (
+        <>
+          <RepeatPicker
+            open={showRepeatPicker}
+            onOpenChange={setShowRepeatPicker}
+            value={repeatPreset}
+            onChange={handleRepeatChange}
+            onCustom={() => {
+              setShowRepeatPicker(false);
+              setShowCustomRepeat(true);
+            }}
+          />
 
-      <CustomRepeatSheet
-        open={showCustomRepeat}
-        onOpenChange={setShowCustomRepeat}
-        frequency={repeatFrequency}
-        interval={repeatInterval}
-        byweekday={repeatByweekday}
-        onConfirm={(freq, intv, days) => {
-          setRepeatFrequency(freq);
-          setRepeatInterval(intv);
-          setRepeatByweekday(days);
-          setRepeatPreset('custom');
-          if (!hasDate) {
-            setHasDate(true);
-            if (!selectedDate) setSelectedDate(new Date());
-          }
-        }}
-      />
+          <CustomRepeatSheet
+            open={showCustomRepeat}
+            onOpenChange={setShowCustomRepeat}
+            frequency={repeatFrequency}
+            interval={repeatInterval}
+            byweekday={repeatByweekday}
+            onConfirm={(freq, intv, days) => {
+              setRepeatFrequency(freq);
+              setRepeatInterval(intv);
+              setRepeatByweekday(days);
+              setRepeatPreset('custom');
+              if (!hasDate) {
+                setHasDate(true);
+                if (!selectedDate) setSelectedDate(new Date());
+              }
+            }}
+          />
+        </>
+      )}
     </>
   );
 }

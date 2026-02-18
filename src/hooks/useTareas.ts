@@ -38,6 +38,7 @@ export interface TareaInsert {
   descripcion?: string;
   asignado_a_id?: string;
   asignado_a_nombre?: string;
+  creado_por_nombre?: string;
   fecha_limite?: string;
   hora?: string;
   repeat_preset?: string;
@@ -70,12 +71,13 @@ export function useTareas() {
   const addTarea = useMutation({
     mutationFn: async (tarea: TareaInsert) => {
       if (!organization?.id || !user?.id) throw new Error('No org or user');
+      const { creado_por_nombre, ...rest } = tarea;
       const { error } = await supabase.from('tareas').insert({
         organization_id: organization.id,
         creado_por_id: user.id,
-        creado_por_nombre: profile?.full_name || profile?.email || '',
+        creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
         recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,
-        ...tarea,
+        ...rest,
       });
       if (error) throw error;
     },
