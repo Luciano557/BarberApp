@@ -543,9 +543,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
         </div>
       )}
 
-      {/* Pending Tasks Bubble */}
+      {/* Pending Tasks Bubble - fixed bottom */}
       {showTasksBubble && pendingTasks.length > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 p-3 animate-fade-in">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-md animate-fade-in">
           <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 shrink-0">
             <ClipboardList className="h-4 w-4 text-primary" />
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
