@@ -10,6 +10,7 @@ interface PaymentRegistrationProps {
   extras: Extra[];
   barbers: Barber[];
   discounts: Discount[];
+  onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
     barberName: string;
@@ -37,7 +38,7 @@ const STEP_INFO = {
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, onSubmit }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
   const [currentStep, setCurrentStep] = useState<Step>('barber');
@@ -545,7 +546,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
 
       {/* Pending Tasks Bubble - fixed bottom */}
       {showTasksBubble && pendingTasks.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-md animate-fade-in">
+        <div
+          onClick={() => { setShowTasksBubble(false); onNavigateToTareas?.(); }}
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-md animate-fade-in cursor-pointer hover:bg-muted/50 transition-colors"
+        >
           <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 shrink-0">
             <ClipboardList className="h-4 w-4 text-primary" />
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
@@ -562,7 +566,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
             </p>
           </div>
           <button
-            onClick={() => setShowTasksBubble(false)}
+            onClick={(e) => { e.stopPropagation(); setShowTasksBubble(false); }}
             className="shrink-0 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
