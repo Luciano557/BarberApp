@@ -1,0 +1,1 @@
+ALTER TABLE public.tareas ADD COLUMN vencimiento_dias integer DEFAULT 60;

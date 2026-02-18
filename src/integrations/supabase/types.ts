@@ -844,6 +844,7 @@ export type Database = {
           tipo: string
           titulo: string
           updated_at: string
+          vencimiento_dias: number | null
         }
         Insert: {
           asignado_a_id?: string | null
@@ -871,6 +872,7 @@ export type Database = {
           tipo?: string
           titulo: string
           updated_at?: string
+          vencimiento_dias?: number | null
         }
         Update: {
           asignado_a_id?: string | null
@@ -898,6 +900,7 @@ export type Database = {
           tipo?: string
           titulo?: string
           updated_at?: string
+          vencimiento_dias?: number | null
         }
         Relationships: [
           {
