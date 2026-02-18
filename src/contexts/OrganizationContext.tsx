@@ -13,6 +13,7 @@ interface Organization {
   address: string | null;
   is_active: boolean;
   timezone: string;
+  peticiones_vencimiento_dias: number;
 }
 
 interface PlanFeatures {

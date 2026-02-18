@@ -1,7 +1,7 @@
-import { Building2, Scissors, Shield, ChevronRight, Users } from 'lucide-react';
+import { Building2, Scissors, Shield, ChevronRight, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin';
+type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin' | 'tareas';
 
 interface ConfigMenuItem {
   id: ConfigSection;
@@ -47,6 +47,13 @@ export function ConfigMenu({ onSelect, counts }: ConfigMenuProps) {
       icon: <Shield className="h-5 w-5" />,
       title: 'PIN de Seguridad',
       description: 'Acceso a secciones protegidas',
+      visible: true,
+    },
+    {
+      id: 'tareas',
+      icon: <ClipboardList className="h-5 w-5" />,
+      title: 'Tareas y Peticiones',
+      description: 'Vencimiento de peticiones',
       visible: true,
     },
   ];
