@@ -43,7 +43,7 @@ serve(async (req) => {
       );
     }
 
-    const { barbero_id, pin, action } = await req.json();
+    const { barbero_id, pin, action, currentPin } = await req.json();
 
     if (!barbero_id) {
       return new Response(
@@ -58,8 +58,52 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Check if barbero already has a PIN
+    const { data: barbero, error: fetchError } = await serviceClient
+      .from('barberos')
+      .select('pin_hash')
+      .eq('id', barbero_id)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    // If barbero has an existing PIN and this is not a delete, verify currentPin
+    if (barbero?.pin_hash && action !== 'delete') {
+      if (!currentPin) {
+        return new Response(
+          JSON.stringify({ error: 'Debes ingresar el PIN actual' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const currentPinHash = await hashPin(currentPin);
+      if (currentPinHash !== barbero.pin_hash) {
+        return new Response(
+          JSON.stringify({ error: 'El PIN actual es incorrecto' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (action === 'delete') {
-      // Delete existing PIN
+      // Also verify current PIN before deleting
+      if (barbero?.pin_hash) {
+        if (!currentPin) {
+          return new Response(
+            JSON.stringify({ error: 'Debes ingresar el PIN actual para eliminarlo' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const currentPinHash = await hashPin(currentPin);
+        if (currentPinHash !== barbero.pin_hash) {
+          return new Response(
+            JSON.stringify({ error: 'El PIN actual es incorrecto' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
       const { error: updateError } = await serviceClient
         .from('barberos')
         .update({ pin_hash: null })
