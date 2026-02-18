@@ -7,14 +7,13 @@ import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { GastosPanel } from '@/components/GastosPanel';
 import { TareasPanel } from '@/components/TareasPanel';
 import { AppSidebar } from '@/components/AppSidebar';
-import { UserManagement } from '@/components/UserManagement';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
-  const { canManagePayments, canManageConfig, canManageUsers } = useAuth();
+  const { canManagePayments, canManageConfig } = useAuth();
   
   // Set default tab based on permissions
   const getDefaultTab = () => {
@@ -128,31 +127,24 @@ const Index = () => {
 
           {activeTab === 'config' && canManageConfig && (
             <PinProtectedSection sectionName="Configuración">
-              <div className="space-y-8">
-                <ConfigurationPanel
-                  services={allServices}
-                  extras={allExtras}
-                  barbers={allBarbers}
-                  discounts={discounts}
-                  lines={allLines}
-                  onAddService={addService}
-                  onUpdateService={updateService}
-                  onAddExtra={addExtra}
-                  onUpdateExtra={updateExtra}
-                  onAddBarber={addBarber}
-                  onUpdateBarber={updateBarber}
-                  onAddDiscount={addDiscount}
-                  onUpdateDiscount={updateDiscount}
-                  onDeleteDiscount={deleteDiscount}
-                  onAddLine={addLine}
-                  onUpdateLine={updateLine}
-                />
-                
-                {/* User Management - only for owner */}
-                {canManageUsers && (
-                  <UserManagement barbers={allBarbers} />
-                )}
-              </div>
+              <ConfigurationPanel
+                services={allServices}
+                extras={allExtras}
+                barbers={allBarbers}
+                discounts={discounts}
+                lines={allLines}
+                onAddService={addService}
+                onUpdateService={updateService}
+                onAddExtra={addExtra}
+                onUpdateExtra={updateExtra}
+                onAddBarber={addBarber}
+                onUpdateBarber={updateBarber}
+                onAddDiscount={addDiscount}
+                onUpdateDiscount={updateDiscount}
+                onDeleteDiscount={deleteDiscount}
+                onAddLine={addLine}
+                onUpdateLine={updateLine}
+              />
             </PinProtectedSection>
           )}
         </div>
