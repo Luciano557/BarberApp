@@ -20,7 +20,7 @@ export function TareasConfig() {
     }
 
     setSaving(true);
-    const { error } = await updateOrganization({ peticiones_vencimiento_dias: value } as any);
+    const { error } = await updateOrganization({ peticiones_vencimiento_dias: value });
     setSaving(false);
 
     if (error) {

@@ -29,7 +29,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
-  const { organization } = useOrganization();
+  const { organization, updateOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState('tareas');
 
   // PIN flow for creating peticiones
@@ -352,7 +352,29 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             {!isTareasTab && <SelectItem value="vencida">Vencida</SelectItem>}
           </SelectContent>
         </Select>
-        {!isTareasTab && (
+        {!isTareasTab && canManageConfig && (
+          <div className="flex items-center gap-2 ml-2">
+            <span className="text-xs text-muted-foreground">Vencimiento:</span>
+            <div className="flex items-center gap-1">
+              {[15, 30, 60, 90].map(d => (
+                <Button
+                  key={d}
+                  variant={vencimientoDias === d ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={async () => {
+                    const { error } = await updateOrganization({ peticiones_vencimiento_dias: d });
+                    if (error) toast.error('Error al guardar');
+                    else toast.success(`Vencimiento: ${d} días`);
+                  }}
+                >
+                  {d}d
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!isTareasTab && !canManageConfig && (
           <span className="text-xs text-muted-foreground ml-2">
             Vencimiento: {vencimientoDias} días
           </span>
