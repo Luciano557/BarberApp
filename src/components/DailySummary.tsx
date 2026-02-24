@@ -525,6 +525,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           Caja Cerrada
                         </Badge>
                       )
+                    ) : isPastDate ? (
+                      <Badge variant="outline" className="w-full justify-center py-2 text-muted-foreground">
+                        <CalendarClock className="h-4 w-4 mr-2" />
+                        Usá "Regularizar día" para cerrar
+                      </Badge>
                     ) : (
                       <Button 
                         className="w-full" 
