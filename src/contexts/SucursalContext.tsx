@@ -90,7 +90,7 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, organization, isOwner]);
+  }, [user, organization, isOwner, isGeneralManager]);
 
   useEffect(() => {
     if (!authLoading && !orgLoading) {
