@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner } = useAuth();
   
   // Set default tab based on permissions
   const getDefaultTab = () => {
