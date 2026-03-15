@@ -50,6 +50,7 @@ const chartConfig = {
 
 export function EstadisticasPanel() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalFacturacion: 0,
