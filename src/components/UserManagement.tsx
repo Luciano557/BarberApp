@@ -141,7 +141,8 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleLabel = (role: AppRole) => {
     switch (role) {
       case 'owner': return 'Dueño';
-      case 'manager': return 'Encargado';
+      case 'general_manager': return 'Enc. General';
+      case 'manager': return 'Enc. Local';
       case 'barber': return 'Barbero';
     }
   };
