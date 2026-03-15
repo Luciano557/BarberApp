@@ -77,6 +77,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const canVoidClosure = isOwner || isManager;
   const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
     : new Date();
