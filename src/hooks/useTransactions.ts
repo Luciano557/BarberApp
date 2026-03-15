@@ -17,6 +17,7 @@ interface VentaInsert {
   metodo_pago: 'efectivo' | 'mercado_pago';
   total_final: number;
   organization_id: string;
+  sucursal_id?: string | null;
 }
 
 interface VentaExtraInsert {
