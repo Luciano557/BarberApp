@@ -106,7 +106,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const handlePinValidate = async (pin: string): Promise<{ success: boolean; userName?: string }> => {
     const { data, error } = await supabase.functions.invoke('validate-pin', {
-      body: { pin },
+      body: { pin, sucursal_id: currentSucursal?.id ?? null },
     });
     if (error || !data?.valid) {
       return { success: false };
