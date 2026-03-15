@@ -12,7 +12,7 @@ const corsHeaders = {
 interface InviteRequest {
   email: string;
   fullName: string;
-  role: "barber" | "manager";
+  role: "barber" | "manager" | "general_manager";
   barberoId?: string;
   organizationId: string;
   organizationName: string;
