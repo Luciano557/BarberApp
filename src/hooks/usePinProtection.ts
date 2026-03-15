@@ -17,6 +17,7 @@ interface UnlockState {
 export function usePinProtection() {
   const { user, canManageConfig } = useAuth();
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
   const [unlockedBy, setUnlockedBy] = useState<string | null>(null);
