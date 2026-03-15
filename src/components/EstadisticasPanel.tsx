@@ -65,7 +65,7 @@ export function EstadisticasPanel() {
     if (organization?.id) {
       fetchData();
     }
-  }, [organization?.id, periodoMeses]);
+  }, [organization?.id, periodoMeses, currentSucursal]);
 
   const fetchData = async () => {
     if (!organization?.id) return;
