@@ -19,6 +19,7 @@ export interface Inversion {
 
 export function useInversiones() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [inversiones, setInversiones] = useState<Inversion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
