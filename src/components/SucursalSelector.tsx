@@ -10,7 +10,7 @@ interface SucursalSelectorProps {
 
 export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
   const { sucursales, currentSucursal, setCurrentSucursal, isAllMode } = useSucursal();
-  const { isOwner } = useAuth();
+  const { isOwner, isGeneralManager } = useAuth();
 
   // Don't show if only 1 sucursal and not owner
   if (sucursales.length <= 1 && !isOwner) return null;
