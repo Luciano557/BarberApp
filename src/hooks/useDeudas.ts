@@ -51,7 +51,7 @@ export function useDeudas() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, currentSucursal]);
 
   useEffect(() => {
     fetchDeudas();
