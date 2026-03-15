@@ -117,7 +117,7 @@ export function useSupabaseData() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentSucursal?.id]);
 
   useEffect(() => {
     fetchData();

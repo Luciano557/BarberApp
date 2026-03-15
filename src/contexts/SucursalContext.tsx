@@ -99,6 +99,9 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
   }, [user, organization, authLoading, orgLoading]);
 
   const setCurrentSucursal = useCallback(async (id: string | null) => {
+    // Block branch switching for non-owner/GM users
+    if (!isOwner && !isGeneralManager) return;
+
     if (id === null) {
       // "Todas" mode — only owners can do this
       setCurrentSucursalState(null);
