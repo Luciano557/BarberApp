@@ -38,7 +38,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
   const [formData, setFormData] = useState({
     email: '',
     fullName: barberFullName,
-    role: barber ? 'barber' : '' as 'barber' | 'manager' | '',
+    role: barber ? 'barber' : '' as 'barber' | 'manager' | 'general_manager' | '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
