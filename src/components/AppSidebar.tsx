@@ -54,10 +54,16 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const planBadge = getPlanBadge();
 
+  const handleTabChange = (tab: string) => {
+    onTabChange(tab);
+    if (isMobile) setCollapsed(true);
+  };
+
   return (
     <aside
       className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col sticky top-0 transition-all duration-200",
+        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-200 z-10",
+        isMobile ? "fixed top-0 left-0" : "sticky top-0",
         collapsed ? "w-16" : "w-56"
       )}
     >
