@@ -26,7 +26,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
     try {
       const result = await onValidate(pin);
       if (!result.success) {
-        setError('PIN incorrecto. Intenta de nuevo.');
+        setError((result as any).error || 'PIN incorrecto. Intenta de nuevo.');
         setPin('');
       }
     } catch {

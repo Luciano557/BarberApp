@@ -26,7 +26,7 @@ export function PinProtectedSection({ children, sectionName = 'esta sección' }:
     try {
       const result = await validatePin(pin);
       if (!result.success) {
-        setError('PIN incorrecto. Intenta de nuevo.');
+        setError(result.error || 'PIN incorrecto. Intenta de nuevo.');
         setPin('');
       }
     } catch {
