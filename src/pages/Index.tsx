@@ -11,6 +11,7 @@ import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const Index = () => {
   const { canManagePayments, canManageConfig } = useAuth();
