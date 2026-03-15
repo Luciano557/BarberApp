@@ -14,7 +14,7 @@ import { Barber } from '@/types/barbershop';
 const inviteSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }).max(255),
   fullName: z.string().trim().min(2, { message: "El nombre debe tener al menos 2 caracteres" }).max(100),
-  role: z.enum(["barber", "manager"], { required_error: "Seleccioná un rol" }),
+  role: z.enum(["barber", "manager", "general_manager"], { required_error: "Seleccioná un rol" }),
 });
 
 interface InviteUserDialogProps {
