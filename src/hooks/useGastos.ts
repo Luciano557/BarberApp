@@ -28,13 +28,19 @@ export function useGastos() {
       const start = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
       const end = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('Egresos')
         .select('*')
         .eq('organization_id', organization.id)
         .gte('Fecha', `${start}T00:00:00`)
         .lte('Fecha', `${end}T23:59:59`)
         .order('Fecha', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setGastos((data as Gasto[]) || []);
