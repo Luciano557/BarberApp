@@ -156,7 +156,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Try to send email (but don't fail if it doesn't work)
-    const roleLabel = role === "barber" ? "Barbero" : "Encargado";
+    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Local";
     
     try {
       const emailResult = await resend.emails.send({
