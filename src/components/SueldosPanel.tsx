@@ -207,19 +207,23 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     setIsLoading(true);
     try {
       // ALWAYS fetch ALL data for saldo calculation (historical)
-      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
+      let ingHistQuery = supabase
         .from('ingresos')
         .select('barbero_id, sueldo')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
+      if (currentSucursal) ingHistQuery = ingHistQuery.eq('sucursal_id', currentSucursal.id);
 
+      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await ingHistQuery;
       if (ingresosHistoricosError) throw ingresosHistoricosError;
 
-      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
+      let pagHistQuery = supabase
         .from('pagos_sueldos')
         .select('barbero_id, monto')
         .eq('organization_id', organization.id);
+      if (currentSucursal) pagHistQuery = pagHistQuery.eq('sucursal_id', currentSucursal.id);
 
+      const { data: pagosHistoricos, error: pagosHistoricosError } = await pagHistQuery;
       if (pagosHistoricosError) throw pagosHistoricosError;
 
       // Calculate HISTORICAL totals for saldo (real debt - never changes with filter)
