@@ -11,8 +11,11 @@ import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
+  const isMobile = useIsMobile();
   const { canManagePayments, canManageConfig } = useAuth();
   
   // Set default tab based on permissions
@@ -78,8 +81,8 @@ const Index = () => {
       <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen overflow-auto">
-        <div className="max-w-4xl mx-auto p-8">
+      <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
+        <div className="max-w-4xl mx-auto p-4 md:p-8">
           {activeTab === 'registro' && canManagePayments && (
             <PaymentRegistration
               services={services}

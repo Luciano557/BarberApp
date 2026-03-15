@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -13,7 +14,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState(isMobile);
   const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
@@ -52,10 +54,16 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const planBadge = getPlanBadge();
 
+  const handleTabChange = (tab: string) => {
+    onTabChange(tab);
+    if (isMobile) setCollapsed(true);
+  };
+
   return (
     <aside
       className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col sticky top-0 transition-all duration-200",
+        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-200 z-10",
+        isMobile ? "fixed top-0 left-0" : "sticky top-0",
         collapsed ? "w-16" : "w-56"
       )}
     >
@@ -106,7 +114,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           {navItems.map((item) => (
             <li key={item.id}>
               <button
-                onClick={() => onTabChange(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                   collapsed && "justify-center px-2",
