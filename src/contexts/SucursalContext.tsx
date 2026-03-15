@@ -118,7 +118,7 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [sucursales, user]);
+  }, [sucursales, user, isOwner, isGeneralManager]);
 
   const isAllMode = (isOwner || isGeneralManager) && currentSucursal === null;
 
