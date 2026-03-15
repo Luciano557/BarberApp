@@ -6,6 +6,7 @@ import { Lock, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Transaction } from '@/types/barbershop';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 interface VoidTransactionDialogProps {
   open: boolean;
