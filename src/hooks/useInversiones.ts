@@ -47,7 +47,7 @@ export function useInversiones() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, currentSucursal]);
 
   useEffect(() => {
     fetchInversiones();
