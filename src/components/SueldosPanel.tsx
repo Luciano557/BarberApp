@@ -251,6 +251,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
       
+      if (currentSucursal) {
+        ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+      
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
