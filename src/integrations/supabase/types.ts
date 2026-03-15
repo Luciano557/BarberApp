@@ -194,6 +194,72 @@ export type Database = {
           },
         ]
       }
+      deudas: {
+        Row: {
+          acreedor: string
+          created_at: string
+          cuotas_pagadas: number
+          cuotas_totales: number | null
+          descripcion: string | null
+          estado: string
+          fecha_inicio: string
+          fecha_proximo_pago: string | null
+          id: string
+          inversion_id: string | null
+          monto_cuota: number | null
+          monto_pagado: number
+          monto_total: number
+          organization_id: string
+        }
+        Insert: {
+          acreedor: string
+          created_at?: string
+          cuotas_pagadas?: number
+          cuotas_totales?: number | null
+          descripcion?: string | null
+          estado?: string
+          fecha_inicio: string
+          fecha_proximo_pago?: string | null
+          id?: string
+          inversion_id?: string | null
+          monto_cuota?: number | null
+          monto_pagado?: number
+          monto_total: number
+          organization_id: string
+        }
+        Update: {
+          acreedor?: string
+          created_at?: string
+          cuotas_pagadas?: number
+          cuotas_totales?: number | null
+          descripcion?: string | null
+          estado?: string
+          fecha_inicio?: string
+          fecha_proximo_pago?: string | null
+          id?: string
+          inversion_id?: string | null
+          monto_cuota?: number | null
+          monto_pagado?: number
+          monto_total?: number
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deudas_inversion_id_fkey"
+            columns: ["inversion_id"]
+            isOneToOne: false
+            referencedRelation: "inversiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deudas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       Egresos: {
         Row: {
           Categoria: string | null
@@ -472,6 +538,53 @@ export type Database = {
             columns: ["servicio_id"]
             isOneToOne: false
             referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inversiones: {
+        Row: {
+          activa: boolean
+          categoria: string | null
+          created_at: string
+          descripcion: string | null
+          fecha_compra: string
+          id: string
+          meses_amortizacion: number
+          monto_total: number
+          nombre: string
+          organization_id: string
+        }
+        Insert: {
+          activa?: boolean
+          categoria?: string | null
+          created_at?: string
+          descripcion?: string | null
+          fecha_compra: string
+          id?: string
+          meses_amortizacion: number
+          monto_total: number
+          nombre: string
+          organization_id: string
+        }
+        Update: {
+          activa?: boolean
+          categoria?: string | null
+          created_at?: string
+          descripcion?: string | null
+          fecha_compra?: string
+          id?: string
+          meses_amortizacion?: number
+          monto_total?: number
+          nombre?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inversiones_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
