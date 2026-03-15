@@ -6,6 +6,7 @@ import { SueldosPanel } from '@/components/SueldosPanel';
 import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
+import { MiNegocioPanel } from '@/components/MiNegocioPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';

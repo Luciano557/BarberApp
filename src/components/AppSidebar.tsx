@@ -33,6 +33,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
     ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     { id: 'tareas', label: 'Tareas', icon: ClipboardList },
+    ...(isOwner ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
