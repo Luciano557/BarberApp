@@ -392,6 +392,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           monto: montoNum,
           concepto: concepto || null,
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
         });
 
       if (error) throw error;
