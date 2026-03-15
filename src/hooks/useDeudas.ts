@@ -31,11 +31,17 @@ export function useDeudas() {
     if (!organization?.id) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('deudas')
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setDeudas((data as Deuda[]) || []);
