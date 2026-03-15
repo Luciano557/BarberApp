@@ -12,8 +12,10 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 const Index = () => {
+  const isMobile = useIsMobile();
   const { canManagePayments, canManageConfig } = useAuth();
   
   // Set default tab based on permissions
