@@ -135,6 +135,7 @@ export function useTransactions() {
       metodo_pago: transaction.paymentMethod,
       total_final: transaction.total,
       organization_id: organization.id,
+      sucursal_id: currentSucursal?.id || null,
     };
 
     const { data: venta, error: ventaError } = await supabase
