@@ -65,6 +65,7 @@ function dbToDiscount(row: any): Discount {
 
 export function useSupabaseData() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [services, setServices] = useState<Service[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);

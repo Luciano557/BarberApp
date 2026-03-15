@@ -171,7 +171,7 @@ export function useCashClosing() {
     
     toast.success(`Cierre de caja guardado para ${normalizedBarberName}`);
     return true;
-  }, [organization]);
+  }, [organization, currentSucursal]);
   
   return { saveCashClosing };
 }
