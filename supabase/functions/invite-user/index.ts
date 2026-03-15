@@ -71,7 +71,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields");
     }
 
-    if (!["barber", "manager"].includes(role)) {
+    if (!["barber", "manager", "general_manager"].includes(role)) {
       throw new Error("Invalid role");
     }
 
