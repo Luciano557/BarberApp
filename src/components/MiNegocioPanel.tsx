@@ -24,8 +24,6 @@ interface MenuItem {
 
 export function MiNegocioPanel() {
   const [activeSection, setActiveSection] = useState<Section>('menu');
-  const { isOwner, isGeneralManager, canManageUsers } = useAuth();
-  const { allBarbers } = useSupabaseData();
 
   const items: MenuItem[] = [
     {
@@ -39,15 +37,8 @@ export function MiNegocioPanel() {
       id: 'sucursales',
       icon: <MapPin className="h-5 w-5" />,
       title: 'Sucursales',
-      description: 'Gestionar sucursales y asignar encargados',
+      description: 'Gestionar sucursales, usuarios y roles',
       visible: true,
-    },
-    {
-      id: 'usuarios',
-      icon: <Users className="h-5 w-5" />,
-      title: 'Usuarios y Roles',
-      description: 'Gestionar usuarios, roles y permisos',
-      visible: canManageUsers,
     },
     {
       id: 'plan',
