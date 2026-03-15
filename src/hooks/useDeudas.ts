@@ -75,6 +75,7 @@ export function useDeudas() {
     try {
       const { error } = await supabase.from('deudas').insert({
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
         acreedor: data.acreedor,
         monto_total: data.monto_total,
         cuotas_totales: data.cuotas_totales || null,

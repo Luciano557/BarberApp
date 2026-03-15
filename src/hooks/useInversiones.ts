@@ -71,6 +71,7 @@ export function useInversiones() {
         .from('inversiones')
         .insert({
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
           nombre: data.nombre,
           monto_total: data.monto_total,
           fecha_compra: data.fecha_compra.toISOString().split('T')[0],

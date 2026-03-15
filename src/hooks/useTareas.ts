@@ -84,6 +84,7 @@ export function useTareas() {
       const { creado_por_nombre, ...rest } = tarea;
       const { error } = await supabase.from('tareas').insert({
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
         creado_por_id: user.id,
         creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
         recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,

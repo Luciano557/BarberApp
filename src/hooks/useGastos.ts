@@ -74,6 +74,7 @@ export function useGastos() {
         Descripcion: data.descripcion || null,
         Fecha: data.fecha.toISOString(),
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
       });
 
       if (error) throw error;
