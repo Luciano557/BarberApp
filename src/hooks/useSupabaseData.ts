@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 // Transform database rows to app types
 function dbToLine(row: any): Line {
