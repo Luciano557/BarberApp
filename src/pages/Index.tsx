@@ -129,6 +129,12 @@ const Index = () => {
             <TareasPanel barbers={allBarbers} />
           )}
 
+          {activeTab === 'mi-negocio' && isOwner && (
+            <PinProtectedSection sectionName="Mi Negocio">
+              <MiNegocioPanel />
+            </PinProtectedSection>
+          )}
+
           {activeTab === 'config' && canManageConfig && (
             <PinProtectedSection sectionName="Configuración">
               <ConfigurationPanel
