@@ -28,6 +28,7 @@ interface CashClosingData {
 
 export function useCashClosing() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
 
   const saveCashClosing = useCallback(async (data: CashClosingData) => {
     if (!organization) {
