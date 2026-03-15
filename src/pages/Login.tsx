@@ -120,6 +120,28 @@ export default function Login() {
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Ingresando...' : 'Ingresar'}
                 </Button>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    onClick={async () => {
+                      if (!loginEmail) {
+                        toast.error('Ingresá tu email primero');
+                        return;
+                      }
+                      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+                        redirectTo: `${window.location.origin}/reset-password`,
+                      });
+                      if (error) {
+                        toast.error('Error al enviar el email', { description: error.message });
+                      } else {
+                        toast.success('Email enviado', { description: 'Revisá tu bandeja de entrada para resetear tu contraseña' });
+                      }
+                    }}
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                </div>
               </form>
             </TabsContent>
 
