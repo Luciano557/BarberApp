@@ -265,10 +265,8 @@ export function SucursalesConfig() {
     return orgUsers.filter(u => !assignedIds.has(u.id));
   };
 
-  // Filter barbers for this sucursal
-  const sucursalBarbers = assignSucursal
-    ? allBarbers.filter(b => b.sucursal_id === assignSucursal.id || !b.sucursal_id)
-    : allBarbers;
+  // All barbers available for linking
+  const availableBarbers = allBarbers;
 
   return (
     <div className="space-y-4">
