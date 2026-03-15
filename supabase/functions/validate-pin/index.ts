@@ -3,10 +3,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Same hash function as set-pin
 async function hashPin(pin: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(pin + (Deno.env.get("PIN_SALT") || "barbershop_salt_2024"));
@@ -43,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    const { pin } = await req.json();
+    const { pin, sucursal_id } = await req.json();
 
     if (!pin) {
       return new Response(
@@ -68,7 +67,6 @@ serve(async (req) => {
       );
     }
 
-    // Use service role to check barbero PINs in the organization
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -77,7 +75,7 @@ serve(async (req) => {
     // Find barbero with matching PIN in the same organization
     const { data: barbero, error: barberoError } = await serviceClient
       .from('barberos')
-      .select('id, nombre, apellido')
+      .select('id, nombre, apellido, sucursal_id')
       .eq('organization_id', profile.organization_id)
       .eq('pin_hash', pinHash)
       .eq('activo', true)
@@ -89,7 +87,56 @@ serve(async (req) => {
 
     if (barbero) {
       const barberoName = `${barbero.nombre} ${barbero.apellido}`;
-      
+
+      // Check if the barbero's linked user has a global role (owner/general_manager)
+      // by finding the profile linked to this barbero_id
+      const { data: linkedProfile } = await serviceClient
+        .from('profiles')
+        .select('id')
+        .eq('organization_id', profile.organization_id)
+        .eq('barbero_id', barbero.id)
+        .maybeSingle();
+
+      let hasGlobalRole = false;
+
+      if (linkedProfile) {
+        const { data: roles } = await serviceClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', linkedProfile.id);
+
+        if (roles) {
+          hasGlobalRole = roles.some(r => r.role === 'owner' || r.role === 'general_manager');
+        }
+      }
+
+      // Enforce sucursal restriction for non-global roles
+      if (!hasGlobalRole && sucursal_id) {
+        // Manager or barber: PIN only works in their assigned sucursal
+        if (barbero.sucursal_id !== sucursal_id) {
+          return new Response(
+            JSON.stringify({ 
+              valid: false, 
+              error: 'Este PIN no tiene acceso a esta sucursal',
+              barbero_sucursal_id: barbero.sucursal_id
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // If no sucursal_id sent (mode "Todas") and not global role, reject
+      if (!hasGlobalRole && !sucursal_id) {
+        return new Response(
+          JSON.stringify({ 
+            valid: false, 
+            error: 'Este PIN no tiene acceso global. Seleccioná una sucursal.',
+            barbero_sucursal_id: barbero.sucursal_id
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Log access
       await serviceClient.from('access_logs').insert({
         user_id: user.id,
@@ -103,7 +150,8 @@ serve(async (req) => {
         JSON.stringify({ 
           valid: true, 
           user_name: barberoName,
-          barbero_id: barbero.id
+          barbero_id: barbero.id,
+          barbero_sucursal_id: barbero.sucursal_id
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

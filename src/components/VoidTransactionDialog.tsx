@@ -45,7 +45,7 @@ export function VoidTransactionDialog({
         handleClose();
         toast.success(`Transacción anulada por ${data.user_name}`);
       } else {
-        setError('PIN incorrecto');
+        setError(data?.error || 'PIN incorrecto');
         setPin('');
       }
     } catch (err: any) {

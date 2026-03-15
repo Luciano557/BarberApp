@@ -110,14 +110,14 @@ export function usePinProtection() {
   }, [isUnlocked, lock]);
 
   // Validate PIN
-  const validatePin = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string }> => {
+  const validatePin = useCallback(async (pin: string, sucursalId?: string | null): Promise<{ success: boolean; userName?: string; error?: string }> => {
     if (!user) {
       return { success: false };
     }
 
     try {
       const { data, error } = await supabase.functions.invoke('validate-pin', {
-        body: { pin }
+        body: { pin, sucursal_id: sucursalId ?? null }
       });
 
       if (error) throw error;

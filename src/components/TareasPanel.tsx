@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 import { PinGateDialog } from './PinGateDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
 interface TareasPanelProps {
