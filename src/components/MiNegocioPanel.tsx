@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { ArrowLeft, Building2, MapPin, Users, Crown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Crown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrganizationSettings } from './OrganizationSettings';
-import { UserManagement } from './UserManagement';
 import { SucursalesConfig } from './config/SucursalesConfig';
-import { useSupabaseData } from '@/hooks/useSupabaseData';
 
-type Section = 'menu' | 'info' | 'sucursales' | 'usuarios' | 'plan';
+type Section = 'menu' | 'info' | 'sucursales' | 'plan';
 
 const sectionTitles: Record<Section, string> = {
   menu: 'Mi Negocio',
   info: 'Información',
   sucursales: 'Sucursales',
-  usuarios: 'Usuarios',
   plan: 'Plan',
 };
 
@@ -27,8 +24,6 @@ interface MenuItem {
 
 export function MiNegocioPanel() {
   const [activeSection, setActiveSection] = useState<Section>('menu');
-  const { isOwner, isGeneralManager, canManageUsers } = useAuth();
-  const { allBarbers } = useSupabaseData();
 
   const items: MenuItem[] = [
     {
@@ -42,15 +37,8 @@ export function MiNegocioPanel() {
       id: 'sucursales',
       icon: <MapPin className="h-5 w-5" />,
       title: 'Sucursales',
-      description: 'Gestionar sucursales y asignar encargados',
+      description: 'Gestionar sucursales, usuarios y roles',
       visible: true,
-    },
-    {
-      id: 'usuarios',
-      icon: <Users className="h-5 w-5" />,
-      title: 'Usuarios y Roles',
-      description: 'Gestionar usuarios, roles y permisos',
-      visible: canManageUsers,
     },
     {
       id: 'plan',
@@ -100,7 +88,6 @@ export function MiNegocioPanel() {
 
       {activeSection === 'info' && <OrganizationSettings />}
       {activeSection === 'sucursales' && <SucursalesConfig />}
-      {activeSection === 'usuarios' && <UserManagement barbers={allBarbers} />}
       {activeSection === 'plan' && <OrganizationSettings />}
     </div>
   );
