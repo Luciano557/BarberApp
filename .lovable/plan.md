@@ -1,30 +1,58 @@
 
-# Multi-Organización y Sucursales — Estado
 
-## ✅ Fase 1: Base de datos (COMPLETADA)
-- Tabla `sucursales` y `user_sucursales` con RLS
-- `sucursal_id` en todas las tablas operativas
-- `handle_new_user` auto-crea sucursal "Casa Central"
-- Datos existentes backfilleados
+# Restringir validación de PIN por sucursal
 
-## ✅ Fase 2: Frontend — Contexto + Selector (COMPLETADA)
-- `SucursalContext` con modo "Todas" para dueños
-- `SucursalSelector` en sidebar
-- Hooks actualizados con filtro por sucursal
+## Problema
 
-## ✅ Fase 3: "Mi Negocio" como sección independiente (COMPLETADA)
-- Nuevo tab "Mi Negocio" en sidebar (solo dueño)
-- Sub-secciones: Información, Sucursales (CRUD + asignación de usuarios), Usuarios, Plan
-- Configuración simplificada: Staff, Cobrar, PIN, Tareas
+La Edge Function `validate-pin` busca el PIN en TODOS los barberos de la organización, sin importar la sucursal. Si Sebastián (dueño) está viendo datos de SDAD y usa el PIN de Tomás (encargado de Casa Central), el PIN se valida exitosamente y desbloquea acceso a datos de SDAD, donde Tomás no tiene rol.
 
-## ✅ Fase 4: Reporting por sucursal (COMPLETADA)
-- EstadisticasPanel filtrado por sucursal
-- DailySummary filtrado por sucursal
-- SueldosPanel filtrado por sucursal (ingresos, pagos, inserts)
+## Reglas de negocio
 
-## ✅ Fase 5: Aislamiento de datos por sucursal para Encargados de Local (COMPLETADA)
-- Barberos filtrados por `sucursal_id` en `useSupabaseData`
-- Re-fetch automático al cambiar de sucursal
-- `SucursalSelector` oculto para managers (encargados de local)
-- `SucursalContext` bloquea cambio de sucursal para no-owner/GM
-- RLS de `barberos` actualizado: managers solo ven barberos de sus sucursales asignadas
+- **Dueño / Enc. General**: Su PIN funciona en cualquier sucursal (acceso global).
+- **Encargado de Local**: Su PIN solo funciona si la sucursal actual coincide con la sucursal del barbero vinculado.
+- **Barbero**: Su PIN solo funciona en su sucursal asignada.
+
+## Cambios
+
+### 1. Edge Function `validate-pin` — Agregar parámetro `sucursal_id`
+
+Recibir `sucursal_id` en el body junto con `pin`. Después de encontrar el barbero por PIN hash:
+
+1. Buscar qué roles tiene el usuario vinculado a ese barbero (`profiles.barbero_id` → `user_roles`).
+2. Si el barbero tiene rol `owner` o `general_manager` → validar sin restricción de sucursal.
+3. Si tiene rol `manager` o `barber` → verificar que `barbero.sucursal_id === sucursal_id` enviado. Si no coincide → rechazar.
+4. Si no hay `sucursal_id` enviado (modo "Todas") → solo permitir si el barbero tiene rol global.
+
+### 2. Frontend — Enviar `sucursal_id` al validar PIN
+
+Actualizar todos los puntos que llaman a `validate-pin`:
+
+- **`usePinProtection.ts`** → `validatePin(pin)` debe enviar `currentSucursal?.id` en el body.
+- **`VoidTransactionDialog.tsx`** → enviar `currentSucursal?.id`.
+- **`TareasPanel.tsx`** → enviar `currentSucursal?.id` (2 llamadas: crear petición y acciones).
+
+En cada caso, obtener `currentSucursal` del contexto `useSucursal()`.
+
+### 3. Respuesta enriquecida de `validate-pin`
+
+Además de `valid`, `user_name`, `barbero_id`, incluir `barbero_sucursal_id` en la respuesta para que el frontend pueda mostrar mensajes descriptivos si falla (ej: "Este PIN no tiene acceso a esta sucursal").
+
+## Archivos a modificar
+
+- `supabase/functions/validate-pin/index.ts` — agregar lógica de sucursal
+- `src/hooks/usePinProtection.ts` — pasar `sucursal_id` al invocar
+- `src/components/VoidTransactionDialog.tsx` — pasar `sucursal_id`
+- `src/components/TareasPanel.tsx` — pasar `sucursal_id` (2 llamadas)
+
+## Flujo resultante
+
+```text
+PIN ingresado + sucursal_id actual
+  → validate-pin busca barbero por hash
+  → encuentra barbero → busca perfil/usuario vinculado
+  → revisa roles del usuario vinculado:
+     owner/GM → ✅ válido
+     manager/barber → barbero.sucursal_id == sucursal_id? → ✅/❌
+  → Si no match → "PIN no autorizado en esta sucursal"
+```
+
