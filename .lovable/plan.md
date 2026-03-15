@@ -1,17 +1,34 @@
 
-# Fix: Cierre de caja normal solo para el dia actual
 
-## Problema
-Cuando navegas a una fecha pasada en "Cierre de Caja" y presionas "Cerrar Caja", el sistema guarda el cierre con la fecha pasada seleccionada (campo `created_at`). Esto provoca que un cierre hecho el miercoles 18/2 quede registrado como martes 17/2.
+# Resumen de cierres por rango de fechas + Fix build error
 
-## Solucion
-El boton "Cerrar Caja" solo debe estar disponible cuando estas viendo el dia de hoy. Para cerrar dias pasados, ya existe la herramienta de "Cierre Diferido" (Regularizar dia / BackfillWizard).
+## Build error
+En `src/hooks/usePinProtection.ts` línea 23, `NodeJS.Timeout` no es reconocido en el entorno del browser/Vite. Se reemplaza por `ReturnType<typeof setTimeout>`.
 
-## Cambios tecnicos
+## Feature: Resumen multi-día
 
-### `src/components/DailySummary.tsx`
-1. **Ocultar boton "Cerrar Caja" en fechas pasadas**: Cuando `isPastDate` es `true`, no mostrar el boton "Cerrar Caja" para ningun barbero. En su lugar, mostrar un mensaje indicando que para cerrar dias anteriores se debe usar la herramienta de cierre diferido.
-2. El boton "Cerrar Caja" solo aparecera cuando `isToday(validDate)` sea verdadero.
-3. La seccion de backfill (Regularizar dia) seguira apareciendo normalmente para fechas pasadas con cierres faltantes, que es la herramienta correcta para esos casos.
+Agregar un botón "Resumen por rango" en la sección de Cierre de Caja que abra un dialog donde el usuario selecciona un rango de fechas (desde/hasta). Al confirmar, se consultan los cierres de `ingresos` en ese rango y se muestra un resumen agrupado por barbero con:
+- Total efectivo
+- Total Mercado Pago
+- Total facturado
+- Comisión total
+- Cantidad de servicios
 
-No se requieren cambios en la base de datos ni en otros archivos.
+### Cambios técnicos
+
+#### 1. `src/hooks/usePinProtection.ts`
+- Línea 23: cambiar `NodeJS.Timeout` por `ReturnType<typeof setTimeout>`
+
+#### 2. `src/components/MultiDayClosingSummary.tsx` (nuevo)
+Componente con:
+- Dialog activado por botón "Resumen por rango"
+- Dos date pickers (Desde / Hasta)
+- Consulta a `ingresos` filtrando por `created_at` en el rango, `estado != 'eliminado'`
+- Agrupa resultados por `barbero_id` + `barbero`
+- Muestra cards por barbero con totales de efectivo, MP, facturado, comisión y servicios
+- Card final con totales generales
+- Protegido por PIN (usa el mismo patrón existente)
+
+#### 3. `src/components/DailySummary.tsx`
+- Importar y agregar el botón `MultiDayClosingSummary` en la barra de acciones junto a "Historial"
+
