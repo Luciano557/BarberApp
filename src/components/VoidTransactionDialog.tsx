@@ -21,6 +21,7 @@ export function VoidTransactionDialog({
   transaction,
   onVoidComplete
 }: VoidTransactionDialogProps) {
+  const { currentSucursal } = useSucursal();
   const [pin, setPin] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState('');
