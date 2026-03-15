@@ -253,6 +253,7 @@ export function useSupabaseData() {
           comision: barber.commission,
           activo: barber.active,
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
         })
         .select()
         .single();
