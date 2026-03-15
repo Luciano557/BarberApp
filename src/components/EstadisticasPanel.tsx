@@ -94,11 +94,17 @@ export function EstadisticasPanel() {
       if (ingresosError) throw ingresosError;
 
       // Fetch barberos activos
-      const { data: barberos, error: barberosError } = await supabase
+      let barberosQuery = supabase
         .from('barberos')
         .select('id')
         .eq('organization_id', organization.id)
         .eq('activo', true);
+
+      if (currentSucursal) {
+        barberosQuery = barberosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data: barberos, error: barberosError } = await barberosQuery;
 
       if (barberosError) throw barberosError;
 
