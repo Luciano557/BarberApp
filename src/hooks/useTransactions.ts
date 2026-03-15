@@ -3,6 +3,7 @@ import { Transaction } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
 
