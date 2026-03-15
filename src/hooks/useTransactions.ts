@@ -112,7 +112,7 @@ export function useTransactions() {
 
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
-  }, [selectedDate, loadTransactionsByDate]);
+  }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     if (!organization) {
