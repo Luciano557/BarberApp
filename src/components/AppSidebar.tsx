@@ -98,6 +98,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         )}
       </div>
 
+      {/* Sucursal Selector */}
+      <SucursalSelector collapsed={collapsed} />
+
       {/* User Info */}
       {!collapsed && profile && (
         <div className="px-3 py-3 border-b border-sidebar-border">
