@@ -132,6 +132,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleIcon = (role: AppRole) => {
     switch (role) {
       case 'owner': return <Shield className="w-3 h-3" />;
+      case 'general_manager': return <Shield className="w-3 h-3" />;
       case 'manager': return <UserCheck className="w-3 h-3" />;
       case 'barber': return <Scissors className="w-3 h-3" />;
     }
