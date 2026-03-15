@@ -42,12 +42,19 @@ export function useTransactions() {
     const startStr = getStartOfDayLocal(date);
     const endStr = getEndOfDayLocal(date);
 
-    const { data: ventas, error } = await supabase
+    let query = supabase
       .from('venta')
       .select('*')
       .gte('fecha_hora', startStr)
       .lte('fecha_hora', endStr)
       .order('fecha_hora', { ascending: false });
+
+    // Filter by sucursal if not in "all" mode
+    if (currentSucursal) {
+      query = query.eq('sucursal_id', currentSucursal.id);
+    }
+
+    const { data: ventas, error } = await query;
 
     if (error) {
       console.error('Error loading ventas:', error);
