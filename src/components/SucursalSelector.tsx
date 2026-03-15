@@ -13,7 +13,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
   const { isOwner, isGeneralManager } = useAuth();
 
   // Don't show if only 1 sucursal and not owner
-  if (sucursales.length <= 1 && !isOwner) return null;
+  if (sucursales.length <= 1 && !isOwner && !isGeneralManager) return null;
 
   // Collapsed mode: just show icon
   if (collapsed) {
