@@ -18,6 +18,7 @@ interface AuthContextType {
   roles: AppRole[];
   isLoading: boolean;
   isOwner: boolean;
+  isGeneralManager: boolean;
   isManager: boolean;
   isBarber: boolean;
   canManagePayments: boolean;
