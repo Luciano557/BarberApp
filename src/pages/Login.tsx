@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Scissors, Store, Globe } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { COUNTRIES } from '@/lib/dateUtils';
 
 export default function Login() {
