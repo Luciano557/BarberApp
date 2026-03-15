@@ -83,10 +83,16 @@ export function useSupabaseData() {
       const fetchedLines = linesRes.data.map(dbToLine);
       setLines(fetchedLines);
 
+      // Build barberos query — filter by sucursal when one is selected
+      let barbersQuery = supabase.from('barberos').select('*').order('nombre');
+      if (currentSucursal?.id) {
+        barbersQuery = barbersQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
       const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
-        supabase.from('barberos').select('*').order('nombre'),
+        barbersQuery,
         supabase.from('descuentos').select('*').order('valor'),
       ]);
 
@@ -111,7 +117,7 @@ export function useSupabaseData() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentSucursal?.id]);
 
   useEffect(() => {
     fetchData();

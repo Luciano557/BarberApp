@@ -12,6 +12,11 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
   const { sucursales, currentSucursal, setCurrentSucursal, isAllMode } = useSucursal();
   const { isOwner, isGeneralManager } = useAuth();
 
+  const { isManager } = useAuth();
+
+  // Managers (encargados de local) can't switch branches
+  if (isManager && !isOwner && !isGeneralManager) return null;
+
   // Don't show if only 1 sucursal and not owner
   if (sucursales.length <= 1 && !isOwner && !isGeneralManager) return null;
 
