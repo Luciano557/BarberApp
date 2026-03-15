@@ -53,16 +53,15 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Unauthorized");
     }
 
-    // Check if requesting user is an owner
-    const { data: ownerRole } = await supabaseAdmin
+    // Check if requesting user is an owner or general_manager
+    const { data: adminRole } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUser.id)
-      .eq("role", "owner")
-      .single();
+      .in("role", ["owner", "general_manager"]);
 
-    if (!ownerRole) {
-      throw new Error("Only owners can invite users");
+    if (!adminRole || adminRole.length === 0) {
+      throw new Error("Only owners and general managers can invite users");
     }
 
     const { email, fullName, role, barberoId, organizationId, organizationName }: InviteRequest = await req.json();
