@@ -53,18 +53,25 @@ export interface TareaInsert {
 
 export function useTareas() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: tareas = [], isLoading } = useQuery({
-    queryKey: ['tareas', organization?.id],
+    queryKey: ['tareas', organization?.id, currentSucursal?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('tareas')
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Tarea[];
     },
