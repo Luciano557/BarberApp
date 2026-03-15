@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { TrendingUp, DollarSign, Users, Scissors, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
@@ -49,6 +50,7 @@ const chartConfig = {
 
 export function EstadisticasPanel() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalFacturacion: 0,
@@ -63,7 +65,7 @@ export function EstadisticasPanel() {
     if (organization?.id) {
       fetchData();
     }
-  }, [organization?.id, periodoMeses]);
+  }, [organization?.id, periodoMeses, currentSucursal]);
 
   const fetchData = async () => {
     if (!organization?.id) return;
@@ -75,7 +77,7 @@ export function EstadisticasPanel() {
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
 
       // Fetch ingresos (cierres de caja) for the period - usando created_at que tiene la fecha real
-      const { data: ingresos, error: ingresosError } = await supabase
+      let ingresosQuery = supabase
         .from('ingresos')
         .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
         .eq('organization_id', organization.id)
@@ -83,14 +85,26 @@ export function EstadisticasPanel() {
         .lte('created_at', endDate.toISOString())
         .neq('estado', 'eliminado');
 
+      if (currentSucursal) {
+        ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data: ingresos, error: ingresosError } = await ingresosQuery;
+
       if (ingresosError) throw ingresosError;
 
       // Fetch barberos activos
-      const { data: barberos, error: barberosError } = await supabase
+      let barberosQuery = supabase
         .from('barberos')
         .select('id')
         .eq('organization_id', organization.id)
         .eq('activo', true);
+
+      if (currentSucursal) {
+        barberosQuery = barberosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data: barberos, error: barberosError } = await barberosQuery;
 
       if (barberosError) throw barberosError;
 

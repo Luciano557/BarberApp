@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
@@ -76,6 +77,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const canVoidClosure = isOwner || isManager;
   const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const validDate = selectedDate instanceof Date && !isNaN(selectedDate.getTime()) 
     ? selectedDate 
     : new Date();
@@ -100,12 +102,18 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     const startStr = getStartOfDayLocal(validDate);
     const endStr = getEndOfDayLocal(validDate);
     
-    const { data } = await supabase
+    let query = supabase
       .from('ingresos')
       .select('id, barbero, barbero_id')
       .gte('created_at', startStr)
       .lte('created_at', endStr)
       .neq('estado', 'eliminado');
+
+    if (currentSucursal) {
+      query = query.eq('sucursal_id', currentSucursal.id);
+    }
+
+    const { data } = await query;
 
     if (data) {
       const closedIds = new Set(data.map(d => d.barbero_id).filter(Boolean));

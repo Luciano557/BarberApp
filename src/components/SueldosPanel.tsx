@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { format, startOfMonth, subDays } from 'date-fns';
@@ -185,6 +186,7 @@ function BarberDetailRow({
 
 export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -205,19 +207,23 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     setIsLoading(true);
     try {
       // ALWAYS fetch ALL data for saldo calculation (historical)
-      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await supabase
+      let ingHistQuery = supabase
         .from('ingresos')
         .select('barbero_id, sueldo')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
+      if (currentSucursal) ingHistQuery = ingHistQuery.eq('sucursal_id', currentSucursal.id);
 
+      const { data: ingresosHistoricos, error: ingresosHistoricosError } = await ingHistQuery;
       if (ingresosHistoricosError) throw ingresosHistoricosError;
 
-      const { data: pagosHistoricos, error: pagosHistoricosError } = await supabase
+      let pagHistQuery = supabase
         .from('pagos_sueldos')
         .select('barbero_id, monto')
         .eq('organization_id', organization.id);
+      if (currentSucursal) pagHistQuery = pagHistQuery.eq('sucursal_id', currentSucursal.id);
 
+      const { data: pagosHistoricos, error: pagosHistoricosError } = await pagHistQuery;
       if (pagosHistoricosError) throw pagosHistoricosError;
 
       // Calculate HISTORICAL totals for saldo (real debt - never changes with filter)
@@ -245,6 +251,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
       
+      if (currentSucursal) {
+        ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+      
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
@@ -259,6 +269,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
+      
+      if (currentSucursal) {
+        pagosQuery = pagosQuery.eq('sucursal_id', currentSucursal.id);
+      }
       
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
@@ -378,6 +392,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           monto: montoNum,
           concepto: concepto || null,
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
         });
 
       if (error) throw error;

@@ -6,6 +6,7 @@ import { SueldosPanel } from '@/components/SueldosPanel';
 import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
+import { MiNegocioPanel } from '@/components/MiNegocioPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner } = useAuth();
   
   // Set default tab based on permissions
   const getDefaultTab = () => {
@@ -126,6 +127,12 @@ const Index = () => {
 
           {activeTab === 'tareas' && (
             <TareasPanel barbers={allBarbers} />
+          )}
+
+          {activeTab === 'mi-negocio' && isOwner && (
+            <PinProtectedSection sectionName="Mi Negocio">
+              <MiNegocioPanel />
+            </PinProtectedSection>
           )}
 
           {activeTab === 'config' && canManageConfig && (

@@ -3,12 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { ConfigMenu } from './config/ConfigMenu';
-import { NegocioConfig } from './config/NegocioConfig';
+import { StaffConfig } from './config/StaffConfig';
 import { CobrarConfig } from './config/CobrarConfig';
 import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
 
-type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin' | 'tareas';
+type ConfigSection = 'menu' | 'cobrar' | 'pin' | 'tareas' | 'staff';
 
 interface ConfigurationPanelProps {
   services: Service[];
@@ -31,10 +31,10 @@ interface ConfigurationPanelProps {
 
 const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
-  negocio: 'Negocio',
   cobrar: 'Cobrar',
   pin: 'PIN de Seguridad',
   tareas: 'Tareas y Peticiones',
+  staff: 'Staff',
 };
 
 export function ConfigurationPanel({
@@ -58,7 +58,7 @@ export function ConfigurationPanel({
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{sectionTitles[activeSection]}</h1>
           {activeSection === 'menu' && (
-            <p className="text-muted-foreground text-sm mt-1">Administrá tu negocio y configuraciones</p>
+            <p className="text-muted-foreground text-sm mt-1">Configuración de servicios y operaciones</p>
           )}
         </div>
       </div>
@@ -67,11 +67,11 @@ export function ConfigurationPanel({
         <ConfigMenu onSelect={setActiveSection} />
       )}
 
-      {activeSection === 'negocio' && (
-        <NegocioConfig
+      {activeSection === 'staff' && (
+        <StaffConfig
           barbers={barbers}
-          onAddBarber={onAddBarber}
-          onUpdateBarber={onUpdateBarber}
+          onAdd={onAddBarber}
+          onUpdate={onUpdateBarber}
         />
       )}
 
