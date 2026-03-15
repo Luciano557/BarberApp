@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet, Lock, TrendingUp, Receipt, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
+
+  useEffect(() => {
+    if (isMobile) setCollapsed(true);
+  }, [isMobile]);
 
   // Filter nav items based on permissions
   const navItems = [

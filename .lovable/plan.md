@@ -1,26 +1,17 @@
 
-
-# Fix: Sidebar arranca expandido en móvil al refrescar
+# Fix: Cierre de caja normal solo para el dia actual
 
 ## Problema
-`useState(isMobile)` captura el valor inicial de `useIsMobile()` que es `undefined` (convertido a `false`) porque el efecto aún no corrió. Además, el viewport de 768px no califica como móvil (`< 768`).
+Cuando navegas a una fecha pasada en "Cierre de Caja" y presionas "Cerrar Caja", el sistema guarda el cierre con la fecha pasada seleccionada (campo `created_at`). Esto provoca que un cierre hecho el miercoles 18/2 quede registrado como martes 17/2.
 
-## Solución
+## Solucion
+El boton "Cerrar Caja" solo debe estar disponible cuando estas viendo el dia de hoy. Para cerrar dias pasados, ya existe la herramienta de "Cierre Diferido" (Regularizar dia / BackfillWizard).
 
-### 1. `src/hooks/use-mobile.tsx`
-- Inicializar con `window.innerWidth` directamente en el estado (no `undefined`) para que el primer render ya tenga el valor correcto
-- Cambiar breakpoint check a `<= 768` para incluir 768px
+## Cambios tecnicos
 
-### 2. `src/components/AppSidebar.tsx`
-- Sincronizar `collapsed` con `isMobile` usando un `useEffect` para que cuando el hook se actualice, el sidebar se colapse correctamente en móvil
+### `src/components/DailySummary.tsx`
+1. **Ocultar boton "Cerrar Caja" en fechas pasadas**: Cuando `isPastDate` es `true`, no mostrar el boton "Cerrar Caja" para ningun barbero. En su lugar, mostrar un mensaje indicando que para cerrar dias anteriores se debe usar la herramienta de cierre diferido.
+2. El boton "Cerrar Caja" solo aparecera cuando `isToday(validDate)` sea verdadero.
+3. La seccion de backfill (Regularizar dia) seguira apareciendo normalmente para fechas pasadas con cierres faltantes, que es la herramienta correcta para esos casos.
 
-```typescript
-// En useIsMobile:
-const [isMobile, setIsMobile] = useState(window.innerWidth <= MOBILE_BREAKPOINT);
-
-// En AppSidebar, agregar efecto de sync:
-useEffect(() => {
-  if (isMobile) setCollapsed(true);
-}, [isMobile]);
-```
-
+No se requieren cambios en la base de datos ni en otros archivos.
