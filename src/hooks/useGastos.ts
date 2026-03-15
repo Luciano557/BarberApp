@@ -50,7 +50,7 @@ export function useGastos() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id, selectedMonth]);
+  }, [organization?.id, selectedMonth, currentSucursal]);
 
   useEffect(() => {
     fetchGastos();
