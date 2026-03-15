@@ -102,12 +102,18 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     const startStr = getStartOfDayLocal(validDate);
     const endStr = getEndOfDayLocal(validDate);
     
-    const { data } = await supabase
+    let query = supabase
       .from('ingresos')
       .select('id, barbero, barbero_id')
       .gte('created_at', startStr)
       .lte('created_at', endStr)
       .neq('estado', 'eliminado');
+
+    if (currentSucursal) {
+      query = query.eq('sucursal_id', currentSucursal.id);
+    }
+
+    const { data } = await query;
 
     if (data) {
       const closedIds = new Set(data.map(d => d.barbero_id).filter(Boolean));
