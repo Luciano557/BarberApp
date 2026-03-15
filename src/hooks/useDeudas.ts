@@ -23,6 +23,7 @@ export interface Deuda {
 
 export function useDeudas() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
