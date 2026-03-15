@@ -14,6 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { format, startOfMonth, subDays } from 'date-fns';
