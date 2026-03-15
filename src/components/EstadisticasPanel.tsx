@@ -77,13 +77,19 @@ export function EstadisticasPanel() {
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
 
       // Fetch ingresos (cierres de caja) for the period - usando created_at que tiene la fecha real
-      const { data: ingresos, error: ingresosError } = await supabase
+      let ingresosQuery = supabase
         .from('ingresos')
         .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
         .eq('organization_id', organization.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .neq('estado', 'eliminado');
+
+      if (currentSucursal) {
+        ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data: ingresos, error: ingresosError } = await ingresosQuery;
 
       if (ingresosError) throw ingresosError;
 
