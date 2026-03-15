@@ -88,7 +88,6 @@ export function MiNegocioPanel() {
 
       {activeSection === 'info' && <OrganizationSettings />}
       {activeSection === 'sucursales' && <SucursalesConfig />}
-      {activeSection === 'usuarios' && <UserManagement barbers={allBarbers} />}
       {activeSection === 'plan' && <OrganizationSettings />}
     </div>
   );

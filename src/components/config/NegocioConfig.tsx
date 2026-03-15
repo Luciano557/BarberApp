@@ -1,7 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OrganizationSettings } from '@/components/OrganizationSettings';
 import { StaffConfig } from './StaffConfig';
-import { UserManagement } from '@/components/UserManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { Barber } from '@/types/barbershop';
 
@@ -12,7 +11,7 @@ interface NegocioConfigProps {
 }
 
 export function NegocioConfig({ barbers, onAddBarber, onUpdateBarber }: NegocioConfigProps) {
-  const { isOwner, canManageUsers } = useAuth();
+  const { isOwner } = useAuth();
 
   return (
     <Tabs defaultValue={isOwner ? "business" : "staff"} className="w-full">
@@ -25,11 +24,6 @@ export function NegocioConfig({ barbers, onAddBarber, onUpdateBarber }: NegocioC
         <TabsTrigger value="staff" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
           Staff
         </TabsTrigger>
-        {canManageUsers && (
-          <TabsTrigger value="users" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
-            Usuarios
-          </TabsTrigger>
-        )}
       </TabsList>
 
       {isOwner && (
@@ -45,12 +39,6 @@ export function NegocioConfig({ barbers, onAddBarber, onUpdateBarber }: NegocioC
           onUpdate={onUpdateBarber}
         />
       </TabsContent>
-
-      {canManageUsers && (
-        <TabsContent value="users" className="mt-6">
-          <UserManagement barbers={barbers} />
-        </TabsContent>
-      )}
     </Tabs>
   );
 }
