@@ -20,6 +20,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
+  useEffect(() => {
+    if (isMobile) setCollapsed(true);
+  }, [isMobile]);
+
   // Filter nav items based on permissions
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
