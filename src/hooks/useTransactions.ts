@@ -108,7 +108,7 @@ export function useTransactions() {
 
     setTransactions(txs);
     setIsLoading(false);
-  }, []);
+  }, [currentSucursal]);
 
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
