@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 // Transform database rows to app types
 function dbToLine(row: any): Line {
@@ -64,6 +65,7 @@ function dbToDiscount(row: any): Discount {
 
 export function useSupabaseData() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [services, setServices] = useState<Service[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -251,6 +253,7 @@ export function useSupabaseData() {
           comision: barber.commission,
           activo: barber.active,
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
         })
         .select()
         .single();

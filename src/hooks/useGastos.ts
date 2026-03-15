@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
@@ -15,6 +16,7 @@ export interface Gasto {
 
 export function useGastos() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
@@ -26,13 +28,19 @@ export function useGastos() {
       const start = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
       const end = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('Egresos')
         .select('*')
         .eq('organization_id', organization.id)
         .gte('Fecha', `${start}T00:00:00`)
         .lte('Fecha', `${end}T23:59:59`)
         .order('Fecha', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setGastos((data as Gasto[]) || []);
@@ -42,7 +50,7 @@ export function useGastos() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id, selectedMonth]);
+  }, [organization?.id, selectedMonth, currentSucursal]);
 
   useEffect(() => {
     fetchGastos();
@@ -66,6 +74,7 @@ export function useGastos() {
         Descripcion: data.descripcion || null,
         Fecha: data.fecha.toISOString(),
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
       });
 
       if (error) throw error;

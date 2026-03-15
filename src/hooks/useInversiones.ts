@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
 export interface Inversion {
@@ -18,6 +19,7 @@ export interface Inversion {
 
 export function useInversiones() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [inversiones, setInversiones] = useState<Inversion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,11 +27,17 @@ export function useInversiones() {
     if (!organization?.id) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inversiones')
         .select('*')
         .eq('organization_id', organization.id)
         .order('fecha_compra', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setInversiones((data as Inversion[]) || []);
@@ -39,7 +47,7 @@ export function useInversiones() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, currentSucursal]);
 
   useEffect(() => {
     fetchInversiones();
@@ -63,6 +71,7 @@ export function useInversiones() {
         .from('inversiones')
         .insert({
           organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
           nombre: data.nombre,
           monto_total: data.monto_total,
           fecha_compra: data.fecha_compra.toISOString().split('T')[0],

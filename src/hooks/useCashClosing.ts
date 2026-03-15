@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
 interface BarberSummary {
@@ -27,6 +28,7 @@ interface CashClosingData {
 
 export function useCashClosing() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
 
   const saveCashClosing = useCallback(async (data: CashClosingData) => {
     if (!organization) {
@@ -154,6 +156,7 @@ export function useCashClosing() {
       created_at: getEndOfDayLocal(date),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
+      sucursal_id: currentSucursal?.id || null,
     };
     
     const { error } = await supabase
@@ -168,7 +171,7 @@ export function useCashClosing() {
     
     toast.success(`Cierre de caja guardado para ${normalizedBarberName}`);
     return true;
-  }, [organization]);
+  }, [organization, currentSucursal]);
   
   return { saveCashClosing };
 }

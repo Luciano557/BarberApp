@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
 export interface Deuda {
@@ -22,6 +23,7 @@ export interface Deuda {
 
 export function useDeudas() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -29,11 +31,17 @@ export function useDeudas() {
     if (!organization?.id) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('deudas')
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setDeudas((data as Deuda[]) || []);
@@ -43,7 +51,7 @@ export function useDeudas() {
     } finally {
       setIsLoading(false);
     }
-  }, [organization?.id]);
+  }, [organization?.id, currentSucursal]);
 
   useEffect(() => {
     fetchDeudas();
@@ -67,6 +75,7 @@ export function useDeudas() {
     try {
       const { error } = await supabase.from('deudas').insert({
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
         acreedor: data.acreedor,
         monto_total: data.monto_total,
         cuotas_totales: data.cuotas_totales || null,

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -52,18 +53,25 @@ export interface TareaInsert {
 
 export function useTareas() {
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: tareas = [], isLoading } = useQuery({
-    queryKey: ['tareas', organization?.id],
+    queryKey: ['tareas', organization?.id, currentSucursal?.id],
     queryFn: async () => {
       if (!organization?.id) return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from('tareas')
         .select('*')
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as Tarea[];
     },
@@ -76,6 +84,7 @@ export function useTareas() {
       const { creado_por_nombre, ...rest } = tarea;
       const { error } = await supabase.from('tareas').insert({
         organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
         creado_por_id: user.id,
         creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
         recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,

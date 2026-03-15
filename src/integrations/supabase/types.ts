@@ -105,6 +105,7 @@ export type Database = {
           nombre: string
           organization_id: string | null
           pin_hash: string | null
+          sucursal_id: string | null
           telefono: string | null
           updated_at: string
         }
@@ -118,6 +119,7 @@ export type Database = {
           nombre: string
           organization_id?: string | null
           pin_hash?: string | null
+          sucursal_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -131,6 +133,7 @@ export type Database = {
           nombre?: string
           organization_id?: string | null
           pin_hash?: string | null
+          sucursal_id?: string | null
           telefono?: string | null
           updated_at?: string
         }
@@ -140,6 +143,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -210,6 +220,7 @@ export type Database = {
           monto_pagado: number
           monto_total: number
           organization_id: string
+          sucursal_id: string | null
         }
         Insert: {
           acreedor: string
@@ -226,6 +237,7 @@ export type Database = {
           monto_pagado?: number
           monto_total: number
           organization_id: string
+          sucursal_id?: string | null
         }
         Update: {
           acreedor?: string
@@ -242,6 +254,7 @@ export type Database = {
           monto_pagado?: number
           monto_total?: number
           organization_id?: string
+          sucursal_id?: string | null
         }
         Relationships: [
           {
@@ -258,6 +271,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deudas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
         ]
       }
       Egresos: {
@@ -268,6 +288,7 @@ export type Database = {
           id: number
           Monto: number | null
           organization_id: string | null
+          sucursal_id: string | null
         }
         Insert: {
           Categoria?: string | null
@@ -276,6 +297,7 @@ export type Database = {
           id?: number
           Monto?: number | null
           organization_id?: string | null
+          sucursal_id?: string | null
         }
         Update: {
           Categoria?: string | null
@@ -284,6 +306,7 @@ export type Database = {
           id?: number
           Monto?: number | null
           organization_id?: string | null
+          sucursal_id?: string | null
         }
         Relationships: [
           {
@@ -291,6 +314,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -361,6 +391,7 @@ export type Database = {
           servicios_con_descuento: number | null
           servicios_por_linea: Json | null
           servicios_sin_descuento: number | null
+          sucursal_id: string | null
           sueldo: number | null
           total_facturado: number | null
           total_sin_descuento: number | null
@@ -393,6 +424,7 @@ export type Database = {
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
+          sucursal_id?: string | null
           sueldo?: number | null
           total_facturado?: number | null
           total_sin_descuento?: number | null
@@ -425,6 +457,7 @@ export type Database = {
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
+          sucursal_id?: string | null
           sueldo?: number | null
           total_facturado?: number | null
           total_sin_descuento?: number | null
@@ -452,6 +485,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ingresos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ingresos_items: {
@@ -467,6 +507,7 @@ export type Database = {
           servicio_id: string | null
           servicio_nombre: string
           subtotal: number
+          sucursal_id: string | null
           unit_price: number
         }
         Insert: {
@@ -481,6 +522,7 @@ export type Database = {
           servicio_id?: string | null
           servicio_nombre?: string
           subtotal?: number
+          sucursal_id?: string | null
           unit_price?: number
         }
         Update: {
@@ -495,6 +537,7 @@ export type Database = {
           servicio_id?: string | null
           servicio_nombre?: string
           subtotal?: number
+          sucursal_id?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -540,6 +583,13 @@ export type Database = {
             referencedRelation: "servicios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ingresos_items_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
         ]
       }
       inversiones: {
@@ -554,6 +604,7 @@ export type Database = {
           monto_total: number
           nombre: string
           organization_id: string
+          sucursal_id: string | null
         }
         Insert: {
           activa?: boolean
@@ -566,6 +617,7 @@ export type Database = {
           monto_total: number
           nombre: string
           organization_id: string
+          sucursal_id?: string | null
         }
         Update: {
           activa?: boolean
@@ -578,6 +630,7 @@ export type Database = {
           monto_total?: number
           nombre?: string
           organization_id?: string
+          sucursal_id?: string | null
         }
         Relationships: [
           {
@@ -585,6 +638,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inversiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -682,6 +742,7 @@ export type Database = {
           id: string
           monto: number
           organization_id: string
+          sucursal_id: string | null
           updated_at: string
         }
         Insert: {
@@ -693,6 +754,7 @@ export type Database = {
           id?: string
           monto?: number
           organization_id: string
+          sucursal_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -704,9 +766,18 @@ export type Database = {
           id?: string
           monto?: number
           organization_id?: string
+          sucursal_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pagos_sueldos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plan_features: {
         Row: {
@@ -745,6 +816,7 @@ export type Database = {
         Row: {
           barbero_id: string | null
           created_at: string | null
+          default_sucursal_id: string | null
           email: string
           full_name: string | null
           id: string
@@ -754,6 +826,7 @@ export type Database = {
         Insert: {
           barbero_id?: string | null
           created_at?: string | null
+          default_sucursal_id?: string | null
           email: string
           full_name?: string | null
           id: string
@@ -763,6 +836,7 @@ export type Database = {
         Update: {
           barbero_id?: string | null
           created_at?: string | null
+          default_sucursal_id?: string | null
           email?: string
           full_name?: string | null
           id?: string
@@ -782,6 +856,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_default_sucursal_id_fkey"
+            columns: ["default_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
           {
@@ -817,6 +898,7 @@ export type Database = {
           Rentabilidad: number | null
           ServiciosPorBarbero: number | null
           ServiciosTotales: number | null
+          sucursal_id: string | null
           TasaDeOcupación: number | null
           TicketPromedio: number | null
         }
@@ -843,6 +925,7 @@ export type Database = {
           Rentabilidad?: number | null
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
+          sucursal_id?: string | null
           TasaDeOcupación?: number | null
           TicketPromedio?: number | null
         }
@@ -869,6 +952,7 @@ export type Database = {
           Rentabilidad?: number | null
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
+          sucursal_id?: string | null
           TasaDeOcupación?: number | null
           TicketPromedio?: number | null
         }
@@ -878,6 +962,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ReportesMensuales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -930,6 +1021,50 @@ export type Database = {
           },
         ]
       }
+      sucursales: {
+        Row: {
+          activa: boolean
+          created_at: string
+          direccion: string | null
+          id: string
+          nombre: string
+          organization_id: string
+          telefono: string | null
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre: string
+          organization_id: string
+          telefono?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre?: string
+          organization_id?: string
+          telefono?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sucursales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tareas: {
         Row: {
           asignado_a_id: string | null
@@ -954,6 +1089,7 @@ export type Database = {
           repeat_frequency: string | null
           repeat_interval: number | null
           repeat_preset: string | null
+          sucursal_id: string | null
           tipo: string
           titulo: string
           updated_at: string
@@ -982,6 +1118,7 @@ export type Database = {
           repeat_frequency?: string | null
           repeat_interval?: number | null
           repeat_preset?: string | null
+          sucursal_id?: string | null
           tipo?: string
           titulo: string
           updated_at?: string
@@ -1010,6 +1147,7 @@ export type Database = {
           repeat_frequency?: string | null
           repeat_interval?: number | null
           repeat_preset?: string | null
+          sucursal_id?: string | null
           tipo?: string
           titulo?: string
           updated_at?: string
@@ -1035,6 +1173,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -1084,6 +1229,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sucursales: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          sucursal_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sucursales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_sucursales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       venta: {
         Row: {
           anulado_at: string | null
@@ -1101,6 +1285,7 @@ export type Database = {
           precio_servicio: number
           servicio_id: string
           servicio_nombre: string
+          sucursal_id: string | null
           total_final: number
         }
         Insert: {
@@ -1119,6 +1304,7 @@ export type Database = {
           precio_servicio?: number
           servicio_id: string
           servicio_nombre: string
+          sucursal_id?: string | null
           total_final?: number
         }
         Update: {
@@ -1137,6 +1323,7 @@ export type Database = {
           precio_servicio?: number
           servicio_id?: string
           servicio_nombre?: string
+          sucursal_id?: string | null
           total_final?: number
         }
         Relationships: [
@@ -1166,6 +1353,13 @@ export type Database = {
             columns: ["servicio_id"]
             isOneToOne: false
             referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -1264,6 +1458,7 @@ export type Database = {
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
       get_user_organization_id: { Args: { _user_id: string }; Returns: string }
+      get_user_sucursal_ids: { Args: { _user_id: string }; Returns: string[] }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

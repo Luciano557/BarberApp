@@ -3,6 +3,7 @@ import { Transaction } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
 
@@ -16,6 +17,7 @@ interface VentaInsert {
   metodo_pago: 'efectivo' | 'mercado_pago';
   total_final: number;
   organization_id: string;
+  sucursal_id?: string | null;
 }
 
 interface VentaExtraInsert {
@@ -28,6 +30,7 @@ interface VentaExtraInsert {
 
 export function useTransactions() {
   const { organization } = useOrganization();
+  const { currentSucursal, isAllMode } = useSucursal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -40,12 +43,19 @@ export function useTransactions() {
     const startStr = getStartOfDayLocal(date);
     const endStr = getEndOfDayLocal(date);
 
-    const { data: ventas, error } = await supabase
+    let query = supabase
       .from('venta')
       .select('*')
       .gte('fecha_hora', startStr)
       .lte('fecha_hora', endStr)
       .order('fecha_hora', { ascending: false });
+
+    // Filter by sucursal if not in "all" mode
+    if (currentSucursal) {
+      query = query.eq('sucursal_id', currentSucursal.id);
+    }
+
+    const { data: ventas, error } = await query;
 
     if (error) {
       console.error('Error loading ventas:', error);
@@ -99,11 +109,11 @@ export function useTransactions() {
 
     setTransactions(txs);
     setIsLoading(false);
-  }, []);
+  }, [currentSucursal]);
 
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
-  }, [selectedDate, loadTransactionsByDate]);
+  }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     if (!organization) {
@@ -126,6 +136,7 @@ export function useTransactions() {
       metodo_pago: transaction.paymentMethod,
       total_final: transaction.total,
       organization_id: organization.id,
+      sucursal_id: currentSucursal?.id || null,
     };
 
     const { data: venta, error: ventaError } = await supabase
