@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { ArrowLeft, Building2, MapPin, Users, Crown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Building2, MapPin, Crown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { OrganizationSettings } from './OrganizationSettings';
-import { UserManagement } from './UserManagement';
 import { SucursalesConfig } from './config/SucursalesConfig';
-import { useSupabaseData } from '@/hooks/useSupabaseData';
 
-type Section = 'menu' | 'info' | 'sucursales' | 'usuarios' | 'plan';
+type Section = 'menu' | 'info' | 'sucursales' | 'plan';
 
 const sectionTitles: Record<Section, string> = {
   menu: 'Mi Negocio',
   info: 'Información',
   sucursales: 'Sucursales',
-  usuarios: 'Usuarios',
   plan: 'Plan',
 };
 
