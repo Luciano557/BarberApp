@@ -27,11 +27,17 @@ export function useInversiones() {
     if (!organization?.id) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('inversiones')
         .select('*')
         .eq('organization_id', organization.id)
         .order('fecha_compra', { ascending: false });
+
+      if (currentSucursal) {
+        query = query.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setInversiones((data as Inversion[]) || []);
