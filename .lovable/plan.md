@@ -1,17 +1,25 @@
 
-# Fix: Cierre de caja normal solo para el dia actual
+# Multi-Organización y Sucursales — Estado
 
-## Problema
-Cuando navegas a una fecha pasada en "Cierre de Caja" y presionas "Cerrar Caja", el sistema guarda el cierre con la fecha pasada seleccionada (campo `created_at`). Esto provoca que un cierre hecho el miercoles 18/2 quede registrado como martes 17/2.
+## ✅ Fase 1: Base de datos (COMPLETADA)
+- Tabla `sucursales` creada con RLS (owner full, manager/barber SELECT por membresía)
+- Tabla `user_sucursales` creada para membresía por sucursal
+- `sucursal_id` agregado a: barberos, venta, ingresos, ingresos_items, Egresos, pagos_sueldos, inversiones, deudas, tareas, ReportesMensuales
+- `default_sucursal_id` agregado a profiles
+- `handle_new_user` actualizado para auto-crear sucursal "Casa Central"
+- Datos existentes backfilleados con sucursal default
+- Función helper `get_user_sucursal_ids`
 
-## Solucion
-El boton "Cerrar Caja" solo debe estar disponible cuando estas viendo el dia de hoy. Para cerrar dias pasados, ya existe la herramienta de "Cierre Diferido" (Regularizar dia / BackfillWizard).
+## ✅ Fase 2: Frontend — Contexto + Selector (COMPLETADA)
+- `SucursalContext` con soporte para "Todas" (dueño) y sucursal fija (encargado/barbero)
+- `SucursalSelector` integrado en sidebar
+- Hooks actualizados: useTransactions, useCashClosing, useGastos, useInversiones, useDeudas, useTareas, useSupabaseData
 
-## Cambios tecnicos
+## 📋 Fase 3: "Mi Negocio" como sección independiente (PENDIENTE)
+- Nuevo tab en sidebar (solo dueño)
+- CRUD de sucursales, asignación de encargados
+- Mover gestión de usuarios desde Config
 
-### `src/components/DailySummary.tsx`
-1. **Ocultar boton "Cerrar Caja" en fechas pasadas**: Cuando `isPastDate` es `true`, no mostrar el boton "Cerrar Caja" para ningun barbero. En su lugar, mostrar un mensaje indicando que para cerrar dias anteriores se debe usar la herramienta de cierre diferido.
-2. El boton "Cerrar Caja" solo aparecera cuando `isToday(validDate)` sea verdadero.
-3. La seccion de backfill (Regularizar dia) seguira apareciendo normalmente para fechas pasadas con cierres faltantes, que es la herramienta correcta para esos casos.
-
-No se requieren cambios en la base de datos ni en otros archivos.
+## 📋 Fase 4: Reporting consolidado (PENDIENTE)
+- Vista "Todas las sucursales": KPIs globales, ranking
+- Vista "Sucursal X": detalle local
