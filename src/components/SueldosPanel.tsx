@@ -270,6 +270,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         .eq('organization_id', organization.id)
         .order('created_at', { ascending: false });
       
+      if (currentSucursal) {
+        pagosQuery = pagosQuery.eq('sucursal_id', currentSucursal.id);
+      }
+      
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         pagosQuery = pagosQuery.gte('created_at', `${startDateStr}T00:00:00`);
