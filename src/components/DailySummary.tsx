@@ -15,6 +15,7 @@ import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { BackfillWizard } from './BackfillWizard';
+import { MultiDayClosingSummary } from './MultiDayClosingSummary';
 import { PinGateDialog } from './PinGateDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -370,6 +371,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               Hoy
             </Button>
           )}
+          <MultiDayClosingSummary />
           <AnulacionesCierreHistory barbers={barbers} />
           <Button variant="outline" size="sm" onClick={handleHistoryClick}>
             <Clock className="h-4 w-4 mr-2" />
