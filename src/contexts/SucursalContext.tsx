@@ -77,8 +77,8 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
         const defaultId = profileData?.default_sucursal_id;
         const defaultSuc = mapped.find(s => s.id === defaultId);
 
-        if (isOwner) {
-          // Owners default to their saved preference or first sucursal
+        if (isOwner || isGeneralManager) {
+          // Owners and GMs default to their saved preference or first sucursal
           setCurrentSucursalState(defaultSuc || mapped[0]);
         } else {
           // Non-owners always get their assigned sucursal
