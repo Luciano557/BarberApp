@@ -123,6 +123,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleBadgeVariant = (role: AppRole) => {
     switch (role) {
       case 'owner': return 'default';
+      case 'general_manager': return 'default';
       case 'manager': return 'secondary';
       case 'barber': return 'outline';
     }
