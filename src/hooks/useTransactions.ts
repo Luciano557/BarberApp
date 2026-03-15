@@ -29,6 +29,7 @@ interface VentaExtraInsert {
 
 export function useTransactions() {
   const { organization } = useOrganization();
+  const { currentSucursal, isAllMode } = useSucursal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
