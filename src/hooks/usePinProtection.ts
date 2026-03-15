@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
 const UNLOCK_DURATION = 4 * 60 * 1000; // 4 minutes in milliseconds
@@ -16,6 +17,7 @@ interface UnlockState {
 export function usePinProtection() {
   const { user, canManageConfig } = useAuth();
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
   const [unlockedBy, setUnlockedBy] = useState<string | null>(null);
@@ -110,14 +112,14 @@ export function usePinProtection() {
   }, [isUnlocked, lock]);
 
   // Validate PIN
-  const validatePin = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string }> => {
+  const validatePin = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string; error?: string }> => {
     if (!user) {
       return { success: false };
     }
 
     try {
       const { data, error } = await supabase.functions.invoke('validate-pin', {
-        body: { pin }
+        body: { pin, sucursal_id: currentSucursal?.id ?? null }
       });
 
       if (error) throw error;
@@ -131,12 +133,12 @@ export function usePinProtection() {
         return { success: true, userName };
       }
 
-      return { success: false };
+      return { success: false, error: data.error };
     } catch (error) {
       console.error('Error validating PIN:', error);
       return { success: false };
     }
-  }, [user, saveSession, resetInactivityTimer]);
+  }, [user, currentSucursal, saveSession, resetInactivityTimer]);
 
   // Setup activity listener
   useEffect(() => {

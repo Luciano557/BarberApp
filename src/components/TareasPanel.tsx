@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 import { PinGateDialog } from './PinGateDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
 interface TareasPanelProps {
@@ -29,6 +30,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
+  const { currentSucursal } = useSucursal();
   
   const [activeTab, setActiveTab] = useState('tareas');
 
@@ -104,7 +106,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const handlePinValidate = async (pin: string): Promise<{ success: boolean; userName?: string }> => {
     const { data, error } = await supabase.functions.invoke('validate-pin', {
-      body: { pin },
+      body: { pin, sucursal_id: currentSucursal?.id ?? null },
     });
     if (error || !data?.valid) {
       return { success: false };
@@ -128,7 +130,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const handleActionPinValidate = async (pin: string): Promise<{ success: boolean; userName?: string }> => {
     const { data, error } = await supabase.functions.invoke('validate-pin', {
-      body: { pin },
+      body: { pin, sucursal_id: currentSucursal?.id ?? null },
     });
     if (error || !data?.valid) {
       return { success: false };

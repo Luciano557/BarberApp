@@ -6,6 +6,7 @@ import { Lock, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Transaction } from '@/types/barbershop';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 interface VoidTransactionDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function VoidTransactionDialog({
   transaction,
   onVoidComplete
 }: VoidTransactionDialogProps) {
+  const { currentSucursal } = useSucursal();
   const [pin, setPin] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ export function VoidTransactionDialog({
 
     try {
       const { data, error: validationError } = await supabase.functions.invoke('validate-pin', {
-        body: { pin: value }
+        body: { pin: value, sucursal_id: currentSucursal?.id ?? null }
       });
 
       if (validationError) throw validationError;
@@ -43,7 +45,7 @@ export function VoidTransactionDialog({
         handleClose();
         toast.success(`Transacción anulada por ${data.user_name}`);
       } else {
-        setError('PIN incorrecto');
+        setError(data?.error || 'PIN incorrecto');
         setPin('');
       }
     } catch (err: any) {
