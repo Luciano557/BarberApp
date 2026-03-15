@@ -20,7 +20,7 @@ export function usePinProtection() {
   const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
   const [unlockedBy, setUnlockedBy] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activityListenerRef = useRef<(() => void) | null>(null);
 
   // Check if any barbero in the organization has a PIN configured
