@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -13,7 +14,8 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState(isMobile);
   const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
