@@ -156,6 +156,7 @@ export function useCashClosing() {
       created_at: getEndOfDayLocal(date),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
+      sucursal_id: currentSucursal?.id || null,
     };
     
     const { error } = await supabase
