@@ -114,7 +114,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           {navItems.map((item) => (
             <li key={item.id}>
               <button
-                onClick={() => onTabChange(item.id)}
+                onClick={() => handleTabChange(item.id)}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                   collapsed && "justify-center px-2",
