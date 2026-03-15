@@ -48,7 +48,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
           <SelectValue placeholder="Seleccionar sucursal" />
         </SelectTrigger>
         <SelectContent>
-          {isOwner && sucursales.length > 1 && (
+          {(isOwner || isGeneralManager) && sucursales.length > 1 && (
             <SelectItem value="__all__">
               <span className="flex items-center gap-1.5">
                 <Building2 className="h-3 w-3" />

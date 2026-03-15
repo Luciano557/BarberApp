@@ -39,7 +39,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const getRoleBadge = () => {
     if (isOwner) return { label: 'Dueño', icon: Shield, variant: 'default' as const };
-    if (isManager) return { label: 'Encargado', icon: UserCheck, variant: 'secondary' as const };
+    if (isGeneralManager) return { label: 'Enc. General', icon: Shield, variant: 'default' as const };
+    if (isManager) return { label: 'Enc. Local', icon: UserCheck, variant: 'secondary' as const };
     if (isBarber) return { label: 'Barbero', icon: Scissors, variant: 'outline' as const };
     return null;
   };

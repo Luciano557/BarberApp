@@ -292,7 +292,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
             <Label htmlFor="invite-role">Rol</Label>
             <Select 
               value={formData.role} 
-              onValueChange={(value: 'barber' | 'manager') => setFormData(prev => ({ ...prev, role: value }))}
+              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => setFormData(prev => ({ ...prev, role: value }))}
               disabled={isLoading}
             >
               <SelectTrigger>
@@ -300,7 +300,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="barber">Barbero</SelectItem>
-                <SelectItem value="manager">Encargado</SelectItem>
+                <SelectItem value="manager">Encargado de Local</SelectItem>
+                <SelectItem value="general_manager">Encargado General</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && <p className="text-sm text-destructive">{errors.role}</p>}

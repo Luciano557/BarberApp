@@ -212,13 +212,31 @@ export function UserManagement({ barbers }: UserManagementProps) {
                   {/* Assign roles */}
                   {!user.roles.includes('owner') && (
                     <>
+                      {!user.roles.includes('general_manager') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAssignRole(user.id, 'general_manager')}
+                        >
+                          + Enc. General
+                        </Button>
+                      )}
+                      {user.roles.includes('general_manager') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveRole(user.id, 'general_manager')}
+                        >
+                          - Enc. General
+                        </Button>
+                      )}
                       {!user.roles.includes('manager') && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleAssignRole(user.id, 'manager')}
                         >
-                          + Encargado
+                          + Enc. Local
                         </Button>
                       )}
                       {user.roles.includes('manager') && (
@@ -227,7 +245,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
                           size="sm"
                           onClick={() => handleRemoveRole(user.id, 'manager')}
                         >
-                          - Encargado
+                          - Enc. Local
                         </Button>
                       )}
                       {!user.roles.includes('barber') && (

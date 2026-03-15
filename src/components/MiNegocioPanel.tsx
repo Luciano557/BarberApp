@@ -27,7 +27,7 @@ interface MenuItem {
 
 export function MiNegocioPanel() {
   const [activeSection, setActiveSection] = useState<Section>('menu');
-  const { isOwner, canManageUsers } = useAuth();
+  const { isOwner, isGeneralManager, canManageUsers } = useAuth();
   const { allBarbers } = useSupabaseData();
 
   const items: MenuItem[] = [
