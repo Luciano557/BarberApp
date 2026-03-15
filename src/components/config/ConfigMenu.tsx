@@ -1,38 +1,29 @@
-import { Building2, Scissors, Shield, ChevronRight, ClipboardList } from 'lucide-react';
+import { Scissors, Shield, ChevronRight, ClipboardList, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-type ConfigSection = 'menu' | 'negocio' | 'cobrar' | 'pin' | 'tareas';
+type ConfigSection = 'menu' | 'cobrar' | 'pin' | 'tareas' | 'staff';
 
 interface ConfigMenuItem {
   id: ConfigSection;
   icon: React.ReactNode;
   title: string;
   description: string;
-  count?: number;
   visible: boolean;
 }
 
 interface ConfigMenuProps {
   onSelect: (section: ConfigSection) => void;
-  counts?: {
-    barbers?: number;
-    services?: number;
-    extras?: number;
-    discounts?: number;
-  };
 }
 
-export function ConfigMenu({ onSelect, counts }: ConfigMenuProps) {
-  const { isOwner, canManageUsers } = useAuth();
+export function ConfigMenu({ onSelect }: ConfigMenuProps) {
+  const { isOwner } = useAuth();
 
   const items: ConfigMenuItem[] = [
     {
-      id: 'negocio',
-      icon: <Building2 className="h-5 w-5" />,
-      title: 'Negocio',
-      description: isOwner 
-        ? 'Info del negocio, staff, usuarios' 
-        : 'Staff y comisiones',
+      id: 'staff',
+      icon: <Users className="h-5 w-5" />,
+      title: 'Staff',
+      description: 'Barberos y comisiones',
       visible: true,
     },
     {
