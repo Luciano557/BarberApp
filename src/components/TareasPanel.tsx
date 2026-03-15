@@ -30,6 +30,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const { canManageConfig } = useAuth();
+  const { currentSucursal } = useSucursal();
   
   const [activeTab, setActiveTab] = useState('tareas');
 
