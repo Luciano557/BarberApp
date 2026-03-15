@@ -162,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         isLoading,
         isOwner,
+        isGeneralManager,
         isManager,
         isBarber,
         canManagePayments,
