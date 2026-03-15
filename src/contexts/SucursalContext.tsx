@@ -25,7 +25,7 @@ interface SucursalContextType {
 const SucursalContext = createContext<SucursalContextType | undefined>(undefined);
 
 export function SucursalProvider({ children }: { children: ReactNode }) {
-  const { user, isOwner, isLoading: authLoading } = useAuth();
+  const { user, isOwner, isGeneralManager, isLoading: authLoading } = useAuth();
   const { organization, isLoading: orgLoading } = useOrganization();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [currentSucursal, setCurrentSucursalState] = useState<Sucursal | null>(null);
@@ -77,8 +77,8 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
         const defaultId = profileData?.default_sucursal_id;
         const defaultSuc = mapped.find(s => s.id === defaultId);
 
-        if (isOwner) {
-          // Owners default to their saved preference or first sucursal
+        if (isOwner || isGeneralManager) {
+          // Owners and GMs default to their saved preference or first sucursal
           setCurrentSucursalState(defaultSuc || mapped[0]);
         } else {
           // Non-owners always get their assigned sucursal
@@ -90,7 +90,7 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, organization, isOwner]);
+  }, [user, organization, isOwner, isGeneralManager]);
 
   useEffect(() => {
     if (!authLoading && !orgLoading) {
@@ -117,7 +117,7 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
     }
   }, [sucursales, user]);
 
-  const isAllMode = isOwner && currentSucursal === null;
+  const isAllMode = (isOwner || isGeneralManager) && currentSucursal === null;
 
   return (
     <SucursalContext.Provider

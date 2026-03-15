@@ -10,10 +10,10 @@ interface SucursalSelectorProps {
 
 export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
   const { sucursales, currentSucursal, setCurrentSucursal, isAllMode } = useSucursal();
-  const { isOwner } = useAuth();
+  const { isOwner, isGeneralManager } = useAuth();
 
   // Don't show if only 1 sucursal and not owner
-  if (sucursales.length <= 1 && !isOwner) return null;
+  if (sucursales.length <= 1 && !isOwner && !isGeneralManager) return null;
 
   // Collapsed mode: just show icon
   if (collapsed) {
@@ -48,7 +48,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
           <SelectValue placeholder="Seleccionar sucursal" />
         </SelectTrigger>
         <SelectContent>
-          {isOwner && sucursales.length > 1 && (
+          {(isOwner || isGeneralManager) && sucursales.length > 1 && (
             <SelectItem value="__all__">
               <span className="flex items-center gap-1.5">
                 <Building2 className="h-3 w-3" />

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-export type AppRole = 'owner' | 'manager' | 'barber';
+export type AppRole = 'owner' | 'general_manager' | 'manager' | 'barber';
 
 interface Profile {
   id: string;
@@ -18,6 +18,7 @@ interface AuthContextType {
   roles: AppRole[];
   isLoading: boolean;
   isOwner: boolean;
+  isGeneralManager: boolean;
   isManager: boolean;
   isBarber: boolean;
   canManagePayments: boolean;
@@ -142,14 +143,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Computed permissions based on roles
   const isOwner = roles.includes('owner');
+  const isGeneralManager = roles.includes('general_manager');
   const isManager = roles.includes('manager');
   const isBarber = roles.includes('barber');
 
-  const canManagePayments = isOwner || isManager;
-  const canManageConfig = isOwner || isManager;
-  const canManageBarbers = isOwner;
-  const canManageUsers = isOwner;
-  const canViewAllClosings = isOwner || isManager;
+  const canManagePayments = isOwner || isGeneralManager || isManager;
+  const canManageConfig = isOwner || isGeneralManager || isManager;
+  const canManageBarbers = isOwner || isGeneralManager;
+  const canManageUsers = isOwner || isGeneralManager;
+  const canViewAllClosings = isOwner || isGeneralManager || isManager;
 
   return (
     <AuthContext.Provider
@@ -160,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         isLoading,
         isOwner,
+        isGeneralManager,
         isManager,
         isBarber,
         canManagePayments,

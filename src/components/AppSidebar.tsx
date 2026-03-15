@@ -17,7 +17,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
-  const { profile, roles, isOwner, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
+  const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
@@ -33,13 +33,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
     ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     { id: 'tareas', label: 'Tareas', icon: ClipboardList },
-    ...(isOwner ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
+    ...(isOwner || isGeneralManager ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
   const getRoleBadge = () => {
     if (isOwner) return { label: 'Dueño', icon: Shield, variant: 'default' as const };
-    if (isManager) return { label: 'Encargado', icon: UserCheck, variant: 'secondary' as const };
+    if (isGeneralManager) return { label: 'Enc. General', icon: Shield, variant: 'default' as const };
+    if (isManager) return { label: 'Enc. Local', icon: UserCheck, variant: 'secondary' as const };
     if (isBarber) return { label: 'Barbero', icon: Scissors, variant: 'outline' as const };
     return null;
   };

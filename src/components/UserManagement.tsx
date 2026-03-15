@@ -123,6 +123,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleBadgeVariant = (role: AppRole) => {
     switch (role) {
       case 'owner': return 'default';
+      case 'general_manager': return 'default';
       case 'manager': return 'secondary';
       case 'barber': return 'outline';
     }
@@ -131,6 +132,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleIcon = (role: AppRole) => {
     switch (role) {
       case 'owner': return <Shield className="w-3 h-3" />;
+      case 'general_manager': return <Shield className="w-3 h-3" />;
       case 'manager': return <UserCheck className="w-3 h-3" />;
       case 'barber': return <Scissors className="w-3 h-3" />;
     }
@@ -139,7 +141,8 @@ export function UserManagement({ barbers }: UserManagementProps) {
   const getRoleLabel = (role: AppRole) => {
     switch (role) {
       case 'owner': return 'Dueño';
-      case 'manager': return 'Encargado';
+      case 'general_manager': return 'Enc. General';
+      case 'manager': return 'Enc. Local';
       case 'barber': return 'Barbero';
     }
   };
@@ -209,13 +212,31 @@ export function UserManagement({ barbers }: UserManagementProps) {
                   {/* Assign roles */}
                   {!user.roles.includes('owner') && (
                     <>
+                      {!user.roles.includes('general_manager') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAssignRole(user.id, 'general_manager')}
+                        >
+                          + Enc. General
+                        </Button>
+                      )}
+                      {user.roles.includes('general_manager') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveRole(user.id, 'general_manager')}
+                        >
+                          - Enc. General
+                        </Button>
+                      )}
                       {!user.roles.includes('manager') && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleAssignRole(user.id, 'manager')}
                         >
-                          + Encargado
+                          + Enc. Local
                         </Button>
                       )}
                       {user.roles.includes('manager') && (
@@ -224,7 +245,7 @@ export function UserManagement({ barbers }: UserManagementProps) {
                           size="sm"
                           onClick={() => handleRemoveRole(user.id, 'manager')}
                         >
-                          - Encargado
+                          - Enc. Local
                         </Button>
                       )}
                       {!user.roles.includes('barber') && (

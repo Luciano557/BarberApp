@@ -14,7 +14,7 @@ import { Barber } from '@/types/barbershop';
 const inviteSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }).max(255),
   fullName: z.string().trim().min(2, { message: "El nombre debe tener al menos 2 caracteres" }).max(100),
-  role: z.enum(["barber", "manager"], { required_error: "Seleccioná un rol" }),
+  role: z.enum(["barber", "manager", "general_manager"], { required_error: "Seleccioná un rol" }),
 });
 
 interface InviteUserDialogProps {
@@ -38,7 +38,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
   const [formData, setFormData] = useState({
     email: '',
     fullName: barberFullName,
-    role: barber ? 'barber' : '' as 'barber' | 'manager' | '',
+    role: barber ? 'barber' : '' as 'barber' | 'manager' | 'general_manager' | '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -292,7 +292,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
             <Label htmlFor="invite-role">Rol</Label>
             <Select 
               value={formData.role} 
-              onValueChange={(value: 'barber' | 'manager') => setFormData(prev => ({ ...prev, role: value }))}
+              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => setFormData(prev => ({ ...prev, role: value }))}
               disabled={isLoading}
             >
               <SelectTrigger>
@@ -300,7 +300,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="barber">Barbero</SelectItem>
-                <SelectItem value="manager">Encargado</SelectItem>
+                <SelectItem value="manager">Encargado de Local</SelectItem>
+                <SelectItem value="general_manager">Encargado General</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && <p className="text-sm text-destructive">{errors.role}</p>}

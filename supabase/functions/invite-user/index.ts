@@ -12,7 +12,7 @@ const corsHeaders = {
 interface InviteRequest {
   email: string;
   fullName: string;
-  role: "barber" | "manager";
+  role: "barber" | "manager" | "general_manager";
   barberoId?: string;
   organizationId: string;
   organizationName: string;
@@ -53,16 +53,15 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Unauthorized");
     }
 
-    // Check if requesting user is an owner
-    const { data: ownerRole } = await supabaseAdmin
+    // Check if requesting user is an owner or general_manager
+    const { data: adminRole } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUser.id)
-      .eq("role", "owner")
-      .single();
+      .in("role", ["owner", "general_manager"]);
 
-    if (!ownerRole) {
-      throw new Error("Only owners can invite users");
+    if (!adminRole || adminRole.length === 0) {
+      throw new Error("Only owners and general managers can invite users");
     }
 
     const { email, fullName, role, barberoId, organizationId, organizationName }: InviteRequest = await req.json();
@@ -72,7 +71,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Missing required fields");
     }
 
-    if (!["barber", "manager"].includes(role)) {
+    if (!["barber", "manager", "general_manager"].includes(role)) {
       throw new Error("Invalid role");
     }
 
@@ -157,7 +156,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Try to send email (but don't fail if it doesn't work)
-    const roleLabel = role === "barber" ? "Barbero" : "Encargado";
+    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Local";
     
     try {
       const emailResult = await resend.emails.send({
