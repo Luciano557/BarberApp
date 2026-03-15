@@ -412,7 +412,7 @@ export function SucursalesConfig() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">Sin vincular</SelectItem>
-                                {sucursalBarbers.map(barber => (
+                                {availableBarbers.map(barber => (
                                   <SelectItem key={barber.id} value={barber.id}>
                                     {getBarberDisplayName(barber)}
                                   </SelectItem>
