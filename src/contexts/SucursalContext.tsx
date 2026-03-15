@@ -25,7 +25,7 @@ interface SucursalContextType {
 const SucursalContext = createContext<SucursalContextType | undefined>(undefined);
 
 export function SucursalProvider({ children }: { children: ReactNode }) {
-  const { user, isOwner, isLoading: authLoading } = useAuth();
+  const { user, isOwner, isGeneralManager, isLoading: authLoading } = useAuth();
   const { organization, isLoading: orgLoading } = useOrganization();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [currentSucursal, setCurrentSucursalState] = useState<Sucursal | null>(null);
