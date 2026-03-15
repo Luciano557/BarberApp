@@ -30,7 +30,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     { id: 'resumen', label: 'Resumen', icon: BarChart3 },
     ...(canManageConfig ? [{ id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp }] : []),
     ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
-    ...(canManageConfig ? [{ id: 'gastos', label: 'Gastos', icon: Receipt }] : []),
+    ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     { id: 'tareas', label: 'Tareas', icon: ClipboardList },
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];

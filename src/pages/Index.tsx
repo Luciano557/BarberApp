@@ -118,9 +118,9 @@ const Index = () => {
             </PinProtectedSection>
           )}
 
-          {activeTab === 'gastos' && canManageConfig && (
-            <PinProtectedSection sectionName="Gastos">
-              <GastosPanel />
+          {activeTab === 'finanzas' && canManageConfig && (
+            <PinProtectedSection sectionName="Finanzas">
+              <FinanzasPanel />
             </PinProtectedSection>
           )}
 
