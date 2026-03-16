@@ -292,10 +292,10 @@ export function SucursalesConfig() {
                     {suc.direccion && <p className="text-sm text-muted-foreground">{suc.direccion}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
-                  <Button variant="ghost" size="icon" onClick={() => handleOpenAssign(suc)} title="Equipo de la sucursal">
-                    <Users className="h-4 w-4" />
+                  <Button variant="outline" size="sm" onClick={() => handleOpenAssign(suc)} className="px-3 py-1.5 text-xs font-medium">
+                    <Users className="h-3.5 w-3.5 mr-1.5" />
                     Ver/Editar Equipo
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(suc)}>
