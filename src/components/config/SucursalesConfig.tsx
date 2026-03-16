@@ -296,6 +296,7 @@ export function SucursalesConfig() {
                   <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
                   <Button variant="ghost" size="icon" onClick={() => handleOpenAssign(suc)} title="Equipo de la sucursal">
                     <Users className="h-4 w-4" />
+                    Ver/Editar Equipo
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(suc)}>
                     <Edit2 className="h-4 w-4" />
