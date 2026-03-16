@@ -4,58 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Phone, Edit2, Save, X, Shield, UserCheck, Scissors, Trash2, Plus, Building2 } from 'lucide-react';
+import { MapPin, Phone, Edit2, Save, X, Building2 } from 'lucide-react';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { AppRole } from '@/contexts/AuthContext';
-import { Barber, Service, Extra, Discount, Line, getBarberDisplayName } from '@/types/barbershop';
+import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { StaffConfig } from './config/StaffConfig';
+import { EquipoUnificado } from './config/EquipoUnificado';
 import { CobrarConfig } from './config/CobrarConfig';
-
-interface UserProfile {
-  id: string;
-  email: string;
-  full_name: string | null;
-  barbero_id: string | null;
-}
-
-interface UserRole {
-  user_id: string;
-  role: AppRole;
-}
-
-interface SucursalAssignment {
-  user_id: string;
-  sucursal_id: string;
-}
-
-const getRoleLabel = (role: AppRole) => {
-  switch (role) {
-    case 'owner': return 'Dueño';
-    case 'general_manager': return 'Enc. General';
-    case 'manager': return 'Enc. Local';
-    case 'barber': return 'Barbero';
-  }
-};
-
-const getRoleBadgeVariant = (role: AppRole): 'default' | 'secondary' | 'outline' => {
-  switch (role) {
-    case 'owner': case 'general_manager': return 'default';
-    case 'manager': return 'secondary';
-    case 'barber': return 'outline';
-  }
-};
-
-const getRoleIcon = (role: AppRole) => {
-  switch (role) {
-    case 'owner': case 'general_manager': return <Shield className="w-3 h-3" />;
-    case 'manager': return <UserCheck className="w-3 h-3" />;
-    case 'barber': return <Scissors className="w-3 h-3" />;
-  }
-};
 
 interface SucursalTabContentProps {
   sucursal: Sucursal;
@@ -129,83 +85,6 @@ export function SucursalTabContent({
     setIsSavingInfo(false);
   };
 
-  // --- Equipo (user assignments) ---
-  const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [assignments, setAssignments] = useState<SucursalAssignment[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState('');
-
-  const fetchOrgUsers = async () => {
-    if (!organization?.id) return;
-    const { data } = await supabase.from('profiles').select('id, email, full_name, barbero_id').eq('organization_id', organization.id);
-    if (data) setOrgUsers(data);
-  };
-
-  const fetchUserRoles = async () => {
-    const { data } = await supabase.from('user_roles').select('user_id, role');
-    if (data) setUserRoles(data as UserRole[]);
-  };
-
-  const fetchAssignments = async () => {
-    const { data } = await supabase.from('user_sucursales').select('user_id, sucursal_id').eq('sucursal_id', sucursal.id);
-    if (data) setAssignments(data);
-  };
-
-  useEffect(() => {
-    fetchOrgUsers();
-    fetchUserRoles();
-    fetchAssignments();
-  }, [organization?.id, sucursal.id]);
-
-  const handleAssignUser = async () => {
-    if (!selectedUserId || !organization?.id) return;
-    const { error } = await supabase.from('user_sucursales').insert({
-      user_id: selectedUserId, sucursal_id: sucursal.id, organization_id: organization.id,
-    });
-    if (error) {
-      toast.error(error.code === '23505' ? 'Ya está asignado' : 'Error al asignar');
-    } else {
-      toast.success('Usuario asignado');
-      await fetchAssignments();
-      setSelectedUserId('');
-    }
-  };
-
-  const handleRemoveAssignment = async (userId: string) => {
-    const { error } = await supabase.from('user_sucursales').delete().eq('user_id', userId).eq('sucursal_id', sucursal.id);
-    if (error) toast.error('Error al remover');
-    else { toast.success('Asignación removida'); await fetchAssignments(); }
-  };
-
-  const handleAssignRole = async (userId: string, role: AppRole) => {
-    const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
-    if (error) toast.error(error.code === '23505' ? 'Ya tiene ese rol' : 'Error');
-    else { toast.success('Rol asignado'); await fetchUserRoles(); }
-  };
-
-  const handleRemoveRole = async (userId: string, role: AppRole) => {
-    const { error } = await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role);
-    if (error) toast.error('Error al quitar rol');
-    else { toast.success('Rol removido'); await fetchUserRoles(); }
-  };
-
-  const handleLinkBarber = async (userId: string, barberoId: string | null) => {
-    const { error } = await supabase.from('profiles').update({ barbero_id: barberoId === 'none' ? null : barberoId }).eq('id', userId);
-    if (error) toast.error('Error al vincular barbero');
-    else { toast.success(barberoId === 'none' ? 'Desvinculado' : 'Vinculado'); await fetchOrgUsers(); }
-  };
-
-  const getUserRoles = (userId: string): AppRole[] =>
-    userRoles.filter(r => r.user_id === userId).map(r => r.role);
-
-  const getAssignedUsers = () =>
-    assignments.map(a => orgUsers.find(u => u.id === a.user_id) || { id: a.user_id, email: 'Desconocido', full_name: null, barbero_id: null });
-
-  const getUnassignedUsers = () => {
-    const assignedIds = new Set(assignments.map(a => a.user_id));
-    return orgUsers.filter(u => !assignedIds.has(u.id));
-  };
-
   return (
     <div className="space-y-6 mt-6">
       {/* Información de la sucursal */}
@@ -275,97 +154,15 @@ export function SucursalTabContent({
         </CardContent>
       </Card>
 
-      {/* Equipo - Usuarios asignados */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-foreground">Equipo</h3>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Usuarios asignados</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {getAssignedUsers().length === 0 ? (
-              <p className="text-sm text-muted-foreground">Sin usuarios asignados</p>
-            ) : (
-              <div className="space-y-3">
-                {getAssignedUsers().map((user) => {
-                  const roles = getUserRoles(user.id);
-                  const isOwnerUser = roles.includes('owner');
-                  return (
-                    <div key={user.id} className="p-3 rounded-lg border border-border space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{user.full_name || 'Sin nombre'}</p>
-                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => handleRemoveAssignment(user.id)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {roles.map(role => (
-                          <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
-                            {getRoleIcon(role)} {getRoleLabel(role)}
-                          </Badge>
-                        ))}
-                      </div>
-                      {!isOwnerUser && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {(['general_manager', 'manager', 'barber'] as AppRole[]).map(role => {
-                            const hasRole = roles.includes(role);
-                            return (
-                              <Button key={role} variant={hasRole ? 'ghost' : 'outline'} size="sm" className="text-xs h-7"
-                                onClick={() => hasRole ? handleRemoveRole(user.id, role) : handleAssignRole(user.id, role)}>
-                                {hasRole ? '−' : '+'} {getRoleLabel(role)}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">Barbero:</span>
-                        <Select value={user.barbero_id || 'none'} onValueChange={(v) => handleLinkBarber(user.id, v)}>
-                          <SelectTrigger className="h-8 text-xs flex-1">
-                            <SelectValue placeholder="Sin vincular" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin vincular</SelectItem>
-                            {allBarbers.map(b => (
-                              <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {getUnassignedUsers().length > 0 && (
-              <div className="pt-2">
-                <Label className="text-sm font-medium mb-2 block">Agregar al equipo</Label>
-                <div className="flex gap-2">
-                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar persona" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getUnassignedUsers().map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.full_name || u.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleAssignUser} disabled={!selectedUserId}>Agregar</Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Staff / Barberos */}
-        <StaffConfig barbers={barbers} onAdd={onAddBarber} onUpdate={onUpdateBarber} />
-      </div>
+      {/* Equipo unificado */}
+      <EquipoUnificado
+        sucursalId={sucursal.id}
+        organizationId={organization?.id || ''}
+        barbers={barbers}
+        allBarbers={allBarbers}
+        onAddBarber={onAddBarber}
+        onUpdateBarber={onUpdateBarber}
+      />
 
       {/* Cobrar */}
       <div className="space-y-4">
