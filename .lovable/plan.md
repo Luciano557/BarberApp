@@ -1,30 +1,73 @@
 
-# Multi-Organización y Sucursales — Estado
 
-## ✅ Fase 1: Base de datos (COMPLETADA)
-- Tabla `sucursales` y `user_sucursales` con RLS
-- `sucursal_id` en todas las tablas operativas
-- `handle_new_user` auto-crea sucursal "Casa Central"
-- Datos existentes backfilleados
+# Reestructurar "Mi Negocio" con tabs por sucursal
 
-## ✅ Fase 2: Frontend — Contexto + Selector (COMPLETADA)
-- `SucursalContext` con modo "Todas" para dueños
-- `SucursalSelector` en sidebar
-- Hooks actualizados con filtro por sucursal
+## Resumen
 
-## ✅ Fase 3: "Mi Negocio" como sección independiente (COMPLETADA)
-- Nuevo tab "Mi Negocio" en sidebar (solo dueño)
-- Sub-secciones: Información, Sucursales (CRUD + asignación de usuarios), Usuarios, Plan
-- Configuración simplificada: Staff, Cobrar, PIN, Tareas
+Transformar el panel "Mi Negocio" para mostrar directamente tabs por sucursal, donde cada tab contiene: información de la sucursal, equipo, y configuración de cobro. Mover "Plan y Suscripción" al panel de Configuración. Eliminar "Cobrar" y "Staff" del menú de Configuración (pasan a vivir dentro de cada sucursal).
 
-## ✅ Fase 4: Reporting por sucursal (COMPLETADA)
-- EstadisticasPanel filtrado por sucursal
-- DailySummary filtrado por sucursal
-- SueldosPanel filtrado por sucursal (ingresos, pagos, inserts)
+## Cambios
 
-## ✅ Fase 5: Aislamiento de datos por sucursal para Encargados de Local (COMPLETADA)
-- Barberos filtrados por `sucursal_id` en `useSupabaseData`
-- Re-fetch automático al cambiar de sucursal
-- `SucursalSelector` oculto para managers (encargados de local)
-- `SucursalContext` bloquea cambio de sucursal para no-owner/GM
-- RLS de `barberos` actualizado: managers solo ven barberos de sus sucursales asignadas
+### 1. `MiNegocioPanel.tsx` — Reescribir completamente
+
+- Eliminar el menú de cards y la navegación por secciones.
+- Título: **"Gestionar Mi Negocio"**.
+- Subtítulo: **"Sucursales"** + **"Gestiona las sucursales de tu negocio"**.
+- Botón "Nueva sucursal" en el header.
+- Tabs con una tab por cada sucursal (usando `allSucursales` de la organización).
+- Dentro de cada tab, 3 secciones verticales:
+  1. **Información de la sucursal** — nombre, dirección, teléfono (inline editable).
+  2. **Equipo** — lista de usuarios asignados con roles y gestión (reutilizar lógica de `SucursalesConfig`).
+  3. **Cobrar** — servicios, extras, descuentos filtrados por esa sucursal (reutilizar `CobrarConfig`).
+
+Se absorberá la lógica de `SucursalesConfig` directamente en este componente (o se refactorizará en sub-componentes).
+
+### 2. `ConfigurationPanel.tsx` y `ConfigMenu.tsx` — Ajustar menú
+
+- Eliminar la card **"Staff"** del menú de configuración (ahora vive en Mi Negocio → tab sucursal).
+- Eliminar la card **"Cobrar"** del menú (ahora vive en Mi Negocio → tab sucursal).
+- Agregar card **"Plan y Suscripción"** con icono Crown.
+- Las secciones que quedan: **Plan y Suscripción**, **PIN de Seguridad**, **Tareas y Peticiones**.
+
+### 3. `ConfigurationPanel.tsx` — Agregar sección Plan
+
+- Importar `OrganizationSettings` (que ya muestra info del plan) o crear una vista dedicada de plan.
+- Renderizar cuando `activeSection === 'plan'`.
+
+### 4. `Index.tsx` — Actualizar props
+
+- Ya no pasar props de servicios/barbers/cobrar a `ConfigurationPanel` (se simplifican).
+- `MiNegocioPanel` necesitará recibir las props de servicios/extras/descuentos/lines/barbers o usar hooks directamente.
+
+### 5. Archivos impactados
+
+- `src/components/MiNegocioPanel.tsx` — reescritura completa
+- `src/components/config/ConfigMenu.tsx` — quitar Staff y Cobrar, agregar Plan
+- `src/components/ConfigurationPanel.tsx` — quitar Staff y Cobrar, agregar Plan
+- `src/pages/Index.tsx` — ajustar props pasadas a ambos paneles
+
+### Estructura visual resultante
+
+```text
+┌─────────────────────────────────────────┐
+│ Gestionar Mi Negocio                    │
+│ Sucursales                              │
+│ Gestiona las sucursales de tu negocio   │
+│                          [+ Nueva suc]  │
+├─────────────────────────────────────────┤
+│ [Casa Central] [SDAD] [Otra...]         │
+├─────────────────────────────────────────┤
+│ ▼ Información de la sucursal            │
+│   Nombre: Casa Central                  │
+│   Dirección: Av. Corrientes...          │
+│   Teléfono: +54...            [Editar]  │
+│                                         │
+│ ▼ Equipo                                │
+│   [Usuarios asignados + roles + gestión]│
+│                                         │
+│ ▼ Cobrar                                │
+│   [Servicios] [Extras] [Descuentos]     │
+│   (tabs internas de CobrarConfig)       │
+└─────────────────────────────────────────┘
+```
+
