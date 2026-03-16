@@ -137,18 +137,14 @@ export function SucursalTabContent({
                   {sucursal.activa ? 'Activa' : 'Inactiva'}
                 </Badge>
               </div>
-              {sucursal.direccion && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">{sucursal.direccion}</span>
-                </div>
-              )}
-              {sucursal.telefono && (
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">{sucursal.telefono}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
+              </div>
             </div>
           )}
         </CardContent>
