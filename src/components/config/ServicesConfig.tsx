@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Service, Line } from '@/types/barbershop';
 
 interface ServicesConfigProps {
@@ -14,6 +15,11 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+}
+
+interface ToggleConfirm {
+  service: Service;
+  action: 'activate' | 'deactivate';
 }
 
 export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: ServicesConfigProps) {
@@ -27,6 +33,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
   const [newLineName, setNewLineName] = useState('');
   const [addLineContext, setAddLineContext] = useState<'add' | 'edit'>('add');
+  const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
 
   const activeServices = services.filter(s => s.active);
   const inactiveServices = services.filter(s => !s.active);
@@ -77,14 +84,16 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
     setShowAddLineDialog(true);
   };
 
+  const handleConfirmToggle = () => {
+    if (!toggleConfirm) return;
+    onUpdate(toggleConfirm.service.id, { active: toggleConfirm.action === 'activate' });
+    setToggleConfirm(null);
+  };
+
   const renderServiceItem = (service: Service) => (
-    <div key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+    <div key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === service.id ? (
         <div className="flex flex-col gap-2 w-full">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/80 px-2 py-1 rounded">
-            <span className="font-medium">UID:</span>
-            <span className="font-mono">{service.uid}</span>
-          </div>
           <div className="flex flex-wrap gap-2">
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
             <Input type="number" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Precio" className="w-28" />
@@ -114,7 +123,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
           <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => onUpdate(service.id, { active: !service.active })} className="h-8 w-8" title={service.active ? 'Desactivar' : 'Activar'}>
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: service.active ? 'deactivate' : 'activate' })} className="h-8 w-8" title={service.active ? 'Desactivar' : 'Activar'}>
             {service.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
         </>
@@ -141,7 +150,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
-                <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg animate-scale-in">
+                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
                   <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" />
                   <Input type="number" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
                   <div className="flex items-center gap-1">
@@ -172,6 +181,28 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Toggle confirmation dialog */}
+      <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleConfirm?.action === 'deactivate' ? 'Desactivar servicio' : 'Activar servicio'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleConfirm?.action === 'deactivate'
+                ? `¿Estás seguro de que querés desactivar "${toggleConfirm?.service.name}"?`
+                : `¿Querés volver a activar "${toggleConfirm?.service.name}"?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggle}>
+              {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={showAddLineDialog} onOpenChange={setShowAddLineDialog}>
         <DialogContent className="sm:max-w-md">

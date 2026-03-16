@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -91,7 +91,7 @@ export function EquipoUnificado({
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '',
+    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' as AppRole,
   });
 
   const activeBarbers = barbers.filter(b => b.active);
@@ -166,7 +166,7 @@ export function EquipoUnificado({
     const currentRoles = getUserRoles(linkedUser.id);
     const isOwner = currentRoles.includes('owner');
     if (isOwner) {
-      toast.error('No se puede cambiar el rol del dueño');
+      toast.error('No se puede cambiar el cargo del dueño');
       return;
     }
 
@@ -176,25 +176,40 @@ export function EquipoUnificado({
     }
     const { error } = await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: newRole });
     if (error) {
-      toast.error('Error al cambiar rol');
+      toast.error('Error al cambiar cargo');
     } else {
-      toast.success(`Rol actualizado a ${getRoleLabel(newRole)}`);
+      toast.success(`Cargo actualizado a ${getRoleLabel(newRole)}`);
       await fetchUserRoles();
     }
   };
 
+  // Assign role to a new barber (no linked user yet - we just store it for when they get invited)
+  const handleAssignRoleToNewBarber = async (barberId: string, role: AppRole) => {
+    const linkedUser = getLinkedUser(barberId);
+    if (!linkedUser) {
+      toast.info('El cargo se asignará cuando el miembro sea invitado al sistema.');
+      return;
+    }
+    await handleChangeRole(barberId, role);
+  };
+
   const resetForm = () => {
-    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '' });
+    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' });
   };
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
-  const handleFormSave = (data: typeof formData, barberId?: string) => {
+  const handleFormSave = async (data: typeof formData, barberId?: string) => {
     if (barberId) {
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
       });
+      // Update role if linked user exists
+      const linkedUser = getLinkedUser(barberId);
+      if (linkedUser) {
+        await handleChangeRole(barberId, data.role);
+      }
       setEditingId(null);
     } else {
       onAddBarber({
@@ -222,11 +237,7 @@ export function EquipoUnificado({
     const [localData, setLocalData] = useState(initialData);
     const [localCommissionError, setLocalCommissionError] = useState('');
 
-    // Check if linked user has barber role - commission required only for barbers
-    const linkedUser = barberId ? getLinkedUser(barberId) : null;
-    const linkedUserRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    const isBarberRole = linkedUserRoles.includes('barber') || (!linkedUser && !isEdit);
-    const commissionRequired = isBarberRole;
+    const commissionRequired = localData.role === 'barber';
 
     const validateLocalCommission = (value: string): boolean => {
       if (!commissionRequired && (value === '' || value === '0')) {
@@ -246,7 +257,7 @@ export function EquipoUnificado({
     };
 
     return (
-      <div className="space-y-3 p-4 bg-muted rounded-lg animate-scale-in">
+      <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-lg animate-scale-in">
         <div className="grid grid-cols-2 gap-3">
           <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
           <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
@@ -264,6 +275,24 @@ export function EquipoUnificado({
         <div className="grid grid-cols-2 gap-3">
           <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
           <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
+        </div>
+        {/* Role selector */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Cargo *</label>
+          <Select value={localData.role} onValueChange={(v) => setLocalData(prev => ({ ...prev, role: v as AppRole }))}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Seleccionar cargo" />
+            </SelectTrigger>
+            <SelectContent>
+              {ASSIGNABLE_ROLES.map(role => (
+                <SelectItem key={role} value={role}>
+                  <span className="flex items-center gap-2">
+                    {getRoleIcon(role)} {getRoleLabel(role)}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
@@ -287,10 +316,14 @@ export function EquipoUnificado({
       <div key={barber.id}>
         {editingId === barber.id ? (
           <StaffForm isEdit={true} barberId={barber.id}
-            initialData={{ firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone, commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '' }}
+            initialData={{
+              firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
+              commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
+              role: highestRole || 'barber',
+            }}
             onSave={(data) => handleFormSave(data, barber.id)} onCancel={cancelEdit} />
         ) : (
-          <div className="p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+          <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
             {/* Header: Name + Role + Commission */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
@@ -301,7 +334,7 @@ export function EquipoUnificado({
                   </Badge>
                 )}
                 {!highestRole && (
-                  <Badge variant="outline" className="text-xs text-muted-foreground">Sin rol asignado</Badge>
+                  <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo asignado</Badge>
                 )}
                 <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{barber.commission}% comisión</span>
               </div>
@@ -309,19 +342,37 @@ export function EquipoUnificado({
 
             {/* Contact info */}
             <div className="text-xs text-muted-foreground space-y-1 mb-3">
-              {linkedUser && <p className="text-xs opacity-70">✉️ {linkedUser.email}</p>}
-              <p>📞 {barber.phone}</p>
-              {barber.address && <p>📍 {barber.address}</p>}
-              {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
+              {linkedUser && (
+                <div className="flex items-center gap-1.5">
+                  <Mail className="w-3 h-3" />
+                  <span>{linkedUser.email}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-3 flex items-center justify-center text-[10px]">Tel</span>
+                <span>{barber.phone}</span>
+              </div>
+              {barber.address && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 flex items-center justify-center text-[10px]">Dir</span>
+                  <span>{barber.address}</span>
+                </div>
+              )}
+              {barber.dni && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 flex items-center justify-center text-[10px]">DNI</span>
+                  <span>{barber.dni}</span>
+                </div>
+              )}
             </div>
 
             {/* Role selector (only for non-owners with linked users) */}
             {linkedUser && !isOwner && (
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Rol:</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Cargo:</span>
                 <Select value={highestRole || ''} onValueChange={(v) => handleChangeRole(barber.id, v as AppRole)}>
                   <SelectTrigger className="h-8 text-xs flex-1 max-w-[220px]">
-                    <SelectValue placeholder="Seleccionar rol" />
+                    <SelectValue placeholder="Seleccionar cargo" />
                   </SelectTrigger>
                   <SelectContent>
                     {ASSIGNABLE_ROLES.map(role => (
@@ -336,7 +387,11 @@ export function EquipoUnificado({
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
                 setEditingId(barber.id);
-                setFormData({ firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone, commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '' });
+                setFormData({
+                  firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
+                  commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
+                  role: highestRole || 'barber',
+                });
               }}>
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
               </Button>
