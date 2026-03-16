@@ -1,50 +1,21 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
 import { ConfigMenu } from './config/ConfigMenu';
-import { StaffConfig } from './config/StaffConfig';
-import { CobrarConfig } from './config/CobrarConfig';
 import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
+import { OrganizationSettings } from './OrganizationSettings';
 
-type ConfigSection = 'menu' | 'cobrar' | 'pin' | 'tareas' | 'staff';
-
-interface ConfigurationPanelProps {
-  services: Service[];
-  extras: Extra[];
-  barbers: Barber[];
-  discounts: Discount[];
-  lines: Line[];
-  onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
-  onUpdateService: (id: string, updates: Partial<Service>) => void;
-  onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
-  onUpdateExtra: (id: string, updates: Partial<Extra>) => void;
-  onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
-  onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
-  onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
-  onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
-  onDeleteDiscount: (id: string) => void;
-  onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
-  onUpdateLine: (id: string, updates: Partial<Line>) => void;
-}
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan';
 
 const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
-  cobrar: 'Cobrar',
   pin: 'PIN de Seguridad',
   tareas: 'Tareas y Peticiones',
-  staff: 'Staff',
+  plan: 'Plan y Suscripción',
 };
 
-export function ConfigurationPanel({
-  services, extras, barbers, discounts, lines,
-  onAddService, onUpdateService,
-  onAddExtra, onUpdateExtra,
-  onAddBarber, onUpdateBarber,
-  onAddDiscount, onUpdateDiscount, onDeleteDiscount,
-  onAddLine, onUpdateLine,
-}: ConfigurationPanelProps) {
+export function ConfigurationPanel() {
   const [activeSection, setActiveSection] = useState<ConfigSection>('menu');
 
   return (
@@ -67,23 +38,8 @@ export function ConfigurationPanel({
         <ConfigMenu onSelect={setActiveSection} />
       )}
 
-      {activeSection === 'staff' && (
-        <StaffConfig
-          barbers={barbers}
-          onAdd={onAddBarber}
-          onUpdate={onUpdateBarber}
-        />
-      )}
-
-      {activeSection === 'cobrar' && (
-        <CobrarConfig
-          services={services} extras={extras} discounts={discounts} lines={lines}
-          onAddService={onAddService} onUpdateService={onUpdateService}
-          onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
-          onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
-          onDeleteDiscount={onDeleteDiscount}
-          onAddLine={onAddLine} onUpdateLine={onUpdateLine}
-        />
+      {activeSection === 'plan' && (
+        <OrganizationSettings />
       )}
 
       {activeSection === 'pin' && (

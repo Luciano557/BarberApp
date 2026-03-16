@@ -1,14 +1,12 @@
-import { Scissors, Shield, ChevronRight, ClipboardList, Users } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Shield, ChevronRight, ClipboardList, Crown } from 'lucide-react';
 
-type ConfigSection = 'menu' | 'cobrar' | 'pin' | 'tareas' | 'staff';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan';
 
 interface ConfigMenuItem {
   id: ConfigSection;
   icon: React.ReactNode;
   title: string;
   description: string;
-  visible: boolean;
 }
 
 interface ConfigMenuProps {
@@ -16,42 +14,30 @@ interface ConfigMenuProps {
 }
 
 export function ConfigMenu({ onSelect }: ConfigMenuProps) {
-  const { isOwner } = useAuth();
-
   const items: ConfigMenuItem[] = [
     {
-      id: 'staff',
-      icon: <Users className="h-5 w-5" />,
-      title: 'Staff',
-      description: 'Barberos y comisiones',
-      visible: true,
-    },
-    {
-      id: 'cobrar',
-      icon: <Scissors className="h-5 w-5" />,
-      title: 'Cobrar',
-      description: 'Servicios, extras, descuentos',
-      visible: true,
+      id: 'plan',
+      icon: <Crown className="h-5 w-5" />,
+      title: 'Plan y Suscripción',
+      description: 'Ver plan actual, límites e información del negocio',
     },
     {
       id: 'pin',
       icon: <Shield className="h-5 w-5" />,
       title: 'PIN de Seguridad',
       description: 'Acceso a secciones protegidas',
-      visible: true,
     },
     {
       id: 'tareas',
       icon: <ClipboardList className="h-5 w-5" />,
       title: 'Tareas y Peticiones',
       description: 'Vencimiento de peticiones',
-      visible: true,
     },
   ];
 
   return (
     <div className="space-y-3">
-      {items.filter(i => i.visible).map((item) => (
+      {items.map((item) => (
         <button
           key={item.id}
           onClick={() => onSelect(item.id)}

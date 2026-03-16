@@ -19,7 +19,6 @@ const Index = () => {
   const isMobile = useIsMobile();
   const { canManagePayments, canManageConfig, isOwner } = useAuth();
   
-  // Set default tab based on permissions
   const getDefaultTab = () => {
     if (canManagePayments) return 'registro';
     return 'resumen';
@@ -27,7 +26,6 @@ const Index = () => {
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
 
-  // Update active tab if current tab becomes inaccessible
   useEffect(() => {
     if (activeTab === 'registro' && !canManagePayments) {
       setActiveTab('resumen');
@@ -40,25 +38,11 @@ const Index = () => {
   const {
     isLoading,
     services,
-    allServices,
     extras,
-    allExtras,
     barbers,
     allBarbers,
     discounts,
     lines,
-    allLines,
-    addService,
-    updateService,
-    addExtra,
-    updateExtra,
-    addBarber,
-    updateBarber,
-    addDiscount,
-    updateDiscount,
-    deleteDiscount,
-    addLine,
-    updateLine,
   } = useSupabaseData();
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
@@ -78,10 +62,8 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex w-full">
-      {/* Sidebar */}
       <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Main Content */}
       <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
         <div className="max-w-4xl mx-auto p-4 md:p-8">
           {activeTab === 'registro' && canManagePayments && (
@@ -137,24 +119,7 @@ const Index = () => {
 
           {activeTab === 'config' && canManageConfig && (
             <PinProtectedSection sectionName="Configuración">
-              <ConfigurationPanel
-                services={allServices}
-                extras={allExtras}
-                barbers={allBarbers}
-                discounts={discounts}
-                lines={allLines}
-                onAddService={addService}
-                onUpdateService={updateService}
-                onAddExtra={addExtra}
-                onUpdateExtra={updateExtra}
-                onAddBarber={addBarber}
-                onUpdateBarber={updateBarber}
-                onAddDiscount={addDiscount}
-                onUpdateDiscount={updateDiscount}
-                onDeleteDiscount={deleteDiscount}
-                onAddLine={addLine}
-                onUpdateLine={updateLine}
-              />
+              <ConfigurationPanel />
             </PinProtectedSection>
           )}
         </div>

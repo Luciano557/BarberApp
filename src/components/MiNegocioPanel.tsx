@@ -1,94 +1,228 @@
-import { useState } from 'react';
-import { ArrowLeft, Building2, MapPin, Crown, ChevronRight } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { OrganizationSettings } from './OrganizationSettings';
-import { SucursalesConfig } from './config/SucursalesConfig';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
+import { Barber } from '@/types/barbershop';
+import { toast } from 'sonner';
+import { SucursalTabContent } from './SucursalTabContent';
 
-type Section = 'menu' | 'info' | 'sucursales' | 'plan';
+interface BarberWithSucursal extends Barber {
+  sucursalId: string | null;
+}
 
-const sectionTitles: Record<Section, string> = {
-  menu: 'Mi Negocio',
-  info: 'Información',
-  sucursales: 'Sucursales',
-  plan: 'Plan',
-};
-
-interface MenuItem {
-  id: Section;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  visible: boolean;
+function dbToBarberWithSucursal(row: any): BarberWithSucursal {
+  return {
+    id: row.id,
+    uid: row.id,
+    firstName: row.nombre,
+    lastName: row.apellido,
+    phone: row.telefono || '',
+    commission: Number(row.comision) || 0,
+    dni: row.dni || undefined,
+    active: row.activo,
+    sucursalId: row.sucursal_id || null,
+  };
 }
 
 export function MiNegocioPanel() {
-  const [activeSection, setActiveSection] = useState<Section>('menu');
+  const { organization } = useOrganization();
+  const { refreshSucursales } = useSucursal();
+  const {
+    allServices, allExtras, discounts, allLines,
+    addService, updateService, addExtra, updateExtra,
+    addDiscount, updateDiscount, deleteDiscount, addLine, updateLine,
+  } = useSupabaseData();
 
-  const items: MenuItem[] = [
-    {
-      id: 'info',
-      icon: <Building2 className="h-5 w-5" />,
-      title: 'Información del Negocio',
-      description: 'Nombre, dirección, teléfono y zona horaria',
-      visible: true,
-    },
-    {
-      id: 'sucursales',
-      icon: <MapPin className="h-5 w-5" />,
-      title: 'Sucursales',
-      description: 'Gestionar sucursales, usuarios y roles',
-      visible: true,
-    },
-    {
-      id: 'plan',
-      icon: <Crown className="h-5 w-5" />,
-      title: 'Plan y Suscripción',
-      description: 'Ver plan actual y límites',
-      visible: true,
-    },
-  ];
+  const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
+  const [allBarbers, setAllBarbers] = useState<BarberWithSucursal[]>([]);
+  const [showDialog, setShowDialog] = useState(false);
+  const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const fetchAllSucursales = useCallback(async () => {
+    if (!organization?.id) return;
+    const { data } = await supabase
+      .from('sucursales')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .order('nombre');
+    if (data) {
+      setAllSucursales(data.map(s => ({
+        id: s.id, organization_id: s.organization_id, nombre: s.nombre,
+        direccion: s.direccion, telefono: s.telefono, timezone: s.timezone, activa: s.activa,
+      })));
+    }
+  }, [organization?.id]);
+
+  const fetchAllBarbers = useCallback(async () => {
+    if (!organization?.id) return;
+    const { data } = await supabase
+      .from('barberos')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .order('nombre');
+    if (data) setAllBarbers(data.map(dbToBarberWithSucursal));
+  }, [organization?.id]);
+
+  useEffect(() => {
+    fetchAllSucursales();
+    fetchAllBarbers();
+  }, [fetchAllSucursales, fetchAllBarbers]);
+
+  // --- Barber CRUD ---
+  const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
+    if (!organization?.id) return;
+    const { error } = await supabase.from('barberos').insert({
+      nombre: barber.firstName.replace(/\s+/g, ' ').trim(),
+      apellido: barber.lastName.replace(/\s+/g, ' ').trim(),
+      telefono: barber.phone || null,
+      dni: barber.dni || null,
+      comision: barber.commission,
+      activo: barber.active,
+      organization_id: organization.id,
+      sucursal_id: sucursalId,
+    });
+    if (error) { toast.error('Error al agregar barbero'); return; }
+    toast.success('Barbero agregado');
+    await fetchAllBarbers();
+  }, [organization?.id, fetchAllBarbers]);
+
+  const updateBarberFn = useCallback(async (id: string, updates: Partial<Barber>) => {
+    const dbUpdates: any = {};
+    if (updates.firstName !== undefined) dbUpdates.nombre = updates.firstName.replace(/\s+/g, ' ').trim();
+    if (updates.lastName !== undefined) dbUpdates.apellido = updates.lastName.replace(/\s+/g, ' ').trim();
+    if (updates.phone !== undefined) dbUpdates.telefono = updates.phone || null;
+    if (updates.dni !== undefined) dbUpdates.dni = updates.dni || null;
+    if (updates.commission !== undefined) dbUpdates.comision = updates.commission;
+    if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+    const { error } = await supabase.from('barberos').update(dbUpdates).eq('id', id);
+    if (error) { toast.error('Error al actualizar barbero'); return; }
+    await fetchAllBarbers();
+  }, [fetchAllBarbers]);
+
+  // --- Sucursal CRUD ---
+  const handleOpenCreate = () => {
+    setFormData({ nombre: '', direccion: '', telefono: '' });
+    setShowDialog(true);
+  };
+
+  const handleSaveSucursal = async () => {
+    if (!organization?.id || !formData.nombre.trim()) return;
+    setIsSaving(true);
+    const { error } = await supabase.from('sucursales').insert({
+      organization_id: organization.id,
+      nombre: formData.nombre.trim(),
+      direccion: formData.direccion || null,
+      telefono: formData.telefono || null,
+      timezone: organization.timezone,
+    });
+    if (error) {
+      toast.error(error.message || 'Error al crear');
+    } else {
+      toast.success('Sucursal creada');
+      setShowDialog(false);
+      await fetchAllSucursales();
+      await refreshSucursales();
+    }
+    setIsSaving(false);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
-        {activeSection !== 'menu' && (
-          <Button variant="ghost" size="icon" onClick={() => setActiveSection('menu')} className="shrink-0">
-            <ArrowLeft className="h-5 w-5" />
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Gestionar Mi Negocio</h1>
+        <div className="flex items-center justify-between mt-4">
+          <div>
+            <h2 className="text-lg font-medium text-foreground">Sucursales</h2>
+            <p className="text-sm text-muted-foreground">Gestiona las sucursales de tu negocio</p>
+          </div>
+          <Button size="sm" onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
           </Button>
-        )}
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">{sectionTitles[activeSection]}</h1>
-          {activeSection === 'menu' && (
-            <p className="text-muted-foreground text-sm mt-1">Administración general de tu negocio</p>
-          )}
         </div>
       </div>
 
-      {activeSection === 'menu' && (
-        <div className="space-y-3">
-          {items.filter(i => i.visible).map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className="w-full flex items-center gap-4 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                {item.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground">{item.title}</p>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-            </button>
+      {/* Tabs por sucursal */}
+      {allSucursales.length > 0 && (
+        <Tabs defaultValue={allSucursales[0]?.id} className="w-full">
+          <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+            {allSucursales.map(s => (
+              <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                {s.nombre}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {allSucursales.map(s => (
+            <TabsContent key={s.id} value={s.id}>
+              <SucursalTabContent
+                sucursal={s}
+                barbers={allBarbers.filter(b => b.sucursalId === s.id)}
+                allBarbers={allBarbers}
+                services={allServices}
+                extras={allExtras}
+                discounts={discounts}
+                lines={allLines}
+                onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
+                onUpdateBarber={updateBarberFn}
+                onAddService={addService}
+                onUpdateService={updateService}
+                onAddExtra={addExtra}
+                onUpdateExtra={updateExtra}
+                onAddDiscount={addDiscount}
+                onUpdateDiscount={updateDiscount}
+                onDeleteDiscount={deleteDiscount}
+                onAddLine={addLine}
+                onUpdateLine={updateLine}
+                onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
+              />
+            </TabsContent>
           ))}
+        </Tabs>
+      )}
+
+      {allSucursales.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No hay sucursales. Creá una para empezar.</p>
         </div>
       )}
 
-      {activeSection === 'info' && <OrganizationSettings />}
-      {activeSection === 'sucursales' && <SucursalesConfig />}
-      {activeSection === 'plan' && <OrganizationSettings />}
+      {/* Crear sucursal */}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva sucursal</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nombre</Label>
+              <Input value={formData.nombre} onChange={(e) => setFormData(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" />
+            </div>
+            <div className="space-y-2">
+              <Label>Dirección</Label>
+              <Input value={formData.direccion} onChange={(e) => setFormData(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" />
+            </div>
+            <div className="space-y-2">
+              <Label>Teléfono</Label>
+              <Input value={formData.telefono} onChange={(e) => setFormData(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowDialog(false)}>Cancelar</Button>
+            <Button onClick={handleSaveSucursal} disabled={isSaving || !formData.nombre.trim()}>
+              {isSaving ? 'Guardando...' : 'Crear'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
