@@ -294,7 +294,7 @@ export function SucursalesConfig() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
-                  <Button variant="ghost" size="icon" onClick={() => handleOpenAssign(suc)} title="Usuarios y roles">
+                  <Button variant="ghost" size="icon" onClick={() => handleOpenAssign(suc)} title="Equipo de la sucursal">
                     <Users className="h-4 w-4" />
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(suc)}>
@@ -343,7 +343,7 @@ export function SucursalesConfig() {
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Usuarios — {assignSucursal?.nombre}</DialogTitle>
+            <DialogTitle>Equipo — {assignSucursal?.nombre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             {/* Assigned users */}
@@ -431,11 +431,11 @@ export function SucursalesConfig() {
             {/* Add user */}
             {getUnassignedUsers().length > 0 && (
               <div>
-                <Label className="text-sm font-medium mb-2 block">Agregar usuario</Label>
+                <Label className="text-sm font-medium mb-2 block">Agregar al equipo</Label>
                 <div className="flex gap-2">
                   <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Seleccionar usuario" />
+                      <SelectValue placeholder="Seleccionar persona" />
                     </SelectTrigger>
                     <SelectContent>
                       {getUnassignedUsers().map((u) => (
@@ -445,7 +445,7 @@ export function SucursalesConfig() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={handleAssignUser} disabled={!selectedUserId}>Asignar</Button>
+                  <Button onClick={handleAssignUser} disabled={!selectedUserId}>Agregar</Button>
                 </div>
               </div>
             )}
