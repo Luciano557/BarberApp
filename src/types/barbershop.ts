@@ -11,6 +11,7 @@ export interface Service {
   price: number;
   lineId?: string; // Reference to lineas table
   lineName?: string; // Cached line name for display
+  sucursalId?: string; // Reference to sucursales table
   active: boolean;
 }
 
