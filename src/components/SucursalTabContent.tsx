@@ -160,9 +160,9 @@ export function SucursalTabContent({
         onUpdateBarber={onUpdateBarber}
       />
 
-      {/* Cobrar */}
+      {/* Catálogo de Servicios */}
       <div className="space-y-4">
-        <h3 className="text-base font-medium text-foreground">Cobrar</h3>
+        <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
         <CobrarConfig
           services={services} extras={extras} discounts={discounts} lines={lines}
           onAddService={onAddService} onUpdateService={onUpdateService}

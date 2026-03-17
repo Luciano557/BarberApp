@@ -23,6 +23,7 @@ function dbToService(row: any, lines: Line[]): Service {
     price: Number(row.precio),
     lineId: row.linea_id || undefined,
     lineName: line?.name,
+    sucursalId: row.sucursal_id || undefined,
     active: row.activo,
   };
 }
@@ -33,6 +34,7 @@ function dbToExtra(row: any): Extra {
     uid: row.id,
     name: row.nombre,
     price: Number(row.precio),
+    sucursalId: row.sucursal_id || undefined,
     active: row.activo,
   };
 }
@@ -60,6 +62,7 @@ function dbToDiscount(row: any): Discount {
     rounding: row.redondeo || 'cliente',
     roundingUnit: Number(row.redondeo_unidad) || 100,
     paymentMethod: row.metodo_pago || 'todos',
+    sucursalId: row.sucursal_id || undefined,
   };
 }
 
@@ -130,7 +133,6 @@ export function useSupabaseData() {
       return null;
     }
     try {
-      // Normalize name to avoid spacing issues
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
       
       const { data, error } = await supabase
@@ -141,6 +143,7 @@ export function useSupabaseData() {
           activo: service.active,
           linea_id: service.lineId || null,
           organization_id: organization.id,
+          sucursal_id: service.sucursalId || null,
         })
         .select()
         .single();
@@ -172,7 +175,6 @@ export function useSupabaseData() {
       
       if (error) throw error;
       
-      // Update lineName if lineId changed
       const updatedLine = updates.lineId ? lines.find(l => l.id === updates.lineId) : undefined;
       const finalUpdates = updates.lineId !== undefined 
         ? { ...updates, lineName: updatedLine?.name } 
@@ -192,7 +194,6 @@ export function useSupabaseData() {
       return null;
     }
     try {
-      // Normalize name to avoid spacing issues
       const normalizedName = extra.name.replace(/\s+/g, ' ').trim();
       
       const { data, error } = await supabase
@@ -202,6 +203,7 @@ export function useSupabaseData() {
           precio: extra.price, 
           activo: extra.active,
           organization_id: organization.id,
+          sucursal_id: extra.sucursalId || null,
         })
         .select()
         .single();
@@ -245,7 +247,6 @@ export function useSupabaseData() {
       return null;
     }
     try {
-      // Normalize names to avoid spacing issues
       const normalizedFirstName = barber.firstName.replace(/\s+/g, ' ').trim();
       const normalizedLastName = barber.lastName.replace(/\s+/g, ' ').trim();
       
@@ -317,6 +318,7 @@ export function useSupabaseData() {
           metodo_pago: discount.paymentMethod || 'todos',
           activo: true,
           organization_id: organization.id,
+          sucursal_id: discount.sucursalId || null,
         })
         .select()
         .single();
@@ -334,7 +336,7 @@ export function useSupabaseData() {
   }, [organization]);
 
   const updateDiscount = useCallback(async (id: string, updates: Partial<Discount>) => {
-    if (id === 'none') return; // Don't update the "Sin descuento" option
+    if (id === 'none') return;
     try {
       const dbUpdates: any = {};
       if (updates.label !== undefined) dbUpdates.nombre = updates.label;
@@ -417,7 +419,6 @@ export function useSupabaseData() {
       if (error) throw error;
       setLines(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
       
-      // Also update lineName in services that reference this line
       if (updates.name !== undefined) {
         setServices(prev => prev.map(s => 
           s.lineId === id ? { ...s, lineName: updates.name } : s
@@ -430,9 +431,7 @@ export function useSupabaseData() {
   }, []);
 
   return {
-    // Loading state
     isLoading,
-    // Data - active items only for operations
     services: services.filter(s => s.active),
     allServices: services,
     extras: extras.filter(e => e.active),
@@ -442,23 +441,17 @@ export function useSupabaseData() {
     discounts,
     lines: lines.filter(l => l.active),
     allLines: lines,
-    // Services
     addService,
     updateService,
-    // Extras
     addExtra,
     updateExtra,
-    // Barbers
     addBarber,
     updateBarber,
-    // Discounts
     addDiscount,
     updateDiscount,
     deleteDiscount,
-    // Lines
     addLine,
     updateLine,
-    // Refresh
     refreshData: fetchData,
   };
 }

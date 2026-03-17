@@ -135,6 +135,35 @@ export function MiNegocioPanel() {
     setIsSaving(false);
   };
 
+  // --- Helpers to scope catalog data by sucursal ---
+  const getServicesForSucursal = (sucursalId: string) =>
+    allServices.filter(s => s.sucursalId === sucursalId);
+
+  const getExtrasForSucursal = (sucursalId: string) =>
+    allExtras.filter(e => e.sucursalId === sucursalId);
+
+  const getDiscountsForSucursal = (sucursalId: string) =>
+    discounts.filter(d => d.id === 'none' || d.sucursalId === sucursalId);
+
+  // Wrap add functions to inject sucursalId
+  const addServiceForSucursal = useCallback((sucursalId: string) => {
+    return (service: Parameters<typeof addService>[0]) => {
+      return addService({ ...service, sucursalId });
+    };
+  }, [addService]);
+
+  const addExtraForSucursal = useCallback((sucursalId: string) => {
+    return (extra: Parameters<typeof addExtra>[0]) => {
+      return addExtra({ ...extra, sucursalId });
+    };
+  }, [addExtra]);
+
+  const addDiscountForSucursal = useCallback((sucursalId: string) => {
+    return (discount: Parameters<typeof addDiscount>[0]) => {
+      return addDiscount({ ...discount, sucursalId });
+    };
+  }, [addDiscount]);
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -167,17 +196,17 @@ export function MiNegocioPanel() {
                 sucursal={s}
                 barbers={allBarbers.filter(b => b.sucursalId === s.id)}
                 allBarbers={allBarbers}
-                services={allServices}
-                extras={allExtras}
-                discounts={discounts}
+                services={getServicesForSucursal(s.id)}
+                extras={getExtrasForSucursal(s.id)}
+                discounts={getDiscountsForSucursal(s.id)}
                 lines={allLines}
                 onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
                 onUpdateBarber={updateBarberFn}
-                onAddService={addService}
+                onAddService={addServiceForSucursal(s.id)}
                 onUpdateService={updateService}
-                onAddExtra={addExtra}
+                onAddExtra={addExtraForSucursal(s.id)}
                 onUpdateExtra={updateExtra}
-                onAddDiscount={addDiscount}
+                onAddDiscount={addDiscountForSucursal(s.id)}
                 onUpdateDiscount={updateDiscount}
                 onDeleteDiscount={deleteDiscount}
                 onAddLine={addLine}

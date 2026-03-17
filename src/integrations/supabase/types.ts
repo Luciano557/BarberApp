@@ -164,6 +164,7 @@ export type Database = {
           organization_id: string | null
           redondeo: string | null
           redondeo_unidad: number | null
+          sucursal_id: string | null
           tipo: string
           updated_at: string
           valor: number
@@ -177,6 +178,7 @@ export type Database = {
           organization_id?: string | null
           redondeo?: string | null
           redondeo_unidad?: number | null
+          sucursal_id?: string | null
           tipo: string
           updated_at?: string
           valor?: number
@@ -190,6 +192,7 @@ export type Database = {
           organization_id?: string | null
           redondeo?: string | null
           redondeo_unidad?: number | null
+          sucursal_id?: string | null
           tipo?: string
           updated_at?: string
           valor?: number
@@ -200,6 +203,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "descuentos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -333,6 +343,7 @@ export type Database = {
           nombre: string
           organization_id: string | null
           precio: number
+          sucursal_id: string | null
           updated_at: string
         }
         Insert: {
@@ -342,6 +353,7 @@ export type Database = {
           nombre: string
           organization_id?: string | null
           precio?: number
+          sucursal_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -351,6 +363,7 @@ export type Database = {
           nombre?: string
           organization_id?: string | null
           precio?: number
+          sucursal_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -359,6 +372,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extras_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]
@@ -982,6 +1002,7 @@ export type Database = {
           nombre: string
           organization_id: string | null
           precio: number
+          sucursal_id: string | null
           updated_at: string
         }
         Insert: {
@@ -992,6 +1013,7 @@ export type Database = {
           nombre: string
           organization_id?: string | null
           precio?: number
+          sucursal_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1002,6 +1024,7 @@ export type Database = {
           nombre?: string
           organization_id?: string | null
           precio?: number
+          sucursal_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1017,6 +1040,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]

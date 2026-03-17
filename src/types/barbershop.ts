@@ -11,6 +11,7 @@ export interface Service {
   price: number;
   lineId?: string; // Reference to lineas table
   lineName?: string; // Cached line name for display
+  sucursalId?: string; // Reference to sucursales table
   active: boolean;
 }
 
@@ -19,6 +20,7 @@ export interface Extra {
   uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  sucursalId?: string; // Reference to sucursales table
   active: boolean;
 }
 
@@ -47,6 +49,7 @@ export interface Discount {
   rounding: 'cliente' | 'negocio' | 'matematico'; // cliente = floor, negocio = ceil, matematico = round
   roundingUnit: number; // unidad de redondeo (100, 500, 1000, etc.)
   paymentMethod: 'todos' | 'efectivo' | 'mercado_pago'; // restricción de método de pago
+  sucursalId?: string; // Reference to sucursales table
 }
 
 export interface Transaction {

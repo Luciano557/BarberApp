@@ -333,7 +333,10 @@ export function EquipoUnificado({
                     {getRoleIcon(highestRole)} {getRoleLabel(highestRole)}
                   </Badge>
                 )}
-                {!highestRole && (
+                {!highestRole && !linkedUser && (
+                  <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo — Invitalo para asignar</Badge>
+                )}
+                {!highestRole && linkedUser && (
                   <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo asignado</Badge>
                 )}
                 <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{barber.commission}% comisión</span>
