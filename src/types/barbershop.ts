@@ -20,6 +20,7 @@ export interface Extra {
   uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  sucursalId?: string; // Reference to sucursales table
   active: boolean;
 }
 
