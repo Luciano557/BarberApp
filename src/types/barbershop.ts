@@ -49,6 +49,7 @@ export interface Discount {
   rounding: 'cliente' | 'negocio' | 'matematico'; // cliente = floor, negocio = ceil, matematico = round
   roundingUnit: number; // unidad de redondeo (100, 500, 1000, etc.)
   paymentMethod: 'todos' | 'efectivo' | 'mercado_pago'; // restricción de método de pago
+  sucursalId?: string; // Reference to sucursales table
 }
 
 export interface Transaction {
