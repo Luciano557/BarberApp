@@ -39,9 +39,10 @@ export function useTransactions() {
   const loadTransactionsByDate = useCallback(async (date: Date) => {
     setIsLoading(true);
     
-    // Usar funciones de fecha consistentes que no dependen de toISOString()
-    const startStr = getStartOfDayLocal(date);
-    const endStr = getEndOfDayLocal(date);
+    // Usar funciones de fecha consistentes con timezone de la organización
+    const tz = organization?.timezone || null;
+    const startStr = getStartOfDayLocal(date, tz);
+    const endStr = getEndOfDayLocal(date, tz);
 
     let query = supabase
       .from('venta')
