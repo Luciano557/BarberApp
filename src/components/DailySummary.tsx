@@ -129,7 +129,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       });
       setClosedBarbersData(dataMap);
     }
-  }, [validDate, organization?.timezone]);
+  }, [validDate, organization?.timezone, currentSucursal]);
 
   // Check closed barbers on date change
   useMemo(() => {
@@ -386,7 +386,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             <Clock className="h-4 w-4 mr-2" />
             Historial
           </Button>
-          <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
           <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
         </div>
       </div>
