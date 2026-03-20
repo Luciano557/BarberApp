@@ -54,25 +54,67 @@ export const COUNTRIES = [
 ];
 
 /**
- * Obtiene el inicio del día en formato string para queries de Supabase
- * Mantiene la fecha local del usuario sin conversión UTC
+ * Calcula el offset UTC de una zona horaria IANA para una fecha dada.
+ * Retorna un string como "+03:00" o "-05:00".
  */
-export function getStartOfDayLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T00:00:00`;
+function getTimezoneOffsetString(date: Date, tz: string): string {
+  try {
+    // Usar Intl para obtener el offset en la zona horaria dada
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'longOffset',
+    });
+    const parts = formatter.formatToParts(date);
+    const tzPart = parts.find(p => p.type === 'timeZoneName');
+    if (tzPart) {
+      // tzPart.value es algo como "GMT-03:00" o "GMT+05:30" o "GMT"
+      const match = tzPart.value.match(/GMT([+-]\d{2}:\d{2})/);
+      if (match) return match[1];
+      // "GMT" sin offset = UTC
+      if (tzPart.value === 'GMT') return '+00:00';
+    }
+  } catch {
+    // fallback si el timezone no es válido
+  }
+  // Fallback: usar el offset del browser local
+  const offsetMin = date.getTimezoneOffset();
+  const sign = offsetMin <= 0 ? '+' : '-';
+  const absMin = Math.abs(offsetMin);
+  const h = String(Math.floor(absMin / 60)).padStart(2, '0');
+  const m = String(absMin % 60).padStart(2, '0');
+  return `${sign}${h}:${m}`;
 }
 
 /**
- * Obtiene el fin del día en formato string para queries de Supabase
- * Mantiene la fecha local del usuario sin conversión UTC
+ * Obtiene el inicio del día en formato string para queries de Supabase.
+ * Si se proporciona timezone, incluye el offset para que PostgreSQL
+ * interprete la hora correctamente en esa zona horaria.
  */
-export function getEndOfDayLocal(date: Date): string {
+export function getStartOfDayLocal(date: Date, timezone?: string | null): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}T23:59:59`;
+  const base = `${year}-${month}-${day}T00:00:00`;
+  if (timezone) {
+    return `${base}${getTimezoneOffsetString(date, timezone)}`;
+  }
+  return base;
+}
+
+/**
+ * Obtiene el fin del día en formato string para queries de Supabase.
+ * Si se proporciona timezone, incluye el offset para que PostgreSQL
+ * interprete la hora correctamente en esa zona horaria.
+ */
+export function getEndOfDayLocal(date: Date, timezone?: string | null): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const base = `${year}-${month}-${day}T23:59:59`;
+  if (timezone) {
+    return `${base}${getTimezoneOffsetString(date, timezone)}`;
+  }
+  return base;
 }
 
 /**
