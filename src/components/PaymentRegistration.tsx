@@ -49,6 +49,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
   const [selectedDiscount, setSelectedDiscount] = useState('none');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pendingTasks = useMemo(() => 
     tareas.filter(t => t.estado === 'pendiente' && t.tipo === 'tarea'),
