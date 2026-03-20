@@ -129,7 +129,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       });
       setClosedBarbersData(dataMap);
     }
-  }, [validDate, organization?.timezone]);
+  }, [validDate, organization?.timezone, currentSucursal]);
 
   // Check closed barbers on date change
   useMemo(() => {
