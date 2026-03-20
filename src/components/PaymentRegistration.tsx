@@ -546,10 +546,13 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
               <Button
                 onClick={handleSubmit}
                 className="w-full mt-6 h-14 text-base font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                disabled={!paymentMethod}
+                disabled={!paymentMethod || isSubmitting}
               >
-                <Check className="h-5 w-5 mr-2" />
-                Registrar Cobro
+                {isSubmitting ? (
+                  <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Guardando...</>
+                ) : (
+                  <><Check className="h-5 w-5 mr-2" /> Registrar Cobro</>
+                )}
               </Button>
             </div>
           </div>

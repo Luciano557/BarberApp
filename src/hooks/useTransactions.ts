@@ -188,7 +188,6 @@ export function useTransactions() {
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
-    toast.success('Cobro registrado correctamente');
     return newTransaction;
   }, [organization, currentSucursal]);
 
