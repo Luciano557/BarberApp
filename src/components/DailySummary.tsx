@@ -387,7 +387,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             Historial
           </Button>
           <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
-          <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
         </div>
       </div>
 
