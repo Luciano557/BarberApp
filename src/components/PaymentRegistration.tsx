@@ -24,7 +24,7 @@ interface PaymentRegistrationProps {
     paymentMethod: PaymentMethod;
     subtotal: number;
     total: number;
-  }) => void;
+  }) => Promise<any | null>;
 }
 
 type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
