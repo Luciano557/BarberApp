@@ -47,8 +47,9 @@ export function useBackfillClosing() {
     const { barberId, barberName, commissionPct, date, reason, note, mode, items, quickData } = data;
 
     // Check for duplicate
-    const startOfDay = getStartOfDayLocal(date);
-    const endOfDay = getEndOfDayLocal(date);
+    const tz = organization?.timezone || null;
+    const startOfDay = getStartOfDayLocal(date, tz);
+    const endOfDay = getEndOfDayLocal(date, tz);
 
     const { data: existing, error: checkError } = await supabase
       .from('ingresos')
@@ -116,7 +117,7 @@ export function useBackfillClosing() {
       estado: 'activo',
       Usuario: 'Sistema',
       servicios_por_linea: {},
-      created_at: getEndOfDayLocal(date),
+      created_at: getEndOfDayLocal(date, tz),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
       entry_mode: 'diferido',

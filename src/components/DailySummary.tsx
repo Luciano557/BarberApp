@@ -99,8 +99,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
   // Check which barbers have their cash closed for the selected date
   const checkClosedBarbers = useCallback(async () => {
-    const startStr = getStartOfDayLocal(validDate);
-    const endStr = getEndOfDayLocal(validDate);
+    const tz = organization?.timezone || null;
+    const startStr = getStartOfDayLocal(validDate, tz);
+    const endStr = getEndOfDayLocal(validDate, tz);
     
     let query = supabase
       .from('ingresos')
@@ -128,7 +129,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       });
       setClosedBarbersData(dataMap);
     }
-  }, [validDate]);
+  }, [validDate, organization?.timezone]);
 
   // Check closed barbers on date change
   useMemo(() => {

@@ -39,9 +39,10 @@ export function useTransactions() {
   const loadTransactionsByDate = useCallback(async (date: Date) => {
     setIsLoading(true);
     
-    // Usar funciones de fecha consistentes que no dependen de toISOString()
-    const startStr = getStartOfDayLocal(date);
-    const endStr = getEndOfDayLocal(date);
+    // Usar funciones de fecha consistentes con timezone de la organización
+    const tz = organization?.timezone || null;
+    const startStr = getStartOfDayLocal(date, tz);
+    const endStr = getEndOfDayLocal(date, tz);
 
     let query = supabase
       .from('venta')
@@ -109,7 +110,7 @@ export function useTransactions() {
 
     setTransactions(txs);
     setIsLoading(false);
-  }, [currentSucursal]);
+  }, [currentSucursal, organization?.timezone]);
 
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
@@ -228,8 +229,9 @@ export function useTransactions() {
 
   // Verificar si un barbero tiene la caja cerrada para una fecha
   const isBarberCashClosed = useCallback(async (barberId: string, barberName: string, date: Date): Promise<boolean> => {
-    const startStr = getStartOfDayLocal(date);
-    const endStr = getEndOfDayLocal(date);
+    const tz = organization?.timezone || null;
+    const startStr = getStartOfDayLocal(date, tz);
+    const endStr = getEndOfDayLocal(date, tz);
     
     const { data, error } = await supabase
       .from('ingresos')
@@ -246,7 +248,7 @@ export function useTransactions() {
     }
 
     return data && data.length > 0;
-  }, []);
+  }, [organization?.timezone]);
 
   const getTodayTransactions = useCallback(() => {
     return transactions;

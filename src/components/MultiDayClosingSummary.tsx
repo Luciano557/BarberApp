@@ -57,8 +57,9 @@ export function MultiDayClosingSummary() {
 
     setLoading(true);
     try {
-      const startStr = getStartOfDayLocal(desde);
-      const endStr = getEndOfDayLocal(hasta);
+      const tz = organization?.timezone || null;
+      const startStr = getStartOfDayLocal(desde, tz);
+      const endStr = getEndOfDayLocal(hasta, tz);
 
       const { data, error } = await supabase
         .from('ingresos')

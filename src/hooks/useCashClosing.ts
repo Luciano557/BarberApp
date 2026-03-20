@@ -42,9 +42,10 @@ export function useCashClosing() {
     const normalizedBarberName = barber.barberName.replace(/\s+/g, ' ').trim();
     
     // Check for duplicate closing on same date for same barber
-    // Usar funciones de fecha consistentes
-    const startOfDay = getStartOfDayLocal(date);
-    const endOfDay = getEndOfDayLocal(date);
+    // Usar funciones de fecha consistentes con timezone
+    const tz = organization?.timezone || null;
+    const startOfDay = getStartOfDayLocal(date, tz);
+    const endOfDay = getEndOfDayLocal(date, tz);
     
     // Validar duplicados por barbero_id (UUID) - más confiable que texto
     const { data: existingClosing, error: checkError } = await supabase
@@ -153,7 +154,7 @@ export function useCashClosing() {
       estado: 'activo',
       Usuario: 'Sistema',
       servicios_por_linea: serviciosPorLinea,
-      created_at: getEndOfDayLocal(date),
+      created_at: getEndOfDayLocal(date, tz),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
       sucursal_id: currentSucursal?.id || null,
