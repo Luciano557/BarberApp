@@ -110,7 +110,7 @@ export function useTransactions() {
 
     setTransactions(txs);
     setIsLoading(false);
-  }, [currentSucursal]);
+  }, [currentSucursal, organization?.timezone]);
 
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
