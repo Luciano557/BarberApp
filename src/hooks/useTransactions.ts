@@ -158,7 +158,6 @@ export function useTransactions() {
 
     if (ventaError) {
       console.error('Error inserting venta:', ventaError);
-      toast.error('Error al registrar la venta');
       return null;
     }
 
