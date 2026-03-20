@@ -118,12 +118,17 @@ export function useTransactions() {
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     if (!organization) {
-      toast.error('Error: No se encontró la organización');
+      toast.error('No se encontró la organización');
       return null;
     }
 
     if (!currentSucursal) {
-      toast.error('Error: Seleccioná una sucursal antes de registrar un cobro');
+      toast.error('Seleccioná una sucursal antes de registrar un cobro');
+      return null;
+    }
+
+    if (!navigator.onLine) {
+      toast.error('No hay conexión a Internet. Conectate y volvé a intentar.');
       return null;
     }
 
