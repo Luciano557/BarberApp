@@ -1,24 +1,29 @@
-# Fix: Ventas sin sucursal_id
 
-## El problema en simple
 
-Cuando tu empleado registra un corte, el sistema debería guardar "este corte es de Casa Central". Pero por un bug en el código, esa etiqueta no se guarda — queda vacía. Después, cuando el sistema busca "mostrame los cortes de Casa Central", esos cortes sin etiqueta no aparecen. No se perdieron, están en la base de datos, pero sin la etiqueta de sucursal.
+## Resumen del problema
 
-## Qué vamos a hacer
+Hay dos errores en la pantalla de Resúmenes que afectan lo que el usuario ve:
 
-### 1. Corregir el registro de ventas nuevas
+1. **El estado "Caja Cerrada" de cada barbero puede quedar desactualizado.** La función que revisa qué barberos cerraron caja no se actualiza cuando cambiás de sucursal. Usa la sucursal anterior, entonces puede mostrar que un barbero cerró caja cuando en realidad no lo hizo (o al revés). Esto no pierde datos, pero muestra información incorrecta.
 
-En `src/hooks/useTransactions.ts`, la función que guarda ventas tiene un bug: usa una referencia vieja de la sucursal (que queda en `null`). Se corrige agregando `currentSucursal` a las dependencias del `useCallback` (línea 184). Además, si por algún motivo no hay sucursal seleccionada, el sistema bloqueará el registro y mostrará un mensaje de error pidiendo seleccionar una sucursal.
+2. **El botón de Historial aparece duplicado.** Hay dos componentes idénticos en las líneas 389 y 390. Esto genera una doble consulta a la base de datos y puede causar comportamiento visual raro.
 
-### 2. Reparar los 29 cortes existentes sin sucursal
+---
 
-Ejecutar un UPDATE en la base de datos para asignarles la sucursal correcta (Casa Central = `ca6babf5-4d85-44c3-86b7-f8cd2c25a4da`) a todas las ventas que tienen `sucursal_id` nulo dentro de tu organización.
+## Detalle técnico
 
-### Mantener el filtro estricto
+### Cambio 1: `src/components/DailySummary.tsx` — línea 132
 
-El filtro de lectura queda como está: `.eq('sucursal_id', currentSucursal.id)` — sin tolerancia para nulos. Una vez reparados los datos y corregido el insert, no debería haber más ventas sin sucursal.
+Agregar `currentSucursal` a las dependencias:
 
-## Archivos a modificar
+```
+}, [validDate, organization?.timezone, currentSucursal]);
+```
 
-- `src/hooks/useTransactions.ts` — fix dependencias + bloqueo si no hay sucursal
-- SQL data update — backfill de `sucursal_id` en ventas existentes
+### Cambio 2: `src/components/DailySummary.tsx` — línea 390
+
+Eliminar la línea duplicada de `<CashClosingHistory>`.
+
+### Archivos a modificar
+- `src/components/DailySummary.tsx` — dos cambios puntuales
+
