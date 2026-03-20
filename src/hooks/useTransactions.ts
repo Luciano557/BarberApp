@@ -122,6 +122,11 @@ export function useTransactions() {
       return null;
     }
 
+    if (!currentSucursal) {
+      toast.error('Error: Seleccioná una sucursal antes de registrar un cobro');
+      return null;
+    }
+
     // Normalize names to avoid spacing issues
     const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
     const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
@@ -137,7 +142,7 @@ export function useTransactions() {
       metodo_pago: transaction.paymentMethod,
       total_final: transaction.total,
       organization_id: organization.id,
-      sucursal_id: currentSucursal?.id || null,
+      sucursal_id: currentSucursal.id,
     };
 
     const { data: venta, error: ventaError } = await supabase
@@ -181,7 +186,7 @@ export function useTransactions() {
     setTransactions(prev => [newTransaction, ...prev]);
     toast.success('Cobro registrado correctamente');
     return newTransaction;
-  }, [organization]);
+  }, [organization, currentSucursal]);
 
   // Anular una transacción (soft delete)
   const voidTransaction = useCallback(async (
