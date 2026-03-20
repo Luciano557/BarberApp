@@ -248,7 +248,7 @@ export function useTransactions() {
     }
 
     return data && data.length > 0;
-  }, []);
+  }, [organization?.timezone]);
 
   const getTodayTransactions = useCallback(() => {
     return transactions;

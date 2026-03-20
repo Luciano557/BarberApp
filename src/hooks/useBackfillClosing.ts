@@ -117,7 +117,7 @@ export function useBackfillClosing() {
       estado: 'activo',
       Usuario: 'Sistema',
       servicios_por_linea: {},
-      created_at: getEndOfDayLocal(date),
+      created_at: getEndOfDayLocal(date, tz),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
       entry_mode: 'diferido',
