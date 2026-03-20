@@ -229,8 +229,9 @@ export function useTransactions() {
 
   // Verificar si un barbero tiene la caja cerrada para una fecha
   const isBarberCashClosed = useCallback(async (barberId: string, barberName: string, date: Date): Promise<boolean> => {
-    const startStr = getStartOfDayLocal(date);
-    const endStr = getEndOfDayLocal(date);
+    const tz = organization?.timezone || null;
+    const startStr = getStartOfDayLocal(date, tz);
+    const endStr = getEndOfDayLocal(date, tz);
     
     const { data, error } = await supabase
       .from('ingresos')
