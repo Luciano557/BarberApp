@@ -167,7 +167,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
     setCurrentStep('barber');
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!selectedBarber || !selectedService || !paymentMethod) {
       toast({
         title: "Campos requeridos",
@@ -177,26 +177,45 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
       return;
     }
 
-    onSubmit({
-      barberId: barber!.id,
-      barberName: `${barber!.firstName} ${barber!.lastName}`,
-      serviceId: service!.id,
-      serviceName: service!.name,
-      servicePrice: service!.price,
-      extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
-      discount: selectedDiscountData?.value || 0,
-      discountType: selectedDiscountData?.type || 'percentage',
-      paymentMethod,
-      subtotal,
-      total,
-    });
+    setIsSubmitting(true);
 
-    toast({
-      title: "Cobro registrado",
-      description: `$${total.toLocaleString()} - ${service!.name}`,
-    });
+    try {
+      const result = await onSubmit({
+        barberId: barber!.id,
+        barberName: `${barber!.firstName} ${barber!.lastName}`,
+        serviceId: service!.id,
+        serviceName: service!.name,
+        servicePrice: service!.price,
+        extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
+        discount: selectedDiscountData?.value || 0,
+        discountType: selectedDiscountData?.type || 'percentage',
+        paymentMethod,
+        subtotal,
+        total,
+      });
 
-    resetForm();
+      if (result) {
+        toast({
+          title: "✅ Cobro guardado correctamente",
+          description: `$${total.toLocaleString()} - ${service!.name}`,
+        });
+        resetForm();
+      } else {
+        toast({
+          title: "❌ No se pudo guardar el cobro",
+          description: "Revisá tu conexión a Internet e intentá de nuevo.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Error inesperado",
+        description: "Ocurrió un problema al guardar. Intentá de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm]);
 
   // Keyboard shortcuts
