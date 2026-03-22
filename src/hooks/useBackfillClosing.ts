@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSucursal } from '@/contexts/SucursalContext';
 import { getEndOfDayLocal, getStartOfDayLocal } from '@/lib/dateUtils';
 
 export interface BackfillServiceItem {
@@ -37,10 +38,16 @@ export interface BackfillData {
 export function useBackfillClosing() {
   const { organization } = useOrganization();
   const { user } = useAuth();
+  const { currentSucursal } = useSucursal();
 
   const saveBackfill = useCallback(async (data: BackfillData): Promise<boolean> => {
     if (!organization || !user) {
       toast.error('Error: No se encontró la organización o usuario');
+      return false;
+    }
+
+    if (!currentSucursal) {
+      toast.error('Seleccioná una sucursal antes de regularizar un día');
       return false;
     }
 
@@ -120,6 +127,7 @@ export function useBackfillClosing() {
       created_at: getEndOfDayLocal(date, tz),
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
+      sucursal_id: currentSucursal.id,
       entry_mode: 'diferido',
       backfilled_at: new Date().toISOString(),
       backfilled_by: user.id,
@@ -170,7 +178,7 @@ export function useBackfillClosing() {
 
     toast.success(`Cierre diferido guardado para ${barberName}`);
     return true;
-  }, [organization, user]);
+  }, [organization, user, currentSucursal]);
 
   return { saveBackfill };
 }
