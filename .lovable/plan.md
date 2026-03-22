@@ -2,40 +2,24 @@
 
 ## Resumen del problema
 
-Hoy el sistema hace esto: vos apretás "Confirmar cobro", e inmediatamente muestra "Cobro registrado" y limpia el formulario — **sin esperar** a que la base de datos confirme que lo guardó. Es como tirar una carta al buzón y asumir que llegó, sin recibir nunca el acuse de recibo.
+Es el mismo tipo de bug que ya corregimos con el registro de ventas: el cierre diferido ("Regularizar día") guarda los datos en la base de datos **sin la etiqueta de sucursal** (`sucursal_id`). Después, cuando entrás a Sueldos o volvés al resumen del día, el sistema filtra por sucursal y esos cierres "no existen" porque no tienen sucursal asignada.
 
-Si en ese momento no hay Internet o la base de datos falla, el sistema igual te dice "Cobro registrado" y borra el formulario. Perdiste la información y no te enteraste.
-
-Lo que vamos a hacer es que el sistema **espere la respuesta de la base de datos** antes de mostrar el resultado:
-- Si se guardó bien → tilde verde con "Cobro guardado correctamente"
-- Si falló → cruz roja con un mensaje claro del problema (sin Internet, error de base de datos, falta de sucursal, etc.)
-- Mientras espera → el botón queda deshabilitado con un spinner para que no hagas doble click
+Es decir: los datos están guardados, pero son invisibles porque les falta la etiqueta de a qué sucursal pertenecen.
 
 ---
 
 ## Detalle técnico
 
-### Archivo: `src/components/PaymentRegistration.tsx`
+### Cambio 1: `src/hooks/useBackfillClosing.ts` — agregar `sucursal_id` al insert
 
-1. **Cambiar el tipo de `onSubmit`** de `(...) => void` a `(...) => Promise<any | null>` para que devuelva la promesa de Supabase.
+En el objeto `insertData` (línea 100), falta `sucursal_id`. Hay que agregarlo usando `currentSucursal` del `SucursalContext`.
 
-2. **Hacer `handleSubmit` async** y usar `await` en la llamada a `onSubmit`:
-   - Si devuelve un resultado (no null) → mostrar toast de éxito con tilde verde
-   - Si devuelve null → mostrar toast de error con cruz roja y mensaje descriptivo
-   - Agregar un estado `isSubmitting` para deshabilitar el botón y mostrar spinner mientras se guarda
+- Importar `useSucursal`
+- Obtener `currentSucursal`
+- Agregar `sucursal_id: currentSucursal?.id || null` al objeto de insert (línea ~127)
+- Agregar `currentSucursal` a las dependencias del `useCallback` (línea 173)
+- Bloquear el guardado si no hay sucursal seleccionada (mismo patrón que `addTransaction`)
 
-3. **Mover el `resetForm()`** para que solo se ejecute si el guardado fue exitoso.
+### Cambio 2: Backfill de datos existentes (SQL)
 
-### Archivo: `src/hooks/useTransactions.ts`
-
-4. **Mejorar los mensajes de error** en `addTransaction` para que sean más descriptivos:
-   - Sin Internet → "No hay conexión a Internet"
-   - Error de base de datos → mostrar detalle del error
-   - Sin sucursal → ya está cubierto con el mensaje actual
-
-5. **Eliminar el `toast.success` de `addTransaction`** porque ahora la confirmación la maneja `PaymentRegistration` (evitar doble notificación).
-
-### Archivos a modificar
-- `src/components/PaymentRegistration.tsx` — async submit + feedback visual + spinner
-- `src/hooks/useTransactions.ts` — quitar toast duplicado + mejorar mensajes de error
-
+Ejecutar un UPDATE para asignar la sucursal correcta a los cierres diferidos que ya se
