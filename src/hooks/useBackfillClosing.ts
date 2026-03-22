@@ -38,10 +38,16 @@ export interface BackfillData {
 export function useBackfillClosing() {
   const { organization } = useOrganization();
   const { user } = useAuth();
+  const { currentSucursal } = useSucursal();
 
   const saveBackfill = useCallback(async (data: BackfillData): Promise<boolean> => {
     if (!organization || !user) {
       toast.error('Error: No se encontró la organización o usuario');
+      return false;
+    }
+
+    if (!currentSucursal) {
+      toast.error('Seleccioná una sucursal antes de regularizar un día');
       return false;
     }
 
