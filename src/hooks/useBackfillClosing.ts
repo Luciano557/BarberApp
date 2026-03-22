@@ -178,7 +178,7 @@ export function useBackfillClosing() {
 
     toast.success(`Cierre diferido guardado para ${barberName}`);
     return true;
-  }, [organization, user]);
+  }, [organization, user, currentSucursal]);
 
   return { saveBackfill };
 }
