@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -94,7 +95,7 @@ export function EquipoUnificado({
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' as AppRole,
+    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
     compensationType: 'comision' as CompensationType, fixedSalary: '',
   });
 
@@ -138,11 +139,16 @@ export function EquipoUnificado({
   const getUserRoles = (userId: string): AppRole[] =>
     userRoles.filter(r => r.user_id === userId).map(r => r.role);
 
-  // Get the highest role for a barber (through linked user)
-  const getBarberRole = (barber: Barber): AppRole | null => {
+  // Get all roles for a barber (through linked user)
+  const getBarberRoles = (barber: Barber): AppRole[] => {
     const linkedUser = getLinkedUser(barber.id);
-    if (!linkedUser) return null;
-    const roles = getUserRoles(linkedUser.id);
+    if (!linkedUser) return [];
+    return getUserRoles(linkedUser.id);
+  };
+
+  // Get the highest role for a barber (for sorting)
+  const getBarberHighestRole = (barber: Barber): AppRole | null => {
+    const roles = getBarberRoles(barber);
     if (roles.length === 0) return null;
     return roles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b])[0];
   };
@@ -150,8 +156,8 @@ export function EquipoUnificado({
   // Sort barbers by role hierarchy
   const sortByHierarchy = (list: Barber[]): Barber[] => {
     return [...list].sort((a, b) => {
-      const roleA = getBarberRole(a);
-      const roleB = getBarberRole(b);
+      const roleA = getBarberHighestRole(a);
+      const roleB = getBarberHighestRole(b);
       const hierarchyA = roleA ? ROLE_HIERARCHY[roleA] : 99;
       const hierarchyB = roleB ? ROLE_HIERARCHY[roleB] : 99;
       if (hierarchyA !== hierarchyB) return hierarchyA - hierarchyB;
@@ -159,8 +165,8 @@ export function EquipoUnificado({
     });
   };
 
-  // Role change handler
-  const handleChangeRole = async (barberId: string, newRole: AppRole) => {
+  // Role change handler — now handles multiple roles via diff
+  const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
     const linkedUser = getLinkedUser(barberId);
     if (!linkedUser) {
       toast.error('Este miembro no tiene un usuario vinculado. Invitalo primero.');
@@ -174,42 +180,43 @@ export function EquipoUnificado({
       return;
     }
 
-    // Remove all non-owner roles, then add new one
-    for (const role of currentRoles.filter(r => r !== 'owner')) {
-      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role);
+    // Ensure at least one role
+    if (newRoles.length === 0) {
+      toast.error('Debe tener al menos un cargo');
+      return;
     }
-    const { error } = await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: newRole });
-    if (error) {
-      toast.error('Error al cambiar cargo');
-    } else {
-      // Sync teamRole on barberos table
-      const teamRole: TeamRole = newRole === 'otros' ? 'otros' : 'barbero';
-      onUpdateBarber(barberId, { teamRole });
-      toast.success(`Cargo actualizado a ${getRoleLabel(newRole)}`);
+
+    const currentNonOwner: string[] = currentRoles.filter(r => r !== 'owner');
+    const toRemove = currentNonOwner.filter(r => !(newRoles as string[]).includes(r));
+    const toAdd = (newRoles as string[]).filter(r => !currentNonOwner.includes(r));
+
+    for (const role of toRemove) {
+      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role as any);
+    }
+    for (const role of toAdd) {
+      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
+    }
+
+    // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
+    const teamRole: TeamRole = newRoles.includes('barber') ? 'barbero' : 'otros';
+    onUpdateBarber(barberId, { teamRole });
+
+    if (toRemove.length > 0 || toAdd.length > 0) {
+      toast.success('Cargos actualizados');
       await fetchUserRoles();
     }
   };
 
-  // Assign role to a new barber (no linked user yet - we just store it for when they get invited)
-  const handleAssignRoleToNewBarber = async (barberId: string, role: AppRole) => {
-    const linkedUser = getLinkedUser(barberId);
-    if (!linkedUser) {
-      toast.info('El cargo se asignará cuando el miembro sea invitado al sistema.');
-      return;
-    }
-    await handleChangeRole(barberId, role);
-  };
-
   const resetForm = () => {
-    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber',
+    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
       compensationType: 'comision', fixedSalary: '' });
   };
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
+    const teamRole: TeamRole = data.roles.includes('barber') ? 'barbero' : 'otros';
     if (barberId) {
-      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
@@ -217,14 +224,13 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         teamRole,
       });
-      // Update role if linked user exists
+      // Update roles if linked user exists
       const linkedUser = getLinkedUser(barberId);
       if (linkedUser) {
-        await handleChangeRole(barberId, data.role);
+        await handleChangeRoles(barberId, data.roles);
       }
       setEditingId(null);
     } else {
-      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
@@ -254,7 +260,7 @@ export function EquipoUnificado({
     const [localCommissionError, setLocalCommissionError] = useState('');
 
     const isComision = localData.compensationType === 'comision';
-    const commissionRequired = isComision && (localData.role === 'barber' || localData.role === 'manager');
+    const commissionRequired = isComision && (localData.roles.includes('barber') || localData.roles.includes('manager'));
 
     const validateLocalCommission = (value: string): boolean => {
       if (!commissionRequired && (value === '' || value === '0')) {
@@ -317,28 +323,34 @@ export function EquipoUnificado({
               onChange={(e) => setLocalData(prev => ({ ...prev, fixedSalary: e.target.value }))} autoComplete="off" />
           </div>
         )}
-        {/* Role selector */}
+        {/* Role selector — multi-select with checkboxes */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Cargo *</label>
-          <Select value={localData.role} onValueChange={(v) => setLocalData(prev => ({ ...prev, role: v as AppRole }))}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Seleccionar cargo" />
-            </SelectTrigger>
-            <SelectContent>
-              {ASSIGNABLE_ROLES.map(role => (
-                <SelectItem key={role} value={role}>
-                  <span className="flex items-center gap-2">
-                    {getRoleIcon(role)} {getRoleLabel(role)}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
+          <div className="space-y-2 p-3 border border-border rounded-md">
+            {ASSIGNABLE_ROLES.map(role => (
+              <label key={role} className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={localData.roles.includes(role)}
+                  onCheckedChange={(checked) => {
+                    setLocalData(prev => {
+                      const newRoles = checked
+                        ? [...prev.roles, role]
+                        : prev.roles.filter(r => r !== role);
+                      return { ...prev, roles: newRoles.length > 0 ? newRoles : prev.roles };
+                    });
+                  }}
+                />
+                <span className="flex items-center gap-1.5 text-sm">
+                  {getRoleIcon(role)} {getRoleLabel(role)}
+                </span>
+              </label>
+            ))}
+          </div>
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
           <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-            disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+            disabled={!localData.firstName || !localData.lastName || !localData.phone || localData.roles.length === 0 || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
             <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
           </Button>
         </div>
@@ -350,8 +362,9 @@ export function EquipoUnificado({
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
     const roles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    const highestRole = getBarberRole(barber);
+    const assignableRoles = roles.filter(r => r !== 'owner');
     const isOwner = roles.includes('owner');
+    const hasSystemAccess = roles.some(r => r !== 'otros');
 
     return (
       <div key={barber.id}>
@@ -360,7 +373,7 @@ export function EquipoUnificado({
             initialData={{
               firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
               commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-              role: highestRole || 'barber',
+              roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
               compensationType: barber.compensationType || 'comision',
               fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
             }}
@@ -371,15 +384,15 @@ export function EquipoUnificado({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-foreground">{barber.firstName} {barber.lastName}</span>
-                {highestRole && (
-                  <Badge variant={getRoleBadgeVariant(highestRole)} className="flex items-center gap-1 text-xs">
-                    {getRoleIcon(highestRole)} {getRoleLabel(highestRole)}
-                  </Badge>
-                )}
-                {!highestRole && !linkedUser && (
+                {roles.filter(r => r !== 'owner' || isOwner).length > 0 ? (
+                  roles.filter(r => isOwner ? true : r !== 'owner').sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(role => (
+                    <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
+                      {getRoleIcon(role)} {getRoleLabel(role)}
+                    </Badge>
+                  ))
+                ) : !linkedUser ? (
                   <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo — Invitalo para asignar</Badge>
-                )}
-                {!highestRole && linkedUser && (
+                ) : (
                   <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo asignado</Badge>
                 )}
                 {barber.compensationType === 'fijo' ? (
@@ -418,20 +431,27 @@ export function EquipoUnificado({
               )}
             </div>
 
-            {/* Role selector (only for non-owners with linked users) */}
+            {/* Role multi-select (only for non-owners with linked users) */}
             {linkedUser && !isOwner && (
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Cargo:</span>
-                <Select value={highestRole || ''} onValueChange={(v) => handleChangeRole(barber.id, v as AppRole)}>
-                  <SelectTrigger className="h-8 text-xs flex-1 max-w-[220px]">
-                    <SelectValue placeholder="Seleccionar cargo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ASSIGNABLE_ROLES.map(role => (
-                      <SelectItem key={role} value={role}>{getRoleLabel(role)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
+                {ASSIGNABLE_ROLES.map(role => (
+                  <label key={role} className="flex items-center gap-1 cursor-pointer">
+                    <Checkbox
+                      className="h-3.5 w-3.5"
+                      checked={(assignableRoles as string[]).includes(role)}
+                      onCheckedChange={(checked) => {
+                        const newRoles = checked
+                          ? [...assignableRoles, role]
+                          : assignableRoles.filter(r => r !== role);
+                        if (newRoles.length > 0) {
+                          handleChangeRoles(barber.id, newRoles);
+                        }
+                      }}
+                    />
+                    <span className="text-xs">{getRoleLabel(role)}</span>
+                  </label>
+                ))}
               </div>
             )}
 
@@ -442,7 +462,7 @@ export function EquipoUnificado({
                 setFormData({
                   firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
                   commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-                  role: highestRole || 'barber',
+                  roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
                   compensationType: barber.compensationType || 'comision',
                   fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
                 });
@@ -450,14 +470,14 @@ export function EquipoUnificado({
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
               </Button>
 
-              {barber.teamRole !== 'otros' && (
+              {hasSystemAccess && (
                 <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
                   onClick={() => setPinDialogBarber(barber)}>
                   <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
                 </Button>
               )}
 
-              {barber.teamRole !== 'otros' && (
+              {hasSystemAccess && (
                 <Button variant="ghost" size="sm" className="h-8 text-xs"
                   onClick={() => setInviteBarber(barber)}>
                   <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
