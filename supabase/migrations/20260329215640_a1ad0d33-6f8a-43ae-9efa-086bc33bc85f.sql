@@ -1,0 +1,1 @@
+ALTER TABLE public.barberos ADD COLUMN rol_equipo text NOT NULL DEFAULT 'barbero';

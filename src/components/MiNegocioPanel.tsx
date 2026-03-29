@@ -27,6 +27,7 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
     commission: Number(row.comision) || 0,
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
+    teamRole: row.rol_equipo || 'barbero',
     dni: row.dni || undefined,
     active: row.activo,
     sucursalId: row.sucursal_id || null,
@@ -92,6 +93,7 @@ export function MiNegocioPanel() {
       sucursal_id: sucursalId,
       tipo_compensacion: barber.compensationType || 'comision',
       sueldo_fijo: barber.fixedSalary || null,
+      rol_equipo: barber.teamRole || 'barbero',
     });
     if (error) { toast.error('Error al agregar barbero'); return; }
     toast.success('Barbero agregado');
@@ -108,6 +110,7 @@ export function MiNegocioPanel() {
     if (updates.active !== undefined) dbUpdates.activo = updates.active;
     if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
     if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
+    if (updates.teamRole !== undefined) dbUpdates.rol_equipo = updates.teamRole;
 
     const { error } = await supabase.from('barberos').update(dbUpdates).eq('id', id);
     if (error) { toast.error('Error al actualizar barbero'); return; }

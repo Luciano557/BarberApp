@@ -63,7 +63,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
       onAdd({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
-        compensationType: 'comision',
+        compensationType: 'comision', teamRole: 'barbero',
       });
       setIsAdding(false);
     }
