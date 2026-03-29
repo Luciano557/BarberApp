@@ -105,6 +105,7 @@ export type Database = {
           nombre: string
           organization_id: string | null
           pin_hash: string | null
+          rol_equipo: string
           sucursal_id: string | null
           sueldo_fijo: number | null
           telefono: string | null
@@ -121,6 +122,7 @@ export type Database = {
           nombre: string
           organization_id?: string | null
           pin_hash?: string | null
+          rol_equipo?: string
           sucursal_id?: string | null
           sueldo_fijo?: number | null
           telefono?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           nombre?: string
           organization_id?: string | null
           pin_hash?: string | null
+          rol_equipo?: string
           sucursal_id?: string | null
           sueldo_fijo?: number | null
           telefono?: string | null

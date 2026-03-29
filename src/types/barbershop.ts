@@ -25,6 +25,7 @@ export interface Extra {
 }
 
 export type CompensationType = 'comision' | 'fijo';
+export type TeamRole = 'barbero' | 'otros';
 
 export interface Barber {
   id: string;
@@ -35,6 +36,7 @@ export interface Barber {
   commission: number; // 0-100 percentage
   compensationType: CompensationType; // 'comision' = variable, 'fijo' = fixed salary
   fixedSalary?: number; // Monthly fixed salary when compensationType = 'fijo'
+  teamRole: TeamRole; // 'barbero' = operational (can receive services), 'otros' = non-operational
   address?: string; // Optional
   dni?: string; // Optional
   active: boolean;

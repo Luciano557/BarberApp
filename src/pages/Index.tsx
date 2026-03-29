@@ -70,7 +70,7 @@ const Index = () => {
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers}
+              barbers={barbers.filter(b => b.teamRole !== 'otros')}
               discounts={discounts}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}

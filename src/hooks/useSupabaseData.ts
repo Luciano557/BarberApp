@@ -49,6 +49,7 @@ function dbToBarber(row: any): Barber {
     commission: Number(row.comision) || 0,
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
+    teamRole: row.rol_equipo || 'barbero',
     address: undefined,
     dni: row.dni || undefined,
     active: row.activo,
@@ -265,6 +266,7 @@ export function useSupabaseData() {
           sucursal_id: currentSucursal?.id || null,
           tipo_compensacion: barber.compensationType || 'comision',
           sueldo_fijo: barber.fixedSalary || null,
+          rol_equipo: barber.teamRole || 'barbero',
         })
         .select()
         .single();
@@ -292,6 +294,7 @@ export function useSupabaseData() {
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
       if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
+      if (updates.teamRole !== undefined) dbUpdates.rol_equipo = updates.teamRole;
 
       const { error } = await supabase
         .from('barberos')
