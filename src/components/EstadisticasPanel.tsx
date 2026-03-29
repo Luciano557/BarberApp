@@ -251,12 +251,26 @@ export function EstadisticasPanel() {
   const [barberosActivos, setBarberosActivos] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [periodoMeses, setPeriodoMeses] = useState('6');
-  const [capacidadDiaria, setCapacidadDiaria] = useState(() => {
-    const saved = localStorage.getItem('estadisticas_capacidad_diaria');
-    return saved ? parseInt(saved) : 18;
-  });
+  const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [ocupacionOpen, setOcupacionOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
+
+  // Fetch capacidad_diaria from DB when sucursal changes
+  useEffect(() => {
+    const fetchCapacidad = async () => {
+      if (!currentSucursal?.id || !organization?.id) {
+        setCapacidadDiaria(18);
+        return;
+      }
+      const { data } = await supabase
+        .from('sucursal_settings')
+        .select('capacidad_diaria')
+        .eq('sucursal_id', currentSucursal.id)
+        .maybeSingle();
+      setCapacidadDiaria(data?.capacidad_diaria ?? 18);
+    };
+    fetchCapacidad();
+  }, [currentSucursal?.id, organization?.id]);
 
   useEffect(() => {
     if (organization?.id) {
@@ -264,9 +278,15 @@ export function EstadisticasPanel() {
     }
   }, [organization?.id, periodoMeses, currentSucursal]);
 
-  useEffect(() => {
-    localStorage.setItem('estadisticas_capacidad_diaria', String(capacidadDiaria));
-  }, [capacidadDiaria]);
+  const saveCapacidadDiaria = async (value: number) => {
+    if (!currentSucursal?.id || !organization?.id) return;
+    await supabase
+      .from('sucursal_settings')
+      .upsert(
+        { sucursal_id: currentSucursal.id, organization_id: organization.id, capacidad_diaria: value },
+        { onConflict: 'sucursal_id' }
+      );
+  };
 
   const fetchData = async () => {
     if (!organization?.id) return;
@@ -758,6 +778,7 @@ export function EstadisticasPanel() {
                   max={100}
                   value={capacidadDiaria}
                   onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
+                  onBlur={(e) => saveCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
                   className="h-7 w-16 text-xs"
                 />
                 <span className="text-xs text-muted-foreground">cortes/barbero</span>
