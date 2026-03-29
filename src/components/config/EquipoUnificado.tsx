@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Barber, CompensationType, getBarberDisplayName } from '@/types/barbershop';
+import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
 import { AppRole } from '@/contexts/AuthContext';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
@@ -206,11 +206,13 @@ export function EquipoUnificado({
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
     if (barberId) {
+      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
+        teamRole,
       });
       // Update role if linked user exists
       const linkedUser = getLinkedUser(barberId);
@@ -219,11 +221,13 @@ export function EquipoUnificado({
       }
       setEditingId(null);
     } else {
+      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
+        teamRole,
       });
       setIsAdding(false);
     }
@@ -443,15 +447,19 @@ export function EquipoUnificado({
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
               </Button>
 
-              <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
-                onClick={() => setPinDialogBarber(barber)}>
-                <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
-              </Button>
+              {barber.teamRole !== 'otros' && (
+                <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
+                  onClick={() => setPinDialogBarber(barber)}>
+                  <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
+                </Button>
+              )}
 
-              <Button variant="ghost" size="sm" className="h-8 text-xs"
-                onClick={() => setInviteBarber(barber)}>
-                <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
-              </Button>
+              {barber.teamRole !== 'otros' && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs"
+                  onClick={() => setInviteBarber(barber)}>
+                  <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
+                </Button>
+              )}
 
               <Button variant="ghost" size="sm" className="h-8 text-xs"
                 onClick={() => setToggleConfirm({
