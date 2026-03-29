@@ -47,6 +47,8 @@ function dbToBarber(row: any): Barber {
     lastName: row.apellido,
     phone: row.telefono || '',
     commission: Number(row.comision) || 0,
+    compensationType: row.tipo_compensacion || 'comision',
+    fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     address: undefined,
     dni: row.dni || undefined,
     active: row.activo,
@@ -286,6 +288,8 @@ export function useSupabaseData() {
       if (updates.dni !== undefined) dbUpdates.dni = updates.dni || null;
       if (updates.commission !== undefined) dbUpdates.comision = updates.commission;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
+      if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
 
       const { error } = await supabase
         .from('barberos')

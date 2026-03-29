@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Barber, getBarberDisplayName } from '@/types/barbershop';
+import { Barber, CompensationType, getBarberDisplayName } from '@/types/barbershop';
 import { AppRole } from '@/contexts/AuthContext';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
@@ -20,6 +20,7 @@ const ROLE_HIERARCHY: Record<AppRole, number> = {
   general_manager: 1,
   manager: 2,
   barber: 3,
+  otros: 4,
 };
 
 const getRoleLabel = (role: AppRole) => {
@@ -28,6 +29,7 @@ const getRoleLabel = (role: AppRole) => {
     case 'general_manager': return 'Encargado General';
     case 'manager': return 'Encargado de Sucursal';
     case 'barber': return 'Barbero';
+    case 'otros': return 'Otros';
   }
 };
 
@@ -35,7 +37,7 @@ const getRoleBadgeVariant = (role: AppRole): 'default' | 'secondary' | 'outline'
   switch (role) {
     case 'owner': case 'general_manager': return 'default';
     case 'manager': return 'secondary';
-    case 'barber': return 'outline';
+    case 'barber': case 'otros': return 'outline';
   }
 };
 
@@ -44,10 +46,11 @@ const getRoleIcon = (role: AppRole) => {
     case 'owner': case 'general_manager': return <Shield className="w-3 h-3" />;
     case 'manager': return <UserCheck className="w-3 h-3" />;
     case 'barber': return <Scissors className="w-3 h-3" />;
+    case 'otros': return <Users className="w-3 h-3" />;
   }
 };
 
-const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber'];
+const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber', 'otros'];
 
 interface UserProfile {
   id: string;
