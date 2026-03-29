@@ -296,6 +296,7 @@ export type Database = {
           Descripcion: string | null
           Fecha: string | null
           id: number
+          inversion_id: string | null
           Monto: number | null
           organization_id: string | null
           sucursal_id: string | null
@@ -306,6 +307,7 @@ export type Database = {
           Descripcion?: string | null
           Fecha?: string | null
           id?: number
+          inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
           sucursal_id?: string | null
@@ -316,6 +318,7 @@ export type Database = {
           Descripcion?: string | null
           Fecha?: string | null
           id?: number
+          inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
           sucursal_id?: string | null

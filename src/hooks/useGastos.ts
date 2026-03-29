@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
 
 export type TipoCosto = 'fijo' | 'variable' | 'semivariable';
 
@@ -15,6 +15,7 @@ export interface Gasto {
   Fecha: string | null;
   organization_id: string | null;
   tipo_costo: TipoCosto | null;
+  inversion_id: string | null;
 }
 
 export function useGastos() {
