@@ -186,9 +186,9 @@ export function EquipoUnificado({
       return;
     }
 
-    const currentNonOwner = currentRoles.filter(r => r !== 'owner');
-    const toRemove = currentNonOwner.filter(r => !newRoles.includes(r));
-    const toAdd = newRoles.filter(r => !currentNonOwner.includes(r));
+    const currentNonOwner: string[] = currentRoles.filter(r => r !== 'owner');
+    const toRemove = currentNonOwner.filter(r => !(newRoles as string[]).includes(r));
+    const toAdd = (newRoles as string[]).filter(r => !currentNonOwner.includes(r));
 
     for (const role of toRemove) {
       await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role as any);
@@ -439,7 +439,7 @@ export function EquipoUnificado({
                   <label key={role} className="flex items-center gap-1 cursor-pointer">
                     <Checkbox
                       className="h-3.5 w-3.5"
-                      checked={assignableRoles.includes(role)}
+                      checked={(assignableRoles as string[]).includes(role)}
                       onCheckedChange={(checked) => {
                         const newRoles = checked
                           ? [...assignableRoles, role]
