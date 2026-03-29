@@ -277,7 +277,7 @@ export function EstadisticasPanel() {
   // Latest month values for headline
   const latest = derivedMetrics.length > 0 ? derivedMetrics[derivedMetrics.length - 1] : null;
 
-  const metricCards: {
+  type MetricCardDef = {
     title: string;
     dataKey: keyof DerivedMonthlyMetrics;
     icon: typeof DollarSign;
@@ -287,7 +287,9 @@ export function EstadisticasPanel() {
     shortFormatFn: (v: number) => string;
     description: string;
     type?: 'area' | 'bar';
-  }[] = [
+  };
+
+  const ingresosCards: MetricCardDef[] = [
     {
       title: 'Facturación',
       dataKey: 'facturacion',
@@ -299,26 +301,6 @@ export function EstadisticasPanel() {
       description: 'Cuánto dinero entró al negocio cada mes.',
     },
     {
-      title: 'Costos Fijos',
-      dataKey: 'costosFijos',
-      icon: PiggyBank,
-      color: 'text-red-500',
-      chartColor: 'hsl(0 84% 60%)',
-      formatFn: formatCurrency,
-      shortFormatFn: formatCurrencyShort,
-      description: 'Gastos mensuales independientes de la cantidad de clientes.',
-    },
-    {
-      title: 'Rentabilidad',
-      dataKey: 'rentabilidad',
-      icon: Percent,
-      color: latest && latest.rentabilidad >= 0 ? 'text-green-600' : 'text-red-600',
-      chartColor: 'hsl(142 76% 36%)',
-      formatFn: (v) => `${v.toFixed(1)}%`,
-      shortFormatFn: (v) => `${v.toFixed(0)}%`,
-      description: 'Porcentaje de lo facturado que queda como ganancia real.',
-    },
-    {
       title: 'Ticket Promedio',
       dataKey: 'ticketPromedio',
       icon: Receipt,
@@ -327,6 +309,19 @@ export function EstadisticasPanel() {
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto gasta cada cliente en promedio por visita.',
+    },
+  ];
+
+  const costosCards: MetricCardDef[] = [
+    {
+      title: 'Costos Fijos',
+      dataKey: 'costosFijos',
+      icon: PiggyBank,
+      color: 'text-red-500',
+      chartColor: 'hsl(0 84% 60%)',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Gastos mensuales independientes de la cantidad de clientes.',
     },
     {
       title: 'Costo Fijo por Servicio',
@@ -359,6 +354,16 @@ export function EstadisticasPanel() {
       description: 'Cuánto ganás realmente por cada cliente después de costos.',
     },
     {
+      title: 'Rentabilidad',
+      dataKey: 'rentabilidad',
+      icon: Percent,
+      color: latest && latest.rentabilidad >= 0 ? 'text-green-600' : 'text-red-600',
+      chartColor: 'hsl(142 76% 36%)',
+      formatFn: (v) => `${v.toFixed(1)}%`,
+      shortFormatFn: (v) => `${v.toFixed(0)}%`,
+      description: 'Porcentaje de lo facturado que queda como ganancia real.',
+    },
+    {
       title: 'Punto de Equilibrio',
       dataKey: 'puntoEquilibrio',
       icon: Target,
@@ -370,6 +375,33 @@ export function EstadisticasPanel() {
       type: 'bar' as const,
     },
   ];
+
+  const renderMetricCard = (metric: MetricCardDef) => (
+    <Card key={metric.dataKey}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">{metric.description}</p>
+        </div>
+        <metric.icon className={`h-4 w-4 ${metric.color} shrink-0`} />
+      </CardHeader>
+      <CardContent>
+        {latest && (
+          <div className={`text-2xl font-bold ${metric.color} mb-1`}>
+            {metric.formatFn(latest[metric.dataKey] as number)}
+            <span className="text-xs font-normal text-muted-foreground ml-2">último mes</span>
+          </div>
+        )}
+        <MetricChart
+          data={derivedMetrics}
+          dataKey={metric.dataKey}
+          color={metric.chartColor}
+          formatValue={metric.shortFormatFn}
+          type={metric.type || 'area'}
+        />
+      </CardContent>
+    </Card>
+  );
 
   if (isLoading) {
     return (
