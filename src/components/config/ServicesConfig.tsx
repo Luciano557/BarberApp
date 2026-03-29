@@ -96,7 +96,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-wrap gap-2">
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
-            <Input type="number" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Precio" className="w-28" />
+            <Input type="number" inputMode="decimal" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="Precio" className="w-28" />
             <div className="flex items-center gap-1">
               <Select value={editLineId} onValueChange={setEditLineId}>
                 <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>
@@ -152,7 +152,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
               {isAdding && (
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
                   <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" />
-                  <Input type="number" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
+                  <Input type="number" inputMode="decimal" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
                   <div className="flex items-center gap-1">
                     <Select value={newLineId} onValueChange={setNewLineId}>
                       <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>

@@ -75,15 +75,15 @@ export function DeudasPanel() {
               </div>
               <div>
                 <Label>Monto total *</Label>
-                <Input type="number" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
+                <Input type="number" inputMode="decimal" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
               </div>
               <div>
                 <Label>Cantidad de cuotas</Label>
-                <Input type="number" value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)} />
+                <Input type="number" inputMode="numeric" value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)} />
               </div>
               <div>
                 <Label>Monto por cuota</Label>
-                <Input type="number" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} />
+                <Input type="number" inputMode="decimal" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} />
               </div>
               <div>
                 <Label>Fecha inicio</Label>

@@ -100,7 +100,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
               {isAdding && (
                 <div className="flex gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
                   <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-                  <Input type="number" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
+                  <Input type="number" inputMode="decimal" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
                   <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                 </div>

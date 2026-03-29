@@ -287,9 +287,10 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                         <Banknote className="h-4 w-4 text-success" /> Total Efectivo
                       </Label>
                       <Input
-                        type="number"
-                        min={0}
-                        value={quickData.totalEfectivo || ''}
+                         type="number"
+                         inputMode="decimal"
+                         min={0}
+                         value={quickData.totalEfectivo || ''}
                         onChange={(e) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(e.target.value) || 0 }))}
                         placeholder="0"
                       />
@@ -299,9 +300,10 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                         <CreditCard className="h-4 w-4 text-secondary" /> Total Mercado Pago
                       </Label>
                       <Input
-                        type="number"
-                        min={0}
-                        value={quickData.totalMercadoPago || ''}
+                         type="number"
+                         inputMode="decimal"
+                         min={0}
+                         value={quickData.totalMercadoPago || ''}
                         onChange={(e) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(e.target.value) || 0 }))}
                         placeholder="0"
                       />
@@ -310,9 +312,10 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                   <div className="space-y-2">
                     <Label className="text-sm">Cantidad de servicios</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      value={quickData.cantidadServicios || ''}
+                       type="number"
+                       inputMode="numeric"
+                       min={0}
+                       value={quickData.cantidadServicios || ''}
                       onChange={(e) => setQuickData(prev => ({ ...prev, cantidadServicios: Number(e.target.value) || 0 }))}
                       placeholder="0"
                     />

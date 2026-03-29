@@ -557,6 +557,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                   <Input
                     id="monto"
                     type="number"
+                    inputMode="decimal"
                     placeholder="0"
                     value={monto}
                     onChange={(e) => setMonto(e.target.value)}

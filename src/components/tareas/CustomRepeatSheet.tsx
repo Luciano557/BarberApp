@@ -103,6 +103,7 @@ export function CustomRepeatSheet({ open, onOpenChange, frequency: initFreq, int
             <Label className="text-sm font-medium">Cada</Label>
             <Input
               type="number"
+              inputMode="numeric"
               className="w-20 text-right"
               min={1}
               max={999}
