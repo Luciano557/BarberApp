@@ -1,0 +1,1 @@
+ALTER TABLE public."Egresos" ADD COLUMN inversion_id uuid;
