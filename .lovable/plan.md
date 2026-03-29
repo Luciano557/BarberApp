@@ -1,45 +1,48 @@
 
 
-## Estadísticas mes a mes (no acumuladas)
+## Organizar Estadísticas en 3 Grupos
 
-El problema: actualmente las 9 métricas muestran valores acumulados del período completo (ej: facturación total de 6 meses). El usuario quiere ver las métricas **mes a mes**, pudiendo seleccionar qué mes ver.
+Reorganizar las 9 tarjetas de métricas (actualmente en un grid plano) en 3 secciones con título, descripción breve del grupo, y las tarjetas correspondientes dentro de cada sección.
 
 ---
 
-## Cambios en `src/components/EstadisticasPanel.tsx`
+## Estructura
 
-### Nuevo selector de mes
+### Grupo 1: Ingresos y Ventas
+**Descripción:** "Estas métricas te muestran cuánto estás vendiendo y cómo evoluciona tu facturación."
 
-- Agregar un segundo `Select` para elegir el mes específico a visualizar (ej: "Marzo 2026", "Febrero 2026", etc.)
-- Las opciones se generan dinámicamente según el período seleccionado (3, 6 o 12 meses)
-- Por defecto muestra el mes actual
-- El selector de período (3/6/12 meses) sigue controlando el rango de los gráficos
+Tarjetas incluidas:
+- Facturación mensual
+- Ticket promedio
+- Servicios por Mes (el gráfico grande existente se mueve aquí dentro del grupo)
+- Métodos de Pago (el gráfico grande existente se mueve aquí dentro del grupo)
 
-### Calcular métricas por mes (no acumuladas)
+### Grupo 2: Costos y Rentabilidad
+**Descripción:** "Estas métricas te muestran cuánto estás ganando realmente después de todos los gastos."
 
-- Extender `MonthlyData` para incluir costos del mes: `costosFijos`, `costosVariables`, `costosSemivariables`, `totalEgresos`
-- En `fetchData`, al procesar cada mes, filtrar también los `Egresos` de ese mes y calcular costos fijos/variables/semivariables por mes
-- Nuevo estado `selectedMonth` (string `yyyy-MM`) para saber qué mes mostrar en las tarjetas
+Tarjetas incluidas:
+- Costos Fijos
+- Costo Fijo por Servicio
+- Costo Variable por Servicio
+- Ganancia por Servicio
+- Rentabilidad
+- Punto de Equilibrio
 
-### Las 9 tarjetas usan datos del mes seleccionado
+### Grupo 3: Capacidad y Eficiencia
+**Descripción:** "Estas métricas te muestran qué tan bien estás aprovechando tu barbería."
 
-En lugar de usar `totalFacturacion`, `costs.fijos`, etc. (acumulados), se toman los valores del mes elegido:
+Tarjetas incluidas:
+- Tasa de Ocupación (con su input de capacidad diaria y collapsible de explicación)
 
-1. **Facturación** = `monthData.facturacion`
-2. **Costos fijos** = `monthData.costosFijos`
-3. **Rentabilidad** = `((facturación - totalEgresos) / facturación) x 100`
-4. **Ticket promedio** = `facturación / servicios`
-5. **Costo fijo por servicio** = `costosFijos / servicios`
-6. **Costo variable por servicio** = `costosVariables / servicios`
-7. **Ganancia por servicio** = `ticket - costoFijo/serv - costoVar/serv`
-8. **Punto de equilibrio** = `costosFijos / ganancia por servicio`
-9. **Tasa de ocupación** = `servicios / (capacidad diaria x barberos x días laborables del mes) x 100`
+---
 
-### Gráficos
+## Cambios técnicos en `EstadisticasPanel.tsx`
 
-Se mantienen los 3 gráficos mostrando la evolución de todo el período (3/6/12 meses) sin cambios.
-
-### Archivo a modificar
-
-- `src/components/EstadisticasPanel.tsx`
+- Reemplazar el grid plano de tarjetas por 3 secciones, cada una con un `<div>` que contiene:
+  - Título del grupo (`h2` o `CardTitle` grande)
+  - Descripción breve del grupo en `text-muted-foreground`
+  - Grid 2 columnas (desktop) con las tarjetas de ese grupo
+- Reorganizar el array `metricCards` en 3 sub-arrays o renderizar condicionalmente por grupo
+- Mover los gráficos de "Servicios por Mes" y "Métodos de Pago" al final del Grupo 1
+- Sin cambios en lógica de datos, cálculos ni fetch
 
