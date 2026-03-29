@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
