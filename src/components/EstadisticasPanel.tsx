@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   TrendingUp, DollarSign, Users, Scissors, Calendar, Target, 
-  PiggyBank, Receipt, BarChart3, Percent, Info, ChevronDown 
+  PiggyBank, Receipt, BarChart3, Percent, Info, ChevronDown,
+  ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -10,13 +11,15 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  AreaChart, Area, LineChart, Line, ResponsiveContainer
+  ComposedChart, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Line, ResponsiveContainer
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface MonthlyData {
   month: string;
@@ -42,6 +45,16 @@ interface DerivedMonthlyMetrics {
   gananciaPorServicio: number;
   puntoEquilibrio: number;
   tasaOcupacion: number;
+  // Variation fields (% change vs previous month)
+  facturacionVar: number | null;
+  costosFijosVar: number | null;
+  rentabilidadVar: number | null;
+  ticketPromedioVar: number | null;
+  costoFijoPorServicioVar: number | null;
+  costoVariablePorServicioVar: number | null;
+  gananciaPorServicioVar: number | null;
+  puntoEquilibrioVar: number | null;
+  tasaOcupacionVar: number | null;
 }
 
 const chartConfig = {
@@ -59,6 +72,18 @@ const chartConfig = {
   tasaOcupacion: { label: "Tasa de Ocupación", color: "hsl(230 70% 55%)" },
 };
 
+const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
+  facturacion: 'facturacionVar',
+  costosFijos: 'costosFijosVar',
+  rentabilidad: 'rentabilidadVar',
+  ticketPromedio: 'ticketPromedioVar',
+  costoFijoPorServicio: 'costoFijoPorServicioVar',
+  costoVariablePorServicio: 'costoVariablePorServicioVar',
+  gananciaPorServicio: 'gananciaPorServicioVar',
+  puntoEquilibrio: 'puntoEquilibrioVar',
+  tasaOcupacion: 'tasaOcupacionVar',
+};
+
 function getWorkDaysInMonth(year: number, month: number): number {
   const daysInMonth = getDaysInMonth(new Date(year, month));
   let workDays = 0;
@@ -69,49 +94,146 @@ function getWorkDaysInMonth(year: number, month: number): number {
   return workDays;
 }
 
+function calcVariation(current: number, previous: number): number | null {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
 function MetricChart({ 
   data, 
   dataKey, 
   color, 
   formatValue,
-  type = 'area'
 }: { 
   data: DerivedMonthlyMetrics[]; 
   dataKey: keyof DerivedMonthlyMetrics; 
   color: string;
   formatValue: (v: number) => string;
-  type?: 'area' | 'bar';
 }) {
   const config = { [dataKey]: { label: dataKey, color } };
-  
+  const vKey = varKeyMap[dataKey as string];
+
   return (
     <ChartContainer config={config} className="h-40 w-full mt-3">
-      {type === 'bar' ? (
-        <BarChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-          <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} width={45} tickFormatter={(v) => formatValue(v)} />
-          <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatValue(Number(value))} />} />
-          <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} />
-        </BarChart>
-      ) : (
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={color} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-          <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} width={45} tickFormatter={(v) => formatValue(v)} />
-          <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatValue(Number(value))} />} />
-          <Area type="monotone" dataKey={dataKey} stroke={color} fillOpacity={1} fill={`url(#gradient-${dataKey})`} strokeWidth={2} />
-        </AreaChart>
-      )}
+      <ComposedChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+        <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+        <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} width={45} tickFormatter={(v) => formatValue(v)} />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              formatter={(value, name, item) => {
+                const varVal = vKey ? (item.payload as any)?.[vKey] : null;
+                const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
+                return `${formatValue(Number(value))}${varStr}`;
+              }}
+            />
+          }
+        />
+        <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} opacity={0.7} />
+        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} />
+      </ComposedChart>
     </ChartContainer>
   );
 }
+
+function MetricDetailDialog({
+  open,
+  onOpenChange,
+  metric,
+  data,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  metric: MetricCardDef | null;
+  data: DerivedMonthlyMetrics[];
+}) {
+  if (!metric) return null;
+  const config = { [metric.dataKey]: { label: metric.title, color: metric.chartColor } };
+  const vKey = varKeyMap[metric.dataKey as string];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <metric.icon className={`h-5 w-5 ${metric.color}`} />
+            {metric.title}
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">{metric.description}</p>
+        </DialogHeader>
+
+        {/* Big chart */}
+        <ChartContainer config={config} className="h-64 w-full">
+          <ComposedChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis dataKey="monthLabel" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} width={55} tickFormatter={(v) => metric.shortFormatFn(v)} />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name, item) => {
+                    const varVal = vKey ? (item.payload as any)?.[vKey] : null;
+                    const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
+                    return `${metric.formatFn(Number(value))}${varStr}`;
+                  }}
+                />
+              }
+            />
+            <Bar dataKey={metric.dataKey} fill={metric.chartColor} radius={[4, 4, 0, 0]} opacity={0.6} />
+            <Line type="monotone" dataKey={metric.dataKey} stroke={metric.chartColor} strokeWidth={2.5} dot={{ r: 3, fill: metric.chartColor }} />
+          </ComposedChart>
+        </ChartContainer>
+
+        {/* Detail table */}
+        <div className="rounded-md border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Mes</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="text-right">Variación</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((row) => {
+                const value = row[metric.dataKey] as number;
+                const variation = vKey ? (row[vKey] as number | null) : null;
+                return (
+                  <TableRow key={row.monthLabel}>
+                    <TableCell className="font-medium">{row.monthLabel}</TableCell>
+                    <TableCell className="text-right">{metric.formatFn(value)}</TableCell>
+                    <TableCell className="text-right">
+                      {variation == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-0.5 ${variation > 0 ? 'text-green-600' : variation < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+                          {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type MetricCardDef = {
+  title: string;
+  dataKey: keyof DerivedMonthlyMetrics;
+  icon: typeof DollarSign;
+  color: string;
+  chartColor: string;
+  formatFn: (v: number) => string;
+  shortFormatFn: (v: number) => string;
+  description: string;
+};
 
 export function EstadisticasPanel() {
   const { organization } = useOrganization();
@@ -125,6 +247,7 @@ export function EstadisticasPanel() {
     return saved ? parseInt(saved) : 18;
   });
   const [ocupacionOpen, setOcupacionOpen] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
   useEffect(() => {
     if (organization?.id) {
@@ -245,49 +368,56 @@ export function EstadisticasPanel() {
 
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
-  // Derive per-month metrics for charts
-  const derivedMetrics: DerivedMonthlyMetrics[] = monthlyData.map(m => {
-    const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
-    const gananciaNeta = m.facturacion - m.totalEgresos;
-    const rentabilidad = m.facturacion > 0 ? (gananciaNeta / m.facturacion) * 100 : 0;
-    const costoFijoPorServicio = m.servicios > 0 ? m.costosFijos / m.servicios : 0;
-    const costoVariablePorServicio = m.servicios > 0 ? m.costosVariables / m.servicios : 0;
-    const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
-    const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
+  // Derive per-month metrics with variation
+  const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
+    const raw = monthlyData.map(m => {
+      const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
+      const gananciaNeta = m.facturacion - m.totalEgresos;
+      const rentabilidad = m.facturacion > 0 ? (gananciaNeta / m.facturacion) * 100 : 0;
+      const costoFijoPorServicio = m.servicios > 0 ? m.costosFijos / m.servicios : 0;
+      const costoVariablePorServicio = m.servicios > 0 ? m.costosVariables / m.servicios : 0;
+      const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
+      const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
 
-    const [y, mo] = m.month.split('-').map(Number);
-    const workDays = getWorkDaysInMonth(y, mo - 1);
-    const cap = capacidadDiaria * (barberosActivos || 1) * workDays;
-    const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
+      const [y, mo] = m.month.split('-').map(Number);
+      const workDays = getWorkDaysInMonth(y, mo - 1);
+      const cap = capacidadDiaria * (barberosActivos || 1) * workDays;
+      const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
 
-    return {
-      monthLabel: m.monthLabel,
-      facturacion: m.facturacion,
-      costosFijos: m.costosFijos,
-      rentabilidad,
-      ticketPromedio,
-      costoFijoPorServicio,
-      costoVariablePorServicio,
-      gananciaPorServicio,
-      puntoEquilibrio,
-      tasaOcupacion,
-    };
-  });
+      return {
+        monthLabel: m.monthLabel,
+        facturacion: m.facturacion,
+        costosFijos: m.costosFijos,
+        rentabilidad,
+        ticketPromedio,
+        costoFijoPorServicio,
+        costoVariablePorServicio,
+        gananciaPorServicio,
+        puntoEquilibrio,
+        tasaOcupacion,
+      };
+    });
+
+    // Calculate variations
+    return raw.map((curr, i): DerivedMonthlyMetrics => {
+      const prev = i > 0 ? raw[i - 1] : null;
+      return {
+        ...curr,
+        facturacionVar: prev ? calcVariation(curr.facturacion, prev.facturacion) : null,
+        costosFijosVar: prev ? calcVariation(curr.costosFijos, prev.costosFijos) : null,
+        rentabilidadVar: prev ? calcVariation(curr.rentabilidad, prev.rentabilidad) : null,
+        ticketPromedioVar: prev ? calcVariation(curr.ticketPromedio, prev.ticketPromedio) : null,
+        costoFijoPorServicioVar: prev ? calcVariation(curr.costoFijoPorServicio, prev.costoFijoPorServicio) : null,
+        costoVariablePorServicioVar: prev ? calcVariation(curr.costoVariablePorServicio, prev.costoVariablePorServicio) : null,
+        gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
+        puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
+        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prev.tasaOcupacion) : null,
+      };
+    });
+  })();
 
   // Latest month values for headline
   const latest = derivedMetrics.length > 0 ? derivedMetrics[derivedMetrics.length - 1] : null;
-
-  type MetricCardDef = {
-    title: string;
-    dataKey: keyof DerivedMonthlyMetrics;
-    icon: typeof DollarSign;
-    color: string;
-    chartColor: string;
-    formatFn: (v: number) => string;
-    shortFormatFn: (v: number) => string;
-    description: string;
-    type?: 'area' | 'bar';
-  };
 
   const ingresosCards: MetricCardDef[] = [
     {
@@ -372,12 +502,28 @@ export function EstadisticasPanel() {
       formatFn: (v) => `${v} clientes`,
       shortFormatFn: (v) => `${v}`,
       description: 'Clientes necesarios para cubrir todos los costos fijos.',
-      type: 'bar' as const,
     },
   ];
 
+  const renderVariationBadge = (metric: MetricCardDef) => {
+    const vKey = varKeyMap[metric.dataKey as string];
+    if (!latest || !vKey) return null;
+    const variation = latest[vKey] as number | null;
+    if (variation == null) return null;
+    return (
+      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${variation > 0 ? 'text-green-600' : variation < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+        {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+        {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
+      </span>
+    );
+  };
+
   const renderMetricCard = (metric: MetricCardDef) => (
-    <Card key={metric.dataKey}>
+    <Card
+      key={metric.dataKey}
+      className="cursor-pointer transition-shadow hover:shadow-md"
+      onClick={() => setSelectedMetric(metric)}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
@@ -387,9 +533,11 @@ export function EstadisticasPanel() {
       </CardHeader>
       <CardContent>
         {latest && (
-          <div className={`text-2xl font-bold ${metric.color} mb-1`}>
-            {metric.formatFn(latest[metric.dataKey] as number)}
-            <span className="text-xs font-normal text-muted-foreground ml-2">último mes</span>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className={`text-2xl font-bold ${metric.color}`}>
+              {metric.formatFn(latest[metric.dataKey] as number)}
+            </span>
+            {renderVariationBadge(metric)}
           </div>
         )}
         <MetricChart
@@ -397,7 +545,6 @@ export function EstadisticasPanel() {
           dataKey={metric.dataKey}
           color={metric.chartColor}
           formatValue={metric.shortFormatFn}
-          type={metric.type || 'area'}
         />
       </CardContent>
     </Card>
@@ -421,6 +568,17 @@ export function EstadisticasPanel() {
       </div>
     );
   }
+
+  const ocupacionMetricDef: MetricCardDef = {
+    title: 'Tasa de Ocupación',
+    dataKey: 'tasaOcupacion',
+    icon: Users,
+    color: 'text-indigo-600',
+    chartColor: 'hsl(230 70% 55%)',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: 'Qué tan llena está tu agenda mes a mes.',
+  };
 
   return (
     <div className="space-y-6">
@@ -513,7 +671,10 @@ export function EstadisticasPanel() {
           <p className="text-sm text-muted-foreground">Estas métricas te muestran qué tan bien estás aprovechando tu barbería.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
+          <Card
+            className="cursor-pointer transition-shadow hover:shadow-md"
+            onClick={() => setSelectedMetric(ocupacionMetricDef)}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
@@ -523,9 +684,11 @@ export function EstadisticasPanel() {
             </CardHeader>
             <CardContent>
               {latest && (
-                <div className="text-2xl font-bold text-indigo-600 mb-1">
-                  {latest.tasaOcupacion.toFixed(1)}%
-                  <span className="text-xs font-normal text-muted-foreground ml-2">último mes</span>
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-2xl font-bold text-indigo-600">
+                    {latest.tasaOcupacion.toFixed(1)}%
+                  </span>
+                  {renderVariationBadge(ocupacionMetricDef)}
                 </div>
               )}
               <MetricChart
@@ -535,7 +698,7 @@ export function EstadisticasPanel() {
                 formatValue={(v) => `${v.toFixed(0)}%`}
               />
 
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
                 <Input
                   type="number"
@@ -548,23 +711,33 @@ export function EstadisticasPanel() {
                 <span className="text-xs text-muted-foreground">cortes/barbero</span>
               </div>
 
-              <Collapsible open={ocupacionOpen} onOpenChange={setOcupacionOpen}>
-                <CollapsibleTrigger className="flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
-                  <Info className="h-3 w-3" />
-                  ¿Cómo se calcula?
-                  <ChevronDown className={`h-3 w-3 transition-transform ${ocupacionOpen ? 'rotate-180' : ''}`} />
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
-                    <p><strong>Capacidad máxima:</strong> Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
-                    <p><strong>Tasa:</strong> (Servicios reales ÷ Capacidad máxima) × 100</p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+              <div onClick={(e) => e.stopPropagation()}>
+                <Collapsible open={ocupacionOpen} onOpenChange={setOcupacionOpen}>
+                  <CollapsibleTrigger className="flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
+                    <Info className="h-3 w-3" />
+                    ¿Cómo se calcula?
+                    <ChevronDown className={`h-3 w-3 transition-transform ${ocupacionOpen ? 'rotate-180' : ''}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
+                      <p><strong>Capacidad máxima:</strong> Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
+                      <p><strong>Tasa:</strong> (Servicios reales ÷ Capacidad máxima) × 100</p>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Detail Dialog */}
+      <MetricDetailDialog
+        open={!!selectedMetric}
+        onOpenChange={(v) => { if (!v) setSelectedMetric(null); }}
+        metric={selectedMetric}
+        data={derivedMetrics}
+      />
     </div>
   );
 }
