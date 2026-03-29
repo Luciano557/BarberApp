@@ -209,5 +209,6 @@ export function useGastos() {
     deleteGasto,
     totalPeriodo,
     refetch: fetchGastos,
+    setSyncRecurrentes,
   };
 }
