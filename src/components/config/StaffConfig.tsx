@@ -56,12 +56,14 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
       onUpdate(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
+        compensationType: 'comision',
       });
       setEditingId(null);
     } else {
       onAdd({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
+        compensationType: 'comision',
       });
       setIsAdding(false);
     }

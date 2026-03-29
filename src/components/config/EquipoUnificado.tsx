@@ -95,6 +95,7 @@ export function EquipoUnificado({
 
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' as AppRole,
+    compensationType: 'comision' as CompensationType, fixedSalary: '',
   });
 
   const activeBarbers = barbers.filter(b => b.active);
@@ -197,8 +198,8 @@ export function EquipoUnificado({
   };
 
   const resetForm = () => {
-    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' });
-  };
+    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber',
+      compensationType: 'comision', fixedSalary: '' });
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
@@ -207,6 +208,8 @@ export function EquipoUnificado({
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
+        compensationType: data.compensationType,
+        fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
       });
       // Update role if linked user exists
       const linkedUser = getLinkedUser(barberId);
@@ -218,6 +221,8 @@ export function EquipoUnificado({
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
+        compensationType: data.compensationType,
+        fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
       });
       setIsAdding(false);
     }
