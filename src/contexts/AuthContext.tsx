@@ -21,11 +21,14 @@ interface AuthContextType {
   isGeneralManager: boolean;
   isManager: boolean;
   isBarber: boolean;
+  hasNoAccess: boolean;
   canManagePayments: boolean;
   canManageConfig: boolean;
   canManageBarbers: boolean;
   canManageUsers: boolean;
   canViewAllClosings: boolean;
+  canViewResumen: boolean;
+  canViewTareas: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -168,11 +171,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGeneralManager,
         isManager,
         isBarber,
+        hasNoAccess,
         canManagePayments,
         canManageConfig,
         canManageBarbers,
         canManageUsers,
         canViewAllClosings,
+        canViewResumen,
+        canViewTareas,
         signIn,
         signUp,
         signOut,
