@@ -11,10 +11,10 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  ComposedChart, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
   Line, ResponsiveContainer
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
