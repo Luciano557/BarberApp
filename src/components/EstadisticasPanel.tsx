@@ -26,13 +26,10 @@ interface MonthlyData {
   servicios: number;
   efectivo: number;
   mp: number;
-}
-
-interface CostData {
-  fijos: number;
-  variables: number;
-  semivariables: number;
-  total: number;
+  costosFijos: number;
+  costosVariables: number;
+  costosSemivariables: number;
+  totalEgresos: number;
 }
 
 const chartConfig = {
@@ -59,7 +56,6 @@ function getWorkDaysInMonth(year: number, month: number): number {
   let workDays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const day = getDay(new Date(year, month, d));
-    // Lun-Sáb = 1-6
     if (day !== 0) workDays++;
   }
   return workDays;
@@ -69,12 +65,10 @@ export function EstadisticasPanel() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [costs, setCosts] = useState<CostData>({ fijos: 0, variables: 0, semivariables: 0, total: 0 });
-  const [totalFacturacion, setTotalFacturacion] = useState(0);
-  const [totalServicios, setTotalServicios] = useState(0);
   const [barberosActivos, setBarberosActivos] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [periodoMeses, setPeriodoMeses] = useState('6');
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [capacidadDiaria, setCapacidadDiaria] = useState(() => {
     const saved = localStorage.getItem('estadisticas_capacidad_diaria');
     return saved ? parseInt(saved) : 18;
@@ -91,6 +85,12 @@ export function EstadisticasPanel() {
     localStorage.setItem('estadisticas_capacidad_diaria', String(capacidadDiaria));
   }, [capacidadDiaria]);
 
+  // Reset selectedMonth to current when period changes
+  useEffect(() => {
+    const currentMonth = format(new Date(), 'yyyy-MM');
+    setSelectedMonth(currentMonth);
+  }, [periodoMeses]);
+
   const fetchData = async () => {
     if (!organization?.id) return;
     setIsLoading(true);
@@ -100,7 +100,6 @@ export function EstadisticasPanel() {
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
 
-      // Fetch ingresos
       let ingresosQuery = supabase
         .from('ingresos')
         .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
@@ -113,7 +112,6 @@ export function EstadisticasPanel() {
         ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      // Fetch egresos
       let egresosQuery = supabase
         .from('Egresos')
         .select('Monto, tipo_costo, Fecha')
@@ -125,7 +123,6 @@ export function EstadisticasPanel() {
         egresosQuery = egresosQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      // Fetch barberos activos
       let barberosQuery = supabase
         .from('barberos')
         .select('id')
@@ -150,16 +147,8 @@ export function EstadisticasPanel() {
       const egresos = egresosRes.data || [];
       const barberos = barberosRes.data || [];
 
-      // Process costs
-      const costosFijos = egresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-      const costosVariables = egresos.filter(e => e.tipo_costo === 'variable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-      const costosSemivariables = egresos.filter(e => e.tipo_costo === 'semivariable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-      const totalEgresos = costosFijos + costosVariables + costosSemivariables;
-
-      setCosts({ fijos: costosFijos, variables: costosVariables, semivariables: costosSemivariables, total: totalEgresos });
       setBarberosActivos(barberos.length);
 
-      // Process monthly data
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
       
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
@@ -172,6 +161,16 @@ export function EstadisticasPanel() {
           return ingresoDate >= monthStart && ingresoDate <= monthEnd;
         });
 
+        const monthEgresos = egresos.filter(e => {
+          if (!e.Fecha) return false;
+          const egresoDate = parseISO(e.Fecha);
+          return egresoDate >= monthStart && egresoDate <= monthEnd;
+        });
+
+        const costosFijos = monthEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+        const costosVariables = monthEgresos.filter(e => e.tipo_costo === 'variable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+        const costosSemivariables = monthEgresos.filter(e => e.tipo_costo === 'semivariable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+
         return {
           month: format(monthDate, 'yyyy-MM'),
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
@@ -179,15 +178,14 @@ export function EstadisticasPanel() {
           servicios: monthIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0),
           efectivo: monthIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0),
           mp: monthIngresos.reduce((sum, i) => sum + (i.mp || 0), 0),
+          costosFijos,
+          costosVariables,
+          costosSemivariables,
+          totalEgresos: costosFijos + costosVariables + costosSemivariables,
         };
       });
 
       setMonthlyData(monthlyStats);
-
-      const totFact = monthlyStats.reduce((s, m) => s + m.facturacion, 0);
-      const totServ = monthlyStats.reduce((s, m) => s + m.servicios, 0);
-      setTotalFacturacion(totFact);
-      setTotalServicios(totServ);
 
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -205,74 +203,83 @@ export function EstadisticasPanel() {
     }).format(value);
   };
 
-  // Calculated metrics
-  const ticketPromedio = totalServicios > 0 ? totalFacturacion / totalServicios : 0;
-  const gananciaNeta = totalFacturacion - costs.total;
-  const rentabilidad = totalFacturacion > 0 ? (gananciaNeta / totalFacturacion) * 100 : 0;
-  const costoFijoPorServicio = totalServicios > 0 ? costs.fijos / totalServicios : 0;
-  const costoVariablePorServicio = totalServicios > 0 ? costs.variables / totalServicios : 0;
-  const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
-  const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(costs.fijos / gananciaPorServicio) : 0;
+  // Get selected month data
+  const currentMonthData = monthlyData.find(m => m.month === selectedMonth) || {
+    month: selectedMonth,
+    monthLabel: '',
+    facturacion: 0,
+    servicios: 0,
+    efectivo: 0,
+    mp: 0,
+    costosFijos: 0,
+    costosVariables: 0,
+    costosSemivariables: 0,
+    totalEgresos: 0,
+  };
 
-  // Tasa de ocupación
-  const meses = parseInt(periodoMeses);
-  let totalWorkDays = 0;
-  const now = new Date();
-  for (let i = 0; i < meses; i++) {
-    const d = subMonths(now, i);
-    totalWorkDays += getWorkDaysInMonth(d.getFullYear(), d.getMonth());
-  }
-  const capacidadMaxima = capacidadDiaria * (barberosActivos || 1) * totalWorkDays;
-  const tasaOcupacion = capacidadMaxima > 0 ? (totalServicios / capacidadMaxima) * 100 : 0;
+  // Calculated metrics for selected month
+  const ticketPromedio = currentMonthData.servicios > 0 ? currentMonthData.facturacion / currentMonthData.servicios : 0;
+  const gananciaNeta = currentMonthData.facturacion - currentMonthData.totalEgresos;
+  const rentabilidad = currentMonthData.facturacion > 0 ? (gananciaNeta / currentMonthData.facturacion) * 100 : 0;
+  const costoFijoPorServicio = currentMonthData.servicios > 0 ? currentMonthData.costosFijos / currentMonthData.servicios : 0;
+  const costoVariablePorServicio = currentMonthData.servicios > 0 ? currentMonthData.costosVariables / currentMonthData.servicios : 0;
+  const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
+  const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(currentMonthData.costosFijos / gananciaPorServicio) : 0;
+
+  // Tasa de ocupación for selected month
+  const [selYear, selMonth] = selectedMonth.split('-').map(Number);
+  const workDaysInSelectedMonth = getWorkDaysInMonth(selYear, selMonth - 1);
+  const capacidadMaxima = capacidadDiaria * (barberosActivos || 1) * workDaysInSelectedMonth;
+  const tasaOcupacion = capacidadMaxima > 0 ? (currentMonthData.servicios / capacidadMaxima) * 100 : 0;
 
   const metrics = [
     {
-      title: 'Facturación Total',
-      value: formatCurrency(totalFacturacion),
+      title: 'Facturación',
+      value: formatCurrency(currentMonthData.facturacion),
       icon: DollarSign,
-      description: 'Muestra cuánto dinero entra al negocio. Es el punto de partida para saber si tu barbería genera lo suficiente para cubrir costos y crecer.',
+      description: 'Cuánto dinero entró al negocio este mes. Es el punto de partida para saber si tu barbería genera lo suficiente.',
       color: 'text-green-600',
     },
     {
       title: 'Costos Fijos',
-      value: formatCurrency(costs.fijos),
+      value: formatCurrency(currentMonthData.costosFijos),
       icon: PiggyBank,
-      description: 'Son los gastos que pagás todos los meses sin importar cuántos clientes atiendas. Conocerlos te permite saber cuánto necesitás facturar como mínimo.',
+      description: 'Gastos que pagás todos los meses sin importar cuántos clientes atiendas. Conocerlos te dice cuánto necesitás facturar como mínimo.',
       color: 'text-red-500',
     },
     {
       title: 'Rentabilidad',
       value: `${rentabilidad.toFixed(1)}%`,
       icon: Percent,
-      description: 'Indica qué porcentaje de lo facturado te queda como ganancia real. Si es baja, estás trabajando mucho para ganar poco.',
+      description: 'Qué porcentaje de lo facturado te queda como ganancia real. Si es baja, estás trabajando mucho para ganar poco.',
       color: rentabilidad >= 0 ? 'text-green-600' : 'text-red-600',
     },
     {
       title: 'Ticket Promedio',
       value: formatCurrency(ticketPromedio),
       icon: Receipt,
-      description: 'Cuánto gasta cada cliente en promedio. Subirlo con extras o servicios premium es la forma más rápida de aumentar la facturación sin más clientes.',
+      description: 'Cuánto gasta cada cliente en promedio. Subirlo con extras o servicios premium es la forma más rápida de facturar más.',
       color: 'text-blue-600',
     },
     {
       title: 'Costo Fijo por Servicio',
       value: formatCurrency(costoFijoPorServicio),
       icon: BarChart3,
-      description: 'Cuánto te cuesta cada cliente solo en costos fijos. Mientras más clientes atiendas, más se diluye este costo y más ganás por servicio.',
+      description: 'Cuánto te cuesta cada cliente solo en costos fijos. Más clientes = más se diluye y más ganás por servicio.',
       color: 'text-orange-500',
     },
     {
       title: 'Costo Variable por Servicio',
       value: formatCurrency(costoVariablePorServicio),
       icon: Scissors,
-      description: 'Lo que gastás por cada cliente en insumos y comisiones. Controlarlo te ayuda a proteger tu margen de ganancia en cada corte.',
+      description: 'Lo que gastás por cada cliente en insumos y comisiones. Controlarlo protege tu margen de ganancia en cada corte.',
       color: 'text-amber-600',
     },
     {
       title: 'Ganancia por Servicio',
       value: formatCurrency(gananciaPorServicio),
       icon: TrendingUp,
-      description: 'Cuánto ganás realmente por cada cliente después de todos los costos. Es la métrica clave para saber si cada corte vale la pena.',
+      description: 'Cuánto ganás realmente por cada cliente después de todos los costos. La métrica clave para saber si cada corte vale la pena.',
       color: gananciaPorServicio >= 0 ? 'text-green-600' : 'text-red-600',
     },
     {
@@ -309,13 +316,25 @@ export function EstadisticasPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Estadísticas</h1>
           <p className="text-muted-foreground">Análisis y métricas del negocio</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Calendar className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthlyData.map(m => (
+                <SelectItem key={m.month} value={m.month}>
+                  {format(parseISO(m.month + '-01'), 'MMMM yyyy', { locale: es })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={periodoMeses} onValueChange={setPeriodoMeses}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -344,7 +363,7 @@ export function EstadisticasPanel() {
           </Card>
         ))}
 
-        {/* Tasa de ocupación - special card */}
+        {/* Tasa de ocupación */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
@@ -353,7 +372,7 @@ export function EstadisticasPanel() {
           <CardContent>
             <div className="text-2xl font-bold text-indigo-600">{tasaOcupacion.toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Qué tan llena está tu agenda. Si es baja, tenés capacidad ociosa. Si es muy alta, podrías necesitar más barberos o más horas.
+              Qué tan llena está tu agenda. Si es baja, tenés capacidad ociosa. Si es muy alta, podrías necesitar más barberos.
             </p>
 
             <div className="mt-3 flex items-center gap-2">
@@ -379,10 +398,10 @@ export function EstadisticasPanel() {
                 <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
                   <p><strong>Paso 1 — Capacidad máxima:</strong></p>
                   <p>Capacidad = Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
-                  <p className="text-foreground">{capacidadDiaria} × {barberosActivos} × {totalWorkDays} = {capacidadMaxima} servicios</p>
+                  <p className="text-foreground">{capacidadDiaria} × {barberosActivos} × {workDaysInSelectedMonth} = {capacidadMaxima} servicios</p>
                   <p className="mt-1"><strong>Paso 2 — Tasa de ocupación:</strong></p>
                   <p>(Servicios reales ÷ Capacidad máxima) × 100</p>
-                  <p className="text-foreground">({totalServicios} ÷ {capacidadMaxima}) × 100 = {tasaOcupacion.toFixed(1)}%</p>
+                  <p className="text-foreground">({currentMonthData.servicios} ÷ {capacidadMaxima}) × 100 = {tasaOcupacion.toFixed(1)}%</p>
                 </div>
               </CollapsibleContent>
             </Collapsible>
