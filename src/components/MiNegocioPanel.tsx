@@ -90,6 +90,8 @@ export function MiNegocioPanel() {
       activo: barber.active,
       organization_id: organization.id,
       sucursal_id: sucursalId,
+      tipo_compensacion: barber.compensationType || 'comision',
+      sueldo_fijo: barber.fixedSalary || null,
     });
     if (error) { toast.error('Error al agregar barbero'); return; }
     toast.success('Barbero agregado');

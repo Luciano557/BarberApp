@@ -263,6 +263,8 @@ export function useSupabaseData() {
           activo: barber.active,
           organization_id: organization.id,
           sucursal_id: currentSucursal?.id || null,
+          tipo_compensacion: barber.compensationType || 'comision',
+          sueldo_fijo: barber.fixedSalary || null,
         })
         .select()
         .single();
