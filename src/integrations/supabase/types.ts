@@ -1114,6 +1114,48 @@ export type Database = {
           },
         ]
       }
+      sucursal_settings: {
+        Row: {
+          capacidad_diaria: number
+          created_at: string
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          capacidad_diaria?: number
+          created_at?: string
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          capacidad_diaria?: number
+          created_at?: string
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sucursal_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_settings_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sucursales: {
         Row: {
           activa: boolean
