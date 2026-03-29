@@ -200,6 +200,7 @@ export function EquipoUnificado({
   const resetForm = () => {
     setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber',
       compensationType: 'comision', fixedSalary: '' });
+  };
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
