@@ -246,7 +246,8 @@ export function EquipoUnificado({
     const [localData, setLocalData] = useState(initialData);
     const [localCommissionError, setLocalCommissionError] = useState('');
 
-    const commissionRequired = localData.role === 'barber';
+    const isComision = localData.compensationType === 'comision';
+    const commissionRequired = isComision && (localData.role === 'barber' || localData.role === 'manager');
 
     const validateLocalCommission = (value: string): boolean => {
       if (!commissionRequired && (value === '' || value === '0')) {
@@ -260,8 +261,9 @@ export function EquipoUnificado({
 
     const handleSubmit = () => {
       if (!localData.firstName || !localData.lastName || !localData.phone) return;
-      if (commissionRequired && !localData.commission) return;
-      if (!validateLocalCommission(localData.commission)) return;
+      if (isComision && commissionRequired && !localData.commission) return;
+      if (isComision && !validateLocalCommission(localData.commission)) return;
+      if (!isComision && !localData.fixedSalary) return;
       onSave(localData);
     };
 
@@ -273,18 +275,41 @@ export function EquipoUnificado({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
-          <div>
-            <Input type="text" inputMode="numeric" placeholder={commissionRequired ? 'Comisión % *' : 'Comisión % (opcional)'} value={localData.commission}
+          <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
+        </div>
+        {/* Compensation type selector */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Tipo de compensación *</label>
+          <Select value={localData.compensationType} onValueChange={(v) => setLocalData(prev => ({ ...prev, compensationType: v as CompensationType }))}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="comision">Por comisión (%)</SelectItem>
+              <SelectItem value="fijo">Sueldo fijo mensual ($)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Commission or Fixed Salary */}
+        {isComision ? (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">{commissionRequired ? 'Comisión % *' : 'Comisión % (opcional)'}</label>
+            <Input type="text" inputMode="numeric" placeholder="Ej: 40" value={localData.commission}
               onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
               onBlur={() => validateLocalCommission(localData.commission)}
               className={localCommissionError ? 'border-destructive' : ''} autoComplete="off" />
             {localCommissionError && <p className="text-xs text-destructive mt-1">{localCommissionError}</p>}
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
-          <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
-        </div>
+        ) : (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
+            <Input type="number" inputMode="decimal" placeholder="Ej: 350000" value={localData.fixedSalary}
+              onChange={(e) => setLocalData(prev => ({ ...prev, fixedSalary: e.target.value }))} autoComplete="off" />
+          </div>
+        )}
         {/* Role selector */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Cargo *</label>
@@ -306,7 +331,7 @@ export function EquipoUnificado({
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
           <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-            disabled={!localData.firstName || !localData.lastName || !localData.phone || (commissionRequired && !localData.commission) || !!localCommissionError}>
+            disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
             <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
           </Button>
         </div>
