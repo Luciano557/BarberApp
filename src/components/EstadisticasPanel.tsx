@@ -434,6 +434,17 @@ export function EstadisticasPanel() {
   // Latest month values for headline
   const latest = derivedMetrics.length > 0 ? derivedMetrics[derivedMetrics.length - 1] : null;
 
+  const serviciosCard: MetricCardDef = {
+    title: 'Servicios',
+    dataKey: 'servicios',
+    icon: Scissors,
+    color: 'text-primary',
+    chartColor: 'hsl(var(--primary))',
+    formatFn: (v) => `${v} servicios`,
+    shortFormatFn: (v) => `${v}`,
+    description: 'Cantidad de servicios realizados por mes.',
+  };
+
   const ingresosCards: MetricCardDef[] = [
     {
       title: 'Facturación',
@@ -454,16 +465,6 @@ export function EstadisticasPanel() {
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto gasta cada cliente en promedio por visita.',
-    },
-    {
-      title: 'Servicios',
-      dataKey: 'servicios',
-      icon: Scissors,
-      color: 'text-primary',
-      chartColor: 'hsl(var(--primary))',
-      formatFn: (v) => `${v} servicios`,
-      shortFormatFn: (v) => `${v}`,
-      description: 'Cantidad de servicios realizados por mes.',
     },
     {
       title: 'Efectivo',
@@ -653,6 +654,50 @@ export function EstadisticasPanel() {
           <h2 className="text-lg font-semibold text-foreground">📈 Ingresos y Ventas</h2>
           <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás vendiendo y cómo evoluciona tu facturación.</p>
         </div>
+        {/* Servicios - full width first */}
+        <Card
+          className="cursor-pointer transition-shadow hover:shadow-md md:col-span-2"
+          onClick={() => setSelectedMetric(serviciosCard)}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">{serviciosCard.title}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">{serviciosCard.description}</p>
+            </div>
+            <serviciosCard.icon className={`h-4 w-4 ${serviciosCard.color} shrink-0`} />
+          </CardHeader>
+          <CardContent>
+            {latest && (
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className={`text-2xl font-bold ${serviciosCard.color}`}>
+                  {serviciosCard.formatFn(latest[serviciosCard.dataKey] as number)}
+                </span>
+                {renderVariationBadge(serviciosCard)}
+              </div>
+            )}
+            <ChartContainer config={{ [serviciosCard.dataKey]: { label: serviciosCard.title, color: serviciosCard.chartColor } }} className="h-52 w-full mt-3">
+              <ComposedChart data={derivedMetrics} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={45} tickFormatter={serviciosCard.shortFormatFn} />
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      formatter={(value, name, item) => {
+                        const varVal = (item.payload as any)?.serviciosVar;
+                        const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
+                        return `${serviciosCard.formatFn(Number(value))}${varStr}`;
+                      }}
+                    />
+                  }
+                />
+                <Bar dataKey="servicios" fill={serviciosCard.chartColor} radius={[3, 3, 0, 0]} opacity={0.7} />
+                <Line type="monotone" dataKey="servicios" stroke={serviciosCard.chartColor} strokeWidth={2} dot={false} />
+              </ComposedChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {ingresosCards.map(renderMetricCard)}
         </div>
