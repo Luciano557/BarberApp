@@ -5,6 +5,8 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
+export type TipoCosto = 'fijo' | 'variable' | 'semivariable';
+
 export interface Gasto {
   id: number;
   Categoria: string | null;
@@ -12,6 +14,7 @@ export interface Gasto {
   Descripcion: string | null;
   Fecha: string | null;
   organization_id: string | null;
+  tipo_costo: TipoCosto | null;
 }
 
 export function useGastos() {
@@ -61,6 +64,7 @@ export function useGastos() {
     monto: number;
     descripcion: string;
     fecha: Date;
+    tipoCosto: TipoCosto;
   }) => {
     if (!organization?.id) {
       toast.error('No se encontró la organización');
@@ -75,6 +79,7 @@ export function useGastos() {
         Fecha: data.fecha.toISOString(),
         organization_id: organization.id,
         sucursal_id: currentSucursal?.id || null,
+        tipo_costo: data.tipoCosto,
       });
 
       if (error) throw error;
