@@ -106,7 +106,9 @@ export type Database = {
           organization_id: string | null
           pin_hash: string | null
           sucursal_id: string | null
+          sueldo_fijo: number | null
           telefono: string | null
+          tipo_compensacion: string
           updated_at: string
         }
         Insert: {
@@ -120,7 +122,9 @@ export type Database = {
           organization_id?: string | null
           pin_hash?: string | null
           sucursal_id?: string | null
+          sueldo_fijo?: number | null
           telefono?: string | null
+          tipo_compensacion?: string
           updated_at?: string
         }
         Update: {
@@ -134,7 +138,9 @@ export type Database = {
           organization_id?: string | null
           pin_hash?: string | null
           sucursal_id?: string | null
+          sueldo_fijo?: number | null
           telefono?: string | null
+          tipo_compensacion?: string
           updated_at?: string
         }
         Relationships: [
@@ -1607,7 +1613,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "owner" | "manager" | "barber" | "general_manager"
+      app_role: "owner" | "manager" | "barber" | "general_manager" | "otros"
       caja_mov_tipo: "ingreso" | "egreso"
       metodo_pago: "efectivo" | "mercado_pago"
     }
@@ -1737,7 +1743,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "manager", "barber", "general_manager"],
+      app_role: ["owner", "manager", "barber", "general_manager", "otros"],
       caja_mov_tipo: ["ingreso", "egreso"],
       metodo_pago: ["efectivo", "mercado_pago"],
     },

@@ -537,10 +537,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="barber">Barbero *</Label>
+                  <Label htmlFor="barber">Empleado *</Label>
                   <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar barbero" />
+                      <SelectValue placeholder="Seleccionar empleado" />
                     </SelectTrigger>
                     <SelectContent>
                       {barbers.map(barber => (
@@ -637,7 +637,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       {/* Salary Table per Barber with expandable details */}
       <Card>
         <CardHeader>
-          <CardTitle>Resumen por Barbero</CardTitle>
+          <CardTitle>Resumen por Empleado</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {salaryData.map(barber => (
@@ -666,7 +666,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Fecha</TableHead>
-                <TableHead>Barbero</TableHead>
+                <TableHead>Empleado</TableHead>
                 <TableHead>Concepto</TableHead>
                 <TableHead className="text-right">Monto</TableHead>
               </TableRow>
