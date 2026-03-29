@@ -21,11 +21,14 @@ interface AuthContextType {
   isGeneralManager: boolean;
   isManager: boolean;
   isBarber: boolean;
+  hasNoAccess: boolean;
   canManagePayments: boolean;
   canManageConfig: boolean;
   canManageBarbers: boolean;
   canManageUsers: boolean;
   canViewAllClosings: boolean;
+  canViewResumen: boolean;
+  canViewTareas: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -147,11 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = roles.includes('manager');
   const isBarber = roles.includes('barber');
 
+  const hasNoAccess = roles.length > 0 && roles.every(r => r === 'otros');
   const canManagePayments = isOwner || isGeneralManager || isManager;
   const canManageConfig = isOwner || isGeneralManager || isManager;
   const canManageBarbers = isOwner || isGeneralManager;
   const canManageUsers = isOwner || isGeneralManager;
   const canViewAllClosings = isOwner || isGeneralManager || isManager;
+  const canViewResumen = !hasNoAccess && roles.length > 0;
+  const canViewTareas = !hasNoAccess && roles.length > 0;
 
   return (
     <AuthContext.Provider
@@ -165,11 +171,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGeneralManager,
         isManager,
         isBarber,
+        hasNoAccess,
         canManagePayments,
         canManageConfig,
         canManageBarbers,
         canManageUsers,
         canViewAllClosings,
+        canViewResumen,
+        canViewTareas,
         signIn,
         signUp,
         signOut,
