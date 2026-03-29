@@ -329,6 +329,8 @@ export function EquipoUnificado({
               firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
               commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
               role: highestRole || 'barber',
+              compensationType: barber.compensationType || 'comision',
+              fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
             }}
             onSave={(data) => handleFormSave(data, barber.id)} onCancel={cancelEdit} />
         ) : (
@@ -403,6 +405,8 @@ export function EquipoUnificado({
                   firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
                   commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
                   role: highestRole || 'barber',
+                  compensationType: barber.compensationType || 'comision',
+                  fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
                 });
               }}>
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
