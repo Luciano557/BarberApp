@@ -1,43 +1,45 @@
 
 
-## Rediseño del Panel de Estadísticas (revisado)
+## Estadísticas mes a mes (no acumuladas)
 
-Agregar 9 métricas financieras como tarjetas nuevas **por encima** de los gráficos existentes. Los 3 gráficos actuales (Facturación mensual, Servicios por mes, Métodos de pago) se mantienen intactos.
+El problema: actualmente las 9 métricas muestran valores acumulados del período completo (ej: facturación total de 6 meses). El usuario quiere ver las métricas **mes a mes**, pudiendo seleccionar qué mes ver.
 
 ---
 
 ## Cambios en `src/components/EstadisticasPanel.tsx`
 
-### Datos adicionales
-- Fetch de `Egresos` del período seleccionado, agrupados por `tipo_costo` (fijo, variable, semivariable)
-- Calcular totales de costos fijos, variables y total de egresos
+### Nuevo selector de mes
 
-### 9 tarjetas de métricas (grid 3 cols desktop, 1 col mobile)
+- Agregar un segundo `Select` para elegir el mes específico a visualizar (ej: "Marzo 2026", "Febrero 2026", etc.)
+- Las opciones se generan dinámicamente según el período seleccionado (3, 6 o 12 meses)
+- Por defecto muestra el mes actual
+- El selector de período (3/6/12 meses) sigue controlando el rango de los gráficos
 
-Cada tarjeta incluye: icono, título, valor calculado, y descripción breve (~200 chars) de por qué es importante.
+### Calcular métricas por mes (no acumuladas)
 
-1. **Facturación mensual** = suma `total_facturado`
-2. **Costos fijos** = suma Egresos tipo fijo
-3. **Rentabilidad** = ((Facturación - Total egresos) / Facturación) x 100
-4. **Ticket promedio** = Facturación / cantidad servicios
-5. **Costo fijo por servicio** = Costos fijos / servicios
-6. **Costo variable por servicio** = Costos variables / servicios
-7. **Ganancia por servicio** = Ticket promedio - costo fijo/serv - costo variable/serv
-8. **Punto de equilibrio** = Costos fijos / Ganancia por servicio (clientes)
-9. **Tasa de ocupación** = (Servicios reales / Capacidad máxima) x 100
+- Extender `MonthlyData` para incluir costos del mes: `costosFijos`, `costosVariables`, `costosSemivariables`, `totalEgresos`
+- En `fetchData`, al procesar cada mes, filtrar también los `Egresos` de ese mes y calcular costos fijos/variables/semivariables por mes
+- Nuevo estado `selectedMonth` (string `yyyy-MM`) para saber qué mes mostrar en las tarjetas
 
-### Tasa de ocupación
-- Capacidad máxima diaria por defecto: **18 cortes**
-- Input editable inline, guardado en `localStorage`
-- Collapsible con explicación del cálculo
-- Capacidad total = capacidad diaria x barberos activos x días laborables (lun-sáb)
+### Las 9 tarjetas usan datos del mes seleccionado
 
-### Gráficos existentes
-Se mantienen los 3 gráficos sin cambios debajo de las métricas:
-- Facturación Mensual (AreaChart)
-- Servicios por Mes (BarChart)
-- Métodos de Pago (BarChart stacked)
+En lugar de usar `totalFacturacion`, `costs.fijos`, etc. (acumulados), se toman los valores del mes elegido:
+
+1. **Facturación** = `monthData.facturacion`
+2. **Costos fijos** = `monthData.costosFijos`
+3. **Rentabilidad** = `((facturación - totalEgresos) / facturación) x 100`
+4. **Ticket promedio** = `facturación / servicios`
+5. **Costo fijo por servicio** = `costosFijos / servicios`
+6. **Costo variable por servicio** = `costosVariables / servicios`
+7. **Ganancia por servicio** = `ticket - costoFijo/serv - costoVar/serv`
+8. **Punto de equilibrio** = `costosFijos / ganancia por servicio`
+9. **Tasa de ocupación** = `servicios / (capacidad diaria x barberos x días laborables del mes) x 100`
+
+### Gráficos
+
+Se mantienen los 3 gráficos mostrando la evolución de todo el período (3/6/12 meses) sin cambios.
 
 ### Archivo a modificar
+
 - `src/components/EstadisticasPanel.tsx`
 
