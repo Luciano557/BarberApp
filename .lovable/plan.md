@@ -1,38 +1,46 @@
 
 
-## Correcciones para empleados con cargo "Otros"
+## Roles múltiples por empleado y filtro de "Cobrar" por rol barbero
 
-### Problemas identificados
+### Problema actual
+- El sistema asigna UN solo cargo por empleado. Al cambiar cargo, borra los anteriores e inserta el nuevo.
+- Agus Community tiene cargo "otros" pero su `rol_equipo` en la tabla `barberos` puede no haberse sincronizado correctamente, por lo que sigue apareciendo en Cobrar.
+- Tomás Basante es encargado de sucursal Y barbero, pero solo puede tener un cargo.
 
-1. **Empleados "otros" aparecen como barberos en Cobrar**: En `PaymentRegistration.tsx`, se muestran todos los `barbers` sin filtrar por tipo. Agus Community (cargo "otros") no debería aparecer como opción para asignarle un corte.
+### Solución
 
-2. **PIN e Invitar disponibles para "otros"**: En `EquipoUnificado.tsx`, los botones "Configurar PIN" e "Invitar" se muestran para todos los empleados, incluyendo los de cargo "otros", que no tienen acceso a nada en la app.
+Separar dos conceptos:
+1. **Cargo(s) del sistema** (`user_roles`): define permisos (owner, general_manager, manager, barber, otros). Un empleado puede tener VARIOS.
+2. **`rol_equipo`** en tabla `barberos`: determina si aparece en Cobrar. Se calcula automáticamente: si tiene el cargo "barber" entre sus roles → `rol_equipo = 'barbero'`, si no → `'otros'`.
 
-3. **SueldosPanel no muestra a Agus**: Probablemente porque `barbers` se filtra solo por `active` pero el problema real es que el empleado con cargo "otros" no tiene cierres (ingresos) ni pagos, y puede no estar apareciendo en la lista del selector.
+### Cambios por archivo
 
-### Plan de cambios
+**1. `src/components/config/EquipoUnificado.tsx`**
+- **Selector de cargo**: Cambiar de single-select a multi-select con checkboxes. Roles disponibles: Encargado General, Encargado de Sucursal, Barbero, Otros.
+- **`handleChangeRole`**: En vez de borrar todos los roles y poner uno, manejar un array de roles seleccionados. Insertar/borrar según diferencia.
+- **Sincronización automática de `rol_equipo`**: Si los roles seleccionados incluyen `'barber'` → `rol_equipo = 'barbero'`. Si no → `'otros'`.
+- **Mostrar badges múltiples**: En vez de mostrar solo el "highest role", mostrar todos los badges de roles asignados.
+- **PIN e Invitar**: Mostrar estos botones si el empleado tiene AL MENOS un rol que no sea 'otros' (o sea, si tiene barber, manager, etc.).
+- **Form**: El selector de cargo en el formulario de agregar/editar también pasa a ser multi-select.
 
-**1. Filtrar empleados "otros" del flujo de cobro (`PaymentRegistration.tsx`)**
-- En `Index.tsx`, al pasar `barbers` a `PaymentRegistration`, filtrar para excluir empleados cuyo `compensationType === 'fijo'` que tengan rol "otros". O mejor: no pasar empleados que no sean barberos.
-- Enfoque más limpio: agregar una propiedad al tipo `Barber` que indique si es "operativo" (puede recibir cortes) o no. Pero dado que el cargo se guarda en `user_roles` y no en `barberos`, necesitamos filtrar desde donde se tiene esa info.
-- **Solución pragmática**: Filtrar en `PaymentRegistration.tsx` — solo mostrar barberos que NO tengan `compensationType === 'fijo'` como criterio. Pero esto no es correcto porque alguien con sueldo fijo podría ser barbero.
-- **Mejor solución**: Necesitamos saber el "cargo" del empleado. El cargo se define en `user_roles` pero no todos los empleados tienen usuario vinculado. Agregar un campo `cargo` o `rol_equipo` a la tabla `barberos` para diferenciar sin depender de `user_roles`.
+**2. `src/components/config/EquipoUnificado.tsx` — funciones auxiliares**
+- `getBarberRole` → `getBarberRoles` (retorna array).
+- `getUserRoles` ya retorna array, se mantiene.
+- Sorting: usar el rol de mayor jerarquía para ordenar, igual que ahora.
 
-**Solución elegida**: Agregar columna `rol_equipo` (text, default `'barbero'`) a la tabla `barberos` con valores posibles: `barbero`, `otros`. Esto permite filtrar directamente.
+**3. `src/pages/Index.tsx`** (sin cambios necesarios)
+- Ya filtra con `b.teamRole !== 'otros'`, y la sincronización automática de `rol_equipo` se encarga del resto.
 
-**Archivos a modificar:**
+**4. No se necesita migración de base de datos**
+- La tabla `user_roles` ya soporta múltiples filas por usuario (tiene `unique(user_id, role)` pero permite múltiples roles distintos).
+- El campo `rol_equipo` en `barberos` ya existe.
 
-1. **Migración SQL**: `ALTER TABLE barberos ADD COLUMN rol_equipo text NOT NULL DEFAULT 'barbero'`
-2. **`src/types/barbershop.ts`**: Agregar `teamRole: 'barbero' | 'otros'` al tipo `Barber`
-3. **`src/hooks/useSupabaseData.ts`**: Mapear `rol_equipo` ↔ `teamRole`
-4. **`src/components/MiNegocioPanel.tsx`**: Mapear `rol_equipo` en add/update
-5. **`src/components/config/EquipoUnificado.tsx`**:
-   - Al crear/editar un empleado, sincronizar el cargo seleccionado con `rol_equipo`
-   - Ocultar botones "Configurar PIN" e "Invitar" para empleados con `rol_equipo === 'otros'`
-6. **`src/pages/Index.tsx`**: Filtrar `barbers` pasados a `PaymentRegistration` para excluir `teamRole === 'otros'`
-7. **`src/components/SueldosPanel.tsx`**: Asegurar que todos los empleados activos aparezcan en el selector (incluidos los "otros" para poder registrarles pagos)
+### Flujo de ejemplo
+- Tomás Basante: se le asignan los cargos "Encargado de Sucursal" + "Barbero" → `rol_equipo = 'barbero'` → aparece en Cobrar.
+- Agus Community: se le asigna solo "Otros" → `rol_equipo = 'otros'` → NO aparece en Cobrar.
 
 ### Resultado
-- Empleados con cargo "Otros" no aparecerán en el flujo de cobro
-- No se les podrá configurar PIN ni invitarlos al sistema
-- Sí aparecerán en Sueldos para poder registrar pagos
+- Cada empleado puede tener múltiples cargos simultáneos.
+- Solo los que tengan "Barbero" entre sus cargos aparecen en el flujo de cobro.
+- PIN e Invitar se muestran si tiene algún rol con acceso al sistema.
+
