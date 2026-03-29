@@ -1,43 +1,61 @@
 
 
-## Resumen
+## Gastos Recurrentes
 
-Cuando una inversión tiene amortización activa, el sistema debe generar automáticamente un gasto fijo mensual en la tabla `Egresos` con categoría "Amortización de equipamiento". Esto se hará al cargar el panel de Gastos para un mes dado: si hay inversiones activas con amortización pendiente para ese mes y no se creó el egreso correspondiente, se inserta automáticamente.
+Agregar la opción de marcar un gasto fijo como recurrente al registrarlo, reutilizando el mismo sistema de repetición de Tareas (RepeatPicker + CustomRepeatSheet). El sistema generará automáticamente los egresos correspondientes al abrir el panel de Gastos.
 
 ---
 
 ## Detalle técnico
 
-### Lógica de generación automática en `useGastos.ts`
+### Nueva tabla: `gastos_recurrentes`
 
-Después de `fetchGastos`, agregar una función `syncAmortizaciones(month)` que:
+Almacena las "plantillas" de gastos recurrentes. Campos principales:
 
-1. Consulta inversiones activas de la organización/sucursal
-2. Para cada inversión, calcula si el mes seleccionado cae dentro del período de amortización (entre `fecha_compra` y `fecha_compra + meses_amortizacion`)
-3. Verifica si ya existe un egreso en `Egresos` para esa inversión en ese mes (usando `Descripcion` que contenga el ID de la inversión, o un nuevo campo `inversion_id`)
-4. Si no existe, inserta automáticamente un egreso con:
-   - `Categoria`: "Amortización de equipamiento"
-   - `tipo_costo`: "fijo"
-   - `Monto`: monto_total / meses_amortizacion
-   - `Descripcion`: nombre de la inversión
-   - `Fecha`: primer día del mes
-   - `organization_id`, `sucursal_id` correspondientes
+- `id` (uuid, PK)
+- `organization_id`, `sucursal_id`
+- `categoria`, `tipo_costo`, `monto`, `descripcion`
+- `repeat_preset` (daily, weekly, monthly, etc.)
+- `repeat_frequency`, `repeat_interval`, `repeat_byweekday` (para custom)
+- `fecha_inicio` (date) - desde cuándo empieza a generar
+- `proxima_fecha` (date) - próxima fecha en que se debe generar un egreso
+- `activo` (boolean, default true)
+- `created_at`
 
-### Cambio en base de datos
+RLS: misma política que Egresos (owner, GM, manager full access).
 
-Agregar columna `inversion_id` (uuid, nullable) a la tabla `Egresos` para vincular el egreso con la inversión y evitar duplicados.
+### Columna en Egresos
 
-### Archivos a modificar
+Agregar `gasto_recurrente_id` (uuid, nullable) para vincular egresos generados automáticamente y evitar duplicados.
 
-- **Migration SQL**: agregar `inversion_id` a `Egresos`
-- **`src/hooks/useGastos.ts`**: agregar función `syncAmortizaciones` que se ejecuta después de `fetchGastos`, importando la lógica de inversiones
-- **`src/hooks/useGastos.ts`**: actualizar el tipo `Gasto` para incluir `inversion_id`
+### Lógica de sincronización en `useGastos.ts`
+
+Agregar `syncGastosRecurrentes()` que:
+
+1. Consulta `gastos_recurrentes` activos de la org/sucursal
+2. Para cada uno, si `proxima_fecha <= hoy`, genera el egreso en `Egresos` con `gasto_recurrente_id`
+3. Calcula la siguiente `proxima_fecha` según el preset/frecuencia y actualiza el registro
+4. Repite hasta que `proxima_fecha > hoy` (por si pasaron varios períodos sin abrir)
+
+Se ejecuta junto con `syncAmortizaciones` al cargar el panel.
+
+### UI en `GastosPanel.tsx`
+
+- Cuando `tipoCosto === 'fijo'`, mostrar un toggle "Recurrente" debajo del formulario
+- Al activar, mostrar selector de repetición (reutilizando `RepeatPicker` y `CustomRepeatSheet` existentes)
+- En el historial, los gastos recurrentes generados automáticamente se muestran como cualquier otro gasto
+- Agregar una sección o botón para ver/gestionar los gastos recurrentes activos (listar, pausar, eliminar)
+
+### Archivos a modificar/crear
+
+- **Migration SQL**: crear tabla `gastos_recurrentes` + agregar `gasto_recurrente_id` a `Egresos`
+- **`src/hooks/useGastos.ts`**: agregar `syncGastosRecurrentes`, CRUD de recurrentes, actualizar tipo `Gasto`
+- **`src/components/GastosPanel.tsx`**: agregar toggle recurrente en formulario, reutilizar RepeatPicker/CustomRepeatSheet, sección de gestión de recurrentes
 
 ### Flujo
 
-1. Usuario entra a Gastos → se carga el mes actual
-2. `fetchGastos` trae los egresos del mes
-3. `syncAmortizaciones` verifica inversiones activas, inserta egresos faltantes
-4. Se vuelve a hacer fetch para mostrar los nuevos egresos
-5. Los egresos de amortización aparecen en la tabla como cualquier otro gasto fijo, con badge "🧱 Fijo" y categoría "Amortización de equipamiento"
+1. Usuario registra gasto fijo → activa "Recurrente" → elige frecuencia (ej: cada 1 mes)
+2. Se guarda en `gastos_recurrentes` con `proxima_fecha = fecha elegida`
+3. Al abrir Gastos, `syncGastosRecurrentes` genera egresos pendientes hasta hoy
+4. Los egresos aparecen normalmente en el historial
 
