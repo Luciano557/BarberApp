@@ -17,23 +17,35 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas } = useAuth();
   
   const getDefaultTab = () => {
+    if (hasNoAccess) return 'no-access';
     if (canManagePayments) return 'registro';
-    return 'resumen';
+    if (canViewResumen) return 'resumen';
+    return 'no-access';
   };
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
 
   useEffect(() => {
+    if (hasNoAccess) {
+      setActiveTab('no-access');
+      return;
+    }
     if (activeTab === 'registro' && !canManagePayments) {
-      setActiveTab('resumen');
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
     if (activeTab === 'config' && !canManageConfig) {
-      setActiveTab('resumen');
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig]);
+    if (activeTab === 'resumen' && !canViewResumen) {
+      setActiveTab('no-access');
+    }
+    if (activeTab === 'tareas' && !canViewTareas) {
+      setActiveTab('no-access');
+    }
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, hasNoAccess]);
 
   const {
     isLoading,
@@ -77,7 +89,7 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'resumen' && (
+          {activeTab === 'resumen' && canViewResumen && (
             <DailySummary 
               summary={summary} 
               barbers={barbers}
@@ -107,8 +119,18 @@ const Index = () => {
             </PinProtectedSection>
           )}
 
-          {activeTab === 'tareas' && (
+          {activeTab === 'tareas' && canViewTareas && (
             <TareasPanel barbers={allBarbers} />
+          )}
+
+          {activeTab === 'no-access' && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <Lock className="h-16 w-16 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-semibold text-foreground mb-2">Sin acceso</h2>
+              <p className="text-muted-foreground max-w-md">
+                No tenés permisos para acceder al sistema. Contactá al dueño o encargado de tu negocio para que te asigne un cargo.
+              </p>
+            </div>
           )}
 
           {activeTab === 'mi-negocio' && isOwner && (

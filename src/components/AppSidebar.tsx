@@ -17,7 +17,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
-  const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canManageConfig, signOut } = useAuth();
+  const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canManageConfig, canViewResumen, canViewTareas, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
@@ -28,24 +28,29 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   // Filter nav items based on permissions
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
-    { id: 'resumen', label: 'Resumen', icon: BarChart3 },
+    ...(canViewResumen ? [{ id: 'resumen', label: 'Resumen', icon: BarChart3 }] : []),
     ...(canManageConfig ? [{ id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp }] : []),
     ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
     ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
-    { id: 'tareas', label: 'Tareas', icon: ClipboardList },
+    ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
     ...(isOwner || isGeneralManager ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
-  const getRoleBadge = () => {
-    if (isOwner) return { label: 'Dueño', icon: Shield, variant: 'default' as const };
-    if (isGeneralManager) return { label: 'Enc. General', icon: Shield, variant: 'default' as const };
-    if (isManager) return { label: 'Enc. Local', icon: UserCheck, variant: 'secondary' as const };
-    if (isBarber) return { label: 'Barbero', icon: Scissors, variant: 'outline' as const };
-    return null;
+  const getRoleBadges = () => {
+    const badgeMap: Record<string, { label: string; icon: typeof Shield; variant: 'default' | 'secondary' | 'outline' }> = {
+      owner: { label: 'Dueño', icon: Shield, variant: 'default' },
+      general_manager: { label: 'Enc. General', icon: Shield, variant: 'default' },
+      manager: { label: 'Enc. Local', icon: UserCheck, variant: 'secondary' },
+      barber: { label: 'Barbero', icon: Scissors, variant: 'outline' },
+    };
+    return roles
+      .filter(r => r !== 'otros')
+      .map(r => badgeMap[r])
+      .filter(Boolean);
   };
 
-  const roleBadge = getRoleBadge();
+  const roleBadges = getRoleBadges();
 
   const getPlanBadge = () => {
     if (!organization) return null;
@@ -109,12 +114,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           <p className="text-sm font-medium text-sidebar-foreground truncate">
             {profile.full_name || profile.email}
           </p>
-          {roleBadge && (
-            <Badge variant={roleBadge.variant} className="mt-1 text-xs">
-              <roleBadge.icon className="w-3 h-3 mr-1" />
-              {roleBadge.label}
+          {roleBadges.map((badge, i) => (
+            <Badge key={i} variant={badge.variant} className="mt-1 text-xs mr-1">
+              <badge.icon className="w-3 h-3 mr-1" />
+              {badge.label}
             </Badge>
-          )}
+          ))}
         </div>
       )}
 
