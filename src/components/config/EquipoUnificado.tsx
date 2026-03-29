@@ -182,6 +182,9 @@ export function EquipoUnificado({
     if (error) {
       toast.error('Error al cambiar cargo');
     } else {
+      // Sync teamRole on barberos table
+      const teamRole: TeamRole = newRole === 'otros' ? 'otros' : 'barbero';
+      onUpdateBarber(barberId, { teamRole });
       toast.success(`Cargo actualizado a ${getRoleLabel(newRole)}`);
       await fetchUserRoles();
     }
