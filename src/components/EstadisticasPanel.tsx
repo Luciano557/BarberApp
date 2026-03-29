@@ -778,6 +778,7 @@ export function EstadisticasPanel() {
                   max={100}
                   value={capacidadDiaria}
                   onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
+                  onBlur={(e) => saveCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
                   className="h-7 w-16 text-xs"
                 />
                 <span className="text-xs text-muted-foreground">cortes/barbero</span>
