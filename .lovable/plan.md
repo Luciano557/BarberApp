@@ -1,30 +1,32 @@
 
 
-## Unificar gráficos y agregar variación mensual clickeable
+## Convertir "Servicios por Mes" y "Métodos de Pago" al mismo formato
 
-### Problema actual
-- Algunos mini-gráficos son `AreaChart` y otros `BarChart` -- inconsistente
-- No se puede ver la variación porcentual mes a mes en cada métrica
+### Problema
+Los gráficos grandes de "Servicios por Mes" y "Métodos de Pago" (líneas 615-653) quedaron como `BarChart` simples sin el estilo unificado (ComposedChart con barras + línea) ni la vista expandida con tabla de variación que tienen las 9 tarjetas de métricas.
 
 ### Cambios en `src/components/EstadisticasPanel.tsx`
 
-**1. Unificar tipo de gráfico**
-- Todos los mini-gráficos dentro de las tarjetas usarán **BarChart + Line combinados** (ComposedChart de Recharts)
-- Las barras muestran el valor absoluto del mes; la línea muestra la tendencia
-- Eliminar el prop `type` de `MetricChart` y el `MetricCardDef.type`
+**1. Agregar variaciones de servicios, efectivo y MP a los datos**
+- Extender `DerivedMonthlyMetrics` con campos: `servicios`, `efectivo`, `mp` y sus variaciones (`serviciosVar`, `efectivoVar`, `mpVar`)
+- Calcular las variaciones en el mismo bloque donde se calculan las demás
+- Agregar estos dataKeys a `varKeyMap` y `chartConfig`
 
-**2. Agregar variación mensual (% de cambio)**
-- En `DerivedMonthlyMetrics`, agregar un campo de variación para cada métrica (ej: `facturacionVar`, `ticketPromedioVar`, etc.)
-- Calcular: `((valorMesActual - valorMesAnterior) / valorMesAnterior) * 100` para cada mes
-- En el tooltip del gráfico, mostrar tanto el valor absoluto como la variación % respecto al mes anterior
+**2. Convertir "Servicios por Mes" en tarjeta clickeable con mini-gráfico**
+- Reemplazar el `Card` grande actual por una tarjeta igual a las métricas: valor del último mes como headline, badge de variación, mini ComposedChart (barras + línea)
+- Definirlo como `MetricCardDef` con `dataKey: 'servicios'`, `formatFn: (v) => \`${v} servicios\``
+- Agregarlo al array `ingresosCards`
+- Click abre el `MetricDetailDialog` con gráfico grande + tabla de variación
 
-**3. Click en tarjeta para ver detalle expandido**
-- Al hacer click en una tarjeta de métrica, se abre un `Dialog` con:
-  - Gráfico grande (ComposedChart) con barras + línea de tendencia
-  - Tabla debajo con columnas: Mes | Valor | Variación % vs mes anterior
-  - Flechita verde (↑) o roja (↓) según si subió o bajó
-- Estado `selectedMetric` para controlar qué dialog está abierto
+**3. Convertir "Métodos de Pago" en dos tarjetas clickeables**
+- Crear dos `MetricCardDef`: una para "Efectivo" (`dataKey: 'efectivo'`) y otra para "Mercado Pago" (`dataKey: 'mp'`)
+- Cada una con su mini ComposedChart, valor del último mes, badge de variación
+- Agregarlas al array `ingresosCards`
+- Click abre el `MetricDetailDialog` igual que las demás
 
-### Archivos a modificar
-- `src/components/EstadisticasPanel.tsx`
+**4. Eliminar los dos bloques de `Card` grandes**
+- Borrar las líneas 615-653 (los gráficos de Servicios por Mes y Métodos de Pago standalone)
+
+### Resultado
+El grupo "Ingresos y Ventas" tendrá 4 tarjetas uniformes: Facturación, Ticket Promedio, Servicios, Efectivo, Mercado Pago -- todas con el mismo estilo ComposedChart + click para detalle expandido.
 
