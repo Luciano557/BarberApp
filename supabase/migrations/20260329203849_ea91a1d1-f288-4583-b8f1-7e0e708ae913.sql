@@ -1,0 +1,1 @@
+ALTER TABLE public."Egresos" ADD COLUMN tipo_costo text DEFAULT 'fijo';

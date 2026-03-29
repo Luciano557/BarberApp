@@ -299,6 +299,7 @@ export type Database = {
           Monto: number | null
           organization_id: string | null
           sucursal_id: string | null
+          tipo_costo: string | null
         }
         Insert: {
           Categoria?: string | null
@@ -308,6 +309,7 @@ export type Database = {
           Monto?: number | null
           organization_id?: string | null
           sucursal_id?: string | null
+          tipo_costo?: string | null
         }
         Update: {
           Categoria?: string | null
@@ -317,6 +319,7 @@ export type Database = {
           Monto?: number | null
           organization_id?: string | null
           sucursal_id?: string | null
+          tipo_costo?: string | null
         }
         Relationships: [
           {
