@@ -1,25 +1,43 @@
 
 
-## Resumen del problema
+## Resumen
 
-Es el mismo tipo de bug que ya corregimos con el registro de ventas: el cierre diferido ("Regularizar día") guarda los datos en la base de datos **sin la etiqueta de sucursal** (`sucursal_id`). Después, cuando entrás a Sueldos o volvés al resumen del día, el sistema filtra por sucursal y esos cierres "no existen" porque no tienen sucursal asignada.
-
-Es decir: los datos están guardados, pero son invisibles porque les falta la etiqueta de a qué sucursal pertenecen.
+Cuando una inversión tiene amortización activa, el sistema debe generar automáticamente un gasto fijo mensual en la tabla `Egresos` con categoría "Amortización de equipamiento". Esto se hará al cargar el panel de Gastos para un mes dado: si hay inversiones activas con amortización pendiente para ese mes y no se creó el egreso correspondiente, se inserta automáticamente.
 
 ---
 
 ## Detalle técnico
 
-### Cambio 1: `src/hooks/useBackfillClosing.ts` — agregar `sucursal_id` al insert
+### Lógica de generación automática en `useGastos.ts`
 
-En el objeto `insertData` (línea 100), falta `sucursal_id`. Hay que agregarlo usando `currentSucursal` del `SucursalContext`.
+Después de `fetchGastos`, agregar una función `syncAmortizaciones(month)` que:
 
-- Importar `useSucursal`
-- Obtener `currentSucursal`
-- Agregar `sucursal_id: currentSucursal?.id || null` al objeto de insert (línea ~127)
-- Agregar `currentSucursal` a las dependencias del `useCallback` (línea 173)
-- Bloquear el guardado si no hay sucursal seleccionada (mismo patrón que `addTransaction`)
+1. Consulta inversiones activas de la organización/sucursal
+2. Para cada inversión, calcula si el mes seleccionado cae dentro del período de amortización (entre `fecha_compra` y `fecha_compra + meses_amortizacion`)
+3. Verifica si ya existe un egreso en `Egresos` para esa inversión en ese mes (usando `Descripcion` que contenga el ID de la inversión, o un nuevo campo `inversion_id`)
+4. Si no existe, inserta automáticamente un egreso con:
+   - `Categoria`: "Amortización de equipamiento"
+   - `tipo_costo`: "fijo"
+   - `Monto`: monto_total / meses_amortizacion
+   - `Descripcion`: nombre de la inversión
+   - `Fecha`: primer día del mes
+   - `organization_id`, `sucursal_id` correspondientes
 
-### Cambio 2: Backfill de datos existentes (SQL)
+### Cambio en base de datos
 
-Ejecutar un UPDATE para asignar la sucursal correcta a los cierres diferidos que ya se
+Agregar columna `inversion_id` (uuid, nullable) a la tabla `Egresos` para vincular el egreso con la inversión y evitar duplicados.
+
+### Archivos a modificar
+
+- **Migration SQL**: agregar `inversion_id` a `Egresos`
+- **`src/hooks/useGastos.ts`**: agregar función `syncAmortizaciones` que se ejecuta después de `fetchGastos`, importando la lógica de inversiones
+- **`src/hooks/useGastos.ts`**: actualizar el tipo `Gasto` para incluir `inversion_id`
+
+### Flujo
+
+1. Usuario entra a Gastos → se carga el mes actual
+2. `fetchGastos` trae los egresos del mes
+3. `syncAmortizaciones` verifica inversiones activas, inserta egresos faltantes
+4. Se vuelve a hacer fetch para mostrar los nuevos egresos
+5. Los egresos de amortización aparecen en la tabla como cualquier otro gasto fijo, con badge "🧱 Fijo" y categoría "Amortización de equipamiento"
+
