@@ -24,6 +24,8 @@ export interface Extra {
   active: boolean;
 }
 
+export type CompensationType = 'comision' | 'fijo';
+
 export interface Barber {
   id: string;
   uid: string; // Auto-generated, unique, non-editable
@@ -31,6 +33,8 @@ export interface Barber {
   lastName: string;
   phone: string;
   commission: number; // 0-100 percentage
+  compensationType: CompensationType; // 'comision' = variable, 'fijo' = fixed salary
+  fixedSalary?: number; // Monthly fixed salary when compensationType = 'fijo'
   address?: string; // Optional
   dni?: string; // Optional
   active: boolean;
