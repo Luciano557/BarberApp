@@ -95,7 +95,7 @@ export function EquipoUnificado({
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
 
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber' as AppRole,
+    firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
     compensationType: 'comision' as CompensationType, fixedSalary: '',
   });
 
@@ -139,11 +139,16 @@ export function EquipoUnificado({
   const getUserRoles = (userId: string): AppRole[] =>
     userRoles.filter(r => r.user_id === userId).map(r => r.role);
 
-  // Get the highest role for a barber (through linked user)
-  const getBarberRole = (barber: Barber): AppRole | null => {
+  // Get all roles for a barber (through linked user)
+  const getBarberRoles = (barber: Barber): AppRole[] => {
     const linkedUser = getLinkedUser(barber.id);
-    if (!linkedUser) return null;
-    const roles = getUserRoles(linkedUser.id);
+    if (!linkedUser) return [];
+    return getUserRoles(linkedUser.id);
+  };
+
+  // Get the highest role for a barber (for sorting)
+  const getBarberHighestRole = (barber: Barber): AppRole | null => {
+    const roles = getBarberRoles(barber);
     if (roles.length === 0) return null;
     return roles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b])[0];
   };
@@ -151,8 +156,8 @@ export function EquipoUnificado({
   // Sort barbers by role hierarchy
   const sortByHierarchy = (list: Barber[]): Barber[] => {
     return [...list].sort((a, b) => {
-      const roleA = getBarberRole(a);
-      const roleB = getBarberRole(b);
+      const roleA = getBarberHighestRole(a);
+      const roleB = getBarberHighestRole(b);
       const hierarchyA = roleA ? ROLE_HIERARCHY[roleA] : 99;
       const hierarchyB = roleB ? ROLE_HIERARCHY[roleB] : 99;
       if (hierarchyA !== hierarchyB) return hierarchyA - hierarchyB;
@@ -160,8 +165,8 @@ export function EquipoUnificado({
     });
   };
 
-  // Role change handler
-  const handleChangeRole = async (barberId: string, newRole: AppRole) => {
+  // Role change handler — now handles multiple roles via diff
+  const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
     const linkedUser = getLinkedUser(barberId);
     if (!linkedUser) {
       toast.error('Este miembro no tiene un usuario vinculado. Invitalo primero.');
@@ -175,42 +180,43 @@ export function EquipoUnificado({
       return;
     }
 
-    // Remove all non-owner roles, then add new one
-    for (const role of currentRoles.filter(r => r !== 'owner')) {
+    // Ensure at least one role
+    if (newRoles.length === 0) {
+      toast.error('Debe tener al menos un cargo');
+      return;
+    }
+
+    const currentNonOwner = currentRoles.filter(r => r !== 'owner');
+    const toRemove = currentNonOwner.filter(r => !newRoles.includes(r));
+    const toAdd = newRoles.filter(r => !currentNonOwner.includes(r));
+
+    for (const role of toRemove) {
       await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role);
     }
-    const { error } = await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: newRole });
-    if (error) {
-      toast.error('Error al cambiar cargo');
-    } else {
-      // Sync teamRole on barberos table
-      const teamRole: TeamRole = newRole === 'otros' ? 'otros' : 'barbero';
-      onUpdateBarber(barberId, { teamRole });
-      toast.success(`Cargo actualizado a ${getRoleLabel(newRole)}`);
+    for (const role of toAdd) {
+      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role });
+    }
+
+    // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
+    const teamRole: TeamRole = newRoles.includes('barber') ? 'barbero' : 'otros';
+    onUpdateBarber(barberId, { teamRole });
+
+    if (toRemove.length > 0 || toAdd.length > 0) {
+      toast.success('Cargos actualizados');
       await fetchUserRoles();
     }
   };
 
-  // Assign role to a new barber (no linked user yet - we just store it for when they get invited)
-  const handleAssignRoleToNewBarber = async (barberId: string, role: AppRole) => {
-    const linkedUser = getLinkedUser(barberId);
-    if (!linkedUser) {
-      toast.info('El cargo se asignará cuando el miembro sea invitado al sistema.');
-      return;
-    }
-    await handleChangeRole(barberId, role);
-  };
-
   const resetForm = () => {
-    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', role: 'barber',
+    setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
       compensationType: 'comision', fixedSalary: '' });
   };
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
+    const teamRole: TeamRole = data.roles.includes('barber') ? 'barbero' : 'otros';
     if (barberId) {
-      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
@@ -218,14 +224,13 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         teamRole,
       });
-      // Update role if linked user exists
+      // Update roles if linked user exists
       const linkedUser = getLinkedUser(barberId);
       if (linkedUser) {
-        await handleChangeRole(barberId, data.role);
+        await handleChangeRoles(barberId, data.roles);
       }
       setEditingId(null);
     } else {
-      const teamRole: TeamRole = data.role === 'otros' ? 'otros' : 'barbero';
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
