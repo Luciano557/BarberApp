@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, Trash2, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Receipt, Trash2, ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react';
 import { useGastos, TipoCosto } from '@/hooks/useGastos';
+import { useGastosRecurrentes } from '@/hooks/useGastosRecurrentes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { RepeatPicker, getRepeatLabel } from '@/components/tareas/RepeatPicker';
+import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/CustomRepeatSheet';
+import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
 
 const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
   fijo: [
@@ -58,7 +63,13 @@ const TIPO_BADGE_VARIANT: Record<TipoCosto, 'default' | 'secondary' | 'outline'>
 };
 
 export function GastosPanel() {
-  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, deleteGasto, totalPeriodo } = useGastos();
+  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, deleteGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const { recurrentes, syncGastosRecurrentes, addRecurrente, toggleRecurrente, deleteRecurrente } = useGastosRecurrentes();
+
+  // Wire up the recurrentes sync into useGastos
+  useEffect(() => {
+    setSyncRecurrentes(syncGastosRecurrentes);
+  }, [setSyncRecurrentes, syncGastosRecurrentes]);
 
   const [tipoCosto, setTipoCosto] = useState<TipoCosto>('fijo');
   const [categoria, setCategoria] = useState('');
@@ -67,9 +78,28 @@ export function GastosPanel() {
   const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [submitting, setSubmitting] = useState(false);
 
+  // Recurrence state
+  const [esRecurrente, setEsRecurrente] = useState(false);
+  const [repeatPreset, setRepeatPreset] = useState('monthly');
+  const [repeatFrequency, setRepeatFrequency] = useState('weekly');
+  const [repeatInterval, setRepeatInterval] = useState(1);
+  const [repeatByweekday, setRepeatByweekday] = useState<number[]>([]);
+  const [repeatPickerOpen, setRepeatPickerOpen] = useState(false);
+  const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
+
   const handleTipoCostoChange = (value: TipoCosto) => {
     setTipoCosto(value);
     setCategoria('');
+    if (value !== 'fijo') {
+      setEsRecurrente(false);
+    }
+  };
+
+  const getRepeatDisplayLabel = () => {
+    if (repeatPreset === 'custom') {
+      return getCustomRepeatLabel(repeatFrequency, repeatInterval, repeatByweekday);
+    }
+    return getRepeatLabel(repeatPreset);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,21 +107,48 @@ export function GastosPanel() {
     if (!categoria || !monto) return;
 
     setSubmitting(true);
-    const success = await addGasto({
-      categoria,
-      monto: parseFloat(monto),
-      descripcion,
-      fecha: new Date(fecha + 'T12:00:00'),
-      tipoCosto,
-    });
 
-    if (success) {
-      setCategoria('');
-      setMonto('');
-      setDescripcion('');
-      setFecha(format(new Date(), 'yyyy-MM-dd'));
+    if (esRecurrente && tipoCosto === 'fijo') {
+      // Create recurring template
+      const success = await addRecurrente({
+        categoria,
+        tipo_costo: tipoCosto,
+        monto: parseFloat(monto),
+        descripcion: descripcion || undefined,
+        repeat_preset: repeatPreset,
+        repeat_frequency: repeatPreset === 'custom' ? repeatFrequency : undefined,
+        repeat_interval: repeatPreset === 'custom' ? repeatInterval : undefined,
+        repeat_byweekday: repeatPreset === 'custom' ? repeatByweekday : undefined,
+        fecha_inicio: fecha,
+      });
+
+      if (success) {
+        resetForm();
+      }
+    } else {
+      // Normal single gasto
+      const success = await addGasto({
+        categoria,
+        monto: parseFloat(monto),
+        descripcion,
+        fecha: new Date(fecha + 'T12:00:00'),
+        tipoCosto,
+      });
+
+      if (success) {
+        resetForm();
+      }
     }
     setSubmitting(false);
+  };
+
+  const resetForm = () => {
+    setCategoria('');
+    setMonto('');
+    setDescripcion('');
+    setFecha(format(new Date(), 'yyyy-MM-dd'));
+    setEsRecurrente(false);
+    setRepeatPreset('monthly');
   };
 
   return (
@@ -150,7 +207,7 @@ export function GastosPanel() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fecha</Label>
+              <Label>{esRecurrente ? 'Fecha de inicio' : 'Fecha'}</Label>
               <Input
                 type="date"
                 value={fecha}
@@ -168,15 +225,52 @@ export function GastosPanel() {
               />
             </div>
 
+            {/* Recurrence toggle - only for fijo */}
+            {tipoCosto === 'fijo' && (
+              <div className="sm:col-span-2 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    checked={esRecurrente}
+                    onCheckedChange={setEsRecurrente}
+                  />
+                  <Label className="flex items-center gap-2 cursor-pointer" onClick={() => setEsRecurrente(!esRecurrente)}>
+                    <Repeat className="h-4 w-4" />
+                    Gasto recurrente
+                  </Label>
+                </div>
+
+                {esRecurrente && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Repetir:</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRepeatPickerOpen(true)}
+                    >
+                      {getRepeatDisplayLabel()}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="sm:col-span-2">
               <Button type="submit" disabled={submitting || !categoria || !monto}>
                 <Plus className="h-4 w-4 mr-2" />
-                {submitting ? 'Registrando...' : 'Registrar gasto'}
+                {submitting ? 'Registrando...' : esRecurrente ? 'Crear gasto recurrente' : 'Registrar gasto'}
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
+
+      {/* Gastos recurrentes list */}
+      <GastosRecurrentesList
+        recurrentes={recurrentes}
+        onToggle={toggleRecurrente}
+        onDelete={deleteRecurrente}
+      />
 
       {/* Historial */}
       <Card>
@@ -257,6 +351,29 @@ export function GastosPanel() {
           )}
         </CardContent>
       </Card>
+
+      {/* Repeat picker sheets */}
+      <RepeatPicker
+        open={repeatPickerOpen}
+        onOpenChange={setRepeatPickerOpen}
+        value={repeatPreset}
+        onChange={(val) => setRepeatPreset(val)}
+        onCustom={() => setCustomRepeatOpen(true)}
+      />
+
+      <CustomRepeatSheet
+        open={customRepeatOpen}
+        onOpenChange={setCustomRepeatOpen}
+        frequency={repeatFrequency}
+        interval={repeatInterval}
+        byweekday={repeatByweekday}
+        onConfirm={(freq, interval, days) => {
+          setRepeatPreset('custom');
+          setRepeatFrequency(freq);
+          setRepeatInterval(interval);
+          setRepeatByweekday(days);
+        }}
+      />
     </div>
   );
 }
