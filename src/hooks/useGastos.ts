@@ -126,12 +126,22 @@ export function useGastos() {
   }, [organization?.id, selectedMonth, currentSucursal]);
 
   const hasSynced = useRef<string>('');
+  const syncRecurrentesRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  // Allow injecting the recurrentes sync from outside
+  const setSyncRecurrentes = useCallback((fn: () => Promise<boolean>) => {
+    syncRecurrentesRef.current = fn;
+  }, []);
 
   useEffect(() => {
     const key = `${organization?.id}-${format(selectedMonth, 'yyyy-MM')}-${currentSucursal?.id || 'all'}`;
     if (hasSynced.current === key) return;
 
     const run = async () => {
+      // Sync recurrentes first (generates egresos up to today)
+      if (syncRecurrentesRef.current) {
+        await syncRecurrentesRef.current();
+      }
       await fetchGastos();
       const inserted = await syncAmortizaciones();
       if (inserted) {
@@ -199,5 +209,6 @@ export function useGastos() {
     deleteGasto,
     totalPeriodo,
     refetch: fetchGastos,
+    setSyncRecurrentes,
   };
 }

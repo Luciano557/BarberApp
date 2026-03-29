@@ -295,6 +295,7 @@ export type Database = {
           Categoria: string | null
           Descripcion: string | null
           Fecha: string | null
+          gasto_recurrente_id: string | null
           id: number
           inversion_id: string | null
           Monto: number | null
@@ -306,6 +307,7 @@ export type Database = {
           Categoria?: string | null
           Descripcion?: string | null
           Fecha?: string | null
+          gasto_recurrente_id?: string | null
           id?: number
           inversion_id?: string | null
           Monto?: number | null
@@ -317,6 +319,7 @@ export type Database = {
           Categoria?: string | null
           Descripcion?: string | null
           Fecha?: string | null
+          gasto_recurrente_id?: string | null
           id?: number
           inversion_id?: string | null
           Monto?: number | null
@@ -388,6 +391,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gastos_recurrentes: {
+        Row: {
+          activo: boolean
+          categoria: string
+          created_at: string
+          descripcion: string | null
+          fecha_inicio: string
+          id: string
+          monto: number
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string
+          sucursal_id: string | null
+          tipo_costo: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria: string
+          created_at?: string
+          descripcion?: string | null
+          fecha_inicio?: string
+          id?: string
+          monto: number
+          organization_id: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          tipo_costo?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria?: string
+          created_at?: string
+          descripcion?: string | null
+          fecha_inicio?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          tipo_costo?: string
+        }
+        Relationships: []
       }
       ingresos: {
         Row: {
