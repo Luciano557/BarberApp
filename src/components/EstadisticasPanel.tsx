@@ -11,10 +11,10 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  ComposedChart, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
   Line, ResponsiveContainer
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -37,6 +37,9 @@ interface MonthlyData {
 interface DerivedMonthlyMetrics {
   monthLabel: string;
   facturacion: number;
+  servicios: number;
+  efectivo: number;
+  mp: number;
   costosFijos: number;
   rentabilidad: number;
   ticketPromedio: number;
@@ -47,6 +50,9 @@ interface DerivedMonthlyMetrics {
   tasaOcupacion: number;
   // Variation fields (% change vs previous month)
   facturacionVar: number | null;
+  serviciosVar: number | null;
+  efectivoVar: number | null;
+  mpVar: number | null;
   costosFijosVar: number | null;
   rentabilidadVar: number | null;
   ticketPromedioVar: number | null;
@@ -74,6 +80,9 @@ const chartConfig = {
 
 const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
   facturacion: 'facturacionVar',
+  servicios: 'serviciosVar',
+  efectivo: 'efectivoVar',
+  mp: 'mpVar',
   costosFijos: 'costosFijosVar',
   rentabilidad: 'rentabilidadVar',
   ticketPromedio: 'ticketPromedioVar',
@@ -387,6 +396,9 @@ export function EstadisticasPanel() {
       return {
         monthLabel: m.monthLabel,
         facturacion: m.facturacion,
+        servicios: m.servicios,
+        efectivo: m.efectivo,
+        mp: m.mp,
         costosFijos: m.costosFijos,
         rentabilidad,
         ticketPromedio,
@@ -404,6 +416,9 @@ export function EstadisticasPanel() {
       return {
         ...curr,
         facturacionVar: prev ? calcVariation(curr.facturacion, prev.facturacion) : null,
+        serviciosVar: prev ? calcVariation(curr.servicios, prev.servicios) : null,
+        efectivoVar: prev ? calcVariation(curr.efectivo, prev.efectivo) : null,
+        mpVar: prev ? calcVariation(curr.mp, prev.mp) : null,
         costosFijosVar: prev ? calcVariation(curr.costosFijos, prev.costosFijos) : null,
         rentabilidadVar: prev ? calcVariation(curr.rentabilidad, prev.rentabilidad) : null,
         ticketPromedioVar: prev ? calcVariation(curr.ticketPromedio, prev.ticketPromedio) : null,
@@ -439,6 +454,36 @@ export function EstadisticasPanel() {
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto gasta cada cliente en promedio por visita.',
+    },
+    {
+      title: 'Servicios',
+      dataKey: 'servicios',
+      icon: Scissors,
+      color: 'text-primary',
+      chartColor: 'hsl(var(--primary))',
+      formatFn: (v) => `${v} servicios`,
+      shortFormatFn: (v) => `${v}`,
+      description: 'Cantidad de servicios realizados por mes.',
+    },
+    {
+      title: 'Efectivo',
+      dataKey: 'efectivo',
+      icon: DollarSign,
+      color: 'text-green-600',
+      chartColor: 'hsl(142 76% 36%)',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Ingresos mensuales cobrados en efectivo.',
+    },
+    {
+      title: 'Mercado Pago',
+      dataKey: 'mp',
+      icon: DollarSign,
+      color: 'text-blue-600',
+      chartColor: 'hsl(217 91% 60%)',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Ingresos mensuales cobrados por Mercado Pago.',
     },
   ];
 
@@ -612,45 +657,6 @@ export function EstadisticasPanel() {
           {ingresosCards.map(renderMetricCard)}
         </div>
 
-        {/* Servicios por Mes */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Servicios por Mes</CardTitle>
-            <CardDescription>Cantidad de servicios realizados mensualmente</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-72 w-full">
-              <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} servicios`} />} />
-                <Bar dataKey="servicios" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Métodos de Pago */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Métodos de Pago</CardTitle>
-            <CardDescription>Distribución mensual por método de pago</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-72 w-full">
-              <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="efectivo" stackId="a" fill="hsl(142 76% 36%)" radius={[0, 0, 0, 0]} name="Efectivo" />
-                <Bar dataKey="mp" stackId="a" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} name="Mercado Pago" />
-              </BarChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Grupo 2: Costos y Rentabilidad */}
