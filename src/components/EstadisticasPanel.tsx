@@ -444,127 +444,127 @@ export function EstadisticasPanel() {
         </div>
       </div>
 
-      {/* Metric Cards with Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {metricCards.map((metric) => (
-          <Card key={metric.dataKey}>
+      {/* Grupo 1: Ingresos y Ventas */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">📈 Ingresos y Ventas</h2>
+          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás vendiendo y cómo evoluciona tu facturación.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {ingresosCards.map(renderMetricCard)}
+        </div>
+
+        {/* Servicios por Mes */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Servicios por Mes</CardTitle>
+            <CardDescription>Cantidad de servicios realizados mensualmente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-72 w-full">
+              <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} servicios`} />} />
+                <Bar dataKey="servicios" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Métodos de Pago */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Métodos de Pago</CardTitle>
+            <CardDescription>Distribución mensual por método de pago</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-72 w-full">
+              <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                <ChartLegend content={<ChartLegendContent />} />
+                <Bar dataKey="efectivo" stackId="a" fill="hsl(142 76% 36%)" radius={[0, 0, 0, 0]} name="Efectivo" />
+                <Bar dataKey="mp" stackId="a" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} name="Mercado Pago" />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Grupo 2: Costos y Rentabilidad */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">💰 Costos y Rentabilidad</h2>
+          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás ganando realmente después de todos los gastos.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {costosCards.map(renderMetricCard)}
+        </div>
+      </div>
+
+      {/* Grupo 3: Capacidad y Eficiencia */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">⚡ Capacidad y Eficiencia</h2>
+          <p className="text-sm text-muted-foreground">Estas métricas te muestran qué tan bien estás aprovechando tu barbería.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
-                <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">{metric.description}</p>
+                <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Qué tan llena está tu agenda mes a mes.</p>
               </div>
-              <metric.icon className={`h-4 w-4 ${metric.color} shrink-0`} />
+              <Users className="h-4 w-4 text-indigo-600 shrink-0" />
             </CardHeader>
             <CardContent>
               {latest && (
-                <div className={`text-2xl font-bold ${metric.color} mb-1`}>
-                  {metric.formatFn(latest[metric.dataKey] as number)}
+                <div className="text-2xl font-bold text-indigo-600 mb-1">
+                  {latest.tasaOcupacion.toFixed(1)}%
                   <span className="text-xs font-normal text-muted-foreground ml-2">último mes</span>
                 </div>
               )}
               <MetricChart
                 data={derivedMetrics}
-                dataKey={metric.dataKey}
-                color={metric.chartColor}
-                formatValue={metric.shortFormatFn}
-                type={metric.type || 'area'}
+                dataKey="tasaOcupacion"
+                color="hsl(230 70% 55%)"
+                formatValue={(v) => `${v.toFixed(0)}%`}
               />
+
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={capacidadDiaria}
+                  onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="h-7 w-16 text-xs"
+                />
+                <span className="text-xs text-muted-foreground">cortes/barbero</span>
+              </div>
+
+              <Collapsible open={ocupacionOpen} onOpenChange={setOcupacionOpen}>
+                <CollapsibleTrigger className="flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
+                  <Info className="h-3 w-3" />
+                  ¿Cómo se calcula?
+                  <ChevronDown className={`h-3 w-3 transition-transform ${ocupacionOpen ? 'rotate-180' : ''}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
+                    <p><strong>Capacidad máxima:</strong> Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
+                    <p><strong>Tasa:</strong> (Servicios reales ÷ Capacidad máxima) × 100</p>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </CardContent>
           </Card>
-        ))}
-
-        {/* Tasa de ocupación - special card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Qué tan llena está tu agenda mes a mes.</p>
-            </div>
-            <Users className="h-4 w-4 text-indigo-600 shrink-0" />
-          </CardHeader>
-          <CardContent>
-            {latest && (
-              <div className="text-2xl font-bold text-indigo-600 mb-1">
-                {latest.tasaOcupacion.toFixed(1)}%
-                <span className="text-xs font-normal text-muted-foreground ml-2">último mes</span>
-              </div>
-            )}
-            <MetricChart
-              data={derivedMetrics}
-              dataKey="tasaOcupacion"
-              color="hsl(230 70% 55%)"
-              formatValue={(v) => `${v.toFixed(0)}%`}
-            />
-
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={capacidadDiaria}
-                onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
-                className="h-7 w-16 text-xs"
-              />
-              <span className="text-xs text-muted-foreground">cortes/barbero</span>
-            </div>
-
-            <Collapsible open={ocupacionOpen} onOpenChange={setOcupacionOpen}>
-              <CollapsibleTrigger className="flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
-                <Info className="h-3 w-3" />
-                ¿Cómo se calcula?
-                <ChevronDown className={`h-3 w-3 transition-transform ${ocupacionOpen ? 'rotate-180' : ''}`} />
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
-                  <p><strong>Capacidad máxima:</strong> Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
-                  <p><strong>Tasa:</strong> (Servicios reales ÷ Capacidad máxima) × 100</p>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </CardContent>
-        </Card>
+        </div>
       </div>
-
-      {/* Servicios por Mes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Servicios por Mes</CardTitle>
-          <CardDescription>Cantidad de servicios realizados mensualmente</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-72 w-full">
-            <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-              <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} servicios`} />} />
-              <Bar dataKey="servicios" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Métodos de Pago */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Métodos de Pago</CardTitle>
-          <CardDescription>Distribución mensual por método de pago</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-72 w-full">
-            <BarChart data={monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-              <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-              <ChartLegend content={<ChartLegendContent />} />
-              <Bar dataKey="efectivo" stackId="a" fill="hsl(142 76% 36%)" radius={[0, 0, 0, 0]} name="Efectivo" />
-              <Bar dataKey="mp" stackId="a" fill="hsl(217 91% 60%)" radius={[4, 4, 0, 0]} name="Mercado Pago" />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
     </div>
   );
 }
