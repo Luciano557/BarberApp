@@ -197,6 +197,7 @@ export function GastosPanel() {
               <Label>Monto *</Label>
               <Input
                 type="number"
+                inputMode="decimal"
                 min="0"
                 step="0.01"
                 placeholder="0.00"

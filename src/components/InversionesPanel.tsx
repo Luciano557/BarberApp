@@ -94,7 +94,7 @@ export function InversionesPanel() {
               </div>
               <div>
                 <Label>Monto total *</Label>
-                <Input type="number" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
+                <Input type="number" inputMode="decimal" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
               </div>
               <div>
                 <Label>Fecha de compra</Label>
@@ -102,7 +102,7 @@ export function InversionesPanel() {
               </div>
               <div>
                 <Label>Meses de amortización *</Label>
-                <Input type="number" value={mesesAmortizacion} onChange={e => setMesesAmortizacion(e.target.value)} placeholder="12" />
+                <Input type="number" inputMode="numeric" value={mesesAmortizacion} onChange={e => setMesesAmortizacion(e.target.value)} placeholder="12" />
               </div>
               <div>
                 <Label>Categoría</Label>
@@ -132,11 +132,11 @@ export function InversionesPanel() {
                 </div>
                 <div>
                   <Label>Cantidad de cuotas</Label>
-                  <Input type="number" value={cuotas} onChange={e => setCuotas(e.target.value)} />
+                  <Input type="number" inputMode="numeric" value={cuotas} onChange={e => setCuotas(e.target.value)} />
                 </div>
                 <div>
                   <Label>Monto por cuota</Label>
-                  <Input type="number" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} />
+                  <Input type="number" inputMode="decimal" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} />
                 </div>
                 <div>
                   <Label>Próximo pago</Label>

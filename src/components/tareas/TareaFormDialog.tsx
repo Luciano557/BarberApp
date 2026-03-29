@@ -213,6 +213,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                   <Label className="text-xs text-muted-foreground shrink-0">Personalizado:</Label>
                   <Input
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     max={365}
                     value={vencimientoDias}

@@ -67,6 +67,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
               <Input
                 id="pin"
                 type={showPin ? 'text' : 'password'}
+                inputMode="numeric"
                 value={pin}
                 onChange={handlePinChange}
                 placeholder="Ingresa tu PIN"

@@ -173,6 +173,7 @@ export function PinConfigSection() {
                   <Input
                     id="current-pin"
                     type={showCurrentPin ? 'text' : 'password'}
+                    inputMode="numeric"
                     value={currentPin}
                     onChange={(e) => handlePinChange(e, setCurrentPin)}
                     placeholder="Ingresá tu PIN actual"
@@ -202,6 +203,7 @@ export function PinConfigSection() {
                   <Input
                     id="new-pin"
                     type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
                     value={pin}
                     onChange={(e) => handlePinChange(e, setPin)}
                     placeholder="4-6 dígitos"
@@ -230,6 +232,7 @@ export function PinConfigSection() {
                   <Input
                     id="confirm-pin"
                     type={showConfirmPin ? 'text' : 'password'}
+                    inputMode="numeric"
                     value={confirmPin}
                     onChange={(e) => handlePinChange(e, setConfirmPin)}
                     placeholder="Repite el PIN"

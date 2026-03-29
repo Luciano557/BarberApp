@@ -753,6 +753,7 @@ export function EstadisticasPanel() {
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
                 <Input
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   max={100}
                   value={capacidadDiaria}

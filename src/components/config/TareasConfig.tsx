@@ -71,6 +71,7 @@ export function TareasConfig() {
             <Label className="text-sm shrink-0">Personalizado:</Label>
             <Input
               type="number"
+              inputMode="numeric"
               min={1}
               max={365}
               value={dias}
