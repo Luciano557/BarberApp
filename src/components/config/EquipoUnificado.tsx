@@ -191,10 +191,10 @@ export function EquipoUnificado({
     const toAdd = newRoles.filter(r => !currentNonOwner.includes(r));
 
     for (const role of toRemove) {
-      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role);
+      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role as any);
     }
     for (const role of toAdd) {
-      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role });
+      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
     }
 
     // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
