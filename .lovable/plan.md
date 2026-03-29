@@ -1,61 +1,43 @@
 
 
-## Gastos Recurrentes
+## Rediseño del Panel de Estadísticas (revisado)
 
-Agregar la opción de marcar un gasto fijo como recurrente al registrarlo, reutilizando el mismo sistema de repetición de Tareas (RepeatPicker + CustomRepeatSheet). El sistema generará automáticamente los egresos correspondientes al abrir el panel de Gastos.
+Agregar 9 métricas financieras como tarjetas nuevas **por encima** de los gráficos existentes. Los 3 gráficos actuales (Facturación mensual, Servicios por mes, Métodos de pago) se mantienen intactos.
 
 ---
 
-## Detalle técnico
+## Cambios en `src/components/EstadisticasPanel.tsx`
 
-### Nueva tabla: `gastos_recurrentes`
+### Datos adicionales
+- Fetch de `Egresos` del período seleccionado, agrupados por `tipo_costo` (fijo, variable, semivariable)
+- Calcular totales de costos fijos, variables y total de egresos
 
-Almacena las "plantillas" de gastos recurrentes. Campos principales:
+### 9 tarjetas de métricas (grid 3 cols desktop, 1 col mobile)
 
-- `id` (uuid, PK)
-- `organization_id`, `sucursal_id`
-- `categoria`, `tipo_costo`, `monto`, `descripcion`
-- `repeat_preset` (daily, weekly, monthly, etc.)
-- `repeat_frequency`, `repeat_interval`, `repeat_byweekday` (para custom)
-- `fecha_inicio` (date) - desde cuándo empieza a generar
-- `proxima_fecha` (date) - próxima fecha en que se debe generar un egreso
-- `activo` (boolean, default true)
-- `created_at`
+Cada tarjeta incluye: icono, título, valor calculado, y descripción breve (~200 chars) de por qué es importante.
 
-RLS: misma política que Egresos (owner, GM, manager full access).
+1. **Facturación mensual** = suma `total_facturado`
+2. **Costos fijos** = suma Egresos tipo fijo
+3. **Rentabilidad** = ((Facturación - Total egresos) / Facturación) x 100
+4. **Ticket promedio** = Facturación / cantidad servicios
+5. **Costo fijo por servicio** = Costos fijos / servicios
+6. **Costo variable por servicio** = Costos variables / servicios
+7. **Ganancia por servicio** = Ticket promedio - costo fijo/serv - costo variable/serv
+8. **Punto de equilibrio** = Costos fijos / Ganancia por servicio (clientes)
+9. **Tasa de ocupación** = (Servicios reales / Capacidad máxima) x 100
 
-### Columna en Egresos
+### Tasa de ocupación
+- Capacidad máxima diaria por defecto: **18 cortes**
+- Input editable inline, guardado en `localStorage`
+- Collapsible con explicación del cálculo
+- Capacidad total = capacidad diaria x barberos activos x días laborables (lun-sáb)
 
-Agregar `gasto_recurrente_id` (uuid, nullable) para vincular egresos generados automáticamente y evitar duplicados.
+### Gráficos existentes
+Se mantienen los 3 gráficos sin cambios debajo de las métricas:
+- Facturación Mensual (AreaChart)
+- Servicios por Mes (BarChart)
+- Métodos de Pago (BarChart stacked)
 
-### Lógica de sincronización en `useGastos.ts`
-
-Agregar `syncGastosRecurrentes()` que:
-
-1. Consulta `gastos_recurrentes` activos de la org/sucursal
-2. Para cada uno, si `proxima_fecha <= hoy`, genera el egreso en `Egresos` con `gasto_recurrente_id`
-3. Calcula la siguiente `proxima_fecha` según el preset/frecuencia y actualiza el registro
-4. Repite hasta que `proxima_fecha > hoy` (por si pasaron varios períodos sin abrir)
-
-Se ejecuta junto con `syncAmortizaciones` al cargar el panel.
-
-### UI en `GastosPanel.tsx`
-
-- Cuando `tipoCosto === 'fijo'`, mostrar un toggle "Recurrente" debajo del formulario
-- Al activar, mostrar selector de repetición (reutilizando `RepeatPicker` y `CustomRepeatSheet` existentes)
-- En el historial, los gastos recurrentes generados automáticamente se muestran como cualquier otro gasto
-- Agregar una sección o botón para ver/gestionar los gastos recurrentes activos (listar, pausar, eliminar)
-
-### Archivos a modificar/crear
-
-- **Migration SQL**: crear tabla `gastos_recurrentes` + agregar `gasto_recurrente_id` a `Egresos`
-- **`src/hooks/useGastos.ts`**: agregar `syncGastosRecurrentes`, CRUD de recurrentes, actualizar tipo `Gasto`
-- **`src/components/GastosPanel.tsx`**: agregar toggle recurrente en formulario, reutilizar RepeatPicker/CustomRepeatSheet, sección de gestión de recurrentes
-
-### Flujo
-
-1. Usuario registra gasto fijo → activa "Recurrente" → elige frecuencia (ej: cada 1 mes)
-2. Se guarda en `gastos_recurrentes` con `proxima_fecha = fecha elegida`
-3. Al abrir Gastos, `syncGastosRecurrentes` genera egresos pendientes hasta hoy
-4. Los egresos aparecen normalmente en el historial
+### Archivo a modificar
+- `src/components/EstadisticasPanel.tsx`
 
