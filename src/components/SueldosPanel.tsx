@@ -96,6 +96,9 @@ function BarberDetailRow({
           <div className="flex items-center gap-3">
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             <span className="font-medium">{barber.barberName}</span>
+            <Badge variant={barber.compensationType === 'fijo' ? 'secondary' : 'outline'} className="text-xs">
+              {barber.compensationType === 'fijo' ? 'Fijo' : 'Comisión'}
+            </Badge>
           </div>
           <div className="flex items-center gap-6">
             <div className="text-right">
