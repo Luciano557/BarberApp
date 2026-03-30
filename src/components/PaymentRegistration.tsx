@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 
 interface PaymentRegistrationProps {
