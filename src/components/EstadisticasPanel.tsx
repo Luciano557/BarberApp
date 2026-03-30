@@ -778,7 +778,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Horarios Pico</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda en tu negocio.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda. Basado en cobros en tiempo real.</p>
             </div>
             <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
