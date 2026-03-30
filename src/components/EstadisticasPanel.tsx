@@ -331,8 +331,20 @@ export function EstadisticasPanel() {
         barberosQuery = barberosQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      const [ingresosRes, egresosRes, barberosRes] = await Promise.all([
-        ingresosQuery, egresosQuery, barberosQuery,
+      let ventasQuery = supabase
+        .from('venta')
+        .select('fecha_hora')
+        .eq('organization_id', organization.id)
+        .eq('estado', 'activo')
+        .gte('fecha_hora', startDate.toISOString())
+        .lte('fecha_hora', endDate.toISOString());
+
+      if (currentSucursal) {
+        ventasQuery = ventasQuery.eq('sucursal_id', currentSucursal.id);
+      }
+
+      const [ingresosRes, egresosRes, barberosRes, ventasRes] = await Promise.all([
+        ingresosQuery, egresosQuery, barberosQuery, ventasQuery,
       ]);
 
       if (ingresosRes.error) throw ingresosRes.error;
