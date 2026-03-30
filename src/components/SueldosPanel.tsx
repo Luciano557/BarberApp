@@ -336,7 +336,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         // For fixed salary: calculate proportional daily accrual
         let fixedSalaryInfo: BarberSalaryData['fixedSalaryInfo'] = undefined;
         if (isFijo && barber.fixedSalary) {
-          const periodStart = periodStartDate || new Date(barber.uid ? '2020-01-01' : '2020-01-01'); // fallback for "Todo"
+          const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
+          const periodStart = periodStartDate || createdAt;
           const dias = differenceInCalendarDays(now, periodStart);
           const devengadoFijo = (barber.fixedSalary / 30) * Math.max(0, dias);
           totalDevengado += devengadoFijo;
@@ -347,20 +348,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
         // For fixed salary: add historical accrual from created_at to now
         if (isFijo && barber.fixedSalary) {
-          // We don't have created_at in the Barber type, so approximate from all-time
-          // Use the same proportional logic: if no period filter was set, use a reasonable start
-          // For historical saldo, we need total days since barber was added
-          // We'll fetch created_at separately — for now use a simpler approach:
-          // historical devengado for fixed = same as filtered when filter is "Todo"
-          if (!periodStartDate) {
-            // "Todo" mode — devengado already includes the fixed calc above
-            saldoHistorico += fixedSalaryInfo?.devengado || 0;
-          } else {
-            // Need all-time fixed salary accrual for saldo
-            // Approximate: we don't have created_at, but saldo should reflect total owed
-            // Use a large window — will be refined when we have created_at
-            saldoHistorico += fixedSalaryInfo?.devengado || 0;
-          }
+          const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
+          const totalDias = differenceInCalendarDays(now, createdAt);
+          const devengadoHistoricoFijo = (barber.fixedSalary / 30) * Math.max(0, totalDias);
+          saldoHistorico += devengadoHistoricoFijo;
         }
         
         // Get detailed ingresos for this barber by barbero_id
