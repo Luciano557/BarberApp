@@ -660,24 +660,19 @@ export function EstadisticasPanel() {
       cursor = addDays(cursor, 1);
     }
 
-    // === Ventas por día de semana: usar INGRESOS (cierres de caja) ===
-    // Agrupar por fecha exacta primero, luego por día de semana
-    const dailyTotals: Record<string, number> = {};
-    ingresosRaw.forEach(i => {
-      try {
-        const localStr = new Date(i.created_at).toLocaleString('en-US', { timeZone: tz });
-        const local = new Date(localStr);
-        const dateKey = `${local.getFullYear()}-${local.getMonth()}-${local.getDate()}`;
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + i.cantidad_de_servicios;
-      } catch {}
-    });
+    // === Ventas por día de semana: usar columna `dia` de INGRESOS ===
+    // Mapa de nombre español a índice JS (getDay(): 0=dom, 1=lun, ...)
+    const diaNameToIndex: Record<string, number> = {
+      'domingo': 0, 'lunes': 1, 'martes': 2, 'miércoles': 3,
+      'jueves': 4, 'viernes': 5, 'sábado': 6,
+    };
 
-    // Ahora agrupar los totales diarios por día de semana
     const dayCounts: number[] = Array(7).fill(0);
-    Object.entries(dailyTotals).forEach(([dateKey, total]) => {
-      const [y, m, d] = dateKey.split('-').map(Number);
-      const dayOfWeek = new Date(y, m, d).getDay();
-      dayCounts[dayOfWeek] += total;
+    ingresosRaw.forEach(i => {
+      if (!i.dia) return;
+      const dayIdx = diaNameToIndex[i.dia.toLowerCase()];
+      if (dayIdx === undefined) return;
+      dayCounts[dayIdx] += i.cantidad_de_servicios;
     });
 
     // Reorder: Lun-Dom
