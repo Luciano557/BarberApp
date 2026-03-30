@@ -1,6 +1,7 @@
 export interface Line {
   id: string;
   name: string;
+  color?: string;
   active: boolean;
 }
 

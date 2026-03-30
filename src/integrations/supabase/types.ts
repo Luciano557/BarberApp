@@ -747,6 +747,7 @@ export type Database = {
       lineas: {
         Row: {
           activo: boolean
+          color: string | null
           created_at: string
           id: string
           nombre: string
@@ -755,6 +756,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          color?: string | null
           created_at?: string
           id?: string
           nombre: string
@@ -763,6 +765,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          color?: string | null
           created_at?: string
           id?: string
           nombre?: string

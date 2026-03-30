@@ -424,6 +424,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.color !== undefined) dbUpdates.color = updates.color || null;
 
       const { error } = await supabase
         .from('lineas')
