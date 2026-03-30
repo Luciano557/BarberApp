@@ -468,6 +468,7 @@ export function EquipoUnificado({
                   roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
                   compensationType: barber.compensationType || 'comision',
                   fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
+                  payDay: barber.payDay != null ? String(barber.payDay) : '1',
                 });
               }}>
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
