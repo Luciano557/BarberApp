@@ -85,6 +85,7 @@ const Index = () => {
               extras={extras}
               barbers={barbers.filter(b => b.teamRole !== 'otros')}
               discounts={discounts}
+              lines={lines}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
             />
