@@ -742,7 +742,7 @@ export function EstadisticasPanel() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/día`} />} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas promedio diarias`} />} />
                 <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </ComposedChart>
             </ChartContainer>
