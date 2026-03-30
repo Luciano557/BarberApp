@@ -410,7 +410,7 @@ export function EquipoUnificado({
                 )}
                 {barber.compensationType === 'fijo' ? (
                   <span className="text-xs px-2 py-0.5 rounded bg-accent/50 text-accent-foreground">
-                    ${(barber.fixedSalary || 0).toLocaleString('es-AR')}/mes
+                    ${(barber.fixedSalary || 0).toLocaleString('es-AR')}/mes · Día {barber.payDay || 1}
                   </span>
                 ) : (
                   <span className="text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{barber.commission}% comisión</span>
