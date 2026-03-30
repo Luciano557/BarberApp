@@ -255,6 +255,7 @@ export function EstadisticasPanel() {
   const [ocupacionOpen, setOcupacionOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
   const [ventasData, setVentasData] = useState<{ fecha_hora: string }[]>([]);
+  const [ingresosRaw, setIngresosRaw] = useState<{ created_at: string; cantidad_de_servicios: number }[]>([]);
 
   // Fetch capacidad_diaria from DB when sucursal changes
   useEffect(() => {
@@ -355,6 +356,10 @@ export function EstadisticasPanel() {
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
       setVentasData((ventasRes.data || []) as { fecha_hora: string }[]);
+      setIngresosRaw((ingresosRes.data || []).map(i => ({
+        created_at: i.created_at,
+        cantidad_de_servicios: i.cantidad_de_servicios || 0,
+      })));
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
@@ -634,13 +639,14 @@ export function EstadisticasPanel() {
   const DAY_NAMES_FULL = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
 
   const behaviorData = useMemo(() => {
-    if (!ventasData.length) return { byDay: [], byHour: [], peakSlots: [] };
+    const hasIngresos = ingresosRaw.length > 0;
+    const hasVentas = ventasData.length > 0;
+    if (!hasIngresos && !hasVentas) return { byDay: [], byHour: [], peakSlots: [] };
 
     const tz = organization?.timezone || 'America/Argentina/Buenos_Aires';
     const meses = parseInt(periodoMeses);
     const endDateRaw = endOfMonth(new Date());
     const startDate = startOfMonth(subMonths(new Date(), meses - 1));
-    // No incluir días futuros: usar min(endOfMonth, hoy)
     const today = new Date();
     const effectiveEnd = min([endDateRaw, today]);
     const totalDays = Math.max(1, differenceInDays(effectiveEnd, startDate) + 1);
@@ -653,21 +659,24 @@ export function EstadisticasPanel() {
       cursor = addDays(cursor, 1);
     }
 
-    const dayCounts: number[] = Array(7).fill(0);
-    const hourCounts: number[] = Array(24).fill(0);
-    const dayHourCounts: Record<string, number> = {};
-
-    ventasData.forEach(v => {
+    // === Ventas por día de semana: usar INGRESOS (cierres de caja) ===
+    // Agrupar por fecha exacta primero, luego por día de semana
+    const dailyTotals: Record<string, number> = {};
+    ingresosRaw.forEach(i => {
       try {
-        const localStr = new Date(v.fecha_hora).toLocaleString('en-US', { timeZone: tz });
+        const localStr = new Date(i.created_at).toLocaleString('en-US', { timeZone: tz });
         const local = new Date(localStr);
-        const day = local.getDay();
-        const hour = local.getHours();
-        dayCounts[day]++;
-        hourCounts[hour]++;
-        const key = `${day}-${hour}`;
-        dayHourCounts[key] = (dayHourCounts[key] || 0) + 1;
+        const dateKey = `${local.getFullYear()}-${local.getMonth()}-${local.getDate()}`;
+        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + i.cantidad_de_servicios;
       } catch {}
+    });
+
+    // Ahora agrupar los totales diarios por día de semana
+    const dayCounts: number[] = Array(7).fill(0);
+    Object.entries(dailyTotals).forEach(([dateKey, total]) => {
+      const [y, m, d] = dateKey.split('-').map(Number);
+      const dayOfWeek = new Date(y, m, d).getDay();
+      dayCounts[dayOfWeek] += total;
     });
 
     // Reorder: Lun-Dom
@@ -677,7 +686,22 @@ export function EstadisticasPanel() {
       ventas: actualOccurrences[d] > 0 ? Math.round((dayCounts[d] / actualOccurrences[d]) * 10) / 10 : 0,
     }));
 
-    // Only hours with activity — dividir por totalDays para promedio diario real
+    // === Ventas por hora: usar VENTA (tickets con hora exacta) ===
+    const hourCounts: number[] = Array(24).fill(0);
+    const dayHourCounts: Record<string, number> = {};
+
+    ventasData.forEach(v => {
+      try {
+        const localStr = new Date(v.fecha_hora).toLocaleString('en-US', { timeZone: tz });
+        const local = new Date(localStr);
+        const hour = local.getHours();
+        hourCounts[hour]++;
+        const day = local.getDay();
+        const key = `${day}-${hour}`;
+        dayHourCounts[key] = (dayHourCounts[key] || 0) + 1;
+      } catch {}
+    });
+
     const byHour = hourCounts
       .map((count, hour) => ({ name: `${hour}hs`, ventas: Math.round((count / totalDays) * 10) / 10, hour, raw: count }))
       .filter(h => h.raw > 0);
@@ -692,13 +716,13 @@ export function EstadisticasPanel() {
       });
 
     return { byDay, byHour, peakSlots };
-  }, [ventasData, organization?.timezone, periodoMeses]);
+  }, [ventasData, ingresosRaw, organization?.timezone, periodoMeses]);
 
   const behaviorChartConfig = {
     ventas: { label: "Ventas promedio", color: "hsl(var(--primary))" },
   };
 
-  const behaviorSection = ventasData.length > 0 ? (
+  const behaviorSection = (ingresosRaw.length > 0 || ventasData.length > 0) ? (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-foreground">👥 Comportamiento del Cliente</h2>
@@ -710,7 +734,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Ventas por día de semana</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Promedio semanal de ventas por día.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Promedio de servicios por día, basado en cierres de caja.</p>
             </div>
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
@@ -732,7 +756,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Ventas por hora del día</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Distribución horaria promedio de ventas.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Distribución horaria promedio. Basado en cobros en tiempo real.</p>
             </div>
             <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
@@ -754,7 +778,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Horarios Pico</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda en tu negocio.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda. Basado en cobros en tiempo real.</p>
             </div>
             <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
