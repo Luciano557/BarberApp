@@ -40,7 +40,7 @@ const STEP_INFO = {
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
   const [currentStep, setCurrentStep] = useState<Step>('barber');
