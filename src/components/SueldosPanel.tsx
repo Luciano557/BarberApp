@@ -21,6 +21,47 @@ import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
+/**
+ * Calcula el devengado de sueldo fijo usando meses calendario reales.
+ * Meses completos = sueldoFijo exacto. Meses parciales = prorrateo por días reales del mes.
+ */
+function calcularDevengadoFijo(sueldoFijo: number, desde: Date, hasta: Date): number {
+  if (isBefore(hasta, desde)) return 0;
+  
+  // Si están en el mismo mes, prorratear
+  if (isSameMonth(desde, hasta)) {
+    const diasMes = getDaysInMonth(desde);
+    const dias = differenceInCalendarDays(hasta, desde);
+    return sueldoFijo * (dias / diasMes);
+  }
+  
+  let total = 0;
+  
+  // Primer mes parcial: desde el día de inicio hasta fin del mes
+  const finPrimerMes = endOfMonth(desde);
+  const diasPrimerMes = getDaysInMonth(desde);
+  const diasEnPrimerMes = differenceInCalendarDays(finPrimerMes, desde) + 1; // +1 para incluir el último día
+  total += sueldoFijo * (diasEnPrimerMes / diasPrimerMes);
+  
+  // Meses completos intermedios
+  let cursor = startOfDay(addMonths(startOfMonth(desde), 1));
+  while (cursor.getFullYear() < hasta.getFullYear() || 
+         (cursor.getFullYear() === hasta.getFullYear() && cursor.getMonth() < hasta.getMonth())) {
+    total += sueldoFijo;
+    cursor = addMonths(cursor, 1);
+  }
+  
+  // Último mes parcial (si estamos en un mes diferente al primero)
+  const inicioUltimoMes = startOfMonth(hasta);
+  const diasUltimoMes = getDaysInMonth(hasta);
+  const diasEnUltimoMes = differenceInCalendarDays(hasta, inicioUltimoMes);
+  if (diasEnUltimoMes > 0) {
+    total += sueldoFijo * (diasEnUltimoMes / diasUltimoMes);
+  }
+  
+  return total;
+}
+
 // Define interface for raw ingresos data from Supabase
 interface IngresoRaw {
   id: number;
