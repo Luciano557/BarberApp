@@ -221,6 +221,21 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
           <DialogHeader><DialogTitle>Nueva Línea</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} />
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">Color (opcional)</label>
+              <div className="flex flex-wrap gap-2">
+                {LINE_COLORS.map(c => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setNewLineColor(newLineColor === c.value ? '' : c.value)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${newLineColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: c.value }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddLineDialog(false)}>Cancelar</Button>
