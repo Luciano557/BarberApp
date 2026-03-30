@@ -720,7 +720,7 @@ export function EstadisticasPanel() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/semana`} />} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value, name, item) => `${value} ventas promedio cada ${DAY_NAMES_FULL[([1,2,3,4,5,6,0])[behaviorData.byDay.findIndex(d => d.name === item?.payload?.name)] ?? 0]}`} />} />
                 <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </ComposedChart>
             </ChartContainer>
