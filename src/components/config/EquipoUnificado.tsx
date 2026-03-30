@@ -319,10 +319,20 @@ export function EquipoUnificado({
             {localCommissionError && <p className="text-xs text-destructive mt-1">{localCommissionError}</p>}
           </div>
         ) : (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
-            <Input type="number" inputMode="decimal" placeholder="Ej: 350000" value={localData.fixedSalary}
-              onChange={(e) => setLocalData(prev => ({ ...prev, fixedSalary: e.target.value }))} autoComplete="off" />
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
+              <Input type="number" inputMode="decimal" placeholder="Ej: 350000" value={localData.fixedSalary}
+                onChange={(e) => setLocalData(prev => ({ ...prev, fixedSalary: e.target.value }))} autoComplete="off" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Día de cobro (1-28) *</label>
+              <Input type="number" inputMode="numeric" placeholder="1" min={1} max={28} value={localData.payDay}
+                onChange={(e) => {
+                  const val = Math.min(28, Math.max(1, Number(e.target.value) || 1));
+                  setLocalData(prev => ({ ...prev, payDay: String(val) }));
+                }} autoComplete="off" />
+            </div>
           </div>
         )}
         {/* Role selector — multi-select with checkboxes */}
