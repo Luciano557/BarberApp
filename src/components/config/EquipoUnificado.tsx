@@ -237,6 +237,7 @@ export function EquipoUnificado({
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
+        payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
       });
       setIsAdding(false);

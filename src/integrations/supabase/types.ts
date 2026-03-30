@@ -101,6 +101,7 @@ export type Database = {
           comision: number
           created_at: string
           dni: string | null
+          fecha_cobro_dia: number
           id: string
           nombre: string
           organization_id: string | null
@@ -118,6 +119,7 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_cobro_dia?: number
           id?: string
           nombre: string
           organization_id?: string | null
@@ -135,6 +137,7 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_cobro_dia?: number
           id?: string
           nombre?: string
           organization_id?: string | null

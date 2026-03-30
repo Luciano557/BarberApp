@@ -1,0 +1,1 @@
+ALTER TABLE public.barberos ADD COLUMN fecha_cobro_dia integer NOT NULL DEFAULT 1;

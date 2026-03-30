@@ -37,6 +37,7 @@ export interface Barber {
   compensationType: CompensationType; // 'comision' = variable, 'fijo' = fixed salary
   fixedSalary?: number; // Monthly fixed salary when compensationType = 'fijo'
   teamRole: TeamRole; // 'barbero' = operational (can receive services), 'otros' = non-operational
+  payDay?: number; // Day of month for fixed salary payment (1-28)
   address?: string; // Optional
   dni?: string; // Optional
   active: boolean;
