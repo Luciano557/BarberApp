@@ -359,6 +359,7 @@ export function EstadisticasPanel() {
       setIngresosRaw((ingresosRes.data || []).map(i => ({
         created_at: i.created_at,
         cantidad_de_servicios: i.cantidad_de_servicios || 0,
+        dia: i.dia || null,
       })));
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
