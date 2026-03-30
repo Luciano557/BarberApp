@@ -1,36 +1,39 @@
+## Resumen simple
 
+El número "7,1 ventas los martes" significa: **en promedio, cada martes entraron 7,1 clientes**. No está corregido por ningún otro valor.
 
-## Agregar sección "Comportamiento del Cliente" a Estadísticas
+**El problema que encontraste es real.** La discrepancia (212 vs 260) viene de cómo se calcula el denominador. Hoy se divide por `totalWeeks` (semanas totales del período usando `differenceInWeeks`), que redondea hacia abajo y no distingue cuántos martes, miércoles, etc. realmente hubo en el período. Además, como el período incluye hasta fin de marzo (31) pero hy un día oy es 30, ha"futuro" inflando el denominador.
 
-### Resumen
-Agregar un nuevo grupo (Grupo 4) al panel de Estadísticas con 3 métricas basadas en la tabla `venta`: ventas por día de semana, ventas por hora del día, y horarios pico.
+**Ejemplo concreto**: en 3 meses (enero-marzo) hay 13 martes, 13 miércoles, pero quizás 14 jueves. Dividir todo por el mismo `totalWeeks` (12 o 13) introduce error.
 
-### Fuente de datos
-Se usará la tabla `venta` (columna `fecha_hora`) filtrada por el mismo período, organización y sucursal que ya usa el panel. Se traerán todas las ventas activas del período y se agruparán en el frontend por día de semana y hora.
+---
 
-### Métricas
+## Plan de corrección
 
-1. **Ventas por día de semana** - Gráfico de barras horizontal/vertical mostrando lun-dom con la cantidad promedio de ventas por día. Permite ver qué días son más fuertes.
+### Archivo: `src/components/EstadisticasPanel.tsx`
 
-2. **Ventas por hora del día** - Gráfico de barras mostrando franjas horarias (9h-21h aprox.) con cantidad promedio de ventas. Permite ver en qué horarios se concentra la actividad.
+**Cambio 1 — Denominador preciso por día de semana**
 
-3. **Horarios pico** - Card resumen que muestra el día + hora con más actividad (ej: "Sábados a las 11hs"), destacando los top 3 momentos de mayor demanda.
+En vez de dividir por `totalWeeks` (que es un número genérico), contar cuántas veces aparece cada día de la semana en el rango real (`startDate` hasta `hoy` o `endDate`, lo que sea menor). Así, si hubo 13 martes, se divide por 13; si hubo 14 jueves, se divide por 14.
 
-### Cambios técnicos
+Se reemplaza:
 
-**Archivo**: `src/components/EstadisticasPanel.tsx`
+```
+ventas: dayCounts[d] / totalWeeks
+```
 
-1. **Fetch adicional en `fetchData`**: Agregar query a `venta` para traer `fecha_hora` de ventas activas del período. Almacenar en nuevo estado `ventasData`.
+por:
 
-2. **Procesamiento**: Crear funciones que agrupen las ventas por:
-   - Día de semana (0-6) → promedio semanal
-   - Hora del día (0-23) → promedio diario
-   - Combinación día+hora → top 3 picos
+```
+ventas: dayCounts[d] / actualOccurrences[d]
+```
 
-3. **UI**: Agregar después del Grupo 3 una nueva sección "👥 Comportamiento del Cliente" con:
-   - Card de Ventas por día de semana con BarChart (recharts)
-   - Card de Ventas por hora del día con BarChart
-   - Card de Horarios pico con los top 3 momentos destacados
+donde `actualOccurrences` es un array de 7 posiciones que cuenta cuántas veces cae cada día de la semana entre `startDate` y `min(hoy, endDate)`.
 
-4. **Timezone**: Usar `organization.timezone` para convertir `fecha_hora` (UTC) a hora local antes de agrupar, asegurando que las horas reflejen el horario real del negocio.
+**Cambio 2 — Corregir endDate para no incluir días futuros**
 
+Usar `min(endOfMonth(today), today)` como fecha final real, para que no se cuenten días que todavía no pasaron.
+
+**Cambio 3 — Corregir ventas por hora**
+
+Aplicar la misma lógica: dividir por `totalDays` real (días transcurridos, no semanas × 7) para que el promedio horario sea correcto.
