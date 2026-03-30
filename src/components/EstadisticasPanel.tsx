@@ -354,7 +354,7 @@ export function EstadisticasPanel() {
       const ingresos = ingresosRes.data || [];
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
-
+      setVentasData((ventasRes.data || []) as { fecha_hora: string }[]);
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
