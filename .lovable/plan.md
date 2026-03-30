@@ -1,50 +1,65 @@
 
 
-## Resumen simple
+## Resumen
 
-El problema es que el código actual toma el `created_at` (que se guarda como 23:59:59 con offset de timezone) y lo convierte de vuelta a hora local para sacar el día de la semana. Esa conversión puede fallar por diferencias de timezone o DST, haciendo que un cierre del sábado aparezca como lunes.
-
-Pero ya existe una solución mucho más robusta: la columna **`dia`** en la tabla `ingresos`, que guarda directamente el nombre del día en español ("lunes", "martes", etc.) basándose en la fecha seleccionada al momento de crear el cierre. No depende de ninguna conversión de timestamp.
+Agrupar visualmente los servicios por línea en la pantalla de Cobrar, y agregar un color opcional a cada línea para distinguirlas mejor.
 
 ---
 
-## Plan de corrección
+## Plan
 
-### Archivo: `src/components/EstadisticasPanel.tsx`
+### 1. Agregar columna `color` a la tabla `lineas`
 
-**Cambio 1 — Agregar `dia` al query de ingresos**
-
-En la línea 304, agregar `dia` a los campos del select:
-```
-.select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia')
+Migración SQL:
+```sql
+ALTER TABLE lineas ADD COLUMN color text DEFAULT NULL;
 ```
 
-**Cambio 2 — Usar `dia` en vez de convertir `created_at`**
+### 2. Actualizar el tipo `Line` en `src/types/barbershop.ts`
 
-En el `useMemo` de `behaviorData` (líneas 662-687), reemplazar la lógica que convierte `created_at` a fecha local para sacar el día de semana. En su lugar:
+Agregar `color?: string` a la interfaz `Line`.
 
-1. Crear un mapa de nombre español a índice: `{ 'domingo': 0, 'lunes': 1, 'martes': 2, ... }`
-2. Para agrupar por fecha exacta (evitar contar doble el mismo día), seguir usando `created_at` solo como clave de agrupación por fecha, pero usar `dia` para determinar el día de semana.
-3. Iterar `ingresosRaw`, agrupar `cantidad_de_servicios` por `dia` directamente (sumando todos los barberos del mismo día de semana), y dividir por `actualOccurrences[d]`.
+### 3. Modificar la pantalla de Cobrar (`PaymentRegistration.tsx`)
 
-Esto elimina completamente la dependencia de la conversión timezone de `created_at` para determinar el día de semana.
+En el paso "service" (líneas 348-374), en vez de listar todos los servicios planos:
 
-### Detalle técnico
+- Recibir `lines` como prop adicional
+- Agrupar servicios por `lineId` (los que no tienen línea van en un grupo "Otros")
+- Renderizar cada grupo con un header que muestre el nombre de la línea y una barra lateral o badge con el color de la línea
+- Dentro de cada grupo, mostrar los servicios como están ahora
+
+### 4. Pasar `lines` al componente `PaymentRegistration`
+
+Desde `src/pages/Index.tsx` (o donde se renderice), pasar la prop `lines` que ya se carga en `useSupabaseData`.
+
+### 5. Agregar selector de color en la configuración de líneas
+
+En `ServicesConfig.tsx`, cuando se crea o edita una línea, agregar un selector de color (paleta predefinida de 8-10 colores) para que el usuario elija el color de la línea.
+
+### 6. Persistir el color en Supabase
+
+Actualizar `useSupabaseData` para leer/escribir el campo `color` de `lineas`.
+
+---
+
+## Detalle técnico
 
 ```text
-Antes:
-  created_at "2025-03-15T23:59:59-03:00"
-  → new Date(...).toLocaleString('en-US', { timeZone })
-  → puede dar sábado o domingo según edge cases
-  → getDay() → índice potencialmente incorrecto
+Paso "Servicio" actual:
+  [Corte Clásico - $5000]
+  [Corte + Barba - $7000]
+  [Corte Deluxe - $8000]
+  [Barba Deluxe - $6000]
 
-Ahora:
-  dia = "sábado" (guardado al crear el cierre)
-  → mapeo directo: "sábado" → 6
-  → sin conversión de timestamp, sin ambigüedad
+Paso "Servicio" nuevo:
+  ── Essential (barra azul) ──
+  [Corte Clásico - $5000]
+  [Corte + Barba - $7000]
+  
+  ── Deluxe (barra dorada) ──
+  [Corte Deluxe - $8000]
+  [Barba Deluxe - $6000]
 ```
 
-### Resultado esperado
-
-Los lunes ya no aparecerán con datos si nunca se trabajó un lunes. El día de semana viene directamente de la columna `dia`, que refleja el día real que el usuario seleccionó al cerrar caja.
+Paleta de colores predefinida: ~8 opciones (azul, verde, dorado, rojo, violeta, naranja, rosa, gris). Se guardan como hex en la columna `color`.
 
