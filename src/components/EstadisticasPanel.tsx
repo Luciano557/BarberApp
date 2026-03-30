@@ -356,6 +356,10 @@ export function EstadisticasPanel() {
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
       setVentasData((ventasRes.data || []) as { fecha_hora: string }[]);
+      setIngresosRaw((ingresosRes.data || []).map(i => ({
+        created_at: i.created_at,
+        cantidad_de_servicios: i.cantidad_de_servicios || 0,
+      })));
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
       const monthlyStats: MonthlyData[] = months.map(monthDate => {
