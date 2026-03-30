@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   TrendingUp, DollarSign, Users, Scissors, Calendar, Target, 
   PiggyBank, Receipt, BarChart3, Percent, Info, ChevronDown,
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, Clock, Trophy
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
