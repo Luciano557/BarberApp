@@ -391,8 +391,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         // For fixed salary: add historical accrual from created_at to now
         if (isFijo && barber.fixedSalary) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
-          const totalDias = differenceInCalendarDays(now, createdAt);
-          const devengadoHistoricoFijo = (barber.fixedSalary / 30) * Math.max(0, totalDias);
+          const devengadoHistoricoFijo = calcularDevengadoFijo(barber.fixedSalary, createdAt, now);
           saldoHistorico += devengadoHistoricoFijo;
         }
         
