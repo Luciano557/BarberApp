@@ -756,7 +756,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Ventas por hora del día</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Distribución horaria promedio de ventas.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Distribución horaria promedio. Basado en cobros en tiempo real.</p>
             </div>
             <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
