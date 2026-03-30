@@ -378,6 +378,7 @@ export function EquipoUnificado({
               roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
               compensationType: barber.compensationType || 'comision',
               fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
+              payDay: barber.payDay != null ? String(barber.payDay) : '1',
             }}
             onSave={(data) => handleFormSave(data, barber.id)} onCancel={cancelEdit} />
         ) : (
