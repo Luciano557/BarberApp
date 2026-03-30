@@ -17,7 +17,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { format, startOfMonth, subDays } from 'date-fns';
+import { format, startOfMonth, subDays, differenceInCalendarDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -37,11 +37,13 @@ interface IngresoRaw {
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
+  compensationType: string;
   totalDevengado: number;           // Filtered by period (or all time if no filter)
   totalPagado: number;              // Filtered by period (or all time if no filter)
   saldo: number;                    // ALWAYS historical: total devengado - total pagado (real debt)
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
+  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
 }
 
 interface IngresoDetalle {
@@ -94,6 +96,9 @@ function BarberDetailRow({
           <div className="flex items-center gap-3">
             {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             <span className="font-medium">{barber.barberName}</span>
+            <Badge variant={barber.compensationType === 'fijo' ? 'secondary' : 'outline'} className="text-xs">
+              {barber.compensationType === 'fijo' ? 'Fijo' : 'Comisión'}
+            </Badge>
           </div>
           <div className="flex items-center gap-6">
             <div className="text-right">
@@ -113,6 +118,12 @@ function BarberDetailRow({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="pl-8 pr-4 pb-4 space-y-4">
+          {/* Fixed salary explanation */}
+          {barber.fixedSalaryInfo && (
+            <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
+              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
@@ -206,6 +217,17 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     
     setIsLoading(true);
     try {
+      // Fetch created_at for barbers with fixed salary (for historical accrual)
+      const fixedBarberIds = barbers.filter(b => b.compensationType === 'fijo' && b.fixedSalary).map(b => b.id);
+      let barberCreatedAtMap: Record<string, string> = {};
+      if (fixedBarberIds.length > 0) {
+        const { data: barberDates } = await supabase
+          .from('barberos')
+          .select('id, created_at')
+          .in('id', fixedBarberIds);
+        barberDates?.forEach(b => { barberCreatedAtMap[b.id] = b.created_at; });
+      }
+
       // ALWAYS fetch ALL data for saldo calculation (historical)
       let ingHistQuery = supabase
         .from('ingresos')
@@ -303,13 +325,34 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       });
 
       // Build salary data for active barbers
+      const now = new Date();
       const data: BarberSalaryData[] = barbers.map(barber => {
+        const isFijo = barber.compensationType === 'fijo';
+        
         // FILTERED values for display (change with period filter)
-        const totalDevengado = devengadoFiltradoPorId[barber.id] || 0;
+        let totalDevengado = devengadoFiltradoPorId[barber.id] || 0;
         const totalPagado = pagadoFiltradoPorId[barber.id] || 0;
         
+        // For fixed salary: calculate proportional daily accrual
+        let fixedSalaryInfo: BarberSalaryData['fixedSalaryInfo'] = undefined;
+        if (isFijo && barber.fixedSalary) {
+          const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
+          const periodStart = periodStartDate || createdAt;
+          const dias = differenceInCalendarDays(now, periodStart);
+          const devengadoFijo = (barber.fixedSalary / 30) * Math.max(0, dias);
+          totalDevengado += devengadoFijo;
+          fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
+        }
+        
         // HISTORICAL saldo - real debt that NEVER changes with filter
-        const saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
+        let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
+        // For fixed salary: add historical accrual from created_at to now
+        if (isFijo && barber.fixedSalary) {
+          const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
+          const totalDias = differenceInCalendarDays(now, createdAt);
+          const devengadoHistoricoFijo = (barber.fixedSalary / 30) * Math.max(0, totalDias);
+          saldoHistorico += devengadoHistoricoFijo;
+        }
         
         // Get detailed ingresos for this barber by barbero_id
         const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
@@ -340,11 +383,13 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         return {
           barberId: barber.id,
           barberName: nombreCompleto || barber.firstName.trim(),
+          compensationType: barber.compensationType || 'comision',
           totalDevengado,
           totalPagado,
           saldo: saldoHistorico,  // Always historical
           detalleIngresos,
           detallePagos,
+          fixedSalaryInfo,
         };
       });
 
