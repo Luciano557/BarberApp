@@ -734,7 +734,7 @@ export function EstadisticasPanel() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
               <CardTitle className="text-sm font-medium">Ventas por día de semana</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Promedio semanal de ventas por día.</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Promedio de servicios por día, basado en cierres de caja.</p>
             </div>
             <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
           </CardHeader>
