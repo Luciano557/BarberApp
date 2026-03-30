@@ -301,7 +301,7 @@ export function EstadisticasPanel() {
 
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
+        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia')
         .eq('organization_id', organization.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
