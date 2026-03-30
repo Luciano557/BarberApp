@@ -1,10 +1,10 @@
+
+
 ## Resumen simple
 
-El número "7,1 ventas los martes" significa: **en promedio, cada martes entraron 7,1 clientes**. No está corregido por ningún otro valor.
+El usuario tiene razón: para calcular el promedio de servicios por día de semana hay que usar los datos de **cierres de caja** (`ingresos`), no los tickets individuales (`venta`). La tabla `venta` solo tiene los cobros registrados en tiempo real, pero muchos días se cierran diferidos/regularizados y esos servicios solo existen en `ingresos.cantidad_de_servicios`.
 
-**El problema que encontraste es real.** La discrepancia (212 vs 260) viene de cómo se calcula el denominador. Hoy se divide por `totalWeeks` (semanas totales del período usando `differenceInWeeks`), que redondea hacia abajo y no distingue cuántos martes, miércoles, etc. realmente hubo en el período. Además, como el período incluye hasta fin de marzo (31) pero hy un día oy es 30, ha"futuro" inflando el denominador.
-
-**Ejemplo concreto**: en 3 meses (enero-marzo) hay 13 martes, 13 miércoles, pero quizás 14 jueves. Dividir todo por el mismo `totalWeeks` (12 o 13) introduce error.
+Para ventas por hora, sí corresponde usar `venta` porque tiene la hora exacta de cada transacción.
 
 ---
 
@@ -12,28 +12,26 @@ El número "7,1 ventas los martes" significa: **en promedio, cada martes entraro
 
 ### Archivo: `src/components/EstadisticasPanel.tsx`
 
-**Cambio 1 — Denominador preciso por día de semana**
+**Cambio 1 — Guardar datos de `ingresos` para comportamiento**
 
-En vez de dividir por `totalWeeks` (que es un número genérico), contar cuántas veces aparece cada día de la semana en el rango real (`startDate` hasta `hoy` o `endDate`, lo que sea menor). Así, si hubo 13 martes, se divide por 13; si hubo 14 jueves, se divide por 14.
+Los datos de `ingresos` ya se traen en `fetchData` (línea 301-307) con `created_at` y `cantidad_de_servicios`. Guardarlos en un nuevo estado `ingresosRaw` para que `behaviorData` pueda usarlos.
 
-Se reemplaza:
+**Cambio 2 — Ventas por día de semana: usar `ingresos` en vez de `venta`**
 
-```
-ventas: dayCounts[d] / totalWeeks
-```
+En el `useMemo` de `behaviorData` (línea 636):
+- Para `byDay`: iterar `ingresosRaw`, agrupar por día de semana usando `created_at`, sumar `cantidad_de_servicios` de todos los barberos del mismo día (agrupando por fecha exacta primero, luego por día de semana).
+- Dividir por `actualOccurrences[día]` (cantidad real de martes, miércoles, etc. en el período).
+- Esto incluye tanto cierres normales como diferidos.
 
-por:
+**Cambio 3 — Ventas por hora y horarios pico: mantener `venta`**
 
-```
-ventas: dayCounts[d] / actualOccurrences[d]
-```
+Siguen usando `ventasData` (tabla `venta`) porque necesitan la hora exacta. Agregar una nota aclaratoria debajo del gráfico: "Basado en cobros registrados en tiempo real".
 
-donde `actualOccurrences` es un array de 7 posiciones que cuenta cuántas veces cae cada día de la semana entre `startDate` y `min(hoy, endDate)`.
+**Cambio 4 — Mostrar sección si hay datos de cualquier fuente**
 
-**Cambio 2 — Corregir endDate para no incluir días futuros**
+Cambiar la condición `ventasData.length > 0` para que la sección de comportamiento se muestre si hay `ingresosRaw` O `ventasData`.
 
-Usar `min(endOfMonth(today), today)` como fecha final real, para que no se cuenten días que todavía no pasaron.
+### Resultado esperado
 
-**Cambio 3 — Corregir ventas por hora**
+Los promedios por día de semana deberían coincidir con lo que el usuario ve en cierres de caja (10+ servicios por martes, no 3.4).
 
-Aplicar la misma lógica: dividir por `totalDays` real (días transcurridos, no semanas × 7) para que el promedio horario sea correcto.
