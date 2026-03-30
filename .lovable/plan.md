@@ -1,50 +1,49 @@
 
 
-## Verificacion y correcciones del sistema de roles multiples
+## Devengado automático para empleados con sueldo fijo
 
-### Problemas encontrados
+### Contexto
+Actualmente, el devengado solo se calcula para empleados por comisión (sumando `sueldo` de la tabla `ingresos`). Para empleados con sueldo fijo, el devengado aparece como $0 porque no tienen cierres de caja con comisiones. Esto hace que el panel de Sueldos sea inútil para ellos.
 
-**1. Usuarios con solo rol "Otros" pueden ver Resumen y Tareas**
-Actualmente, las tabs "Resumen" y "Tareas" se muestran siempre en el sidebar y en Index.tsx sin ninguna restriccion de rol. Un usuario con solo el rol "otros" puede ver ambas secciones, cuando no deberia ver nada.
+### Solución
+Calcular el devengado de sueldo fijo de forma proporcional diaria (`sueldo_fijo / 30 * días transcurridos`) y agregar una fecha de cobro mensual configurable por empleado.
 
-**2. Sidebar muestra solo el badge del rol mas alto**
-`getRoleBadge()` en `AppSidebar.tsx` retorna un unico badge basado en prioridad. Con multi-roles, deberia mostrar todos los roles asignados (ej: "Enc. Local" + "Barbero").
+### Cambios
 
-**3. No hay pantalla de "sin acceso" para rol "otros"**
-Si un usuario con solo "otros" inicia sesion, deberia ver un mensaje indicando que no tiene permisos, en lugar de una interfaz vacia.
+**1. Base de datos — migración**
+- Agregar columna `fecha_cobro_dia` (integer, default 1) a la tabla `barberos`. Representa el día del mes en que se paga (1-28).
 
-### Plan de cambios
+**2. Tipo Barber (`src/types/barbershop.ts`)**
+- Agregar `payDay?: number` (1-28) al interface `Barber`.
 
-**1. AuthContext — agregar `hasNoAccess` computed (`src/contexts/AuthContext.tsx`)**
-- Agregar: `const hasNoAccess = roles.length > 0 && roles.every(r => r === 'otros');`
-- Agregar: `canViewResumen` = cualquier rol que no sea solo "otros" (owner, GM, manager, barber)
-- Agregar: `canViewTareas` = cualquier rol que no sea solo "otros"
-- Exportar estos valores en el context
+**3. Mapeo de datos (`src/hooks/useSupabaseData.ts`)**
+- Mapear `fecha_cobro_dia` ↔ `payDay` en lectura y escritura.
 
-**2. AppSidebar — filtrar tabs y mostrar multi-badges (`src/components/AppSidebar.tsx`)**
-- Condicionar "Resumen" a `canViewResumen` (ya no se muestra siempre)
-- Condicionar "Tareas" a `canViewTareas`
-- Cambiar `getRoleBadge()` a `getRoleBadges()` que retorne un array de badges para todos los roles del usuario
-- Si el usuario tiene solo "otros", no mostrar ninguna nav item
+**4. Formulario de equipo (`src/components/config/EquipoUnificado.tsx`)**
+- Cuando `compensationType === 'fijo'`, mostrar un campo adicional: "Día de cobro (1-28)" con input numérico. Default: 1.
 
-**3. Index.tsx — mostrar mensaje de "sin acceso" para rol otros**
-- Si `hasNoAccess` es true, mostrar un mensaje claro: "No tenes permisos para acceder a esta seccion"
-- Condicionar tabs Resumen y Tareas con los nuevos permisos
-- Agregar redirect al detectar `hasNoAccess`
+**5. Panel de Sueldos (`src/components/SueldosPanel.tsx`)** — cambio principal
+- En `fetchData`, para cada barbero con `compensationType === 'fijo'`:
+  - Calcular devengado proporcional: `sueldo_fijo / 30 * días_transcurridos_en_periodo`
+  - Si hay filtro de periodo: contar días desde `periodStartDate` hasta hoy (o fin de periodo)
+  - Para saldo histórico: contar días desde `created_at` del barbero hasta hoy, aplicar `sueldo_fijo / 30 * total_días`
+- Mostrar en el detalle expandible una fila explicativa: "Sueldo fijo: $X/mes — Y días → $Z devengado"
+- El header de la columna "Comisión" cambia a "Devengado" (ya se muestra así)
 
-**4. Index.tsx — redirect si tab activa no tiene permisos**
-- Actualizar el `useEffect` para cubrir los casos de resumen y tareas cuando el usuario pierde acceso
+**6. Indicador visual**
+- En la lista de Sueldos, agregar un badge "Fijo" o "Comisión" junto al nombre del empleado para distinguir el tipo de compensación.
+
+### Flujo resultante
+1. Se configura un empleado con sueldo fijo de $350.000/mes, día de cobro 5.
+2. El devengado se acumula diariamente: $350.000 / 30 ≈ $11.667/día.
+3. El saldo pendiente crece automáticamente cada día.
+4. Al registrar un pago manual, el saldo baja.
+5. El día 5 de cada mes, el empleado "debería" cobrar — el saldo refleja cuánto se le debe.
 
 ### Archivos a modificar
-1. `src/contexts/AuthContext.tsx` — agregar `hasNoAccess`, `canViewResumen`, `canViewTareas`
-2. `src/components/AppSidebar.tsx` — filtrar Resumen/Tareas, multi-badges
-3. `src/pages/Index.tsx` — pantalla "sin acceso" para "otros", condicionar tabs
-
-### Sin cambios necesarios
-- La logica de multi-roles en `EquipoUnificado.tsx` funciona correctamente
-- La sincronizacion de `rol_equipo` con `barberos` funciona
-- El filtro de `teamRole !== 'otros'` en `PaymentRegistration` funciona
-- PIN e Invitar ocultos para "otros" funciona
-- La migracion de `app_role` enum con 'otros' esta aplicada
-- RLS policies existentes son compatibles con multi-roles (usan `has_role` que chequea existencia)
+1. Migración SQL: agregar `fecha_cobro_dia` a `barberos`
+2. `src/types/barbershop.ts`: agregar `payDay`
+3. `src/hooks/useSupabaseData.ts`: mapear `fecha_cobro_dia`
+4. `src/components/config/EquipoUnificado.tsx`: campo día de cobro
+5. `src/components/SueldosPanel.tsx`: cálculo proporcional + badge tipo compensación
 
