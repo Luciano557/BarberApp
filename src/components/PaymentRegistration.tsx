@@ -11,6 +11,7 @@ interface PaymentRegistrationProps {
   extras: Extra[];
   barbers: Barber[];
   discounts: Discount[];
+  lines?: Line[];
   onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
