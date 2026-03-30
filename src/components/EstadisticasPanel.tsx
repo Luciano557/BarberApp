@@ -8,7 +8,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks, differenceInDays, min, eachDayOfInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
