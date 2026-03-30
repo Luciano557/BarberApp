@@ -255,7 +255,7 @@ export function EstadisticasPanel() {
   const [ocupacionOpen, setOcupacionOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
   const [ventasData, setVentasData] = useState<{ fecha_hora: string }[]>([]);
-  const [ingresosRaw, setIngresosRaw] = useState<{ created_at: string; cantidad_de_servicios: number }[]>([]);
+  const [ingresosRaw, setIngresosRaw] = useState<{ created_at: string; cantidad_de_servicios: number; dia: string | null }[]>([]);
 
   // Fetch capacidad_diaria from DB when sucursal changes
   useEffect(() => {
@@ -301,7 +301,7 @@ export function EstadisticasPanel() {
 
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado')
+        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia')
         .eq('organization_id', organization.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -359,6 +359,7 @@ export function EstadisticasPanel() {
       setIngresosRaw((ingresosRes.data || []).map(i => ({
         created_at: i.created_at,
         cantidad_de_servicios: i.cantidad_de_servicios || 0,
+        dia: i.dia || null,
       })));
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
@@ -659,24 +660,19 @@ export function EstadisticasPanel() {
       cursor = addDays(cursor, 1);
     }
 
-    // === Ventas por día de semana: usar INGRESOS (cierres de caja) ===
-    // Agrupar por fecha exacta primero, luego por día de semana
-    const dailyTotals: Record<string, number> = {};
-    ingresosRaw.forEach(i => {
-      try {
-        const localStr = new Date(i.created_at).toLocaleString('en-US', { timeZone: tz });
-        const local = new Date(localStr);
-        const dateKey = `${local.getFullYear()}-${local.getMonth()}-${local.getDate()}`;
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + i.cantidad_de_servicios;
-      } catch {}
-    });
+    // === Ventas por día de semana: usar columna `dia` de INGRESOS ===
+    // Mapa de nombre español a índice JS (getDay(): 0=dom, 1=lun, ...)
+    const diaNameToIndex: Record<string, number> = {
+      'domingo': 0, 'lunes': 1, 'martes': 2, 'miércoles': 3,
+      'jueves': 4, 'viernes': 5, 'sábado': 6,
+    };
 
-    // Ahora agrupar los totales diarios por día de semana
     const dayCounts: number[] = Array(7).fill(0);
-    Object.entries(dailyTotals).forEach(([dateKey, total]) => {
-      const [y, m, d] = dateKey.split('-').map(Number);
-      const dayOfWeek = new Date(y, m, d).getDay();
-      dayCounts[dayOfWeek] += total;
+    ingresosRaw.forEach(i => {
+      if (!i.dia) return;
+      const dayIdx = diaNameToIndex[i.dia.toLowerCase()];
+      if (dayIdx === undefined) return;
+      dayCounts[dayIdx] += i.cantidad_de_servicios;
     });
 
     // Reorder: Lun-Dom
