@@ -8,7 +8,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks, differenceInDays, min, eachDayOfInterval, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -638,9 +638,20 @@ export function EstadisticasPanel() {
 
     const tz = organization?.timezone || 'America/Argentina/Buenos_Aires';
     const meses = parseInt(periodoMeses);
-    const endDate = endOfMonth(new Date());
+    const endDateRaw = endOfMonth(new Date());
     const startDate = startOfMonth(subMonths(new Date(), meses - 1));
-    const totalWeeks = Math.max(1, differenceInWeeks(endDate, startDate));
+    // No incluir días futuros: usar min(endOfMonth, hoy)
+    const today = new Date();
+    const effectiveEnd = min([endDateRaw, today]);
+    const totalDays = Math.max(1, differenceInDays(effectiveEnd, startDate) + 1);
+
+    // Contar cuántas veces aparece cada día de semana en el rango real
+    const actualOccurrences: number[] = Array(7).fill(0);
+    let cursor = new Date(startDate);
+    while (cursor <= effectiveEnd) {
+      actualOccurrences[cursor.getDay()]++;
+      cursor = addDays(cursor, 1);
+    }
 
     const dayCounts: number[] = Array(7).fill(0);
     const hourCounts: number[] = Array(24).fill(0);
@@ -663,12 +674,12 @@ export function EstadisticasPanel() {
     const dayOrder = [1, 2, 3, 4, 5, 6, 0];
     const byDay = dayOrder.map(d => ({
       name: DAY_NAMES[d],
-      ventas: Math.round((dayCounts[d] / totalWeeks) * 10) / 10,
+      ventas: actualOccurrences[d] > 0 ? Math.round((dayCounts[d] / actualOccurrences[d]) * 10) / 10 : 0,
     }));
 
-    // Only hours with activity
+    // Only hours with activity — dividir por totalDays para promedio diario real
     const byHour = hourCounts
-      .map((count, hour) => ({ name: `${hour}hs`, ventas: Math.round((count / (totalWeeks * 7)) * 70) / 10, hour, raw: count }))
+      .map((count, hour) => ({ name: `${hour}hs`, ventas: Math.round((count / totalDays) * 10) / 10, hour, raw: count }))
       .filter(h => h.raw > 0);
 
     // Top 3 peak slots
@@ -709,7 +720,7 @@ export function EstadisticasPanel() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/semana`} />} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value, name, item) => `${value} ventas promedio cada ${DAY_NAMES_FULL[([1,2,3,4,5,6,0])[behaviorData.byDay.findIndex(d => d.name === item?.payload?.name)] ?? 0]}`} />} />
                 <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </ComposedChart>
             </ChartContainer>
@@ -731,7 +742,7 @@ export function EstadisticasPanel() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/día`} />} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas promedio diarias`} />} />
                 <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </ComposedChart>
             </ChartContainer>
