@@ -973,3 +973,4 @@ export function EstadisticasPanel() {
       />
     </div>
   );
+}
