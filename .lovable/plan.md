@@ -2,9 +2,9 @@
 
 ## Resumen simple
 
-El usuario tiene razón: para calcular el promedio de servicios por día de semana hay que usar los datos de **cierres de caja** (`ingresos`), no los tickets individuales (`venta`). La tabla `venta` solo tiene los cobros registrados en tiempo real, pero muchos días se cierran diferidos/regularizados y esos servicios solo existen en `ingresos.cantidad_de_servicios`.
+El problema es que el código actual toma el `created_at` (que se guarda como 23:59:59 con offset de timezone) y lo convierte de vuelta a hora local para sacar el día de la semana. Esa conversión puede fallar por diferencias de timezone o DST, haciendo que un cierre del sábado aparezca como lunes.
 
-Para ventas por hora, sí corresponde usar `venta` porque tiene la hora exacta de cada transacción.
+Pero ya existe una solución mucho más robusta: la columna **`dia`** en la tabla `ingresos`, que guarda directamente el nombre del día en español ("lunes", "martes", etc.) basándose en la fecha seleccionada al momento de crear el cierre. No depende de ninguna conversión de timestamp.
 
 ---
 
@@ -12,26 +12,39 @@ Para ventas por hora, sí corresponde usar `venta` porque tiene la hora exacta d
 
 ### Archivo: `src/components/EstadisticasPanel.tsx`
 
-**Cambio 1 — Guardar datos de `ingresos` para comportamiento**
+**Cambio 1 — Agregar `dia` al query de ingresos**
 
-Los datos de `ingresos` ya se traen en `fetchData` (línea 301-307) con `created_at` y `cantidad_de_servicios`. Guardarlos en un nuevo estado `ingresosRaw` para que `behaviorData` pueda usarlos.
+En la línea 304, agregar `dia` a los campos del select:
+```
+.select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia')
+```
 
-**Cambio 2 — Ventas por día de semana: usar `ingresos` en vez de `venta`**
+**Cambio 2 — Usar `dia` en vez de convertir `created_at`**
 
-En el `useMemo` de `behaviorData` (línea 636):
-- Para `byDay`: iterar `ingresosRaw`, agrupar por día de semana usando `created_at`, sumar `cantidad_de_servicios` de todos los barberos del mismo día (agrupando por fecha exacta primero, luego por día de semana).
-- Dividir por `actualOccurrences[día]` (cantidad real de martes, miércoles, etc. en el período).
-- Esto incluye tanto cierres normales como diferidos.
+En el `useMemo` de `behaviorData` (líneas 662-687), reemplazar la lógica que convierte `created_at` a fecha local para sacar el día de semana. En su lugar:
 
-**Cambio 3 — Ventas por hora y horarios pico: mantener `venta`**
+1. Crear un mapa de nombre español a índice: `{ 'domingo': 0, 'lunes': 1, 'martes': 2, ... }`
+2. Para agrupar por fecha exacta (evitar contar doble el mismo día), seguir usando `created_at` solo como clave de agrupación por fecha, pero usar `dia` para determinar el día de semana.
+3. Iterar `ingresosRaw`, agrupar `cantidad_de_servicios` por `dia` directamente (sumando todos los barberos del mismo día de semana), y dividir por `actualOccurrences[d]`.
 
-Siguen usando `ventasData` (tabla `venta`) porque necesitan la hora exacta. Agregar una nota aclaratoria debajo del gráfico: "Basado en cobros registrados en tiempo real".
+Esto elimina completamente la dependencia de la conversión timezone de `created_at` para determinar el día de semana.
 
-**Cambio 4 — Mostrar sección si hay datos de cualquier fuente**
+### Detalle técnico
 
-Cambiar la condición `ventasData.length > 0` para que la sección de comportamiento se muestre si hay `ingresosRaw` O `ventasData`.
+```text
+Antes:
+  created_at "2025-03-15T23:59:59-03:00"
+  → new Date(...).toLocaleString('en-US', { timeZone })
+  → puede dar sábado o domingo según edge cases
+  → getDay() → índice potencialmente incorrecto
+
+Ahora:
+  dia = "sábado" (guardado al crear el cierre)
+  → mapeo directo: "sábado" → 6
+  → sin conversión de timestamp, sin ambigüedad
+```
 
 ### Resultado esperado
 
-Los promedios por día de semana deberían coincidir con lo que el usuario ve en cierres de caja (10+ servicios por martes, no 3.4).
+Los lunes ya no aparecerán con datos si nunca se trabajó un lunes. El día de semana viene directamente de la columna `dia`, que refleja el día real que el usuario seleccionó al cerrar caja.
 
