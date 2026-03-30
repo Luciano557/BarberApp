@@ -1,29 +1,28 @@
 
 
-## Actualizar datos de Agus Community para reflejar saldo real
-
-### Situación actual
-- **Empleada**: Agus Community (ID: `959a39c0-f4be-45f1-8f53-909d00d1d8df`)
-- **Sueldo fijo**: $150.000/mes → $5.000/día
-- **created_at actual**: 29 de marzo 2026 (ayer, cuando se cargó)
-- **fecha_cobro_dia actual**: 1
-- **Pagos registrados**: $0
+## Corregir cálculo de sueldo fijo para que sea exacto por mes calendario
 
 ### Problema
-El sistema calcula el devengado desde `created_at`, que es ayer. Pero Agustina trabaja desde antes y se le debe $225.000.
+El cálculo actual usa `sueldoFijo / 30 * días`, lo que genera variaciones:
+- Febrero (28 días): devenga $140.000 en vez de $150.000
+- Marzo (31 días): devenga $155.000 en vez de $150.000
 
 ### Solución
-Una migración SQL que actualice:
+Cambiar la lógica en `SueldosPanel.tsx` para contar **meses completos + fracción proporcional del mes actual**:
 
-1. **`fecha_cobro_dia`** → **15** (cobra el 15 de cada mes)
-2. **`created_at`** → **15 de febrero 2026** (para que el cálculo proporcional dé 45 días × $5.000 = $225.000)
+1. Desde `created_at` hasta hoy, contar cada mes calendario completo como exactamente `$150.000`
+2. Para el mes parcial actual (o el primer mes si recién arrancó), calcular proporcionalmente con los días reales de ese mes: `sueldoFijo * (díasTranscurridos / díasTotalesDelMes)`
 
-### Verificación
-Después de la migración, en el panel de Sueldos debería aparecer:
-- Devengado: ~$225.000
-- Pagado: $0
-- Saldo pendiente: ~$225.000
+### Ejemplo con Agus Community (created_at = 15 feb)
+- Feb: 13 días de 28 → $150.000 × 13/28 = $69.643
+- Mar: mes completo (si ya pasó el 15) → $150.000
+- Resultado: ~$219.643 (más preciso al mes calendario real)
 
-### Archivo
-- Migración SQL: `UPDATE barberos SET fecha_cobro_dia = 15, created_at = '2026-02-15'::timestamptz WHERE id = '959a39c0-...'`
+**Nota**: Con esta lógica, el devengado de Agus ya no dará exactamente $225.000 porque febrero tiene 28 días, no 30. El cálculo anterior asumía 30 días fijos. Si querés mantener los $225.000 exactos para Agus, habría que ajustar su `created_at` después de aplicar el cambio.
+
+### Cambios técnicos
+- **Archivo**: `src/components/SueldosPanel.tsx`
+- **Líneas afectadas**: ~340-344 (devengado filtrado) y ~350-354 (devengado histórico)
+- Se reemplaza `(fixedSalary / 30) * días` por una función helper que itere mes a mes sumando el monto exacto mensual, con prorrateo solo en el primer y último mes parcial
+- Se usa `getDaysInMonth()` de `date-fns` para obtener los días reales de cada mes
 
