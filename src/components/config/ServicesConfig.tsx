@@ -32,8 +32,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
   const [newLineName, setNewLineName] = useState('');
+  const [newLineColor, setNewLineColor] = useState('');
   const [addLineContext, setAddLineContext] = useState<'add' | 'edit'>('add');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+
+  const LINE_COLORS = [
+    { label: 'Azul', value: '#3B82F6' },
+    { label: 'Verde', value: '#22C55E' },
+    { label: 'Dorado', value: '#EAB308' },
+    { label: 'Rojo', value: '#EF4444' },
+    { label: 'Violeta', value: '#8B5CF6' },
+    { label: 'Naranja', value: '#F97316' },
+    { label: 'Rosa', value: '#EC4899' },
+    { label: 'Gris', value: '#6B7280' },
+  ];
 
   const activeServices = services.filter(s => s.active);
   const inactiveServices = services.filter(s => !s.active);
