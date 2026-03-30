@@ -1,49 +1,29 @@
 
 
-## Devengado automático para empleados con sueldo fijo
+## Actualizar datos de Agus Community para reflejar saldo real
 
-### Contexto
-Actualmente, el devengado solo se calcula para empleados por comisión (sumando `sueldo` de la tabla `ingresos`). Para empleados con sueldo fijo, el devengado aparece como $0 porque no tienen cierres de caja con comisiones. Esto hace que el panel de Sueldos sea inútil para ellos.
+### Situación actual
+- **Empleada**: Agus Community (ID: `959a39c0-f4be-45f1-8f53-909d00d1d8df`)
+- **Sueldo fijo**: $150.000/mes → $5.000/día
+- **created_at actual**: 29 de marzo 2026 (ayer, cuando se cargó)
+- **fecha_cobro_dia actual**: 1
+- **Pagos registrados**: $0
+
+### Problema
+El sistema calcula el devengado desde `created_at`, que es ayer. Pero Agustina trabaja desde antes y se le debe $225.000.
 
 ### Solución
-Calcular el devengado de sueldo fijo de forma proporcional diaria (`sueldo_fijo / 30 * días transcurridos`) y agregar una fecha de cobro mensual configurable por empleado.
+Una migración SQL que actualice:
 
-### Cambios
+1. **`fecha_cobro_dia`** → **15** (cobra el 15 de cada mes)
+2. **`created_at`** → **15 de febrero 2026** (para que el cálculo proporcional dé 45 días × $5.000 = $225.000)
 
-**1. Base de datos — migración**
-- Agregar columna `fecha_cobro_dia` (integer, default 1) a la tabla `barberos`. Representa el día del mes en que se paga (1-28).
+### Verificación
+Después de la migración, en el panel de Sueldos debería aparecer:
+- Devengado: ~$225.000
+- Pagado: $0
+- Saldo pendiente: ~$225.000
 
-**2. Tipo Barber (`src/types/barbershop.ts`)**
-- Agregar `payDay?: number` (1-28) al interface `Barber`.
-
-**3. Mapeo de datos (`src/hooks/useSupabaseData.ts`)**
-- Mapear `fecha_cobro_dia` ↔ `payDay` en lectura y escritura.
-
-**4. Formulario de equipo (`src/components/config/EquipoUnificado.tsx`)**
-- Cuando `compensationType === 'fijo'`, mostrar un campo adicional: "Día de cobro (1-28)" con input numérico. Default: 1.
-
-**5. Panel de Sueldos (`src/components/SueldosPanel.tsx`)** — cambio principal
-- En `fetchData`, para cada barbero con `compensationType === 'fijo'`:
-  - Calcular devengado proporcional: `sueldo_fijo / 30 * días_transcurridos_en_periodo`
-  - Si hay filtro de periodo: contar días desde `periodStartDate` hasta hoy (o fin de periodo)
-  - Para saldo histórico: contar días desde `created_at` del barbero hasta hoy, aplicar `sueldo_fijo / 30 * total_días`
-- Mostrar en el detalle expandible una fila explicativa: "Sueldo fijo: $X/mes — Y días → $Z devengado"
-- El header de la columna "Comisión" cambia a "Devengado" (ya se muestra así)
-
-**6. Indicador visual**
-- En la lista de Sueldos, agregar un badge "Fijo" o "Comisión" junto al nombre del empleado para distinguir el tipo de compensación.
-
-### Flujo resultante
-1. Se configura un empleado con sueldo fijo de $350.000/mes, día de cobro 5.
-2. El devengado se acumula diariamente: $350.000 / 30 ≈ $11.667/día.
-3. El saldo pendiente crece automáticamente cada día.
-4. Al registrar un pago manual, el saldo baja.
-5. El día 5 de cada mes, el empleado "debería" cobrar — el saldo refleja cuánto se le debe.
-
-### Archivos a modificar
-1. Migración SQL: agregar `fecha_cobro_dia` a `barberos`
-2. `src/types/barbershop.ts`: agregar `payDay`
-3. `src/hooks/useSupabaseData.ts`: mapear `fecha_cobro_dia`
-4. `src/components/config/EquipoUnificado.tsx`: campo día de cobro
-5. `src/components/SueldosPanel.tsx`: cálculo proporcional + badge tipo compensación
+### Archivo
+- Migración SQL: `UPDATE barberos SET fecha_cobro_dia = 15, created_at = '2026-02-15'::timestamptz WHERE id = '959a39c0-...'`
 
