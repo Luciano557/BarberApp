@@ -96,7 +96,7 @@ export function EquipoUnificado({
 
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
-    compensationType: 'comision' as CompensationType, fixedSalary: '',
+    compensationType: 'comision' as CompensationType, fixedSalary: '', payDay: '1',
   });
 
   const activeBarbers = barbers.filter(b => b.active);
