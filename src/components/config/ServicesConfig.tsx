@@ -82,12 +82,12 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
 
   const handleAddNewLine = async () => {
     if (newLineName.trim()) {
-      const newLine = await onAddLine({ name: newLineName.trim(), active: true });
+      const newLine = await onAddLine({ name: newLineName.trim(), active: true, color: newLineColor || undefined });
       if (newLine) {
         if (addLineContext === 'add') setNewLineId(newLine.id);
         else setEditLineId(newLine.id);
       }
-      setNewLineName(''); setShowAddLineDialog(false);
+      setNewLineName(''); setNewLineColor(''); setShowAddLineDialog(false);
     }
   };
 
