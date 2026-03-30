@@ -659,7 +659,151 @@ export function EstadisticasPanel() {
     description: 'Qué tan llena está tu agenda mes a mes.',
   };
 
-  return (
+  // ---- Comportamiento del Cliente ----
+  const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const DAY_NAMES_FULL = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
+
+  const behaviorData = useMemo(() => {
+    if (!ventasData.length) return { byDay: [], byHour: [], peakSlots: [] };
+
+    const tz = organization?.timezone || 'America/Argentina/Buenos_Aires';
+    const meses = parseInt(periodoMeses);
+    const endDate = endOfMonth(new Date());
+    const startDate = startOfMonth(subMonths(new Date(), meses - 1));
+    const totalWeeks = Math.max(1, differenceInWeeks(endDate, startDate));
+
+    const dayCounts: number[] = Array(7).fill(0);
+    const hourCounts: number[] = Array(24).fill(0);
+    const dayHourCounts: Record<string, number> = {};
+
+    ventasData.forEach(v => {
+      try {
+        const localStr = new Date(v.fecha_hora).toLocaleString('en-US', { timeZone: tz });
+        const local = new Date(localStr);
+        const day = local.getDay();
+        const hour = local.getHours();
+        dayCounts[day]++;
+        hourCounts[hour]++;
+        const key = `${day}-${hour}`;
+        dayHourCounts[key] = (dayHourCounts[key] || 0) + 1;
+      } catch {}
+    });
+
+    // Reorder: Lun-Dom
+    const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+    const byDay = dayOrder.map(d => ({
+      name: DAY_NAMES[d],
+      ventas: Math.round((dayCounts[d] / totalWeeks) * 10) / 10,
+    }));
+
+    // Only hours with activity
+    const byHour = hourCounts
+      .map((count, hour) => ({ name: `${hour}hs`, ventas: Math.round((count / (totalWeeks * 7)) * 70) / 10, hour, raw: count }))
+      .filter(h => h.raw > 0);
+
+    // Top 3 peak slots
+    const peakSlots = Object.entries(dayHourCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([key, count]) => {
+        const [d, h] = key.split('-').map(Number);
+        return { label: `${DAY_NAMES_FULL[d]} a las ${h}hs`, count };
+      });
+
+    return { byDay, byHour, peakSlots };
+  }, [ventasData, organization?.timezone, periodoMeses]);
+
+  const behaviorChartConfig = {
+    ventas: { label: "Ventas promedio", color: "hsl(var(--primary))" },
+  };
+
+  const behaviorSection = ventasData.length > 0 ? (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-foreground">👥 Comportamiento del Cliente</h2>
+        <p className="text-sm text-muted-foreground">Patrones de demanda por día y horario para optimizar tu operación.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Ventas por día de semana */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Ventas por día de semana</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Promedio semanal de ventas por día.</p>
+            </div>
+            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={behaviorChartConfig} className="h-48 w-full">
+              <ComposedChart data={behaviorData.byDay} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
+                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/semana`} />} />
+                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Ventas por hora del día */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Ventas por hora del día</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Distribución horaria promedio de ventas.</p>
+            </div>
+            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={behaviorChartConfig} className="h-48 w-full">
+              <ComposedChart data={behaviorData.byHour} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
+                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
+                <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas/día`} />} />
+                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Horarios pico */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-sm font-medium">Horarios Pico</CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda en tu negocio.</p>
+            </div>
+            <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
+          </CardHeader>
+          <CardContent>
+            {behaviorData.peakSlots.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Sin datos suficientes.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {behaviorData.peakSlots.map((slot, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
+                      i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'
+                    }`}>
+                      #{i + 1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{slot.label}</p>
+                      <p className="text-xs text-muted-foreground">{slot.count} ventas en el período</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  ) : null;
+
+
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
