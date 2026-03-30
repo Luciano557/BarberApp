@@ -296,6 +296,7 @@ export function useSupabaseData() {
       if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
       if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
       if (updates.teamRole !== undefined) dbUpdates.rol_equipo = updates.teamRole;
+      if (updates.payDay !== undefined) dbUpdates.fecha_cobro_dia = updates.payDay;
 
       const { error } = await supabase
         .from('barberos')
