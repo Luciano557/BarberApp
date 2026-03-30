@@ -254,6 +254,7 @@ export function EstadisticasPanel() {
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [ocupacionOpen, setOcupacionOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
+  const [ventasData, setVentasData] = useState<{ fecha_hora: string }[]>([]);
 
   // Fetch capacidad_diaria from DB when sucursal changes
   useEffect(() => {
