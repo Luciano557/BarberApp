@@ -17,9 +17,50 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { format, startOfMonth, subDays, differenceInCalendarDays } from 'date-fns';
+import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+
+/**
+ * Calcula el devengado de sueldo fijo usando meses calendario reales.
+ * Meses completos = sueldoFijo exacto. Meses parciales = prorrateo por días reales del mes.
+ */
+function calcularDevengadoFijo(sueldoFijo: number, desde: Date, hasta: Date): number {
+  if (isBefore(hasta, desde)) return 0;
+  
+  // Si están en el mismo mes, prorratear
+  if (isSameMonth(desde, hasta)) {
+    const diasMes = getDaysInMonth(desde);
+    const dias = differenceInCalendarDays(hasta, desde);
+    return sueldoFijo * (dias / diasMes);
+  }
+  
+  let total = 0;
+  
+  // Primer mes parcial: desde el día de inicio hasta fin del mes
+  const finPrimerMes = endOfMonth(desde);
+  const diasPrimerMes = getDaysInMonth(desde);
+  const diasEnPrimerMes = differenceInCalendarDays(finPrimerMes, desde) + 1; // +1 para incluir el último día
+  total += sueldoFijo * (diasEnPrimerMes / diasPrimerMes);
+  
+  // Meses completos intermedios
+  let cursor = startOfDay(addMonths(startOfMonth(desde), 1));
+  while (cursor.getFullYear() < hasta.getFullYear() || 
+         (cursor.getFullYear() === hasta.getFullYear() && cursor.getMonth() < hasta.getMonth())) {
+    total += sueldoFijo;
+    cursor = addMonths(cursor, 1);
+  }
+  
+  // Último mes parcial (si estamos en un mes diferente al primero)
+  const inicioUltimoMes = startOfMonth(hasta);
+  const diasUltimoMes = getDaysInMonth(hasta);
+  const diasEnUltimoMes = differenceInCalendarDays(hasta, inicioUltimoMes);
+  if (diasEnUltimoMes > 0) {
+    total += sueldoFijo * (diasEnUltimoMes / diasUltimoMes);
+  }
+  
+  return total;
+}
 
 // Define interface for raw ingresos data from Supabase
 interface IngresoRaw {
@@ -338,8 +379,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         if (isFijo && barber.fixedSalary) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
           const periodStart = periodStartDate || createdAt;
-          const dias = differenceInCalendarDays(now, periodStart);
-          const devengadoFijo = (barber.fixedSalary / 30) * Math.max(0, dias);
+          const efectiveStart = isBefore(createdAt, periodStart) ? periodStart : createdAt;
+          const devengadoFijo = calcularDevengadoFijo(barber.fixedSalary, efectiveStart, now);
+          const dias = differenceInCalendarDays(now, efectiveStart);
           totalDevengado += devengadoFijo;
           fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
         }
@@ -349,8 +391,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         // For fixed salary: add historical accrual from created_at to now
         if (isFijo && barber.fixedSalary) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
-          const totalDias = differenceInCalendarDays(now, createdAt);
-          const devengadoHistoricoFijo = (barber.fixedSalary / 30) * Math.max(0, totalDias);
+          const devengadoHistoricoFijo = calcularDevengadoFijo(barber.fixedSalary, createdAt, now);
           saldoHistorico += devengadoHistoricoFijo;
         }
         
