@@ -37,11 +37,13 @@ interface IngresoRaw {
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
+  compensationType: string;
   totalDevengado: number;           // Filtered by period (or all time if no filter)
   totalPagado: number;              // Filtered by period (or all time if no filter)
   saldo: number;                    // ALWAYS historical: total devengado - total pagado (real debt)
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
+  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
 }
 
 interface IngresoDetalle {
