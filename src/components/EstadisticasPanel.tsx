@@ -817,6 +817,9 @@ export function EstadisticasPanel() {
         </div>
       </div>
 
+      {/* Grupo 4: Comportamiento del Cliente */}
+      {behaviorSection}
+
       {/* Detail Dialog */}
       <MetricDetailDialog
         open={!!selectedMetric}
@@ -826,4 +829,3 @@ export function EstadisticasPanel() {
       />
     </div>
   );
-}
