@@ -401,6 +401,7 @@ export function useSupabaseData() {
         .insert({ 
           nombre: line.name, 
           activo: line.active,
+          color: line.color || null,
           organization_id: organization.id,
         })
         .select()
