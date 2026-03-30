@@ -50,6 +50,7 @@ function dbToBarber(row: any): Barber {
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     teamRole: row.rol_equipo || 'barbero',
+    payDay: row.fecha_cobro_dia || 1,
     address: undefined,
     dni: row.dni || undefined,
     active: row.activo,
