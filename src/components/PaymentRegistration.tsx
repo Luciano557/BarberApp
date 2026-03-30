@@ -357,6 +357,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             lineMap.get(key)!.push(service);
           });
 
+          // Sort services within each group by price ascending
+          lineMap.forEach((svcs) => svcs.sort((a, b) => a.price - b.price));
+
           // Add groups with lines first (sorted by line name), then "Otros"
           const activeLines = lines.filter(l => lineMap.has(l.id));
           activeLines.forEach(line => {
@@ -364,7 +367,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           });
           const noLine = lineMap.get(null);
           if (noLine) {
-            grouped.push({ lineId: null, lineName: activeLines.length > 0 ? 'Otros' : '', lineColor: undefined, services: noLine });
+            grouped.push({ lineId: null, lineName: 'Otros', lineColor: undefined, services: noLine });
           }
 
           let globalIndex = 0;
