@@ -209,7 +209,7 @@ export function EquipoUnificado({
 
   const resetForm = () => {
     setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
-      compensationType: 'comision', fixedSalary: '' });
+      compensationType: 'comision', fixedSalary: '', payDay: '1' });
   };
 
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
