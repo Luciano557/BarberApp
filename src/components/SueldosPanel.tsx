@@ -217,6 +217,17 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     
     setIsLoading(true);
     try {
+      // Fetch created_at for barbers with fixed salary (for historical accrual)
+      const fixedBarberIds = barbers.filter(b => b.compensationType === 'fijo' && b.fixedSalary).map(b => b.id);
+      let barberCreatedAtMap: Record<string, string> = {};
+      if (fixedBarberIds.length > 0) {
+        const { data: barberDates } = await supabase
+          .from('barberos')
+          .select('id, created_at')
+          .in('id', fixedBarberIds);
+        barberDates?.forEach(b => { barberCreatedAtMap[b.id] = b.created_at; });
+      }
+
       // ALWAYS fetch ALL data for saldo calculation (historical)
       let ingHistQuery = supabase
         .from('ingresos')
