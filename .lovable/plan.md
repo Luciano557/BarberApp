@@ -1,28 +1,36 @@
 
 
-## Corregir cálculo de sueldo fijo para que sea exacto por mes calendario
+## Agregar sección "Comportamiento del Cliente" a Estadísticas
 
-### Problema
-El cálculo actual usa `sueldoFijo / 30 * días`, lo que genera variaciones:
-- Febrero (28 días): devenga $140.000 en vez de $150.000
-- Marzo (31 días): devenga $155.000 en vez de $150.000
+### Resumen
+Agregar un nuevo grupo (Grupo 4) al panel de Estadísticas con 3 métricas basadas en la tabla `venta`: ventas por día de semana, ventas por hora del día, y horarios pico.
 
-### Solución
-Cambiar la lógica en `SueldosPanel.tsx` para contar **meses completos + fracción proporcional del mes actual**:
+### Fuente de datos
+Se usará la tabla `venta` (columna `fecha_hora`) filtrada por el mismo período, organización y sucursal que ya usa el panel. Se traerán todas las ventas activas del período y se agruparán en el frontend por día de semana y hora.
 
-1. Desde `created_at` hasta hoy, contar cada mes calendario completo como exactamente `$150.000`
-2. Para el mes parcial actual (o el primer mes si recién arrancó), calcular proporcionalmente con los días reales de ese mes: `sueldoFijo * (díasTranscurridos / díasTotalesDelMes)`
+### Métricas
 
-### Ejemplo con Agus Community (created_at = 15 feb)
-- Feb: 13 días de 28 → $150.000 × 13/28 = $69.643
-- Mar: mes completo (si ya pasó el 15) → $150.000
-- Resultado: ~$219.643 (más preciso al mes calendario real)
+1. **Ventas por día de semana** - Gráfico de barras horizontal/vertical mostrando lun-dom con la cantidad promedio de ventas por día. Permite ver qué días son más fuertes.
 
-**Nota**: Con esta lógica, el devengado de Agus ya no dará exactamente $225.000 porque febrero tiene 28 días, no 30. El cálculo anterior asumía 30 días fijos. Si querés mantener los $225.000 exactos para Agus, habría que ajustar su `created_at` después de aplicar el cambio.
+2. **Ventas por hora del día** - Gráfico de barras mostrando franjas horarias (9h-21h aprox.) con cantidad promedio de ventas. Permite ver en qué horarios se concentra la actividad.
+
+3. **Horarios pico** - Card resumen que muestra el día + hora con más actividad (ej: "Sábados a las 11hs"), destacando los top 3 momentos de mayor demanda.
 
 ### Cambios técnicos
-- **Archivo**: `src/components/SueldosPanel.tsx`
-- **Líneas afectadas**: ~340-344 (devengado filtrado) y ~350-354 (devengado histórico)
-- Se reemplaza `(fixedSalary / 30) * días` por una función helper que itere mes a mes sumando el monto exacto mensual, con prorrateo solo en el primer y último mes parcial
-- Se usa `getDaysInMonth()` de `date-fns` para obtener los días reales de cada mes
+
+**Archivo**: `src/components/EstadisticasPanel.tsx`
+
+1. **Fetch adicional en `fetchData`**: Agregar query a `venta` para traer `fecha_hora` de ventas activas del período. Almacenar en nuevo estado `ventasData`.
+
+2. **Procesamiento**: Crear funciones que agrupen las ventas por:
+   - Día de semana (0-6) → promedio semanal
+   - Hora del día (0-23) → promedio diario
+   - Combinación día+hora → top 3 picos
+
+3. **UI**: Agregar después del Grupo 3 una nueva sección "👥 Comportamiento del Cliente" con:
+   - Card de Ventas por día de semana con BarChart (recharts)
+   - Card de Ventas por hora del día con BarChart
+   - Card de Horarios pico con los top 3 momentos destacados
+
+4. **Timezone**: Usar `organization.timezone` para convertir `fecha_hora` (UTC) a hora local antes de agrupar, asegurando que las horas reflejen el horario real del negocio.
 
