@@ -118,6 +118,12 @@ function BarberDetailRow({
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="pl-8 pr-4 pb-4 space-y-4">
+          {/* Fixed salary explanation */}
+          {barber.fixedSalaryInfo && (
+            <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
+              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
