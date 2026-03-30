@@ -629,36 +629,6 @@ export function EstadisticasPanel() {
     </Card>
   );
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Estadísticas</h1>
-          <p className="text-muted-foreground">Cargando datos...</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="pb-2"><div className="h-4 bg-muted rounded w-24" /></CardHeader>
-              <CardContent><div className="h-32 bg-muted rounded" /></CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  const ocupacionMetricDef: MetricCardDef = {
-    title: 'Tasa de Ocupación',
-    dataKey: 'tasaOcupacion',
-    icon: Users,
-    color: 'text-indigo-600',
-    chartColor: 'hsl(230 70% 55%)',
-    formatFn: (v) => `${v.toFixed(1)}%`,
-    shortFormatFn: (v) => `${v.toFixed(0)}%`,
-    description: 'Qué tan llena está tu agenda mes a mes.',
-  };
-
   // ---- Comportamiento del Cliente ----
   const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const DAY_NAMES_FULL = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
