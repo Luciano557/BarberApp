@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 
 interface PaymentRegistrationProps {
@@ -11,6 +11,7 @@ interface PaymentRegistrationProps {
   extras: Extra[];
   barbers: Barber[];
   discounts: Discount[];
+  lines?: Line[];
   onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
@@ -39,7 +40,7 @@ const STEP_INFO = {
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
   const [currentStep, setCurrentStep] = useState<Step>('barber');
@@ -345,34 +346,73 @@ export function PaymentRegistration({ services, extras, barbers, discounts, onSu
         )}
 
         {/* Service Step */}
-        {currentStep === 'service' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {services.map((service, index) => (
-              <button
-                key={service.id}
-                onClick={() => handleSelectService(service.id)}
-                className={`relative p-5 rounded-lg border transition-all text-left hover:border-secondary ${
-                  selectedService === service.id
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                  {index + 1}
-                </span>
-                <div className="flex justify-between items-center pl-6">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-medium text-foreground">{service.name}</span>
-                    {service.lineName && (
-                      <span className="text-xs px-2 py-0.5 rounded-md bg-muted text-muted-foreground w-fit">{service.lineName}</span>
-                    )}
+        {currentStep === 'service' && (() => {
+          // Group services by line
+          const grouped: { lineId: string | null; lineName: string; lineColor?: string; services: Service[] }[] = [];
+          const lineMap = new Map<string | null, Service[]>();
+          
+          services.forEach(service => {
+            const key = service.lineId || null;
+            if (!lineMap.has(key)) lineMap.set(key, []);
+            lineMap.get(key)!.push(service);
+          });
+
+          // Add groups with lines first (sorted by line name), then "Otros"
+          const activeLines = lines.filter(l => lineMap.has(l.id));
+          activeLines.forEach(line => {
+            grouped.push({ lineId: line.id, lineName: line.name, lineColor: line.color, services: lineMap.get(line.id)! });
+          });
+          const noLine = lineMap.get(null);
+          if (noLine) {
+            grouped.push({ lineId: null, lineName: activeLines.length > 0 ? 'Otros' : '', lineColor: undefined, services: noLine });
+          }
+
+          let globalIndex = 0;
+
+          return (
+            <div className="space-y-5">
+              {grouped.map((group) => (
+                <div key={group.lineId || 'no-line'}>
+                  {group.lineName && (
+                    <div className="flex items-center gap-2 mb-3">
+                      {group.lineColor && (
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: group.lineColor }} />
+                      )}
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{group.lineName}</h3>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {group.services.map((service) => {
+                      globalIndex++;
+                      const idx = globalIndex;
+                      return (
+                        <button
+                          key={service.id}
+                          onClick={() => handleSelectService(service.id)}
+                          className={`relative p-5 rounded-lg border transition-all text-left hover:border-secondary ${
+                            selectedService === service.id
+                              ? 'border-secondary bg-secondary/5'
+                              : 'border-border bg-card hover:bg-muted/50'
+                          }`}
+                          style={group.lineColor ? { borderLeftWidth: '3px', borderLeftColor: selectedService === service.id ? undefined : group.lineColor } : undefined}
+                        >
+                          <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                            {idx}
+                          </span>
+                          <div className="flex justify-between items-center pl-6">
+                            <span className="font-medium text-foreground">{service.name}</span>
+                            <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
                 </div>
-              </button>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Extras Step */}
         {currentStep === 'extras' && (

@@ -32,8 +32,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
   const [newLineName, setNewLineName] = useState('');
+  const [newLineColor, setNewLineColor] = useState('');
   const [addLineContext, setAddLineContext] = useState<'add' | 'edit'>('add');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+
+  const LINE_COLORS = [
+    { label: 'Azul', value: '#3B82F6' },
+    { label: 'Verde', value: '#22C55E' },
+    { label: 'Dorado', value: '#EAB308' },
+    { label: 'Rojo', value: '#EF4444' },
+    { label: 'Violeta', value: '#8B5CF6' },
+    { label: 'Naranja', value: '#F97316' },
+    { label: 'Rosa', value: '#EC4899' },
+    { label: 'Gris', value: '#6B7280' },
+  ];
 
   const activeServices = services.filter(s => s.active);
   const inactiveServices = services.filter(s => !s.active);
@@ -70,12 +82,12 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
 
   const handleAddNewLine = async () => {
     if (newLineName.trim()) {
-      const newLine = await onAddLine({ name: newLineName.trim(), active: true });
+      const newLine = await onAddLine({ name: newLineName.trim(), active: true, color: newLineColor || undefined });
       if (newLine) {
         if (addLineContext === 'add') setNewLineId(newLine.id);
         else setEditLineId(newLine.id);
       }
-      setNewLineName(''); setShowAddLineDialog(false);
+      setNewLineName(''); setNewLineColor(''); setShowAddLineDialog(false);
     }
   };
 
@@ -209,6 +221,21 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
           <DialogHeader><DialogTitle>Nueva Línea</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} />
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">Color (opcional)</label>
+              <div className="flex flex-wrap gap-2">
+                {LINE_COLORS.map(c => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setNewLineColor(newLineColor === c.value ? '' : c.value)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${newLineColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                    style={{ backgroundColor: c.value }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddLineDialog(false)}>Cancelar</Button>

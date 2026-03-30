@@ -1,0 +1,1 @@
+ALTER TABLE lineas ADD COLUMN color text DEFAULT NULL;

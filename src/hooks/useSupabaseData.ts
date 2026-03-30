@@ -10,6 +10,7 @@ function dbToLine(row: any): Line {
   return {
     id: row.id,
     name: row.nombre,
+    color: row.color || undefined,
     active: row.activo,
   };
 }
@@ -400,6 +401,7 @@ export function useSupabaseData() {
         .insert({ 
           nombre: line.name, 
           activo: line.active,
+          color: line.color || null,
           organization_id: organization.id,
         })
         .select()
@@ -422,6 +424,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.color !== undefined) dbUpdates.color = updates.color || null;
 
       const { error } = await supabase
         .from('lineas')
