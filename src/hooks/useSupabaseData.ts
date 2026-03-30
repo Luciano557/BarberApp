@@ -10,6 +10,7 @@ function dbToLine(row: any): Line {
   return {
     id: row.id,
     name: row.nombre,
+    color: row.color || undefined,
     active: row.activo,
   };
 }
