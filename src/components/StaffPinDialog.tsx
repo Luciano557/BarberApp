@@ -143,7 +143,7 @@ export function StaffPinDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2" autoComplete="off">
           {hasPin && (
             <div className="space-y-2">
               <Label htmlFor="staff-current-pin">PIN actual</Label>
