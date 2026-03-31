@@ -152,13 +152,15 @@ export function StaffPinDialog({
                   id="staff-current-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-current"
                   value={currentPin}
                   onChange={(e) => handlePinChange(e, setCurrentPin)}
                   placeholder="Ingresá el PIN actual"
                   className="pr-10"
                   maxLength={6}
                   autoFocus
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
