@@ -41,10 +41,7 @@ const Index = () => {
     if (activeTab === 'resumen' && !canViewResumen) {
       setActiveTab('no-access');
     }
-    if (activeTab === 'tareas' && !canViewTareas) {
-      setActiveTab('no-access');
-    }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, hasNoAccess]);
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, hasNoAccess]);
 
   const {
     isLoading,
