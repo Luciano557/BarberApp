@@ -101,21 +101,9 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'estadisticas' && canManageConfig && (
-            <PinProtectedSection sectionName="Estadísticas">
-              <EstadisticasPanel />
-            </PinProtectedSection>
-          )}
-
-          {activeTab === 'sueldos' && canManageConfig && (
-            <PinProtectedSection sectionName="Sueldos">
-              <SueldosPanel barbers={barbers} />
-            </PinProtectedSection>
-          )}
-
           {activeTab === 'finanzas' && canManageConfig && (
             <PinProtectedSection sectionName="Finanzas">
-              <FinanzasPanel />
+              <FinanzasPanel barbers={barbers} />
             </PinProtectedSection>
           )}
 

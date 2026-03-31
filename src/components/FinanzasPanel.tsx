@@ -1,48 +1,22 @@
-import { useState } from 'react';
-import { ArrowLeft, Receipt, TrendingUp, Landmark } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Receipt, TrendingUp, Landmark, BarChart3, Wallet } from 'lucide-react';
 import { GastosPanel } from '@/components/GastosPanel';
 import { InversionesPanel } from '@/components/InversionesPanel';
 import { DeudasPanel } from '@/components/DeudasPanel';
+import { EstadisticasPanel } from '@/components/EstadisticasPanel';
+import { SueldosPanel } from '@/components/SueldosPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { Barber } from '@/types/barbershop';
 
-type FinanzasSection = 'menu' | 'gastos' | 'inversiones' | 'deudas';
+interface FinanzasPanelProps {
+  barbers: Barber[];
+}
 
-const sectionTitles: Record<FinanzasSection, string> = {
-  menu: 'Finanzas',
-  gastos: 'Gastos',
-  inversiones: 'Inversiones',
-  deudas: 'Deudas',
-};
-
-const menuItems = [
-  {
-    id: 'gastos' as const,
-    icon: Receipt,
-    title: 'Gastos',
-    description: 'Egresos operativos del local. Controlá cuánto cuesta operar el negocio mes a mes.',
-  },
-  {
-    id: 'inversiones' as const,
-    icon: TrendingUp,
-    title: 'Inversiones',
-    description: 'Compras o mejoras que generan valor. Distribuí el costo en el tiempo con amortización.',
-  },
-  {
-    id: 'deudas' as const,
-    icon: Landmark,
-    title: 'Deudas',
-    description: 'Dinero que el negocio todavía debe. Registrá cuotas y controlá pagos pendientes.',
-  },
-];
-
-export function FinanzasPanel() {
+export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
   return (
     <div>
       <h2 className="text-2xl font-bold text-foreground mb-6">Finanzas</h2>
       <Tabs defaultValue="gastos">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex-wrap h-auto gap-1">
           <TabsTrigger value="gastos" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Gastos
@@ -55,6 +29,14 @@ export function FinanzasPanel() {
             <Landmark className="h-4 w-4" />
             Deudas
           </TabsTrigger>
+          <TabsTrigger value="estadisticas" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Estadísticas
+          </TabsTrigger>
+          <TabsTrigger value="sueldos" className="flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            Sueldos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="gastos">
@@ -65,6 +47,12 @@ export function FinanzasPanel() {
         </TabsContent>
         <TabsContent value="deudas">
           <DeudasPanel />
+        </TabsContent>
+        <TabsContent value="estadisticas">
+          <EstadisticasPanel />
+        </TabsContent>
+        <TabsContent value="sueldos">
+          <SueldosPanel barbers={barbers} />
         </TabsContent>
       </Tabs>
     </div>
