@@ -95,7 +95,7 @@ export function InversionesPanel() {
               </div>
               <div>
                 <Label>Monto total *</Label>
-                <Input type="number" inputMode="decimal" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
+                <CurrencyInput value={montoTotal} onChange={setMontoTotal} placeholder="0" />
               </div>
               <div>
                 <Label>Fecha de compra</Label>
