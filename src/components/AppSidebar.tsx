@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Wallet, Lock, TrendingUp, Receipt, ClipboardList } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,9 +28,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   // Filter nav items based on permissions
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
-    ...(canViewResumen ? [{ id: 'resumen', label: 'Resumen', icon: BarChart3 }] : []),
-    ...(canManageConfig ? [{ id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp }] : []),
-    ...(canManageConfig ? [{ id: 'sueldos', label: 'Sueldos', icon: Wallet }] : []),
+    ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
     ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
     ...(isOwner || isGeneralManager ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),

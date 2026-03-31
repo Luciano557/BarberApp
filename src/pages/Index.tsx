@@ -3,8 +3,6 @@ import { Lock } from 'lucide-react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
-import { SueldosPanel } from '@/components/SueldosPanel';
-import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
 import { MiNegocioPanel } from '@/components/MiNegocioPanel';
@@ -103,21 +101,9 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'estadisticas' && canManageConfig && (
-            <PinProtectedSection sectionName="Estadísticas">
-              <EstadisticasPanel />
-            </PinProtectedSection>
-          )}
-
-          {activeTab === 'sueldos' && canManageConfig && (
-            <PinProtectedSection sectionName="Sueldos">
-              <SueldosPanel barbers={barbers} />
-            </PinProtectedSection>
-          )}
-
           {activeTab === 'finanzas' && canManageConfig && (
             <PinProtectedSection sectionName="Finanzas">
-              <FinanzasPanel />
+              <FinanzasPanel barbers={barbers} />
             </PinProtectedSection>
           )}
 
