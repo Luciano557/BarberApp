@@ -191,13 +191,15 @@ export function StaffPinDialog({
                   id="staff-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-new"
                   value={pin}
                   onChange={(e) => handlePinChange(e, setPin)}
                   placeholder="4-6 dígitos"
                   className="pr-10"
                   maxLength={6}
                   autoFocus={!hasPin}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
