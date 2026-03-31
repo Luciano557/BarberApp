@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -286,12 +287,9 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                       <Label className="text-sm flex items-center gap-1.5">
                         <Banknote className="h-4 w-4 text-success" /> Total Efectivo
                       </Label>
-                      <Input
-                         type="number"
-                         inputMode="decimal"
-                         min={0}
-                         value={quickData.totalEfectivo || ''}
-                        onChange={(e) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(e.target.value) || 0 }))}
+                      <CurrencyInput
+                        value={quickData.totalEfectivo ? String(quickData.totalEfectivo) : ''}
+                        onChange={(v) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(v) || 0 }))}
                         placeholder="0"
                       />
                     </div>
@@ -299,12 +297,9 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                       <Label className="text-sm flex items-center gap-1.5">
                         <CreditCard className="h-4 w-4 text-secondary" /> Total Mercado Pago
                       </Label>
-                      <Input
-                         type="number"
-                         inputMode="decimal"
-                         min={0}
-                         value={quickData.totalMercadoPago || ''}
-                        onChange={(e) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(e.target.value) || 0 }))}
+                      <CurrencyInput
+                        value={quickData.totalMercadoPago ? String(quickData.totalMercadoPago) : ''}
+                        onChange={(v) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(v) || 0 }))}
                         placeholder="0"
                       />
                     </div>

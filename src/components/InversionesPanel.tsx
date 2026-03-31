@@ -5,6 +5,7 @@ import { useDeudas } from '@/hooks/useDeudas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -94,7 +95,7 @@ export function InversionesPanel() {
               </div>
               <div>
                 <Label>Monto total *</Label>
-                <Input type="number" inputMode="decimal" value={montoTotal} onChange={e => setMontoTotal(e.target.value)} placeholder="0" />
+                <CurrencyInput value={montoTotal} onChange={setMontoTotal} placeholder="0" />
               </div>
               <div>
                 <Label>Fecha de compra</Label>
@@ -136,7 +137,7 @@ export function InversionesPanel() {
                 </div>
                 <div>
                   <Label>Monto por cuota</Label>
-                  <Input type="number" inputMode="decimal" value={montoCuota} onChange={e => setMontoCuota(e.target.value)} />
+                  <CurrencyInput value={montoCuota} onChange={setMontoCuota} />
                 </div>
                 <div>
                   <Label>Próximo pago</Label>

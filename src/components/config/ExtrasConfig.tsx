@@ -3,6 +3,7 @@ import { Plus, Edit2, Save, X, PowerOff, Power } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Extra } from '@/types/barbershop';
@@ -60,7 +61,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
       {editingId === extra.id ? (
         <div className="flex gap-2 w-full">
           <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-          <Input type="number" inputMode="decimal" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
+          <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
           <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
         </div>
@@ -100,7 +101,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
               {isAdding && (
                 <div className="flex gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
                   <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-                  <Input type="number" inputMode="decimal" placeholder="Precio" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} className="w-28" />
+                  <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
                   <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                 </div>
