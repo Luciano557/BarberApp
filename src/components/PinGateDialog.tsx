@@ -60,7 +60,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="pin">PIN de seguridad</Label>
             <div className="relative">
