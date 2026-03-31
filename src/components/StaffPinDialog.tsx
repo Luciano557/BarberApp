@@ -187,7 +187,7 @@ export function StaffPinDialog({
               <div className="relative">
                 <Input
                   id="staff-pin"
-                  type={showPin ? 'text' : 'password'}
+                  type="text"
                   inputMode="numeric"
                   value={pin}
                   onChange={(e) => handlePinChange(e, setPin)}
@@ -195,6 +195,11 @@ export function StaffPinDialog({
                   className="pr-10"
                   maxLength={6}
                   autoFocus={!hasPin}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' } as React.CSSProperties}
                 />
                 <Button
                   type="button"
