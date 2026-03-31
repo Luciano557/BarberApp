@@ -228,12 +228,14 @@ export function StaffPinDialog({
                   id="staff-confirm-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-confirm"
                   value={confirmPin}
                   onChange={(e) => handlePinChange(e, setConfirmPin)}
                   placeholder="Repite el PIN"
                   className="pr-10"
                   maxLength={6}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
