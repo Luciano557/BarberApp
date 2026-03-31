@@ -323,8 +323,8 @@ export function EquipoUnificado({
           <div className="space-y-3">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
-              <Input type="number" inputMode="decimal" placeholder="Ej: 350000" value={localData.fixedSalary}
-                onChange={(e) => setLocalData(prev => ({ ...prev, fixedSalary: e.target.value }))} autoComplete="off" />
+              <CurrencyInput placeholder="Ej: 350.000" value={localData.fixedSalary}
+                onChange={(v) => setLocalData(prev => ({ ...prev, fixedSalary: v }))} />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Día de cobro (1-28) *</label>

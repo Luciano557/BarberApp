@@ -297,12 +297,9 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                       <Label className="text-sm flex items-center gap-1.5">
                         <CreditCard className="h-4 w-4 text-secondary" /> Total Mercado Pago
                       </Label>
-                      <Input
-                         type="number"
-                         inputMode="decimal"
-                         min={0}
-                         value={quickData.totalMercadoPago || ''}
-                        onChange={(e) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(e.target.value) || 0 }))}
+                      <CurrencyInput
+                        value={quickData.totalMercadoPago ? String(quickData.totalMercadoPago) : ''}
+                        onChange={(v) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(v) || 0 }))}
                         placeholder="0"
                       />
                     </div>

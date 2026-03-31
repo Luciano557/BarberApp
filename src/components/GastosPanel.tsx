@@ -196,15 +196,10 @@ export function GastosPanel() {
 
             <div className="space-y-2">
               <Label>Monto *</Label>
-              <Input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
+              <CurrencyInput
+                placeholder="0"
                 value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                required
+                onChange={setMonto}
               />
             </div>
 

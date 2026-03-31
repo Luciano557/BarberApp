@@ -641,13 +641,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                 
                 <div className="space-y-2">
                   <Label htmlFor="monto">Monto *</Label>
-                  <Input
+                  <CurrencyInput
                     id="monto"
-                    type="number"
-                    inputMode="decimal"
                     placeholder="0"
                     value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
+                    onChange={setMonto}
                   />
                 </div>
                 
