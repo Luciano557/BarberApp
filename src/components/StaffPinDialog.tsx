@@ -222,13 +222,18 @@ export function StaffPinDialog({
               <div className="relative">
                 <Input
                   id="staff-confirm-pin"
-                  type={showConfirmPin ? 'text' : 'password'}
+                  type="text"
                   inputMode="numeric"
                   value={confirmPin}
                   onChange={(e) => handlePinChange(e, setConfirmPin)}
                   placeholder="Repite el PIN"
                   className="pr-10"
                   maxLength={6}
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  style={{ WebkitTextSecurity: showConfirmPin ? 'none' : 'disc' } as React.CSSProperties}
                 />
                 <Button
                   type="button"
