@@ -3,8 +3,6 @@ import { Lock } from 'lucide-react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
-import { SueldosPanel } from '@/components/SueldosPanel';
-import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
 import { MiNegocioPanel } from '@/components/MiNegocioPanel';
