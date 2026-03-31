@@ -150,7 +150,7 @@ export function StaffPinDialog({
               <div className="relative">
                 <Input
                   id="staff-current-pin"
-                  type={showCurrentPin ? 'text' : 'password'}
+                  type="text"
                   inputMode="numeric"
                   value={currentPin}
                   onChange={(e) => handlePinChange(e, setCurrentPin)}
@@ -158,6 +158,11 @@ export function StaffPinDialog({
                   className="pr-10"
                   maxLength={6}
                   autoFocus
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-form-type="other"
+                  style={{ WebkitTextSecurity: showCurrentPin ? 'none' : 'disc' } as React.CSSProperties}
                 />
                 <Button
                   type="button"
