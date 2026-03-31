@@ -66,7 +66,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
             <div className="relative">
               <Input
                 id="pin"
-                type={showPin ? 'text' : 'password'}
+                type="text"
                 inputMode="numeric"
                 value={pin}
                 onChange={handlePinChange}
@@ -75,6 +75,11 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
                 maxLength={6}
                 autoFocus
                 disabled={isValidating}
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                data-form-type="other"
+                style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' } as React.CSSProperties}
               />
               <Button
                 type="button"
