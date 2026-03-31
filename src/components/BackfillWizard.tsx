@@ -287,12 +287,9 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                       <Label className="text-sm flex items-center gap-1.5">
                         <Banknote className="h-4 w-4 text-success" /> Total Efectivo
                       </Label>
-                      <Input
-                         type="number"
-                         inputMode="decimal"
-                         min={0}
-                         value={quickData.totalEfectivo || ''}
-                        onChange={(e) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(e.target.value) || 0 }))}
+                      <CurrencyInput
+                        value={quickData.totalEfectivo ? String(quickData.totalEfectivo) : ''}
+                        onChange={(v) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(v) || 0 }))}
                         placeholder="0"
                       />
                     </div>
