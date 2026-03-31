@@ -1,48 +1,31 @@
 
 
-## Resumen
+## Problema
 
-Solucionar dos problemas con los inputs de PIN: (1) que muestre teclado numérico en lugar de alfanumérico, y (2) que Chrome/gestores de contraseñas no ofrezcan guardar el PIN.
-
-## Causa raíz
-
-- `type="password"` es lo que hace que Chrome detecte el campo como contraseña y ofrezca guardarlo. También en algunos navegadores móviles, `type="password"` anula `inputMode="numeric"` y muestra teclado alfanumérico.
+Samsung Internet ignora `inputMode="numeric"` en ciertos contextos y detecta el `<form>` como formulario de login, sugiriendo autocompletado de email. Esto pasa porque:
+1. Algunos navegadores necesitan `pattern="[0-9]*"` además de `inputMode` para forzar teclado numérico
+2. El navegador detecta un formulario con un campo de texto + botón submit como login form
 
 ## Plan
 
-### 1. Cambiar todos los inputs de PIN a `type="text"` con enmascaramiento visual por CSS
+### Archivos a modificar: `PinGateDialog.tsx` y `StaffPinDialog.tsx`
 
-En lugar de `type="password"`, usar `type="text"` con la propiedad CSS `-webkit-text-security: disc` para mostrar puntos. Esto:
-- Evita que Chrome lo detecte como campo de contraseña
-- Permite que `inputMode="numeric"` funcione correctamente y muestre teclado numérico
-- Visualmente sigue mostrando puntos como un campo de contraseña
+**Cambios en cada input de PIN:**
 
-### 2. Agregar atributos anti-autocompletado
+1. Agregar `pattern="[0-9]*"` — esto fuerza teclado numérico en Safari iOS y Samsung Internet
+2. Agregar `name` con valor no-estándar (ej: `name="app-pin-code"`) — evita que el browser lo asocie a campos de login
+3. Agregar `autoComplete="one-time-code"` en vez de `"off"` — los browsers respetan más este valor y no ofrecen guardar credenciales
+4. Envolver el `<form>` con `autoComplete="off"` a nivel form también
 
-En cada input de PIN, agregar:
-- `autoComplete="off"`
-- `data-1p-ignore` (1Password)
-- `data-lpignore="true"` (LastPass)
-- `data-form-type="other"` (genérico)
-
-### 3. Archivos a modificar
-
-- **`PinGateDialog.tsx`** — input principal de PIN de acceso
-- **`StaffPinDialog.tsx`** — 3 inputs: PIN actual, nuevo PIN, confirmar PIN
-
-### 4. Toggle de visibilidad
-
-Cuando el usuario activa "mostrar PIN", se remueve el estilo `-webkit-text-security` para mostrar los dígitos en texto plano. El toggle sigue funcionando igual que ahora.
-
----
-
-## Detalle técnico
-
-```text
-Antes:  type="password" inputMode="numeric"  → Chrome: "¿Guardar contraseña?" + teclado alfanumérico
-Después: type="text" inputMode="numeric" style="-webkit-text-security: disc" autocomplete="off"
-         → Sin prompt de contraseña + teclado numérico
+**Resumen de atributos finales por input:**
 ```
-
-Se aplica el estilo inline condicionalmente: `style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' }}`
+type="text"
+inputMode="numeric"
+pattern="[0-9]*"
+name="app-pin-code"
+autoComplete="one-time-code"
+data-1p-ignore
+data-lpignore="true"
+data-form-type="other"
+```
 
