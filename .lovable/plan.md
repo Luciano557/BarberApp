@@ -1,31 +1,36 @@
 
 
-## Problema
+## Resumen
 
-Samsung Internet ignora `inputMode="numeric"` en ciertos contextos y detecta el `<form>` como formulario de login, sugiriendo autocompletado de email. Esto pasa porque:
-1. Algunos navegadores necesitan `pattern="[0-9]*"` además de `inputMode` para forzar teclado numérico
-2. El navegador detecta un formulario con un campo de texto + botón submit como login form
+Renombrar "Resumen" a "Caja" en la navegación, y mover "Estadísticas" y "Sueldos" del sidebar hacia dentro de "Finanzas" como tabs adicionales.
 
 ## Plan
 
-### Archivos a modificar: `PinGateDialog.tsx` y `StaffPinDialog.tsx`
+### 1. AppSidebar — Renombrar y eliminar items
 
-**Cambios en cada input de PIN:**
+- Cambiar `{ id: 'resumen', label: 'Resumen', icon: BarChart3 }` → label `'Caja'`
+- Eliminar las entradas de `estadisticas` y `sueldos` del array `navItems`
+- Eliminar imports no usados (`Wallet`, `TrendingUp`)
 
-1. Agregar `pattern="[0-9]*"` — esto fuerza teclado numérico en Safari iOS y Samsung Internet
-2. Agregar `name` con valor no-estándar (ej: `name="app-pin-code"`) — evita que el browser lo asocie a campos de login
-3. Agregar `autoComplete="one-time-code"` en vez de `"off"` — los browsers respetan más este valor y no ofrecen guardar credenciales
-4. Envolver el `<form>` con `autoComplete="off"` a nivel form también
+### 2. FinanzasPanel — Agregar tabs de Estadísticas y Sueldos
 
-**Resumen de atributos finales por input:**
+- Agregar dos nuevos tabs: "Estadísticas" y "Sueldos" al `TabsList` (total: 5 tabs)
+- Importar `EstadisticasPanel` y `SueldosPanel`
+- `FinanzasPanel` necesita recibir `barbers` como prop para pasárselo a `SueldosPanel`
+- El `TabsList` con 5 tabs puede necesitar scroll horizontal en mobile — agregar `overflow-x-auto` y `flex-wrap` o scroll
+
+### 3. Index.tsx — Limpiar secciones eliminadas
+
+- Eliminar los bloques `activeTab === 'estadisticas'` y `activeTab === 'sueldos'`
+- Pasar `barbers` como prop a `<FinanzasPanel barbers={barbers} />`
+- Eliminar imports de `SueldosPanel` y `EstadisticasPanel` (ahora se importan desde FinanzasPanel)
+
+### Detalle técnico
+
+**FinanzasPanel** recibe `barbers` y renderiza 5 tabs:
 ```
-type="text"
-inputMode="numeric"
-pattern="[0-9]*"
-name="app-pin-code"
-autoComplete="one-time-code"
-data-1p-ignore
-data-lpignore="true"
-data-form-type="other"
+Gastos | Inversiones | Deudas | Estadísticas | Sueldos
 ```
+
+La protección por PIN se mantiene a nivel de la sección "Finanzas" completa (ya está wrapeado en `PinProtectedSection` en Index.tsx), por lo que Estadísticas y Sueldos quedan protegidos automáticamente.
 
