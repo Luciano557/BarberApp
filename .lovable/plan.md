@@ -2,64 +2,51 @@
 
 ## Resumen
 
-Agrupar visualmente los servicios por línea en la pantalla de Cobrar, y agregar un color opcional a cada línea para distinguirlas mejor.
+Crear un componente `CurrencyInput` reutilizable que formatee montos en tiempo real con separador de miles argentino (`.`) y decimales (`,`), manteniendo el valor numérico limpio internamente.
 
 ---
 
 ## Plan
 
-### 1. Agregar columna `color` a la tabla `lineas`
+### 1. Crear componente `src/components/ui/currency-input.tsx`
 
-Migración SQL:
-```sql
-ALTER TABLE lineas ADD COLUMN color text DEFAULT NULL;
+Un wrapper de `<Input>` que:
+- Acepta `value: number | string` (valor numérico limpio) y `onChange: (value: string) => void` (devuelve string numérica limpia, ej: `"1250000"` o `"1250000.50"`)
+- Muestra el valor formateado con `toLocaleString('es-AR')` (miles con `.`, decimales con `,`)
+- Al escribir, filtra solo dígitos y `,` → convierte internamente `,` a `.` para el valor limpio
+- Usa `type="text"` con `inputMode="decimal"` para teclado numérico en mobile sin restricciones de `type="number"`
+- Acepta todas las props de Input (placeholder, className, etc.)
+
+Lógica clave:
+```
+Input del usuario: "1234567" → Muestra: "1.234.567" → Valor interno: "1234567"
+Input del usuario: "1234567,50" → Muestra: "1.234.567,50" → Valor interno: "1234567.50"
 ```
 
-### 2. Actualizar el tipo `Line` en `src/types/barbershop.ts`
+### 2. Reemplazar inputs de dinero en todos los formularios
 
-Agregar `color?: string` a la interfaz `Line`.
+Archivos a modificar (solo los inputs de montos/precios, NO los de cantidades/días/cuotas numéricas):
 
-### 3. Modificar la pantalla de Cobrar (`PaymentRegistration.tsx`)
+- `GastosPanel.tsx` — campo "Monto"
+- `InversionesPanel.tsx` — "Monto total", "Monto por cuota"
+- `DeudasPanel.tsx` — "Monto total", "Monto por cuota"
+- `SueldosPanel.tsx` — campo "monto"
+- `BackfillWizard.tsx` — campos de efectivo y digital
+- `ServicesConfig.tsx` — campos "Precio"
+- `ExtrasConfig.tsx` — campos "Precio"
+- `EquipoUnificado.tsx` — "Sueldo fijo mensual"
 
-En el paso "service" (líneas 348-374), en vez de listar todos los servicios planos:
+Cada reemplazo: cambiar `<Input type="number" ...>` por `<CurrencyInput ...>`. El `parseFloat` en submit sigue funcionando porque el value ya es numérico limpio.
 
-- Recibir `lines` como prop adicional
-- Agrupar servicios por `lineId` (los que no tienen línea van en un grupo "Otros")
-- Renderizar cada grupo con un header que muestre el nombre de la línea y una barra lateral o badge con el color de la línea
-- Dentro de cada grupo, mostrar los servicios como están ahora
+### 3. Formatear montos en la visualización existente
 
-### 4. Pasar `lines` al componente `PaymentRegistration`
-
-Desde `src/pages/Index.tsx` (o donde se renderice), pasar la prop `lines` que ya se carga en `useSupabaseData`.
-
-### 5. Agregar selector de color en la configuración de líneas
-
-En `ServicesConfig.tsx`, cuando se crea o edita una línea, agregar un selector de color (paleta predefinida de 8-10 colores) para que el usuario elija el color de la línea.
-
-### 6. Persistir el color en Supabase
-
-Actualizar `useSupabaseData` para leer/escribir el campo `color` de `lineas`.
+Los `toLocaleString('es-AR')` que ya existen en tablas/listados seguirán funcionando igual — no requieren cambios.
 
 ---
 
 ## Detalle técnico
 
-```text
-Paso "Servicio" actual:
-  [Corte Clásico - $5000]
-  [Corte + Barba - $7000]
-  [Corte Deluxe - $8000]
-  [Barba Deluxe - $6000]
-
-Paso "Servicio" nuevo:
-  ── Essential (barra azul) ──
-  [Corte Clásico - $5000]
-  [Corte + Barba - $7000]
-  
-  ── Deluxe (barra dorada) ──
-  [Corte Deluxe - $8000]
-  [Barba Deluxe - $6000]
-```
-
-Paleta de colores predefinida: ~8 opciones (azul, verde, dorado, rojo, violeta, naranja, rosa, gris). Se guardan como hex en la columna `color`.
+- NO se cambian inputs de cantidades (cuotas, días, intervalos) — solo montos de dinero
+- El componente maneja el cursor position para evitar saltos al formatear
+- Se permiten máximo 2 decimales
 
