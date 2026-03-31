@@ -60,7 +60,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4" autoComplete="off">
           <div className="space-y-2">
             <Label htmlFor="pin">PIN de seguridad</Label>
             <div className="relative">
@@ -68,6 +68,8 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
                 id="pin"
                 type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
+                name="app-pin-code"
                 value={pin}
                 onChange={handlePinChange}
                 placeholder="Ingresa tu PIN"
@@ -75,7 +77,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
                 maxLength={6}
                 autoFocus
                 disabled={isValidating}
-                autoComplete="off"
+                autoComplete="one-time-code"
                 data-1p-ignore
                 data-lpignore="true"
                 data-form-type="other"

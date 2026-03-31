@@ -143,7 +143,7 @@ export function StaffPinDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2" autoComplete="off">
           {hasPin && (
             <div className="space-y-2">
               <Label htmlFor="staff-current-pin">PIN actual</Label>
@@ -152,13 +152,15 @@ export function StaffPinDialog({
                   id="staff-current-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-current"
                   value={currentPin}
                   onChange={(e) => handlePinChange(e, setCurrentPin)}
                   placeholder="Ingresá el PIN actual"
                   className="pr-10"
                   maxLength={6}
                   autoFocus
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
@@ -189,13 +191,15 @@ export function StaffPinDialog({
                   id="staff-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-new"
                   value={pin}
                   onChange={(e) => handlePinChange(e, setPin)}
                   placeholder="4-6 dígitos"
                   className="pr-10"
                   maxLength={6}
                   autoFocus={!hasPin}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
@@ -224,12 +228,14 @@ export function StaffPinDialog({
                   id="staff-confirm-pin"
                   type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  name="app-pin-confirm"
                   value={confirmPin}
                   onChange={(e) => handlePinChange(e, setConfirmPin)}
                   placeholder="Repite el PIN"
                   className="pr-10"
                   maxLength={6}
-                  autoComplete="off"
+                  autoComplete="one-time-code"
                   data-1p-ignore
                   data-lpignore="true"
                   data-form-type="other"
