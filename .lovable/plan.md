@@ -2,51 +2,47 @@
 
 ## Resumen
 
-Crear un componente `CurrencyInput` reutilizable que formatee montos en tiempo real con separador de miles argentino (`.`) y decimales (`,`), manteniendo el valor numérico limpio internamente.
+Solucionar dos problemas con los inputs de PIN: (1) que muestre teclado numérico en lugar de alfanumérico, y (2) que Chrome/gestores de contraseñas no ofrezcan guardar el PIN.
 
----
+## Causa raíz
+
+- `type="password"` es lo que hace que Chrome detecte el campo como contraseña y ofrezca guardarlo. También en algunos navegadores móviles, `type="password"` anula `inputMode="numeric"` y muestra teclado alfanumérico.
 
 ## Plan
 
-### 1. Crear componente `src/components/ui/currency-input.tsx`
+### 1. Cambiar todos los inputs de PIN a `type="text"` con enmascaramiento visual por CSS
 
-Un wrapper de `<Input>` que:
-- Acepta `value: number | string` (valor numérico limpio) y `onChange: (value: string) => void` (devuelve string numérica limpia, ej: `"1250000"` o `"1250000.50"`)
-- Muestra el valor formateado con `toLocaleString('es-AR')` (miles con `.`, decimales con `,`)
-- Al escribir, filtra solo dígitos y `,` → convierte internamente `,` a `.` para el valor limpio
-- Usa `type="text"` con `inputMode="decimal"` para teclado numérico en mobile sin restricciones de `type="number"`
-- Acepta todas las props de Input (placeholder, className, etc.)
+En lugar de `type="password"`, usar `type="text"` con la propiedad CSS `-webkit-text-security: disc` para mostrar puntos. Esto:
+- Evita que Chrome lo detecte como campo de contraseña
+- Permite que `inputMode="numeric"` funcione correctamente y muestre teclado numérico
+- Visualmente sigue mostrando puntos como un campo de contraseña
 
-Lógica clave:
-```
-Input del usuario: "1234567" → Muestra: "1.234.567" → Valor interno: "1234567"
-Input del usuario: "1234567,50" → Muestra: "1.234.567,50" → Valor interno: "1234567.50"
-```
+### 2. Agregar atributos anti-autocompletado
 
-### 2. Reemplazar inputs de dinero en todos los formularios
+En cada input de PIN, agregar:
+- `autoComplete="off"`
+- `data-1p-ignore` (1Password)
+- `data-lpignore="true"` (LastPass)
+- `data-form-type="other"` (genérico)
 
-Archivos a modificar (solo los inputs de montos/precios, NO los de cantidades/días/cuotas numéricas):
+### 3. Archivos a modificar
 
-- `GastosPanel.tsx` — campo "Monto"
-- `InversionesPanel.tsx` — "Monto total", "Monto por cuota"
-- `DeudasPanel.tsx` — "Monto total", "Monto por cuota"
-- `SueldosPanel.tsx` — campo "monto"
-- `BackfillWizard.tsx` — campos de efectivo y digital
-- `ServicesConfig.tsx` — campos "Precio"
-- `ExtrasConfig.tsx` — campos "Precio"
-- `EquipoUnificado.tsx` — "Sueldo fijo mensual"
+- **`PinGateDialog.tsx`** — input principal de PIN de acceso
+- **`StaffPinDialog.tsx`** — 3 inputs: PIN actual, nuevo PIN, confirmar PIN
 
-Cada reemplazo: cambiar `<Input type="number" ...>` por `<CurrencyInput ...>`. El `parseFloat` en submit sigue funcionando porque el value ya es numérico limpio.
+### 4. Toggle de visibilidad
 
-### 3. Formatear montos en la visualización existente
-
-Los `toLocaleString('es-AR')` que ya existen en tablas/listados seguirán funcionando igual — no requieren cambios.
+Cuando el usuario activa "mostrar PIN", se remueve el estilo `-webkit-text-security` para mostrar los dígitos en texto plano. El toggle sigue funcionando igual que ahora.
 
 ---
 
 ## Detalle técnico
 
-- NO se cambian inputs de cantidades (cuotas, días, intervalos) — solo montos de dinero
-- El componente maneja el cursor position para evitar saltos al formatear
-- Se permiten máximo 2 decimales
+```text
+Antes:  type="password" inputMode="numeric"  → Chrome: "¿Guardar contraseña?" + teclado alfanumérico
+Después: type="text" inputMode="numeric" style="-webkit-text-security: disc" autocomplete="off"
+         → Sin prompt de contraseña + teclado numérico
+```
+
+Se aplica el estilo inline condicionalmente: `style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' }}`
 
