@@ -34,6 +34,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           cliente_nombre: user?.user_metadata?.full_name || user?.email || "Cliente",
           cliente_telefono: user?.user_metadata?.phone || null,
           user_id: user?.id,
+          cliente_email: user?.email || null,
         },
       });
 

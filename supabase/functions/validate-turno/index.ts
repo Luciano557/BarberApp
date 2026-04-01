@@ -125,6 +125,8 @@ Deno.serve(async (req) => {
         hora_fin,
         cliente_nombre: cliente_nombre.trim(),
         cliente_telefono: cliente_telefono?.trim() || null,
+        cliente_email: cliente_email?.trim() || null,
+        user_id: user_id || null,
         estado: "pendiente",
         timezone,
       })

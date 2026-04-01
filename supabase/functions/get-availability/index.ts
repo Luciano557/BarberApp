@@ -98,13 +98,17 @@ Deno.serve(async (req) => {
         .eq("sucursal_id", sucursal_id)
         .lte("fecha_inicio", fecha)
         .gte("fecha_fin", fecha),
-      supabase
-        .from("turnos")
-        .select("barbero_id, hora_inicio, hora_fin")
-        .eq("organization_id", organization_id)
-        .eq("sucursal_id", sucursal_id)
-        .eq("fecha", fecha)
-        .in("estado", ["pendiente", "confirmado", "en_curso"]),
+      (() => {
+        let q = supabase
+          .from("turnos")
+          .select("id, barbero_id, hora_inicio, hora_fin")
+          .eq("organization_id", organization_id)
+          .eq("sucursal_id", sucursal_id)
+          .eq("fecha", fecha)
+          .in("estado", ["pendiente", "confirmado", "en_curso"]);
+        if (exclude_turno_id) q = q.neq("id", exclude_turno_id);
+        return q;
+      })(),
     ]);
 
     const config = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30 };
