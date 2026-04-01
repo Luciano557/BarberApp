@@ -130,9 +130,9 @@ Deno.serve(async (req) => {
     }
 
     const duracion = servicio.duracion_min || config.duracion_base_min;
-    const bufferBefore = config.buffer_antes_min || 0;
+    const bufferBefore = 0; // buffer antes eliminado
     const bufferAfter = config.buffer_despues_min || 0;
-    const totalSlotDuration = bufferBefore + duracion + bufferAfter;
+    const totalSlotDuration = duracion + bufferAfter;
     const allHorarios = horariosRes.data || [];
     const bloqueos = bloqueosRes.data || [];
     const turnos = turnosRes.data || [];

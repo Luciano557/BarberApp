@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power } from 'lucide-react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
+  const [newDuration, setNewDuration] = useState('30');
   const [newLineId, setNewLineId] = useState<string>('');
   const [editLineId, setEditLineId] = useState<string>('');
+  const [editDuration, setEditDuration] = useState('30');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
   const [newLineName, setNewLineName] = useState('');
@@ -53,24 +55,26 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
   const activeLines = lines.filter(l => l.active);
 
   const handleAdd = () => {
-    if (newName && newPrice) {
+    const dur = parseInt(newDuration) || 30;
+    if (newName && newPrice && dur >= 5) {
       onAdd({
-        name: newName, price: parseFloat(newPrice), active: true,
+        name: newName, price: parseFloat(newPrice), durationMin: dur, active: true,
         lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
         lineName: activeLines.find(l => l.id === newLineId)?.name,
       });
-      setNewName(''); setNewPrice(''); setNewLineId(''); setIsAdding(false);
+      setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
     }
   };
 
   const handleUpdate = (id: string) => {
-    if (newName && newPrice) {
+    const dur = parseInt(editDuration) || 30;
+    if (newName && newPrice && dur >= 5) {
       onUpdate(id, {
-        name: newName, price: parseFloat(newPrice),
+        name: newName, price: parseFloat(newPrice), durationMin: dur,
         lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
         lineName: activeLines.find(l => l.id === editLineId)?.name,
       });
-      setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId('');
+      setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
     }
   };
 
@@ -78,6 +82,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
     setEditingId(service.id);
     setNewName(service.name);
     setNewPrice(service.price.toString());
+    setEditDuration((service.durationMin || 30).toString());
     setEditLineId(service.lineId || '');
   };
 
@@ -111,6 +116,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
             <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
             <div className="flex items-center gap-1">
+              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Min" className="w-20" />
+              <span className="text-xs text-muted-foreground">min</span>
+            </div>
+            <div className="flex items-center gap-1">
               <Select value={editLineId} onValueChange={setEditLineId}>
                 <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>
                 <SelectContent>
@@ -132,6 +141,9 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
               <span className="ml-2 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">{service.lineName}</span>
             )}
           </div>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" />{service.durationMin || 30} min
+          </span>
           <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
           <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
@@ -166,6 +178,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
                   <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" />
                   <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  <div className="flex items-center gap-1">
+                    <Input type="number" min={5} placeholder="Min" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
+                    <span className="text-xs text-muted-foreground">min</span>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Select value={newLineId} onValueChange={setNewLineId}>
                       <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>
