@@ -84,8 +84,8 @@ export const BookingStepper = ({ orgData }: { orgData: OrgPublicData }) => {
   if (confirmed) {
     return (
       <div className="text-center space-y-4 py-8">
-        <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-          <Check className="h-8 w-8 text-green-600" />
+        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <Check className="h-8 w-8 text-primary" />
         </div>
         <h2 className="text-xl font-bold text-foreground">¡Turno confirmado!</h2>
         <p className="text-muted-foreground">
