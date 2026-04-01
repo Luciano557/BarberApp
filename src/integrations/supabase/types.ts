@@ -56,10 +56,12 @@ export type Database = {
         Row: {
           buffer_antes_min: number
           buffer_despues_min: number
+          cancelacion_limite_hs: number
           created_at: string
           dias_anticipacion: number
           duracion_base_min: number
           id: string
+          modificacion_limite_hs: number
           organization_id: string
           sucursal_id: string
           updated_at: string
@@ -67,10 +69,12 @@ export type Database = {
         Insert: {
           buffer_antes_min?: number
           buffer_despues_min?: number
+          cancelacion_limite_hs?: number
           created_at?: string
           dias_anticipacion?: number
           duracion_base_min?: number
           id?: string
+          modificacion_limite_hs?: number
           organization_id: string
           sucursal_id: string
           updated_at?: string
@@ -78,10 +82,12 @@ export type Database = {
         Update: {
           buffer_antes_min?: number
           buffer_despues_min?: number
+          cancelacion_limite_hs?: number
           created_at?: string
           dias_anticipacion?: number
           duracion_base_min?: number
           id?: string
+          modificacion_limite_hs?: number
           organization_id?: string
           sucursal_id?: string
           updated_at?: string
@@ -1530,6 +1536,9 @@ export type Database = {
       turnos: {
         Row: {
           barbero_id: string
+          cancelado_at: string | null
+          cancelado_motivo: string | null
+          cliente_email: string | null
           cliente_nombre: string | null
           cliente_telefono: string | null
           created_at: string
@@ -1545,9 +1554,13 @@ export type Database = {
           sucursal_id: string
           timezone: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           barbero_id: string
+          cancelado_at?: string | null
+          cancelado_motivo?: string | null
+          cliente_email?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
@@ -1563,9 +1576,13 @@ export type Database = {
           sucursal_id: string
           timezone?: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           barbero_id?: string
+          cancelado_at?: string | null
+          cancelado_motivo?: string | null
+          cliente_email?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
@@ -1581,6 +1598,7 @@ export type Database = {
           sucursal_id?: string
           timezone?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {

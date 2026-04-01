@@ -8,6 +8,8 @@ import { FechaStep } from "./FechaStep";
 import { HorarioStep } from "./HorarioStep";
 import { AuthStep } from "./AuthStep";
 import { ConfirmacionStep } from "./ConfirmacionStep";
+import { MisTurnosStep } from "./MisTurnosStep";
+import { RescheduleFlow } from "./RescheduleFlow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Check } from "lucide-react";
@@ -28,7 +30,13 @@ export interface BookingState {
 
 const STEP_LABELS = ["Sucursal", "Servicio", "Barbero", "Fecha", "Horario", "Datos", "Confirmar"];
 
-export const BookingStepper = ({ orgData }: { orgData: OrgPublicData }) => {
+interface Props {
+  orgData: OrgPublicData;
+  mode: "book" | "manage";
+  onBackToLanding: () => void;
+}
+
+export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   const [step, setStep] = useState(0);
   const [booking, setBooking] = useState<BookingState>({
     sucursalId: null,
@@ -45,37 +53,87 @@ export const BookingStepper = ({ orgData }: { orgData: OrgPublicData }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
+  // Manage mode state
+  const [manageAuthDone, setManageAuthDone] = useState(false);
+  const [rescheduleTurno, setRescheduleTurno] = useState<any>(null);
+
   // Check auth on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setIsAuthenticated(!!data.session);
+      const authed = !!data.session;
+      setIsAuthenticated(authed);
+      if (mode === "manage" && authed) setManageAuthDone(true);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session);
+      const authed = !!session;
+      setIsAuthenticated(authed);
+      if (mode === "manage" && authed) setManageAuthDone(true);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [mode]);
 
-  // Auto-skip sucursal if only 1
+  // Auto-skip sucursal if only 1 (book mode)
   useEffect(() => {
-    if (step === 0 && orgData.sucursales.length === 1) {
+    if (mode === "book" && step === 0 && orgData.sucursales.length === 1) {
       const s = orgData.sucursales[0];
       setBooking((b) => ({ ...b, sucursalId: s.id, sucursalNombre: s.nombre }));
       setStep(1);
     }
-  }, [step, orgData.sucursales]);
+  }, [step, orgData.sucursales, mode]);
 
+  // === MANAGE MODE ===
+  if (mode === "manage") {
+    // If reschedule flow is active
+    if (rescheduleTurno) {
+      return (
+        <RescheduleFlow
+          turno={rescheduleTurno}
+          onDone={() => {
+            setRescheduleTurno(null);
+          }}
+          onBack={() => setRescheduleTurno(null)}
+        />
+      );
+    }
+
+    // Auth required first
+    if (!manageAuthDone) {
+      return (
+        <div className="space-y-4">
+          <Button variant="ghost" size="sm" onClick={onBackToLanding} className="gap-1">
+            <ChevronLeft className="h-4 w-4" /> Volver
+          </Button>
+          <AuthStep onAuthenticated={() => setManageAuthDone(true)} />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={onBackToLanding} className="gap-1">
+          <ChevronLeft className="h-4 w-4" /> Volver
+        </Button>
+        <MisTurnosStep
+          organizationId={orgData.organization.id}
+          onReschedule={(turno) => setRescheduleTurno(turno)}
+          onBookNew={() => onBackToLanding()}
+        />
+      </div>
+    );
+  }
+
+  // === BOOK MODE ===
   const totalSteps = isAuthenticated ? 6 : 7;
   const progress = ((step + 1) / totalSteps) * 100;
 
   const goBack = () => {
     if (step > 0) setStep(step - 1);
+    else onBackToLanding();
   };
 
-  // Map logical step to actual step (skip auth if authenticated)
   const getActualStep = () => {
     if (step <= 4) return step;
-    if (isAuthenticated) return step === 5 ? 6 : step; // skip auth
+    if (isAuthenticated) return step === 5 ? 6 : step;
     return step;
   };
 
@@ -98,10 +156,8 @@ export const BookingStepper = ({ orgData }: { orgData: OrgPublicData }) => {
 
   return (
     <div className="space-y-4">
-      {/* Progress bar */}
       <Progress value={progress} className="h-2" />
 
-      {/* Context chips */}
       <div className="flex flex-wrap gap-2">
         {booking.sucursalNombre && <Badge variant="secondary">{booking.sucursalNombre}</Badge>}
         {booking.servicioNombre && <Badge variant="secondary">{booking.servicioNombre}</Badge>}
@@ -110,14 +166,10 @@ export const BookingStepper = ({ orgData }: { orgData: OrgPublicData }) => {
         {booking.horaInicio && step > 4 && <Badge variant="secondary">{booking.horaInicio}</Badge>}
       </div>
 
-      {/* Back button */}
-      {step > 0 && (
-        <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
-          <ChevronLeft className="h-4 w-4" /> Volver
-        </Button>
-      )}
+      <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
+        <ChevronLeft className="h-4 w-4" /> Volver
+      </Button>
 
-      {/* Steps */}
       {actualStep === 0 && (
         <SucursalStep
           sucursales={orgData.sucursales}

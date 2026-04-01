@@ -17,7 +17,7 @@ const Reservar = () => {
   const [orgData, setOrgData] = useState<OrgPublicData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [started, setStarted] = useState(false);
+  const [mode, setMode] = useState<"landing" | "book" | "manage">("landing");
 
   useEffect(() => {
     const fetchOrg = async () => {
@@ -65,16 +65,22 @@ const Reservar = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-lg mx-auto px-4 py-6">
-        {/* Header */}
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-foreground">{orgData.organization.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Reserva tu turno</p>
         </div>
 
-        {!started ? (
-          <BookingLanding onStart={() => setStarted(true)} />
+        {mode === "landing" ? (
+          <BookingLanding
+            onStart={() => setMode("book")}
+            onManage={() => setMode("manage")}
+          />
         ) : (
-          <BookingStepper orgData={orgData} />
+          <BookingStepper
+            orgData={orgData}
+            mode={mode}
+            onBackToLanding={() => setMode("landing")}
+          />
         )}
       </div>
     </div>

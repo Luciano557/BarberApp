@@ -16,13 +16,14 @@ interface Props {
   servicioId: string;
   barberoId: string | null;
   fecha: string;
+  excludeTurnoId?: string;
   onSelect: (horaInicio: string, horaFin: string, barberoId?: string, barberoNombre?: string) => void;
   onChangeFecha: () => void;
   onChangeBarbero: () => void;
 }
 
 export const HorarioStep = ({
-  organizationId, sucursalId, servicioId, barberoId, fecha,
+  organizationId, sucursalId, servicioId, barberoId, fecha, excludeTurnoId,
   onSelect, onChangeFecha, onChangeBarbero,
 }: Props) => {
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -41,6 +42,7 @@ export const HorarioStep = ({
             servicio_id: servicioId,
             fecha,
             barbero_id: barberoId,
+            exclude_turno_id: excludeTurnoId || undefined,
           },
         });
         if (fnError || data?.error) {

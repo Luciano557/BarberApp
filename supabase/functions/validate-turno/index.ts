@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { organization_id, sucursal_id, barbero_id, servicio_id, fecha, hora_inicio, cliente_nombre, cliente_telefono, user_id } = body;
+    const { organization_id, sucursal_id, barbero_id, servicio_id, fecha, hora_inicio, cliente_nombre, cliente_telefono, user_id, cliente_email } = body;
 
     // Validate required fields
     if (!organization_id || !sucursal_id || !barbero_id || !servicio_id || !fecha || !hora_inicio) {
@@ -125,6 +125,8 @@ Deno.serve(async (req) => {
         hora_fin,
         cliente_nombre: cliente_nombre.trim(),
         cliente_telefono: cliente_telefono?.trim() || null,
+        cliente_email: cliente_email?.trim() || null,
+        user_id: user_id || null,
         estado: "pendiente",
         timezone,
       })
