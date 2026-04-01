@@ -59,13 +59,34 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Parse date to get day of week (0=Sunday in JS, but DB uses 0=Monday style)
     const dateObj = new Date(fecha + "T12:00:00Z");
-    const jsDow = dateObj.getUTCDay(); // 0=Sun
-    const dbDow = jsDow === 0 ? 7 : jsDow; // 1=Mon..7=Sun
+    const jsDow = dateObj.getUTCDay();
+    const dbDow = jsDow === 0 ? 7 : jsDow;
 
-    // Parallel fetches
-    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes] = await Promise.all([
+    // Build barberos query
+    let barberosQuery = supabase
+      .from("barberos")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
+      .eq("activo", true)
+      .eq("rol_equipo", "barbero");
+    if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
+
+    // Build horarios query — fetch ALL (base + overrides) for this day
+    let horariosQuery = supabase
+      .from("horarios_trabajo")
+      .select("barbero_id, hora_inicio, hora_fin")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
+      .eq("dia_semana", dbDow)
+      .eq("activo", true);
+    // If specific barbero requested, fetch their overrides + base (null)
+    if (barbero_id) {
+      horariosQuery = horariosQuery.or(`barbero_id.eq.${barbero_id},barbero_id.is.null`);
+    }
+
+    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, barberosRes] = await Promise.all([
       supabase
         .from("agenda_config")
         .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion")
@@ -77,20 +98,7 @@ Deno.serve(async (req) => {
         .select("duracion_min")
         .eq("id", servicio_id)
         .single(),
-      supabase
-        .from("horarios_trabajo")
-        .select("barbero_id, hora_inicio, hora_fin")
-        .eq("organization_id", organization_id)
-        .eq("sucursal_id", sucursal_id)
-        .eq("dia_semana", dbDow)
-        .eq("activo", true)
-        .then((res) => {
-          // Filter by barbero if specified
-          if (barbero_id && res.data) {
-            return { ...res, data: res.data.filter((h: any) => h.barbero_id === barbero_id) };
-          }
-          return res;
-        }),
+      horariosQuery,
       supabase
         .from("bloqueos_agenda")
         .select("barbero_id, hora_inicio, hora_fin, todo_el_dia")
@@ -109,6 +117,7 @@ Deno.serve(async (req) => {
         if (exclude_turno_id) q = q.neq("id", exclude_turno_id);
         return q;
       })(),
+      barberosQuery,
     ]);
 
     const config = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30 };
@@ -124,9 +133,20 @@ Deno.serve(async (req) => {
     const bufferBefore = config.buffer_antes_min || 0;
     const bufferAfter = config.buffer_despues_min || 0;
     const totalSlotDuration = bufferBefore + duracion + bufferAfter;
-    const horarios = horariosRes.data || [];
+    const allHorarios = horariosRes.data || [];
     const bloqueos = bloqueosRes.data || [];
     const turnos = turnosRes.data || [];
+    const activeBarberos: string[] = (barberosRes.data || []).map((b: any) => b.id);
+
+    if (activeBarberos.length === 0) {
+      return new Response(JSON.stringify({ slots: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Separate base (barbero_id=null) vs override horarios
+    const baseHorarios = allHorarios.filter((h: any) => h.barbero_id === null);
+    const overrideHorarios = allHorarios.filter((h: any) => h.barbero_id !== null);
 
     // Count existing turnos per barbero for load balancing
     const turnoCountByBarbero: Record<string, number> = {};
@@ -134,24 +154,23 @@ Deno.serve(async (req) => {
       turnoCountByBarbero[t.barbero_id] = (turnoCountByBarbero[t.barbero_id] || 0) + 1;
     }
 
-    // Group by barbero
-    const barberoIds = [...new Set(horarios.map((h: any) => h.barbero_id))];
-
-    // For each barbero, compute available intervals
-    type SlotWithBarberos = { hora_inicio: string; hora_fin: string; barberos: { id: string; nombre?: string }[] };
+    type SlotWithBarberos = { hora_inicio: string; hora_fin: string; barberos: { id: string }[] };
     const allSlots: Map<string, SlotWithBarberos> = new Map();
 
-    for (const bid of barberoIds) {
-      const bHorarios = horarios.filter((h: any) => h.barbero_id === bid);
-      let intervals: Interval[] = bHorarios.map((h: any) => ({
+    for (const bid of activeBarberos) {
+      // Resolve hierarchy: override wins, fallback to base
+      const bOverrides = overrideHorarios.filter((h: any) => h.barbero_id === bid);
+      const resolvedHorarios = bOverrides.length > 0 ? bOverrides : baseHorarios;
+
+      let intervals: Interval[] = resolvedHorarios.map((h: any) => ({
         start: timeToMinutes(h.hora_inicio),
         end: timeToMinutes(h.hora_fin),
       }));
 
-      // Subtract bloqueos for this barbero + sucursal-wide blocks
-      const bBloqueos = bloqueos.filter(
-        (b: any) => b.barbero_id === bid || b.barbero_id === null
-      );
+      if (intervals.length === 0) continue;
+
+      // Subtract bloqueos
+      const bBloqueos = bloqueos.filter((b: any) => b.barbero_id === bid || b.barbero_id === null);
       const blockIntervals: Interval[] = bBloqueos.map((b: any) => {
         if (b.todo_el_dia) return { start: 0, end: 1440 };
         return { start: timeToMinutes(b.hora_inicio), end: timeToMinutes(b.hora_fin) };
@@ -174,20 +193,15 @@ Deno.serve(async (req) => {
           const slotEnd = minutesToTime(cursor + bufferBefore + duracion);
           const key = `${slotStart}-${slotEnd}`;
           if (allSlots.has(key)) {
-            allSlots.get(key)!.barberos.push({ id: bid as string });
+            allSlots.get(key)!.barberos.push({ id: bid });
           } else {
-            allSlots.set(key, {
-              hora_inicio: slotStart,
-              hora_fin: slotEnd,
-              barberos: [{ id: bid as string }],
-            });
+            allSlots.set(key, { hora_inicio: slotStart, hora_fin: slotEnd, barberos: [{ id: bid }] });
           }
           cursor += config.duracion_base_min || duracion;
         }
       }
     }
 
-    // Sort slots by time, sort barberos by load (ascending)
     const slots = Array.from(allSlots.values()).sort(
       (a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
     );
