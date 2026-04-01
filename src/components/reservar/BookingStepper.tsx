@@ -12,8 +12,10 @@ import { MisTurnosStep } from "./MisTurnosStep";
 import { RescheduleFlow } from "./RescheduleFlow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Check } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChevronLeft, Check, CalendarPlus, ArrowLeft, MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { formatFechaLegible, buildGoogleCalendarUrl } from "@/lib/dateUtils";
 
 export interface BookingState {
   sucursalId: string | null;
@@ -83,20 +85,16 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
   // === MANAGE MODE ===
   if (mode === "manage") {
-    // If reschedule flow is active
     if (rescheduleTurno) {
       return (
         <RescheduleFlow
           turno={rescheduleTurno}
-          onDone={() => {
-            setRescheduleTurno(null);
-          }}
+          onDone={() => setRescheduleTurno(null)}
           onBack={() => setRescheduleTurno(null)}
         />
       );
     }
 
-    // Auth required first
     if (!manageAuthDone) {
       return (
         <div className="space-y-4">
@@ -140,16 +138,63 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   const actualStep = getActualStep();
 
   if (confirmed) {
+    const calendarUrl = buildGoogleCalendarUrl({
+      title: `Turno en ${orgData.organization.name}`,
+      description: `${booking.servicioNombre} con ${booking.barberoNombre}`,
+      location: booking.sucursalNombre,
+      fecha: booking.fecha,
+      horaInicio: booking.horaInicio,
+      horaFin: booking.horaFin,
+      timezone: orgData.organization.timezone || null,
+    });
+
     return (
-      <div className="text-center space-y-4 py-8">
-        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-          <Check className="h-8 w-8 text-primary" />
+      <div className="text-center space-y-5 py-8 animate-in fade-in zoom-in-95 duration-300">
+        <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <Check className="h-10 w-10 text-primary" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">¡Turno confirmado!</h2>
-        <p className="text-muted-foreground">
-          {booking.fecha} a las {booking.horaInicio} con {booking.barberoNombre}
-        </p>
-        <p className="text-sm text-muted-foreground">{booking.servicioNombre} en {booking.sucursalNombre}</p>
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-foreground">¡Turno confirmado!</h2>
+          <p className="text-muted-foreground">Te esperamos</p>
+        </div>
+
+        <Card className="text-left">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-foreground">{booking.sucursalNombre}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-foreground">{booking.servicioNombre}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-foreground">{booking.barberoNombre}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-foreground">{formatFechaLegible(booking.fecha)}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-foreground">{booking.horaInicio} - {booking.horaFin}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2">
+          <Button className="w-full h-12 gap-2" asChild>
+            <a href={calendarUrl} target="_blank" rel="noopener noreferrer">
+              <CalendarPlus className="h-4 w-4" />
+              Agregar al calendario
+            </a>
+          </Button>
+          <Button variant="outline" className="w-full h-12 gap-2" onClick={onBackToLanding}>
+            <ArrowLeft className="h-4 w-4" />
+            Volver al inicio
+          </Button>
+        </div>
       </div>
     );
   }
@@ -162,7 +207,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         {booking.sucursalNombre && <Badge variant="secondary">{booking.sucursalNombre}</Badge>}
         {booking.servicioNombre && <Badge variant="secondary">{booking.servicioNombre}</Badge>}
         {booking.barberoNombre && <Badge variant="secondary">{booking.barberoNombre}</Badge>}
-        {booking.fecha && step > 3 && <Badge variant="secondary">{booking.fecha}</Badge>}
+        {booking.fecha && step > 3 && <Badge variant="secondary">{formatFechaLegible(booking.fecha)}</Badge>}
         {booking.horaInicio && step > 4 && <Badge variant="secondary">{booking.horaInicio}</Badge>}
       </div>
 

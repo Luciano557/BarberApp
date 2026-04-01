@@ -60,7 +60,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         onAuthenticated();
       }
     } catch {
-      toast.error("Error de conexión");
+      toast.error("Ocurrió un problema. Probá nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -72,12 +72,12 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">
-        {isLogin ? "Iniciá sesión" : "Creá tu cuenta"}
+        {isLogin ? "Iniciá sesión" : "Ya casi terminás"}
       </h2>
       <p className="text-sm text-muted-foreground">
         {isLogin
           ? "Ingresá con tu email y contraseña"
-          : "Necesitamos algunos datos para confirmar tu turno"}
+          : "Confirmá tus datos para reservar el turno."}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -87,9 +87,11 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               <Label htmlFor="fullName">Nombre completo *</Label>
               <Input
                 id="fullName"
+                className="h-12 text-base"
                 value={form.fullName}
                 onChange={(e) => update("fullName", e.target.value)}
                 placeholder="Tu nombre"
+                autoComplete="name"
                 required
               />
             </div>
@@ -98,9 +100,12 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               <Input
                 id="phone"
                 type="tel"
+                inputMode="tel"
+                className="h-12 text-base"
                 value={form.phone}
                 onChange={(e) => update("phone", e.target.value)}
                 placeholder="+54 11 1234-5678"
+                autoComplete="tel"
               />
             </div>
             <div className="space-y-1">
@@ -108,8 +113,10 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               <Input
                 id="birthDate"
                 type="date"
+                className="h-12 text-base"
                 value={form.birthDate}
                 onChange={(e) => update("birthDate", e.target.value)}
+                autoComplete="bday"
               />
             </div>
           </>
@@ -120,9 +127,12 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
           <Input
             id="email"
             type="email"
+            inputMode="email"
+            className="h-12 text-base"
             value={form.email}
             onChange={(e) => update("email", e.target.value)}
             placeholder="tu@email.com"
+            autoComplete="email"
             required
           />
         </div>
@@ -132,16 +142,18 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
           <Input
             id="password"
             type="password"
+            className="h-12 text-base"
             value={form.password}
             onChange={(e) => update("password", e.target.value)}
             placeholder="••••••••"
+            autoComplete={isLogin ? "current-password" : "new-password"}
             required
             minLength={6}
           />
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Procesando..." : isLogin ? "Iniciar sesión" : "Crear cuenta"}
+        <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+          {loading ? "Procesando..." : isLogin ? "Iniciar sesión" : "Crear cuenta y continuar"}
         </Button>
       </form>
 

@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface Props {
   turno: { id: string; fecha: string; hora_inicio: string; servicio_nombre: string };
@@ -32,14 +33,18 @@ export const CancelTurnoDialog = ({ turno, open, onOpenChange, onCancelled }: Pr
       });
 
       if (error || data?.error) {
-        toast.error(data?.message || data?.error || "Error al cancelar");
+        if (data?.error === "time_limit") {
+          toast.error("Este turno ya no puede cancelarse.");
+          return;
+        }
+        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
         return;
       }
 
       toast.success("Turno cancelado correctamente");
       onCancelled();
     } catch {
-      toast.error("Error de conexión");
+      toast.error("Ocurrió un problema. Probá nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -49,9 +54,9 @@ export const CancelTurnoDialog = ({ turno, open, onOpenChange, onCancelled }: Pr
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Cancelar turno?</AlertDialogTitle>
+          <AlertDialogTitle>¿Querés cancelar este turno?</AlertDialogTitle>
           <AlertDialogDescription>
-            {turno.servicio_nombre} — {turno.fecha} a las {turno.hora_inicio}
+            {turno.servicio_nombre} — {formatFechaLegible(turno.fecha)} a las {turno.hora_inicio}
           </AlertDialogDescription>
         </AlertDialogHeader>
 

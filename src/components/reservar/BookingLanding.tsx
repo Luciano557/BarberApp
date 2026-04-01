@@ -10,7 +10,7 @@ export const BookingLanding = ({ onStart, onManage }: Props) => {
   return (
     <div className="space-y-4">
       <Card
-        className="cursor-pointer hover:shadow-md transition-shadow border-primary/30"
+        className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98] border-primary/30"
         onClick={onStart}
       >
         <CardContent className="flex items-center gap-4 p-6">
@@ -19,13 +19,13 @@ export const BookingLanding = ({ onStart, onManage }: Props) => {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Reservar turno</h2>
-            <p className="text-sm text-muted-foreground">Elegí tu servicio, barbero y horario</p>
+            <p className="text-sm text-muted-foreground">Elegí día y horario en segundos</p>
           </div>
         </CardContent>
       </Card>
 
       <Card
-        className="cursor-pointer hover:shadow-md transition-shadow border-muted-foreground/20"
+        className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98] border-muted-foreground/20"
         onClick={onManage}
       >
         <CardContent className="flex items-center gap-4 p-6">
@@ -34,7 +34,7 @@ export const BookingLanding = ({ onStart, onManage }: Props) => {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-foreground">Reprogramar / Cancelar</h2>
-            <p className="text-sm text-muted-foreground">Gestioná tus turnos existentes</p>
+            <p className="text-sm text-muted-foreground">Gestioná un turno existente</p>
           </div>
         </CardContent>
       </Card>
