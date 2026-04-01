@@ -2,98 +2,70 @@
 
 ## Resumen
 
-Ajustes finales al diseño del motor de agenda antes de implementar: timezone explícito en constraint DB, validación de buffers en backend, bloqueos multi-día reales, orden de reglas documentado, y ordenamiento de barberos disponibles.
+Definir políticas RLS estrictas para las 4 tablas del sistema de agenda (`agenda_config`, `horarios_trabajo`, `bloqueos_agenda`, `turnos`), aislando staff de clientes y exponiendo disponibilidad solo via endpoints controlados.
 
-## Plan
+## Políticas RLS
 
-### 1. Migración SQL — Timezone explícito en rango_horario
+### 1. `agenda_config`
 
-La columna generada `rango_horario` debe construirse con el timezone de la organización, no depender del timezone del servidor.
+Solo staff administrativo. Barberos pueden ver config de su sucursal (necesitan `duracion_base_min` para UI).
 
-**Problema**: `(fecha || ' ' || hora_inicio)::timestamptz` usa el timezone de la conexión PostgreSQL (UTC por defecto en Supabase), no el del negocio.
+| Operación | Quién | Condición |
+|-----------|-------|-----------|
+| ALL | Owner, GM, Manager | `organization_id = get_user_organization_id(auth.uid())` |
+| SELECT | Barber | `organization_id = get_user_organization_id(auth.uid()) AND sucursal_id IN (get_user_sucursal_ids(auth.uid()))` |
 
-**Solución**: Agregar columna `timezone` a la tabla `turnos` (copiada de la organización al insertar) y usarla en la columna generada:
+Sin acceso para `anon` ni clientes.
 
-```sql
--- En la tabla turnos, agregar:
-timezone text NOT NULL DEFAULT 'America/Argentina/Buenos_Aires',
+### 2. `horarios_trabajo`
 
--- Columna generada con timezone explícito:
-rango_horario tstzrange GENERATED ALWAYS AS (
-  tstzrange(
-    ((fecha || ' ' || hora_inicio)::timestamp AT TIME ZONE timezone),
-    ((fecha || ' ' || hora_fin)::timestamp AT TIME ZONE timezone),
-    '[)'
-  )
-) STORED
-```
+| Operación | Quién | Condición |
+|-----------|-------|-----------|
+| ALL | Owner, GM, Manager | `organization_id = get_user_organization_id(auth.uid())` |
+| SELECT | Barber | `organization_id = ... AND barbero_id = get_user_barbero_id(auth.uid())` |
 
-Esto garantiza que `AT TIME ZONE` convierte correctamente a UTC para comparación, sin importar config del servidor. Funciona bien con DST para países que lo usan (Chile, Paraguay, etc.).
+Sin acceso para `anon`. Los clientes obtienen disponibilidad via edge function, no consultando esta tabla.
 
-### 2. Validación de buffers en backend — Edge function
+### 3. `bloqueos_agenda`
 
-Crear edge function `validate-turno` que se invoca antes de insertar un turno:
+| Operación | Quién | Condición |
+|-----------|-------|-----------|
+| ALL | Owner, GM, Manager | `organization_id = get_user_organization_id(auth.uid())` |
+| SELECT | Barber | `organization_id = ... AND barbero_id = get_user_barbero_id(auth.uid())` (incluye bloqueos de sucursal donde `barbero_id IS NULL` y `sucursal_id IN get_user_sucursal_ids`) |
 
-1. Recibe `sucursal_id`, `barbero_id`, `fecha`, `hora_inicio`, `servicio_id`
-2. Consulta `agenda_config` para obtener buffers
-3. Consulta `servicios` para obtener `duracion_min`
-4. Calcula `hora_fin` = `hora_inicio + duracion_min`
-5. Busca turnos existentes activos del mismo barbero en esa fecha
-6. Valida que no haya solapamiento considerando buffers (turno_existente.hora_fin + buffer_despues <= nuevo.hora_inicio AND nuevo.hora_fin + buffer_despues <= turno_existente.hora_inicio)
-7. Si válido → inserta el turno y retorna. Si no → retorna error 409.
+Sin acceso para `anon`.
 
-Esto previene race conditions donde dos clientes pasan validación frontend simultáneamente.
+### 4. `turnos`
 
-### 3. Engine — Bloqueos multi-día reales
+La tabla más sensible. Clientes no consultan directamente — la edge function `validate-turno` inserta con `service_role`.
 
-Cambiar la lógica de bloqueos nocturnos de "split en 2 días" a iteración por rango real:
+| Operación | Quién | Condición |
+|-----------|-------|-----------|
+| ALL | Owner, GM, Manager | `organization_id = get_user_organization_id(auth.uid())` |
+| SELECT | Barber | `organization_id = ... AND barbero_id = get_user_barbero_id(auth.uid())` |
 
-```text
-Para cada bloqueo:
-  - Generar lista de fechas afectadas: desde fecha_inicio hasta fecha_fin (inclusive)
-  - Para cada fecha afectada:
-    - Si es fecha_inicio y hora_inicio != null: bloquear desde hora_inicio hasta fin del día
-    - Si es fecha_fin y hora_fin != null: bloquear desde inicio del día hasta hora_fin
-    - Si es fecha intermedia: bloquear día completo
-    - Si fecha_inicio == fecha_fin: bloquear hora_inicio → hora_fin
-```
+Sin acceso para `anon`. La inserción de turnos por clientes se hace exclusivamente via la edge function `validate-turno` que usa `service_role_key` para bypassear RLS tras validar disponibilidad.
 
-Esto cubre correctamente bloqueos de viernes 22:00 a domingo 10:00 (3 días).
-
-### 4. Engine — Orden de reglas documentado y forzado
-
-El engine debe aplicar reglas siempre en este orden estricto:
+### 5. Flujo de clientes
 
 ```text
-1. Generar slots base desde horarios_trabajo (rangos del día)
-2. Filtrar slots que caen en bloqueos
-3. Filtrar slots que colisionan con turnos existentes
-4. Aplicar buffers (reducir ventanas libres por buffer_antes/buffer_despues)
-5. Validar que el servicio completo quepa en el slot restante
+Cliente → Edge Function (get-availability) → consulta tablas con service_role → retorna slots
+Cliente → Edge Function (validate-turno) → valida + inserta con service_role → retorna turno
 ```
 
-Esto se implementa como pipeline de funciones encadenadas en `availabilityEngine.ts`, donde cada paso recibe el output del anterior. El orden está forzado por la estructura del código (no es configurable).
+Los clientes **nunca** ejecutan queries directas contra estas tablas. Las edge functions actúan como API gateway con validación.
 
-### 5. Engine — Ordenamiento de barberosDisponibles
+## Migración SQL
 
-Cuando `barberoId` es null (cliente elige "cualquiera"), el array `barberosDisponibles[]` en cada `TimeSlot` se ordena por carga del día (menos turnos activos primero):
+Una sola migración que:
+1. Habilita RLS en las 4 tablas (ya debería estar habilitado desde la migración anterior)
+2. Crea las políticas usando las funciones `has_role()`, `get_user_organization_id()`, `get_user_barbero_id()` y `get_user_sucursal_ids()` ya existentes
+3. Para `bloqueos_agenda` barberos: política SELECT que incluye bloqueos propios (`barbero_id = get_user_barbero_id`) OR bloqueos de sucursal (`barbero_id IS NULL AND sucursal_id IN get_user_sucursal_ids`)
 
-```text
-Para cada slot:
-  - Contar turnos activos del día para cada barbero disponible
-  - Ordenar ascendente por cantidad de turnos
-  - En caso de empate: orden alfabético por nombre
-```
+## Detalle técnico
 
-Esto permite asignación automática futura (tomar el primero del array = barbero con menos carga).
-
-### Resumen de cambios vs plan anterior
-
-| Ajuste | Antes | Ahora |
-|--------|-------|-------|
-| Timezone en constraint | Cast implícito del servidor | `AT TIME ZONE` explícito con tz del turno |
-| Validación de buffers | "Validar antes de insertar" (ambiguo) | Edge function backend con lock implícito |
-| Bloqueos multi-día | Split en 2 días | Iteración por rango real de fechas |
-| Orden de reglas | Implícito | Pipeline forzado por estructura de código |
-| barberosDisponibles | Sin orden definido | Ordenado por menor carga del día |
+- Todas las políticas son `FOR authenticated` — no se crea ninguna política para `anon`
+- Las edge functions usan `createClient(url, service_role_key)` para operar sin restricciones RLS
+- El patrón es idéntico al usado en las demás tablas del proyecto (ej: `barberos`, `servicios`, `ingresos`)
+- No se necesitan funciones `security definer` nuevas — las existentes cubren todos los casos
 
