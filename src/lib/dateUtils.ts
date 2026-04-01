@@ -126,3 +126,75 @@ export function formatDateForQuery(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Convierte "2026-04-15" → "Martes 15 de abril"
+ */
+export function formatFechaLegible(fecha: string): string {
+  try {
+    const [year, month, day] = fecha.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    const formatter = new Intl.DateTimeFormat('es', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    const result = formatter.format(date);
+    return result.charAt(0).toUpperCase() + result.slice(1);
+  } catch {
+    return fecha;
+  }
+}
+
+/**
+ * Genera URL de Google Calendar con timezone correcto.
+ * Convierte fecha + hora local a UTC usando el timezone de la org.
+ */
+export function buildGoogleCalendarUrl(params: {
+  title: string;
+  description: string;
+  location: string;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  timezone?: string | null;
+}): string {
+  const { title, description, location, fecha, horaInicio, horaFin, timezone } = params;
+
+  // Parse local date+time
+  const startLocal = new Date(`${fecha}T${horaInicio}:00`);
+  const endLocal = new Date(`${fecha}T${horaFin}:00`);
+
+  // If we have a timezone, compute the offset and convert to UTC
+  if (timezone) {
+    const offsetStr = getTimezoneOffsetString(startLocal, timezone);
+    const match = offsetStr.match(/([+-])(\d{2}):(\d{2})/);
+    if (match) {
+      const sign = match[1] === '+' ? 1 : -1;
+      const offsetMinutes = sign * (parseInt(match[2]) * 60 + parseInt(match[3]));
+      // UTC = local - offset
+      startLocal.setMinutes(startLocal.getMinutes() - offsetMinutes);
+      endLocal.setMinutes(endLocal.getMinutes() - offsetMinutes);
+    }
+  }
+
+  const fmt = (d: Date) => {
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const da = String(d.getUTCDate()).padStart(2, '0');
+    const h = String(d.getUTCHours()).padStart(2, '0');
+    const mi = String(d.getUTCMinutes()).padStart(2, '0');
+    return `${y}${mo}${da}T${h}${mi}00Z`;
+  };
+
+  const dates = `${fmt(startLocal)}/${fmt(endLocal)}`;
+
+  const url = new URL('https://www.google.com/calendar/render');
+  url.searchParams.set('action', 'TEMPLATE');
+  url.searchParams.set('text', title);
+  url.searchParams.set('dates', dates);
+  url.searchParams.set('details', description);
+  url.searchParams.set('location', location);
+
+  return url.toString();
+}
