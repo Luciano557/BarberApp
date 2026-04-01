@@ -22,7 +22,6 @@ interface ConfigData {
 
 const DEFAULTS: ConfigData = {
   duracion_base_min: 15,
-  buffer_antes_min: 0,
   buffer_despues_min: 5,
   cancelacion_limite_hs: 2,
   modificacion_limite_hs: 2,
