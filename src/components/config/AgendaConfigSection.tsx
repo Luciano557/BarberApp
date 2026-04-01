@@ -61,6 +61,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
         sucursal_id: sucursalId,
         organization_id: organizationId,
         ...config,
+        buffer_antes_min: 0,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'sucursal_id' });
 
