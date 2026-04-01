@@ -1,35 +1,54 @@
 
 
-## Resumen
+## Problema encontrado
 
-5 ajustes al plan de pulido UX: fix timezone en Google Calendar, reducir delay de selección, sincronizar selectedSlot, corregir tilde, y animación en success screen.
+El bug esta en `get-availability/index.ts`, linea 138:
 
-## Cambios al plan anterior
+```js
+const barberoIds = [...new Set(horarios.map((h: any) => h.barbero_id))];
+```
 
-### 1. `src/lib/dateUtils.ts` — `buildGoogleCalendarUrl`
-- Generar fechas en UTC con sufijo `Z`: convertir fecha + hora local a UTC usando el timezone de la organización (disponible via `COUNTRY_TIMEZONES`)
-- Formato final: `YYYYMMDDTHHmmssZ`
-- La función recibe `timezone` como parámetro opcional; si no se pasa, usa hora local como fallback
+Con el nuevo modelo de horarios (Stage 4), los horarios base de sucursal tienen `barbero_id = NULL`. Cuando un barbero NO tiene override, sus horarios no aparecen en la query porque solo se buscan registros con `barbero_id` real. El engine agrupa por `barbero_id` del resultado, encuentra `null`, intenta generar slots para un "barbero null" — que no es un barbero real — y descarta todo.
 
-### 2. `HorarioStep.tsx` — sin delay fijo
-- Al hacer click: feedback visual inmediato (highlight del slot) + llamar `onSelect` directamente sin setTimeout
-- El estado `selectedSlot` es puramente visual/transitorio — se setea en el click y el componente se desmonta al avanzar de step
-- No hay riesgo de desincronización porque `selectedSlot` es local al componente y no compite con el booking state del stepper — el source of truth es `BookingStepper.booking` que se actualiza via `onSelect`
+```text
+Flujo actual (roto):
+  horarios_trabajo WHERE dia_semana = X
+  → solo encuentra rows con barbero_id = NULL (sucursal base)
+  → barberoIds = [null]
+  → genera slots para barbero "null"
+  → slots inútiles (no hay barbero real asignado)
 
-### 3. `AuthStep.tsx` — tilde corregida
-- Copy: "Ya casi terminás. Confirmá tus datos para reservar el turno."
+Flujo correcto:
+  1. Fetch horarios con barbero_id IS NULL (sucursal base) + horarios con barbero_id real
+  2. Fetch lista de barberos activos de la sucursal
+  3. Para cada barbero real:
+     - Si tiene override → usar sus horarios propios
+     - Si no → usar horarios de sucursal como base
+  4. Generar slots por barbero real
+```
 
-### 4. `BookingStepper.tsx` — success screen con animación
-- Wrapper del bloque confirmed: `animate-in fade-in zoom-in-95 duration-300`
-- Usar clases de Tailwind CSS animate (ya disponibles via tailwindcss-animate en el proyecto)
+## Cambios
 
-### Todo lo demás del plan anterior se mantiene igual
+### `supabase/functions/get-availability/index.ts`
 
-## Orden de implementación
-1. Helpers en dateUtils (formatFechaLegible + buildGoogleCalendarUrl con UTC)
-2. HorarioStep (selección visual sin delay)
-3. AuthStep (copy + inputs mobile)
-4. ConfirmacionStep (fecha legible + botón)
-5. BookingStepper (success screen animado + calendar)
-6. RescheduleFlow + BookingLanding + MisTurnosStep
+1. **Agregar fetch de barberos activos** de la sucursal (en paralelo con los demas queries). Si el cliente pidio `barbero_id` especifico, filtrar solo ese.
+
+2. **Separar horarios base vs override**: del resultado de `horarios_trabajo`, separar los que tienen `barbero_id = NULL` (base sucursal) de los que tienen barbero especifico.
+
+3. **Resolver jerarquia por barbero**: para cada barbero activo:
+   - Si tiene registros propios en `horarios_trabajo` → usar esos
+   - Si no → usar los registros de sucursal (barbero_id IS NULL) como sus intervalos
+
+4. **Generar slots con barbero real**: el resto del pipeline (bloqueos, turnos, buffers, slot generation) se mantiene igual, pero ahora itera sobre barberos reales con intervalos correctamente resueltos.
+
+### Detalle tecnico
+
+- La query de `horarios_trabajo` ya NO filtra por `barbero_id` cuando el cliente no especifica uno — trae todos (base + overrides)
+- Se agrega una query a `barberos` para obtener los IDs reales activos de la sucursal
+- Si `barbero_id` se especifica en el request, se filtra tanto barberos como horarios a solo ese
+- No hay cambios en la UI ni en el panel de gestion — el problema es puramente en el engine
+
+### Archivo a redesplegar
+
+Solo `supabase/functions/get-availability/index.ts` — se redespliega la edge function.
 
