@@ -42,7 +42,6 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
     if (data) {
       setConfig({
         duracion_base_min: data.duracion_base_min,
-        buffer_antes_min: data.buffer_antes_min,
         buffer_despues_min: data.buffer_despues_min,
         cancelacion_limite_hs: data.cancelacion_limite_hs,
         modificacion_limite_hs: data.modificacion_limite_hs,
