@@ -16,6 +16,7 @@ interface Props {
   servicioId: string;
   barberoId: string | null;
   fecha: string;
+  excludeTurnoId?: string;
   onSelect: (horaInicio: string, horaFin: string, barberoId?: string, barberoNombre?: string) => void;
   onChangeFecha: () => void;
   onChangeBarbero: () => void;
