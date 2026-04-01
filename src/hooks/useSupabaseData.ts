@@ -22,6 +22,7 @@ function dbToService(row: any, lines: Line[]): Service {
     uid: row.id,
     name: row.nombre,
     price: Number(row.precio),
+    durationMin: row.duracion_min ?? 30,
     lineId: row.linea_id || undefined,
     lineName: line?.name,
     sucursalId: row.sucursal_id || undefined,
@@ -145,6 +146,7 @@ export function useSupabaseData() {
         .insert({ 
           nombre: normalizedName, 
           precio: service.price, 
+          duracion_min: service.durationMin || 30,
           activo: service.active,
           linea_id: service.lineId || null,
           organization_id: organization.id,
@@ -170,6 +172,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
+      if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
 

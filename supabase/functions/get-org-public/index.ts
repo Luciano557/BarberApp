@@ -51,7 +51,8 @@ Deno.serve(async (req) => {
         .select("id, nombre, apellido, sucursal_id")
         .eq("organization_id", org.id)
         .eq("activo", true)
-        .eq("rol_equipo", "barbero"),
+        .eq("rol_equipo", "barbero")
+        .not("sucursal_id", "is", null),
       supabase
         .from("servicios")
         .select("id, nombre, precio, duracion_min, sucursal_id")

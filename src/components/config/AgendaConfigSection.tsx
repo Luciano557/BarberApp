@@ -14,7 +14,6 @@ interface AgendaConfigSectionProps {
 
 interface ConfigData {
   duracion_base_min: number;
-  buffer_antes_min: number;
   buffer_despues_min: number;
   cancelacion_limite_hs: number;
   modificacion_limite_hs: number;
@@ -23,7 +22,6 @@ interface ConfigData {
 
 const DEFAULTS: ConfigData = {
   duracion_base_min: 15,
-  buffer_antes_min: 0,
   buffer_despues_min: 5,
   cancelacion_limite_hs: 2,
   modificacion_limite_hs: 2,
@@ -44,7 +42,6 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
     if (data) {
       setConfig({
         duracion_base_min: data.duracion_base_min,
-        buffer_antes_min: data.buffer_antes_min,
         buffer_despues_min: data.buffer_despues_min,
         cancelacion_limite_hs: data.cancelacion_limite_hs,
         modificacion_limite_hs: data.modificacion_limite_hs,
@@ -64,6 +61,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
         sucursal_id: sucursalId,
         organization_id: organizationId,
         ...config,
+        buffer_antes_min: 0,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'sucursal_id' });
 
@@ -102,7 +100,6 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
 
   const fields: { key: keyof ConfigData; label: string; suffix: string; description: string }[] = [
     { key: 'duracion_base_min', label: 'Duración base', suffix: 'min', description: 'Unidad mínima de tiempo para turnos' },
-    { key: 'buffer_antes_min', label: 'Buffer antes', suffix: 'min', description: 'Tiempo libre antes de cada turno' },
     { key: 'buffer_despues_min', label: 'Buffer después', suffix: 'min', description: 'Tiempo libre después de cada turno' },
     { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
     { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
