@@ -173,6 +173,13 @@ export function SucursalTabContent({
           onAddLine={onAddLine} onUpdateLine={onUpdateLine}
         />
       </div>
+
+      {/* Gestión de Turnos y Agenda */}
+      <AgendaManagement
+        sucursalId={sucursal.id}
+        organizationId={organization?.id || ''}
+        barbers={barbers}
+      />
     </div>
   );
 }
