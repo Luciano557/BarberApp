@@ -14,7 +14,6 @@ interface AgendaConfigSectionProps {
 
 interface ConfigData {
   duracion_base_min: number;
-  buffer_antes_min: number;
   buffer_despues_min: number;
   cancelacion_limite_hs: number;
   modificacion_limite_hs: number;
