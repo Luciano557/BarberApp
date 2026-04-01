@@ -1,0 +1,1 @@
+ALTER TABLE public.horarios_trabajo ALTER COLUMN barbero_id DROP NOT NULL;
