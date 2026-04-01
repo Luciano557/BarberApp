@@ -589,7 +589,7 @@ export type Database = {
       horarios_trabajo: {
         Row: {
           activo: boolean
-          barbero_id: string
+          barbero_id: string | null
           created_at: string
           dia_semana: number
           hora_fin: string
@@ -601,7 +601,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
-          barbero_id: string
+          barbero_id?: string | null
           created_at?: string
           dia_semana: number
           hora_fin: string
@@ -613,7 +613,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
-          barbero_id?: string
+          barbero_id?: string | null
           created_at?: string
           dia_semana?: number
           hora_fin?: string
