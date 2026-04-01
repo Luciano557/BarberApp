@@ -6,7 +6,7 @@ import { BookingStepper } from "@/components/reservar/BookingStepper";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export interface OrgPublicData {
-  organization: { id: string; name: string; logo_url: string | null };
+  organization: { id: string; name: string; logo_url: string | null; timezone: string | null };
   sucursales: { id: string; nombre: string }[];
   barberos: { id: string; nombre: string; apellido: string; sucursal_id: string }[];
   servicios: { id: string; nombre: string; precio: number; duracion_min: number; sucursal_id: string }[];
