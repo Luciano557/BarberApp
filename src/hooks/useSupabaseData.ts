@@ -22,6 +22,7 @@ function dbToService(row: any, lines: Line[]): Service {
     uid: row.id,
     name: row.nombre,
     price: Number(row.precio),
+    durationMin: row.duracion_min ?? 30,
     lineId: row.linea_id || undefined,
     lineName: line?.name,
     sucursalId: row.sucursal_id || undefined,
