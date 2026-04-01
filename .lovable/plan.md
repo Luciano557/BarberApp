@@ -2,56 +2,34 @@
 
 ## Resumen
 
-Panel "Gestion de Turnos y Agenda" dentro de cada tab de sucursal en Mi Negocio. 3 secciones: Configuracion, Horarios, Bloqueos. Sin migraciones (tablas existentes). Corregidos los 4 problemas reportados.
+5 ajustes al plan de pulido UX: fix timezone en Google Calendar, reducir delay de selección, sincronizar selectedSlot, corregir tilde, y animación en success screen.
 
-## Archivos nuevos
+## Cambios al plan anterior
 
-### `src/components/config/AgendaManagement.tsx`
-- Contenedor Accordion con 3 secciones
-- Props: `sucursalId`, `organizationId`, `barbers`
+### 1. `src/lib/dateUtils.ts` — `buildGoogleCalendarUrl`
+- Generar fechas en UTC con sufijo `Z`: convertir fecha + hora local a UTC usando el timezone de la organización (disponible via `COUNTRY_TIMEZONES`)
+- Formato final: `YYYYMMDDTHHmmssZ`
+- La función recibe `timezone` como parámetro opcional; si no se pasa, usa hora local como fallback
 
-### `src/components/config/AgendaConfigSection.tsx`
-- Fetch/upsert `agenda_config` para la sucursal
-- Campos: `duracion_base_min`, `buffer_antes_min`, `buffer_despues_min`, `cancelacion_limite_hs`, `modificacion_limite_hs`, `dias_anticipacion`
-- Inputs numericos + boton Guardar con toast
+### 2. `HorarioStep.tsx` — sin delay fijo
+- Al hacer click: feedback visual inmediato (highlight del slot) + llamar `onSelect` directamente sin setTimeout
+- El estado `selectedSlot` es puramente visual/transitorio — se setea en el click y el componente se desmonta al avanzar de step
+- No hay riesgo de desincronización porque `selectedSlot` es local al componente y no compite con el booking state del stepper — el source of truth es `BookingStepper.booking` que se actualiza via `onSelect`
 
-### `src/components/config/HorariosTrabajoSection.tsx`
-- **Dos tabs**: "Horario Sucursal" y "Horarios por Barbero"
-- **Tab Sucursal**: grilla 7 dias, cada dia con toggle activo + rangos hora inicio/fin + boton agregar rango. Guarda en `horarios_trabajo` con `barbero_id = NULL`. Sin bulk copy, sin dummy IDs.
-- **Tab Barberos**: selector de barbero. Al seleccionar uno:
-  - Si no tiene registros propios en `horarios_trabajo` → mostrar badge "Usa horario de sucursal" + boton "Crear horario propio"
-  - Si tiene registros propios → mostrar grilla editable (misma UI) + boton "Volver a horario de sucursal" (elimina sus registros)
-  - Esto da visibilidad clara de quien tiene override y quien no
-- Validacion: no permitir rangos solapados en mismo dia
+### 3. `AuthStep.tsx` — tilde corregida
+- Copy: "Ya casi terminás. Confirmá tus datos para reservar el turno."
 
-### `src/components/config/BloqueosSection.tsx`
-- Lista de bloqueos con info clara por cada uno:
-  - Badge "Sucursal" o nombre del barbero
-  - Rango de fechas formateado
-  - "Todo el dia" o rango horario
-  - Motivo
-- Formulario crear: fecha inicio/fin, toggle todo_el_dia, hora inicio/fin (si no todo el dia), motivo, selector barbero (opcional, null = sucursal)
-- Boton eliminar bloqueo
+### 4. `BookingStepper.tsx` — success screen con animación
+- Wrapper del bloque confirmed: `animate-in fade-in zoom-in-95 duration-300`
+- Usar clases de Tailwind CSS animate (ya disponibles via tailwindcss-animate en el proyecto)
 
-## Archivo modificado
+### Todo lo demás del plan anterior se mantiene igual
 
-### `src/components/SucursalTabContent.tsx`
-- Agregar seccion "Gestion de Turnos y Agenda" al final
-- Renderizar `<AgendaManagement sucursalId={sucursal.id} organizationId={organization?.id} barbers={barbers} />`
-
-## Detalles tecnicos
-
-- Horarios sucursal = `barbero_id IS NULL` en `horarios_trabajo`. Sin dummy, sin bulk.
-- El motor de disponibilidad ya soporta este modelo (sucursal base + barbero override)
-- `dia_semana`: 1=Lun a 7=Dom
-- Queries directas con Supabase client, RLS ya cubre owner/GM/manager
-- No se necesitan migraciones
-
-## Orden
-
-1. AgendaConfigSection
-2. HorariosTrabajoSection
-3. BloqueosSection
-4. AgendaManagement (contenedor)
-5. Integrar en SucursalTabContent
+## Orden de implementación
+1. Helpers en dateUtils (formatFechaLegible + buildGoogleCalendarUrl con UTC)
+2. HorarioStep (selección visual sin delay)
+3. AuthStep (copy + inputs mobile)
+4. ConfirmacionStep (fecha legible + botón)
+5. BookingStepper (success screen animado + calendar)
+6. RescheduleFlow + BookingLanding + MisTurnosStep
 
