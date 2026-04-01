@@ -2,87 +2,56 @@
 
 ## Resumen
 
-Implementar reprogramacion y cancelacion de turnos en el flujo publico existente. Incluye 1 migracion SQL, actualizacion de 2 edge functions existentes, 3 edge functions nuevas, 3 componentes React nuevos, y actualizacion de 2 componentes existentes.
+Panel "Gestion de Turnos y Agenda" dentro de cada tab de sucursal en Mi Negocio. 3 secciones: Configuracion, Horarios, Bloqueos. Sin migraciones (tablas existentes). Corregidos los 4 problemas reportados.
 
-## 1. Migracion SQL
+## Archivos nuevos
 
-```sql
-ALTER TABLE public.agenda_config
-  ADD COLUMN IF NOT EXISTS cancelacion_limite_hs integer NOT NULL DEFAULT 2,
-  ADD COLUMN IF NOT EXISTS modificacion_limite_hs integer NOT NULL DEFAULT 2;
+### `src/components/config/AgendaManagement.tsx`
+- Contenedor Accordion con 3 secciones
+- Props: `sucursalId`, `organizationId`, `barbers`
 
-ALTER TABLE public.turnos
-  ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS cliente_email text,
-  ADD COLUMN IF NOT EXISTS cancelado_at timestamptz,
-  ADD COLUMN IF NOT EXISTS cancelado_motivo text;
-```
+### `src/components/config/AgendaConfigSection.tsx`
+- Fetch/upsert `agenda_config` para la sucursal
+- Campos: `duracion_base_min`, `buffer_antes_min`, `buffer_despues_min`, `cancelacion_limite_hs`, `modificacion_limite_hs`, `dias_anticipacion`
+- Inputs numericos + boton Guardar con toast
 
-## 2. Actualizar `validate-turno`
+### `src/components/config/HorariosTrabajoSection.tsx`
+- **Dos tabs**: "Horario Sucursal" y "Horarios por Barbero"
+- **Tab Sucursal**: grilla 7 dias, cada dia con toggle activo + rangos hora inicio/fin + boton agregar rango. Guarda en `horarios_trabajo` con `barbero_id = NULL`. Sin bulk copy, sin dummy IDs.
+- **Tab Barberos**: selector de barbero. Al seleccionar uno:
+  - Si no tiene registros propios en `horarios_trabajo` → mostrar badge "Usa horario de sucursal" + boton "Crear horario propio"
+  - Si tiene registros propios → mostrar grilla editable (misma UI) + boton "Volver a horario de sucursal" (elimina sus registros)
+  - Esto da visibilidad clara de quien tiene override y quien no
+- Validacion: no permitir rangos solapados en mismo dia
 
-Agregar `user_id` y `cliente_email` (del body) al INSERT del turno.
+### `src/components/config/BloqueosSection.tsx`
+- Lista de bloqueos con info clara por cada uno:
+  - Badge "Sucursal" o nombre del barbero
+  - Rango de fechas formateado
+  - "Todo el dia" o rango horario
+  - Motivo
+- Formulario crear: fecha inicio/fin, toggle todo_el_dia, hora inicio/fin (si no todo el dia), motivo, selector barbero (opcional, null = sucursal)
+- Boton eliminar bloqueo
 
-## 3. Actualizar `get-availability`
+## Archivo modificado
 
-Aceptar param opcional `exclude_turno_id`. En la query de turnos existentes, agregar `AND id != exclude_turno_id` cuando presente.
+### `src/components/SucursalTabContent.tsx`
+- Agregar seccion "Gestion de Turnos y Agenda" al final
+- Renderizar `<AgendaManagement sucursalId={sucursal.id} organizationId={organization?.id} barbers={barbers} />`
 
-## 4. Nueva edge function `get-my-turnos`
+## Detalles tecnicos
 
-- Extraer JWT del Authorization header, decodificar user_id/email/phone
-- Query segura: `(user_id = uid) OR (user_id IS NULL AND (cliente_email = email OR cliente_telefono = phone))`
-- Filtro: `estado IN ('pendiente','confirmado') AND (fecha > CURRENT_DATE OR (fecha = CURRENT_DATE AND hora_inicio > NOW()::time))`
-- JOIN con sucursales, barberos, servicios
-- Calcular `puede_cancelar` y `puede_reprogramar` usando agenda_config limites
-- Ordenar por fecha ASC, hora_inicio ASC
-
-## 5. Nueva edge function `cancel-turno`
-
-- Requiere JWT, valida ownership (misma logica segura)
-- Valida estado IN ('pendiente','confirmado') y turno futuro
-- Valida cancelacion_limite_hs
-- UPDATE: estado='cancelado', cancelado_at=now(), cancelado_motivo
-
-## 6. Nueva edge function `reschedule-turno`
-
-- Requiere JWT, valida ownership
-- Valida estado y turno futuro
-- Valida modificacion_limite_hs contra turno original
-- Verifica disponibilidad del nuevo slot excluyendo turno actual (reutiliza logica de availability con exclude)
-- UPDATE fecha/hora_inicio/hora_fin
-
-## 7. Componentes React
-
-### `MisTurnosStep.tsx`
-- Llama get-my-turnos, muestra cards con info completa
-- Botones Reprogramar/Cancelar (disabled con tooltip si no cumple limite)
-- Estado vacio con CTA "Reservar turno"
-
-### `CancelTurnoDialog.tsx`
-- AlertDialog con motivo opcional
-- Llama cancel-turno, refresh on success
-
-### `RescheduleFlow.tsx`
-- Reutiliza FechaStep y HorarioStep con exclude_turno_id
-- Llama reschedule-turno al confirmar
-
-## 8. Actualizar componentes existentes
-
-### `BookingLanding.tsx`
-- Activar card "Reprogramar / Cancelar" con callback `onManage()`
-
-### `BookingStepper.tsx`
-- Agregar `mode: 'book' | 'manage'` state
-- Si manage: auth obligatorio → MisTurnosStep
-- Callbacks para reschedule/cancel flows
-
-### `ConfirmacionStep.tsx`
-- Enviar `cliente_email` en el body de validate-turno
+- Horarios sucursal = `barbero_id IS NULL` en `horarios_trabajo`. Sin dummy, sin bulk.
+- El motor de disponibilidad ya soporta este modelo (sucursal base + barbero override)
+- `dia_semana`: 1=Lun a 7=Dom
+- Queries directas con Supabase client, RLS ya cubre owner/GM/manager
+- No se necesitan migraciones
 
 ## Orden
 
-1. Migracion SQL
-2. validate-turno + get-availability updates
-3. get-my-turnos, cancel-turno, reschedule-turno
-4. MisTurnosStep, CancelTurnoDialog, RescheduleFlow
-5. BookingLanding + BookingStepper integration
+1. AgendaConfigSection
+2. HorariosTrabajoSection
+3. BloqueosSection
+4. AgendaManagement (contenedor)
+5. Integrar en SucursalTabContent
 
