@@ -23,7 +23,7 @@ interface Props {
 }
 
 export const HorarioStep = ({
-  organizationId, sucursalId, servicioId, barberoId, fecha,
+  organizationId, sucursalId, servicioId, barberoId, fecha, excludeTurnoId,
   onSelect, onChangeFecha, onChangeBarbero,
 }: Props) => {
   const [slots, setSlots] = useState<Slot[]>([]);
