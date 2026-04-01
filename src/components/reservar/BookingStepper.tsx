@@ -235,7 +235,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       )}
       {actualStep === 2 && (
         <BarberoStep
-          barberos={orgData.barberos.filter((b) => b.sucursal_id === booking.sucursalId || !b.sucursal_id)}
+          barberos={orgData.barberos.filter((b) => b.sucursal_id === booking.sucursalId)}
           onSelect={(id, nombre) => {
             setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible" }));
             setStep(3);

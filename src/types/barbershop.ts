@@ -10,6 +10,7 @@ export interface Service {
   uid: string; // Auto-generated, unique, non-editable
   name: string;
   price: number;
+  durationMin?: number; // Duration in minutes
   lineId?: string; // Reference to lineas table
   lineName?: string; // Cached line name for display
   sucursalId?: string; // Reference to sucursales table

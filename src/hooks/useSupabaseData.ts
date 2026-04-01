@@ -172,6 +172,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.price !== undefined) dbUpdates.precio = updates.price;
+      if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
 
