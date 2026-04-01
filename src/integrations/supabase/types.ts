@@ -52,6 +52,57 @@ export type Database = {
           },
         ]
       }
+      agenda_config: {
+        Row: {
+          buffer_antes_min: number
+          buffer_despues_min: number
+          created_at: string
+          dias_anticipacion: number
+          duracion_base_min: number
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          buffer_antes_min?: number
+          buffer_despues_min?: number
+          created_at?: string
+          dias_anticipacion?: number
+          duracion_base_min?: number
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          buffer_antes_min?: number
+          buffer_despues_min?: number
+          created_at?: string
+          dias_anticipacion?: number
+          duracion_base_min?: number
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_config_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       anulaciones_cierre: {
         Row: {
           anulado_at: string
@@ -159,6 +210,77 @@ export type Database = {
           },
           {
             foreignKeyName: "barberos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bloqueos_agenda: {
+        Row: {
+          barbero_id: string | null
+          created_at: string
+          fecha_fin: string
+          fecha_inicio: string
+          hora_fin: string | null
+          hora_inicio: string | null
+          id: string
+          motivo: string | null
+          organization_id: string
+          sucursal_id: string
+          todo_el_dia: boolean
+        }
+        Insert: {
+          barbero_id?: string | null
+          created_at?: string
+          fecha_fin: string
+          fecha_inicio: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          id?: string
+          motivo?: string | null
+          organization_id: string
+          sucursal_id: string
+          todo_el_dia?: boolean
+        }
+        Update: {
+          barbero_id?: string | null
+          created_at?: string
+          fecha_fin?: string
+          fecha_inicio?: string
+          hora_fin?: string | null
+          hora_inicio?: string | null
+          id?: string
+          motivo?: string | null
+          organization_id?: string
+          sucursal_id?: string
+          todo_el_dia?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bloqueos_agenda_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloqueos_agenda_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloqueos_agenda_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bloqueos_agenda_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
@@ -457,6 +579,74 @@ export type Database = {
           tipo_costo?: string
         }
         Relationships: []
+      }
+      horarios_trabajo: {
+        Row: {
+          activo: boolean
+          barbero_id: string
+          created_at: string
+          dia_semana: number
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          barbero_id: string
+          created_at?: string
+          dia_semana: number
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          barbero_id?: string
+          created_at?: string
+          dia_semana?: number
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "horarios_trabajo_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "horarios_trabajo_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "horarios_trabajo_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "horarios_trabajo_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingresos: {
         Row: {
@@ -1075,6 +1265,7 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
+          duracion_min: number
           id: string
           linea_id: string | null
           nombre: string
@@ -1086,6 +1277,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           created_at?: string
+          duracion_min?: number
           id?: string
           linea_id?: string | null
           nombre: string
@@ -1097,6 +1289,7 @@ export type Database = {
         Update: {
           activo?: boolean
           created_at?: string
+          duracion_min?: number
           id?: string
           linea_id?: string | null
           nombre?: string
@@ -1327,6 +1520,99 @@ export type Database = {
           },
           {
             foreignKeyName: "tareas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turnos: {
+        Row: {
+          barbero_id: string
+          cliente_nombre: string | null
+          cliente_telefono: string | null
+          created_at: string
+          estado: string
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id: string
+          notas: string | null
+          organization_id: string
+          rango_horario: unknown
+          servicio_id: string
+          sucursal_id: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          barbero_id: string
+          cliente_nombre?: string | null
+          cliente_telefono?: string | null
+          created_at?: string
+          estado?: string
+          fecha: string
+          hora_fin: string
+          hora_inicio: string
+          id?: string
+          notas?: string | null
+          organization_id: string
+          rango_horario?: unknown
+          servicio_id: string
+          sucursal_id: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          barbero_id?: string
+          cliente_nombre?: string | null
+          cliente_telefono?: string | null
+          created_at?: string
+          estado?: string
+          fecha?: string
+          hora_fin?: string
+          hora_inicio?: string
+          id?: string
+          notas?: string | null
+          organization_id?: string
+          rango_horario?: unknown
+          servicio_id?: string
+          sucursal_id?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turnos_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turnos_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turnos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turnos_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turnos_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
