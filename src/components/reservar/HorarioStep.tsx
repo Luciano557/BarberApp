@@ -42,6 +42,7 @@ export const HorarioStep = ({
             servicio_id: servicioId,
             fecha,
             barbero_id: barberoId,
+            exclude_turno_id: excludeTurnoId || undefined,
           },
         });
         if (fnError || data?.error) {
