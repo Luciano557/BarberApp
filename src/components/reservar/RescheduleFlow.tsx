@@ -5,8 +5,9 @@ import { HorarioStep } from "./HorarioStep";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, Check, CalendarDays, Clock, Scissors, User } from "lucide-react";
+import { ChevronLeft, Check, CalendarDays, Clock, Scissors, User, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface TurnoData {
   id: string;
@@ -49,18 +50,22 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
 
       if (error || data?.error) {
         if (data?.error === "slot_taken") {
-          toast.error(data.message || "Horario no disponible");
+          toast.error("Ese horario ya fue reservado. Elegí otro.");
           setStep("horario");
           return;
         }
-        toast.error(data?.message || data?.error || "Error al reprogramar");
+        if (data?.error === "time_limit") {
+          toast.error("Este turno ya no puede modificarse.");
+          return;
+        }
+        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
         return;
       }
 
       toast.success("¡Turno reprogramado!");
       setStep("done");
     } catch {
-      toast.error("Error de conexión");
+      toast.error("Ocurrió un problema. Probá nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -68,15 +73,41 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
 
   if (step === "done") {
     return (
-      <div className="text-center space-y-4 py-8">
-        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-          <Check className="h-8 w-8 text-primary" />
+      <div className="text-center space-y-5 py-8 animate-in fade-in zoom-in-95 duration-300">
+        <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <Check className="h-10 w-10 text-primary" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">¡Turno reprogramado!</h2>
-        <p className="text-muted-foreground">
-          {nuevaFecha} a las {nuevaHoraInicio}
-        </p>
-        <Button onClick={onDone}>Volver a mis turnos</Button>
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-foreground">¡Turno reprogramado!</h2>
+          <p className="text-muted-foreground">Tu nuevo horario</p>
+        </div>
+
+        <Card className="text-left">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{turno.sucursal_nombre}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{turno.servicio_nombre}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{turno.barbero_nombre}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{formatFechaLegible(nuevaFecha)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span>{nuevaHoraInicio} - {nuevaHoraFin}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Button onClick={onDone} className="w-full h-12">Volver a mis turnos</Button>
       </div>
     );
   }
@@ -87,12 +118,17 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
         <ChevronLeft className="h-4 w-4" /> Volver
       </Button>
 
+      {/* Header contextual */}
+      <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
+        Reprogramando turno del <span className="font-medium text-foreground">{formatFechaLegible(turno.fecha)}</span> a las <span className="font-medium text-foreground">{turno.hora_inicio}</span>
+      </div>
+
       {/* Context chips */}
       <div className="flex flex-wrap gap-2">
         <Badge variant="secondary">{turno.sucursal_nombre}</Badge>
         <Badge variant="secondary">{turno.servicio_nombre}</Badge>
         <Badge variant="secondary">{turno.barbero_nombre}</Badge>
-        {step !== "fecha" && <Badge variant="secondary">{nuevaFecha}</Badge>}
+        {step !== "fecha" && <Badge variant="secondary">{formatFechaLegible(nuevaFecha)}</Badge>}
       </div>
 
       {step === "fecha" && (
@@ -140,7 +176,7 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
               </div>
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span>{nuevaFecha}</span>
+                <span>{formatFechaLegible(nuevaFecha)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
@@ -149,7 +185,7 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
             </CardContent>
           </Card>
 
-          <Button className="w-full text-lg h-12" onClick={handleConfirm} disabled={loading}>
+          <Button className="w-full text-lg h-14 font-semibold" onClick={handleConfirm} disabled={loading}>
             {loading ? "Reprogramando..." : "Confirmar reprogramación"}
           </Button>
         </div>

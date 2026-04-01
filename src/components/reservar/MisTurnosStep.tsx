@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, Clock, MapPin, Scissors, User, RefreshCw, X, CalendarPlus } from "lucide-react";
 import { CancelTurnoDialog } from "./CancelTurnoDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface Turno {
   id: string;
@@ -74,8 +75,8 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
   if (turnos.length === 0) {
     return (
       <div className="text-center space-y-4 py-8">
-        <p className="text-muted-foreground">No tenés turnos próximos</p>
-        <Button onClick={onBookNew} className="gap-2">
+        <p className="text-muted-foreground">No tenés turnos próximos. Reservá uno en segundos.</p>
+        <Button onClick={onBookNew} className="gap-2 h-12">
           <CalendarPlus className="h-4 w-4" />
           Reservar turno
         </Button>
@@ -112,7 +113,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
                 </div>
                 <div className="flex items-center gap-2">
                   <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{turno.fecha}</span>
+                  <span className="text-foreground">{formatFechaLegible(turno.fecha)}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -127,7 +128,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full gap-1"
+                        className="w-full gap-1 h-10"
                         disabled={!turno.puede_reprogramar}
                         onClick={() => onReschedule(turno)}
                       >
@@ -149,7 +150,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
                       <Button
                         variant="destructive"
                         size="sm"
-                        className="w-full gap-1"
+                        className="w-full gap-1 h-10"
                         disabled={!turno.puede_cancelar}
                         onClick={() => setCancelTurno(turno)}
                       >

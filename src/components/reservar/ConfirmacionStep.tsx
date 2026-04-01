@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
+import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface Props {
   booking: BookingState;
@@ -40,18 +41,18 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
 
       if (fnError || data?.error) {
         if (data?.error === "slot_taken") {
-          toast.error(data.message || "Este horario ya fue reservado");
+          toast.error("Ese horario ya fue reservado. Elegí otro.");
           onSlotTaken();
           return;
         }
-        toast.error(data?.message || data?.error || "Error al confirmar el turno");
+        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
         return;
       }
 
       toast.success("¡Turno reservado con éxito!");
       onConfirmed();
     } catch {
-      toast.error("Error de conexión");
+      toast.error("Ocurrió un problema. Probá nuevamente.");
     } finally {
       setLoading(false);
     }
@@ -77,7 +78,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           </div>
           <div className="flex items-center gap-3">
             <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{booking.fecha}</span>
+            <span className="text-foreground">{formatFechaLegible(booking.fecha)}</span>
           </div>
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -86,7 +87,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
         </CardContent>
       </Card>
 
-      <Button className="w-full text-lg h-12" onClick={handleConfirm} disabled={loading}>
+      <Button className="w-full h-14 text-lg font-semibold" onClick={handleConfirm} disabled={loading}>
         {loading ? "Confirmando..." : "Confirmar turno"}
       </Button>
     </div>
