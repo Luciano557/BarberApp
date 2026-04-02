@@ -118,6 +118,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
           barberoId: barber?.id,
           organizationId: organization.id,
           organizationName: organization.name,
+          sucursalId: formData.role === 'manager' ? selectedSucursalId : undefined,
         },
       });
 
