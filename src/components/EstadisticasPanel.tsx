@@ -32,6 +32,7 @@ interface MonthlyData {
   costosVariables: number;
   costosSemivariables: number;
   totalEgresos: number;
+  barberosDelMes: number;
 }
 
 interface DerivedMonthlyMetrics {
@@ -301,7 +302,7 @@ export function EstadisticasPanel() {
 
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia')
+        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia, barbero_id')
         .eq('organization_id', organization.id)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -383,6 +384,8 @@ export function EstadisticasPanel() {
         const costosVariables = monthEgresos.filter(e => e.tipo_costo === 'variable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
         const costosSemivariables = monthEgresos.filter(e => e.tipo_costo === 'semivariable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
 
+        const barberosDelMes = new Set(monthIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
+
         return {
           month: format(monthDate, 'yyyy-MM'),
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
@@ -394,6 +397,7 @@ export function EstadisticasPanel() {
           costosVariables,
           costosSemivariables,
           totalEgresos: costosFijos + costosVariables + costosSemivariables,
+          barberosDelMes,
         };
       });
 
@@ -429,7 +433,7 @@ export function EstadisticasPanel() {
 
       const [y, mo] = m.month.split('-').map(Number);
       const workDays = getWorkDaysInMonth(y, mo - 1);
-      const cap = capacidadDiaria * (barberosActivos || 1) * workDays;
+      const cap = capacidadDiaria * (m.barberosDelMes || barberosActivos || 1) * workDays;
       const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
 
       return {
