@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export function PinConfigSection() {
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -34,21 +34,26 @@ export function PinConfigSection() {
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
 
-  // Check if user has PIN
+  // Check if user's barbero has PIN via barberos.pin_hash
   const checkHasPin = async () => {
-    if (!user) return;
+    if (!profile?.barbero_id) {
+      setHasPin(false);
+      setIsLoading(false);
+      return;
+    }
     
     try {
       const { data, error } = await supabase
-        .from('user_pins')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .from('barberos')
+        .select('pin_hash')
+        .eq('id', profile.barbero_id)
+        .single();
 
       if (error) throw error;
-      setHasPin(!!data);
+      setHasPin(!!data?.pin_hash);
     } catch (error) {
       console.error('Error checking PIN:', error);
+      setHasPin(false);
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +61,7 @@ export function PinConfigSection() {
 
   useEffect(() => {
     checkHasPin();
-  }, [user]);
+  }, [profile?.barbero_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +84,7 @@ export function PinConfigSection() {
     setIsSaving(true);
 
     try {
+      // Use set-pin function without barbero_id — it will auto-detect from profile
       const { data, error } = await supabase.functions.invoke('set-pin', {
         body: { pin, ...(hasPin ? { currentPin } : {}) }
       });
@@ -142,6 +148,16 @@ export function PinConfigSection() {
     );
   }
 
+  if (!profile?.barbero_id) {
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <p>No tienes un perfil de barbero vinculado. Contactá al dueño o encargado para que te vincule.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -151,8 +167,7 @@ export function PinConfigSection() {
             <CardTitle>PIN de Seguridad</CardTitle>
           </div>
           <CardDescription>
-            Configura un PIN personal para acceder a las secciones protegidas (Resumen y Sueldos).
-            Cada dueño o encargado debe configurar su propio PIN.
+            Configura un PIN personal para acceder a las secciones protegidas.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -316,8 +331,8 @@ export function PinConfigSection() {
           <CardTitle className="text-base">¿Cómo funciona?</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• El PIN te permite acceder a las secciones "Resumen" y "Sueldos".</p>
-          <p>• Una vez desbloqueado, el acceso permanece activo por 30 minutos.</p>
+          <p>• El PIN te permite acceder a secciones protegidas como Finanzas, Mi Negocio y Configuración.</p>
+          <p>• Una vez desbloqueado, el acceso permanece activo por 4 minutos.</p>
           <p>• Se bloquea automáticamente por inactividad.</p>
           <p>• Cada acceso queda registrado para auditoría.</p>
         </CardContent>

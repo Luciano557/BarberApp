@@ -45,24 +45,65 @@ serve(async (req) => {
 
     const { barbero_id, pin, action, currentPin } = await req.json();
 
-    if (!barbero_id) {
-      return new Response(
-        JSON.stringify({ error: 'barbero_id es requerido' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Use service role to update barbero PIN
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Determine which barbero_id to use
+    let targetBarberoId = barbero_id;
+
+    // If no barbero_id provided, use the user's own barbero_id from profile
+    if (!targetBarberoId) {
+      const { data: profile } = await serviceClient
+        .from('profiles')
+        .select('barbero_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.barbero_id) {
+        targetBarberoId = profile.barbero_id;
+      }
+    }
+
+    if (!targetBarberoId) {
+      return new Response(
+        JSON.stringify({ error: 'No se encontró un barbero vinculado a tu cuenta' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Security check: if barbero_id was explicitly provided and differs from user's own,
+    // verify user is owner or general_manager
+    if (barbero_id) {
+      const { data: profile } = await serviceClient
+        .from('profiles')
+        .select('barbero_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.barbero_id !== barbero_id) {
+        const { data: roles } = await serviceClient
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .in('role', ['owner', 'general_manager']);
+
+        if (!roles || roles.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No tienes permiso para configurar el PIN de otro usuario' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+
     // Check if barbero already has a PIN
     const { data: barbero, error: fetchError } = await serviceClient
       .from('barberos')
       .select('pin_hash')
-      .eq('id', barbero_id)
+      .eq('id', targetBarberoId)
       .single();
 
     if (fetchError) {
@@ -107,7 +148,7 @@ serve(async (req) => {
       const { error: updateError } = await serviceClient
         .from('barberos')
         .update({ pin_hash: null })
-        .eq('id', barbero_id);
+        .eq('id', targetBarberoId);
 
       if (updateError) {
         throw updateError;
@@ -133,7 +174,7 @@ serve(async (req) => {
     const { error: updateError } = await serviceClient
       .from('barberos')
       .update({ pin_hash: pinHash })
-      .eq('id', barbero_id);
+      .eq('id', targetBarberoId);
 
     if (updateError) {
       throw updateError;
