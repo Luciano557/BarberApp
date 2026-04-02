@@ -71,6 +71,7 @@ interface EquipoUnificadoProps {
   organizationId: string;
   barbers: Barber[];
   allBarbers: Barber[];
+  sucursales?: { id: string; nombre: string }[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
 }
