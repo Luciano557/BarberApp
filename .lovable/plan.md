@@ -2,91 +2,70 @@
 
 ## Resumen
 
-7 cambios en Mi Negocio: fix equipo (cargos + invitar sin usuario vinculado), fix placeholder servicios, fix domingo en horarios, renombrar bloqueos, filtrar vencidos, nueva sección "Visualizar agenda".
+4 cambios: renombrar "Encargado de Local" a "Encargado de Sucursal", ajustar permisos del manager (sin Config, Mi Negocio limitado a su sucursal), solicitar sucursal al asignar rol manager, y abrir Mi Negocio en la pestaña de la sucursal seleccionada en el panel.
 
-## 1. Equipo: permitir cargos e invitar sin usuario vinculado
+## 1. Renombrar "Encargado de Local" → "Encargado de Sucursal"
 
-**Problema**: Los checkboxes de "Cargos" y el botón "Invitar" solo se muestran si `linkedUser` existe (línea 449 y 488-500 de EquipoUnificado.tsx). Un barbero recién creado no tiene usuario vinculado.
+Cambios de texto en:
+- `EquipoUnificado.tsx` línea 32: `'Encargado de Sucursal'` (ya está hecho)
+- `AppSidebar.tsx` línea 42: cambiar `'Enc. Local'` → `'Enc. Sucursal'`
+- `InviteUserDialog.tsx` línea 303: cambiar `"Encargado de Local"` → `"Encargado de Sucursal"`
+- `invite-user/index.ts` línea 159: cambiar `"Encargado de Local"` → `"Encargado de Sucursal"`
 
-**Fix en `EquipoUnificado.tsx`**:
-- Mostrar botón "Invitar" siempre (sin depender de `hasSystemAccess` que requiere linkedUser). Solo ocultarlo si ya tiene usuario vinculado.
-- Para cargos sin usuario vinculado: los cargos se asignan en el formulario de creación/edición (ya funciona en StaffForm). El problema es que en la vista de detalle no se ven. Mostrar badge "Sin invitar — Invitalo para asignar cargos del sistema" pero mostrar el botón Invitar.
-- Cambiar línea 488-500: mostrar "Invitar" cuando `!linkedUser` (barbero sin cuenta). Cuando `linkedUser` existe, mostrar "Invitar" solo si no tiene acceso.
+## 2. Ajustar permisos del Encargado de Sucursal (manager)
 
-## 2. Servicios: placeholder "Tiempo" en vez de "Min"
+**En `AuthContext.tsx`**:
+- `canManageConfig`: quitar `isManager` → solo `isOwner || isGeneralManager`
+- Agregar nuevo permiso `canViewMiNegocio`: `isOwner || isGeneralManager || isManager`
 
-**Fix en `ServicesConfig.tsx`**:
-- Línea 182: cambiar `placeholder="Min"` a `placeholder="Tiempo"`
-- Línea 119: cambiar `placeholder="Min"` a `placeholder="Tiempo"`
+**En `AppSidebar.tsx`**:
+- Cambiar nav item "Configuración": solo mostrar si `canManageConfig` (que ahora excluye manager)
+- Cambiar nav item "Mi Negocio": mostrar si `canViewMiNegocio` (nuevo permiso que incluye manager)
+- Finanzas: mantener con `canManageConfig` (excluye manager) o crear permiso separado — dado que el usuario dijo "todo menos Configuración", Finanzas debería quedarse visible para el manager. Confirmo: `canManageConfig` actualmente controla tanto Config como Finanzas. Necesitamos separar: crear `canViewFinanzas = isOwner || isGeneralManager || isManager` y dejar `canManageConfig = isOwner || isGeneralManager`.
 
-## 3. Horarios: fix domingo (dia_semana 7 vs constraint 0-6)
+**En `Index.tsx`**:
+- Tab `mi-negocio`: cambiar condición de `isOwner` a `canViewMiNegocio`
+- Tab `config`: mantener con `canManageConfig` (ahora solo owner/GM)
+- Tab `finanzas`: usar `canViewFinanzas`
 
-**Causa raíz**: La DB tiene `CHECK (dia_semana BETWEEN 0 AND 6)` donde 0=Domingo. Pero la UI usa `DIAS` con Domingo=7 (línea 36). Al insertar dia_semana=7, la DB rechaza.
+## 3. Manager en Mi Negocio: solo su sucursal asignada
 
-**Fix**:
-- Migración: `ALTER TABLE horarios_trabajo DROP CONSTRAINT ..., ADD CONSTRAINT ... CHECK (dia_semana BETWEEN 0 AND 7)` — o mejor, cambiar a 1-7 en la constraint.
-  
-  Alternativa más limpia: actualizar la UI para mapear Domingo a 0 al insertar/leer. Pero esto rompería datos existentes (Lunes=1 etc ya insertados como 1-6).
+**En `MiNegocioPanel.tsx`**:
+- Importar `useAuth` y detectar si es `isManager` (sin ser owner/GM)
+- Si es manager: filtrar `allSucursales` para mostrar solo las sucursales asignadas al usuario (query `user_sucursales` por `user_id`)
+- Ocultar botón "Nueva sucursal" para managers
+- Si solo tiene 1 sucursal (caso típico del manager), no mostrar tabs, ir directo al contenido
 
-  **Mejor approach**: nueva migración que amplía constraint a `BETWEEN 0 AND 7` para soportar ambas convenciones. Y también actualizar `get-availability` que ya usa 7 para domingo.
+## 4. Solicitar sucursal al asignar rol "manager"
 
-- Migración SQL:
-```sql
-ALTER TABLE horarios_trabajo DROP CONSTRAINT IF EXISTS horarios_trabajo_dia_semana_check;
-ALTER TABLE horarios_trabajo ADD CONSTRAINT horarios_trabajo_dia_semana_check CHECK (dia_semana BETWEEN 1 AND 7);
-```
-  Esto normaliza a 1=Lunes, 7=Domingo (ISO). La edge function ya usa esta convención.
+**En `EquipoUnificado.tsx`** (formulario de roles):
+- Cuando se activa el checkbox de `manager` en la vista de detalle, mostrar un `Select` para elegir la sucursal asignada
+- Al confirmar, además de insertar el rol en `user_roles`, insertar/actualizar en `user_sucursales` con la sucursal elegida
+- Props: pasar lista de sucursales disponibles al componente
 
-## 4. Renombrar "Bloqueos y excepciones" → "Gestionar ausencias y cierres"
+**En `InviteUserDialog.tsx`**:
+- Cuando se selecciona rol `manager`, mostrar un campo adicional de selección de sucursal
+- Pasar `sucursalId` al edge function para que cree el registro en `user_sucursales`
 
-**Fix en**:
-- `AgendaManagement.tsx` línea 49: cambiar texto del AccordionTrigger
-- `BloqueosSection.tsx` línea 136: cambiar CardTitle
-- Botón "Nuevo bloqueo" → "Nueva ausencia"
-- Toast "Bloqueo creado" → "Ausencia registrada"
-- Texto vacío → "No hay ausencias o cierres registrados"
+**En `invite-user/index.ts`**:
+- Aceptar nuevo campo opcional `sucursalId` en el request
+- Si viene `sucursalId`, insertar en `user_sucursales` tras crear el usuario
 
-## 5. Filtrar bloqueos vencidos
+## 5. Mi Negocio abre en la pestaña de la sucursal del panel
 
-**Fix en `BloqueosSection.tsx`**:
-- En `fetchBloqueos`, agregar filtro `.gte('fecha_fin', new Date().toISOString().split('T')[0])` para solo traer bloqueos cuya fecha_fin >= hoy.
-
-## 6. Nueva sección "Visualizar agenda"
-
-**Nuevo archivo** `src/components/config/AgendaViewer.tsx`:
-
-- AccordionItem en `AgendaManagement.tsx` con valor "agenda-view"
-- Muestra una vista semanal (Lun-Dom) con columnas por barbero activo
-- Ribbon de navegación: `< Semana anterior | Lun DD/MM – Dom DD/MM | Semana siguiente >`
-- Botón de selector de fecha (datepicker) para saltar a la semana de esa fecha
-- Query a tabla `turnos` filtrando por `sucursal_id`, `fecha BETWEEN lunes AND domingo`, estado != 'cancelado'
-- Cada turno se muestra como un bloque con hora, cliente y servicio
-- Vista compacta tipo lista agrupada por día, con sub-agrupación por barbero
-
-**Props**: `sucursalId`, `organizationId`, `barbers`
-
-**Estructura visual**:
-```text
-  [< Sem anterior]  Lun 31/03 – Dom 06/04  [Sem siguiente >]  [📅 Ir a fecha]
-  
-  Lunes 31/03
-    Juan Pérez
-      09:00 - 09:30 | Carlos M. | Corte clásico
-      10:00 - 10:45 | María L.  | Corte + Barba
-    Pedro López
-      11:00 - 11:30 | Ana R.    | Corte
-  
-  Martes 01/04
-    (sin turnos)
-```
+**En `MiNegocioPanel.tsx`**:
+- Importar `useSucursal` y obtener `currentSucursal`
+- Cambiar `defaultValue` del `Tabs` de `allSucursales[0]?.id` a `currentSucursal?.id || allSucursales[0]?.id`
+- Si `currentSucursal` está seteada y existe en la lista, usar su id como tab activa inicial
 
 ## Archivos a modificar
 
-1. **`src/components/config/EquipoUnificado.tsx`** — fix invitar/cargos
-2. **`src/components/config/ServicesConfig.tsx`** — placeholder "Tiempo"
-3. **`supabase/migrations/nuevo.sql`** — constraint dia_semana 1-7
-4. **`src/components/config/BloqueosSection.tsx`** — renombrar + filtrar vencidos
-5. **`src/components/config/AgendaManagement.tsx`** — renombrar accordion + agregar AgendaViewer
-6. **`src/components/config/AgendaViewer.tsx`** — NUEVO, vista semanal de turnos
-7. **`supabase/functions/get-availability/index.ts`** — sin cambios (ya usa 7 para domingo)
+1. **`src/contexts/AuthContext.tsx`** — nuevos permisos `canViewMiNegocio`, `canViewFinanzas`; `canManageConfig` sin manager
+2. **`src/components/AppSidebar.tsx`** — renombrar badge, actualizar nav items con nuevos permisos
+3. **`src/pages/Index.tsx`** — usar nuevos permisos para tabs
+4. **`src/components/MiNegocioPanel.tsx`** — filtrar sucursales para manager, abrir en pestaña de sucursal actual
+5. **`src/components/config/EquipoUnificado.tsx`** — pedir sucursal al asignar rol manager + pasar sucursales como prop
+6. **`src/components/InviteUserDialog.tsx`** — campo sucursal para rol manager, renombrar texto
+7. **`supabase/functions/invite-user/index.ts`** — aceptar `sucursalId`, insertar en `user_sucursales`
+8. **`src/components/SucursalTabContent.tsx`** — pasar sucursales a EquipoUnificado (nueva prop)
 
