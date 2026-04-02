@@ -71,6 +71,7 @@ interface EquipoUnificadoProps {
   organizationId: string;
   barbers: Barber[];
   allBarbers: Barber[];
+  sucursales?: { id: string; nombre: string }[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
 }
@@ -81,7 +82,7 @@ interface ToggleConfirm {
 }
 
 export function EquipoUnificado({
-  sucursalId, organizationId, barbers, allBarbers, onAddBarber, onUpdateBarber,
+  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber,
 }: EquipoUnificadoProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -557,7 +558,7 @@ export function EquipoUnificado({
       </Card>
 
       {/* Dialogs */}
-      <InviteUserDialog open={!!inviteBarber} onOpenChange={(open) => !open && setInviteBarber(null)} barber={inviteBarber || undefined} />
+      <InviteUserDialog open={!!inviteBarber} onOpenChange={(open) => !open && setInviteBarber(null)} barber={inviteBarber || undefined} sucursales={sucursales as any} />
       <StaffPinDialog open={!!pinDialogBarber} onOpenChange={(open) => !open && setPinDialogBarber(null)}
         barberId={pinDialogBarber?.id || ''} barberName={pinDialogBarber ? `${pinDialogBarber.firstName} ${pinDialogBarber.lastName}` : ''}
         hasPin={pinDialogBarber ? !!barberPinStatus[pinDialogBarber.id] : false} onPinUpdated={fetchPinStatus} />

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas } = useAuth();
   
   const getDefaultTab = () => {
     if (hasNoAccess) return 'no-access';
@@ -44,7 +44,13 @@ const Index = () => {
     if (activeTab === 'tareas' && !canViewTareas) {
       setActiveTab('no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, hasNoAccess]);
+    if (activeTab === 'finanzas' && !canViewFinanzas) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+    if (activeTab === 'mi-negocio' && !canViewMiNegocio) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, hasNoAccess]);
 
   const {
     isLoading,
@@ -101,7 +107,7 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'finanzas' && canManageConfig && (
+          {activeTab === 'finanzas' && canViewFinanzas && (
             <PinProtectedSection sectionName="Finanzas">
               <FinanzasPanel barbers={barbers} />
             </PinProtectedSection>
@@ -121,7 +127,7 @@ const Index = () => {
             </div>
           )}
 
-          {activeTab === 'mi-negocio' && isOwner && (
+          {activeTab === 'mi-negocio' && canViewMiNegocio && (
             <PinProtectedSection sectionName="Mi Negocio">
               <MiNegocioPanel />
             </PinProtectedSection>

@@ -16,6 +16,7 @@ interface InviteRequest {
   barberoId?: string;
   organizationId: string;
   organizationName: string;
+  sucursalId?: string;
 }
 
 function generatePassword(): string {
@@ -64,7 +65,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Only owners and general managers can invite users");
     }
 
-    const { email, fullName, role, barberoId, organizationId, organizationName }: InviteRequest = await req.json();
+    const { email, fullName, role, barberoId, organizationId, organizationName, sucursalId }: InviteRequest = await req.json();
 
     // Validate input
     if (!email || !fullName || !role || !organizationId) {
@@ -155,8 +156,33 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // Assign sucursal for manager role
+    if (sucursalId) {
+      // Check if already assigned
+      const { data: existing } = await supabaseAdmin
+        .from("user_sucursales")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("sucursal_id", sucursalId)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: sucursalError } = await supabaseAdmin
+          .from("user_sucursales")
+          .insert({
+            user_id: userId,
+            sucursal_id: sucursalId,
+            organization_id: organizationId,
+          });
+
+        if (sucursalError) {
+          console.error("Sucursal assignment error:", sucursalError);
+        }
+      }
+    }
+
     // Try to send email (but don't fail if it doesn't work)
-    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Local";
+    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Sucursal";
     
     try {
       const emailResult = await resend.emails.send({

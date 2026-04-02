@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
+import { Sucursal } from '@/contexts/SucursalContext';
 
 const inviteSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }).max(255),
@@ -20,19 +21,20 @@ const inviteSchema = z.object({
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  barber?: Barber; // Optional - if provided, prefills name and links to barber
+  barber?: Barber;
+  sucursales?: Sucursal[];
   onSuccess?: () => void;
 }
 
-export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: InviteUserDialogProps) {
+export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], onSuccess }: InviteUserDialogProps) {
   const { organization } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [selectedSucursalId, setSelectedSucursalId] = useState('');
   
-  // Compute initial values based on barber prop
   const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
   
   const [formData, setFormData] = useState({
@@ -50,6 +52,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
         fullName: barberFullName,
         role: barber ? 'barber' : '',
       });
+      setSelectedSucursalId('');
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
@@ -92,6 +95,11 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
       return;
     }
 
+    if (formData.role === 'manager' && !selectedSucursalId) {
+      setErrors(prev => ({ ...prev, sucursal: 'Seleccioná una sucursal para el encargado' }));
+      return;
+    }
+
     if (!organization) {
       toast.error('Error: No se encontró la organización');
       return;
@@ -110,6 +118,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
           barberoId: barber?.id,
           organizationId: organization.id,
           organizationName: organization.name,
+          sucursalId: formData.role === 'manager' ? selectedSucursalId : undefined,
         },
       });
 
@@ -155,6 +164,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
   const handleClose = () => {
     if (!isLoading) {
       setFormData({ email: '', fullName: barber ? `${barber.firstName} ${barber.lastName}` : '', role: barber ? 'barber' : '' });
+      setSelectedSucursalId('');
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
@@ -292,7 +302,10 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
             <Label htmlFor="invite-role">Rol</Label>
             <Select 
               value={formData.role} 
-              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => setFormData(prev => ({ ...prev, role: value }))}
+              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => {
+                setFormData(prev => ({ ...prev, role: value }));
+                if (value !== 'manager') setSelectedSucursalId('');
+              }}
               disabled={isLoading}
             >
               <SelectTrigger>
@@ -300,12 +313,29 @@ export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: Invi
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="barber">Barbero</SelectItem>
-                <SelectItem value="manager">Encargado de Local</SelectItem>
+                <SelectItem value="manager">Encargado de Sucursal</SelectItem>
                 <SelectItem value="general_manager">Encargado General</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && <p className="text-sm text-destructive">{errors.role}</p>}
           </div>
+
+          {formData.role === 'manager' && sucursales.length > 0 && (
+            <div className="space-y-2">
+              <Label>Sucursal asignada</Label>
+              <Select value={selectedSucursalId} onValueChange={setSelectedSucursalId} disabled={isLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar sucursal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sucursales.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.sucursal && <p className="text-sm text-destructive">{errors.sucursal}</p>}
+            </div>
+          )}
 
           <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
             <p>Se enviará un email con:</p>

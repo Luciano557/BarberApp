@@ -29,6 +29,8 @@ interface AuthContextType {
   canViewAllClosings: boolean;
   canViewResumen: boolean;
   canViewTareas: boolean;
+  canViewMiNegocio: boolean;
+  canViewFinanzas: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -152,12 +154,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasNoAccess = roles.length > 0 && roles.every(r => r === 'otros');
   const canManagePayments = isOwner || isGeneralManager || isManager;
-  const canManageConfig = isOwner || isGeneralManager || isManager;
+  const canManageConfig = isOwner || isGeneralManager;
   const canManageBarbers = isOwner || isGeneralManager;
   const canManageUsers = isOwner || isGeneralManager;
   const canViewAllClosings = isOwner || isGeneralManager || isManager;
   const canViewResumen = !hasNoAccess && roles.length > 0;
   const canViewTareas = !hasNoAccess && roles.length > 0;
+  const canViewMiNegocio = isOwner || isGeneralManager || isManager;
+  const canViewFinanzas = isOwner || isGeneralManager || isManager;
 
   return (
     <AuthContext.Provider
@@ -179,6 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canViewAllClosings,
         canViewResumen,
         canViewTareas,
+        canViewMiNegocio,
+        canViewFinanzas,
         signIn,
         signUp,
         signOut,

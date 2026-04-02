@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
@@ -36,7 +37,8 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
 
 export function MiNegocioPanel() {
   const { organization } = useOrganization();
-  const { refreshSucursales } = useSucursal();
+  const { currentSucursal, refreshSucursales } = useSucursal();
+  const { isOwner, isGeneralManager, isManager, user } = useAuth();
   const {
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
@@ -48,6 +50,10 @@ export function MiNegocioPanel() {
   const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+
+  const isManagerOnly = isManager && !isOwner && !isGeneralManager;
+  const canCreateSucursal = isOwner || isGeneralManager;
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
@@ -74,10 +80,31 @@ export function MiNegocioPanel() {
     if (data) setAllBarbers(data.map(dbToBarberWithSucursal));
   }, [organization?.id]);
 
+  // Fetch manager's assigned sucursales
+  const fetchManagerSucursales = useCallback(async () => {
+    if (!isManagerOnly || !user?.id) return;
+    const { data } = await supabase
+      .from('user_sucursales')
+      .select('sucursal_id')
+      .eq('user_id', user.id);
+    if (data) setManagerSucursalIds(data.map(d => d.sucursal_id));
+  }, [isManagerOnly, user?.id]);
+
   useEffect(() => {
     fetchAllSucursales();
     fetchAllBarbers();
-  }, [fetchAllSucursales, fetchAllBarbers]);
+    fetchManagerSucursales();
+  }, [fetchAllSucursales, fetchAllBarbers, fetchManagerSucursales]);
+
+  // Filter sucursales for managers
+  const visibleSucursales = isManagerOnly
+    ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
+    : allSucursales;
+
+  // Default tab: use current sucursal from panel selector if it exists in visible list
+  const defaultTabId = (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+    ? currentSucursal.id
+    : visibleSucursales[0]?.id;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
@@ -183,28 +210,33 @@ export function MiNegocioPanel() {
             <h2 className="text-lg font-medium text-foreground">Sucursales</h2>
             <p className="text-sm text-muted-foreground">Gestiona las sucursales de tu negocio</p>
           </div>
-          <Button size="sm" onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
-          </Button>
+          {canCreateSucursal && (
+            <Button size="sm" onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Tabs por sucursal */}
-      {allSucursales.length > 0 && (
-        <Tabs defaultValue={allSucursales[0]?.id} className="w-full">
-          <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
-            {allSucursales.map(s => (
-              <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
-                {s.nombre}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {allSucursales.map(s => (
+      {visibleSucursales.length > 0 && (
+        <Tabs defaultValue={defaultTabId} className="w-full">
+          {visibleSucursales.length > 1 && (
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+              {visibleSucursales.map(s => (
+                <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                  {s.nombre}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+          {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
               <SucursalTabContent
                 sucursal={s}
                 barbers={allBarbers.filter(b => b.sucursalId === s.id)}
                 allBarbers={allBarbers}
+                allSucursales={allSucursales}
                 services={getServicesForSucursal(s.id)}
                 extras={getExtrasForSucursal(s.id)}
                 discounts={getDiscountsForSucursal(s.id)}
@@ -227,9 +259,11 @@ export function MiNegocioPanel() {
         </Tabs>
       )}
 
-      {allSucursales.length === 0 && (
+      {visibleSucursales.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No hay sucursales. Creá una para empezar.</p>
+          <p className="text-muted-foreground">
+            {isManagerOnly ? 'No tenés sucursales asignadas.' : 'No hay sucursales. Creá una para empezar.'}
+          </p>
         </div>
       )}
 
