@@ -158,6 +158,7 @@ export function SucursalTabContent({
         organizationId={organization?.id || ''}
         barbers={barbers}
         allBarbers={allBarbers}
+        sucursales={allSucursales}
         onAddBarber={onAddBarber}
         onUpdateBarber={onUpdateBarber}
       />
