@@ -489,6 +489,10 @@ export function EstadisticasPanel() {
 
   // Derive per-month metrics with variation
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
+    const today = new Date();
+    const currentMonthStr = format(today, 'yyyy-MM');
+    const diaActual = today.getDate();
+
     const raw = monthlyData.map(m => {
       const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
       const gananciaNeta = m.facturacion - m.totalEgresos;
@@ -499,7 +503,11 @@ export function EstadisticasPanel() {
       const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
 
       const [y, mo] = m.month.split('-').map(Number);
-      const workDays = getWorkDaysInMonth(y, mo - 1);
+      const isCurrentMonth = m.month === currentMonthStr;
+      // For current month, use only elapsed work days for capacity
+      const workDays = isCurrentMonth
+        ? getWorkDaysUpTo(y, mo - 1, diaActual)
+        : getWorkDaysInMonth(y, mo - 1);
       const cap = capacidadDiaria * (m.barberosDelMes || barberosActivos || 1) * workDays;
       const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
 
