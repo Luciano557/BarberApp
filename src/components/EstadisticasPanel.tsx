@@ -433,7 +433,7 @@ export function EstadisticasPanel() {
 
       const [y, mo] = m.month.split('-').map(Number);
       const workDays = getWorkDaysInMonth(y, mo - 1);
-      const cap = capacidadDiaria * (barberosActivos || 1) * workDays;
+      const cap = capacidadDiaria * (m.barberosDelMes || barberosActivos || 1) * workDays;
       const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
 
       return {
