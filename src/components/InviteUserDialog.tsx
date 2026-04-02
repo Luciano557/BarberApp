@@ -26,15 +26,15 @@ interface InviteUserDialogProps {
   onSuccess?: () => void;
 }
 
-export function InviteUserDialog({ open, onOpenChange, barber, onSuccess }: InviteUserDialogProps) {
+export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], onSuccess }: InviteUserDialogProps) {
   const { organization } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [selectedSucursalId, setSelectedSucursalId] = useState('');
   
-  // Compute initial values based on barber prop
   const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
   
   const [formData, setFormData] = useState({
