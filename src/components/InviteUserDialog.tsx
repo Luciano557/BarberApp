@@ -52,6 +52,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
         fullName: barberFullName,
         role: barber ? 'barber' : '',
       });
+      setSelectedSucursalId('');
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
