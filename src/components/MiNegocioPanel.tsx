@@ -259,9 +259,11 @@ export function MiNegocioPanel() {
         </Tabs>
       )}
 
-      {allSucursales.length === 0 && (
+      {visibleSucursales.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No hay sucursales. Creá una para empezar.</p>
+          <p className="text-muted-foreground">
+            {isManagerOnly ? 'No tenés sucursales asignadas.' : 'No hay sucursales. Creá una para empezar.'}
+          </p>
         </div>
       )}
 
