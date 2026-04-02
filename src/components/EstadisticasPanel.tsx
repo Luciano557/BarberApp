@@ -39,6 +39,7 @@ interface MonthlyData {
   parcialEfectivo?: number;
   parcialMp?: number;
   parcialCostosFijos?: number;
+  parcialTasaOcupacion?: number;
 }
 
 interface DerivedMonthlyMetrics {
