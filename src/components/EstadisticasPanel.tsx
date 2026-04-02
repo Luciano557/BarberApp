@@ -39,6 +39,7 @@ interface MonthlyData {
   parcialEfectivo?: number;
   parcialMp?: number;
   parcialCostosFijos?: number;
+  parcialTasaOcupacion?: number;
 }
 
 interface DerivedMonthlyMetrics {
@@ -106,6 +107,17 @@ function getWorkDaysInMonth(year: number, month: number): number {
   const daysInMonth = getDaysInMonth(new Date(year, month));
   let workDays = 0;
   for (let d = 1; d <= daysInMonth; d++) {
+    const day = getDay(new Date(year, month, d));
+    if (day !== 0) workDays++;
+  }
+  return workDays;
+}
+
+function getWorkDaysUpTo(year: number, month: number, maxDay: number): number {
+  const daysInMonth = getDaysInMonth(new Date(year, month));
+  const limit = Math.min(maxDay, daysInMonth);
+  let workDays = 0;
+  for (let d = 1; d <= limit; d++) {
     const day = getDay(new Date(year, month, d));
     if (day !== 0) workDays++;
   }
@@ -408,6 +420,7 @@ export function EstadisticasPanel() {
         let parcialEfectivo: number | undefined;
         let parcialMp: number | undefined;
         let parcialCostosFijos: number | undefined;
+        let parcialTasaOcupacion: number | undefined;
 
         if (needsPartial) {
           // Filter ingresos where day-of-month <= diaActual
@@ -425,6 +438,13 @@ export function EstadisticasPanel() {
           parcialEfectivo = partialIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
           parcialMp = partialIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
           parcialCostosFijos = partialEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+
+          // Partial occupancy: services in first N days / capacity of first N work days
+          const [py, pmo] = monthStr.split('-').map(Number);
+          const partialWorkDays = getWorkDaysUpTo(py, pmo - 1, diaActual);
+          const partialBarberos = new Set(partialIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
+          const partialCap = capacidadDiaria * (partialBarberos || barberosActivos || 1) * partialWorkDays;
+          parcialTasaOcupacion = partialCap > 0 ? (parcialServicios / partialCap) * 100 : 0;
         }
 
         return {
@@ -444,6 +464,7 @@ export function EstadisticasPanel() {
           parcialEfectivo,
           parcialMp,
           parcialCostosFijos,
+          parcialTasaOcupacion,
         };
       });
 
@@ -468,6 +489,10 @@ export function EstadisticasPanel() {
 
   // Derive per-month metrics with variation
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
+    const today = new Date();
+    const currentMonthStr = format(today, 'yyyy-MM');
+    const diaActual = today.getDate();
+
     const raw = monthlyData.map(m => {
       const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
       const gananciaNeta = m.facturacion - m.totalEgresos;
@@ -478,7 +503,11 @@ export function EstadisticasPanel() {
       const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
 
       const [y, mo] = m.month.split('-').map(Number);
-      const workDays = getWorkDaysInMonth(y, mo - 1);
+      const isCurrentMonth = m.month === currentMonthStr;
+      // For current month, use only elapsed work days for capacity
+      const workDays = isCurrentMonth
+        ? getWorkDaysUpTo(y, mo - 1, diaActual)
+        : getWorkDaysInMonth(y, mo - 1);
       const cap = capacidadDiaria * (m.barberosDelMes || barberosActivos || 1) * workDays;
       const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
 
@@ -498,10 +527,6 @@ export function EstadisticasPanel() {
         tasaOcupacion,
       };
     });
-
-    const today = new Date();
-    const currentMonthStr = format(today, 'yyyy-MM');
-    const diaActual = today.getDate();
 
     // Calculate variations
     return raw.map((curr, i): DerivedMonthlyMetrics => {
@@ -535,7 +560,7 @@ export function EstadisticasPanel() {
         costoVariablePorServicioVar: prev ? calcVariation(curr.costoVariablePorServicio, prev.costoVariablePorServicio) : null,
         gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
         puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
-        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prev.tasaOcupacion) : null,
+        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, useSameDayComparison && prevM!.parcialTasaOcupacion !== undefined ? prevM!.parcialTasaOcupacion! : prev.tasaOcupacion) : null,
       };
     });
   })();
@@ -671,7 +696,7 @@ export function EstadisticasPanel() {
         {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
         {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
         {isPartial && (
-          <span className="ml-1 text-muted-foreground" title={`Comparación parcial: primeros ${latest.diasTranscurridos} días vs mismos días del mes anterior`}>
+          <span className="ml-1 text-muted-foreground" title={`Estimación basada en los primeros ${latest.diasTranscurridos} días del mes, comparados con los mismos ${latest.diasTranscurridos} días del mes anterior`}>
             <Clock className="h-3 w-3 inline" />
           </span>
         )}
