@@ -464,6 +464,7 @@ export function EstadisticasPanel() {
           parcialEfectivo,
           parcialMp,
           parcialCostosFijos,
+          parcialTasaOcupacion,
         };
       });
 
