@@ -372,7 +372,11 @@ export function EstadisticasPanel() {
       })));
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
 
-      const monthlyStats: MonthlyData[] = months.map(monthDate => {
+      const today = new Date();
+      const diaActual = today.getDate();
+      const currentMonthStr = format(today, 'yyyy-MM');
+
+      const monthlyStats: MonthlyData[] = months.map((monthDate, idx) => {
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
 
@@ -394,8 +398,37 @@ export function EstadisticasPanel() {
 
         const barberosDelMes = new Set(monthIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
 
+        const monthStr = format(monthDate, 'yyyy-MM');
+        // Check if the NEXT month in the array is the current month — if so, compute partial sums for first N days
+        const nextMonthStr = idx < months.length - 1 ? format(months[idx + 1], 'yyyy-MM') : null;
+        const needsPartial = nextMonthStr === currentMonthStr;
+
+        let parcialFacturacion: number | undefined;
+        let parcialServicios: number | undefined;
+        let parcialEfectivo: number | undefined;
+        let parcialMp: number | undefined;
+        let parcialCostosFijos: number | undefined;
+
+        if (needsPartial) {
+          // Filter ingresos where day-of-month <= diaActual
+          const partialIngresos = monthIngresos.filter(i => {
+            const d = parseISO(i.created_at);
+            return d.getDate() <= diaActual;
+          });
+          const partialEgresos = monthEgresos.filter(e => {
+            const d = parseISO(e.Fecha!);
+            return d.getDate() <= diaActual;
+          });
+
+          parcialFacturacion = partialIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0);
+          parcialServicios = partialIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0);
+          parcialEfectivo = partialIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
+          parcialMp = partialIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
+          parcialCostosFijos = partialEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+        }
+
         return {
-          month: format(monthDate, 'yyyy-MM'),
+          month: monthStr,
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
           facturacion: monthIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0),
           servicios: monthIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0),
@@ -406,6 +439,11 @@ export function EstadisticasPanel() {
           costosSemivariables,
           totalEgresos: costosFijos + costosVariables + costosSemivariables,
           barberosDelMes,
+          parcialFacturacion,
+          parcialServicios,
+          parcialEfectivo,
+          parcialMp,
+          parcialCostosFijos,
         };
       });
 
