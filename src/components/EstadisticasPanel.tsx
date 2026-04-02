@@ -499,16 +499,36 @@ export function EstadisticasPanel() {
       };
     });
 
+    const today = new Date();
+    const currentMonthStr = format(today, 'yyyy-MM');
+    const diaActual = today.getDate();
+
     // Calculate variations
     return raw.map((curr, i): DerivedMonthlyMetrics => {
       const prev = i > 0 ? raw[i - 1] : null;
+      const m = monthlyData[i];
+      const prevM = i > 0 ? monthlyData[i - 1] : null;
+      const isCurrentMonth = m.month === currentMonthStr;
+
+      // For the current month, use partial previous month data (same first N days) for cumulative metrics
+      const useSameDayComparison = isCurrentMonth && prevM && prevM.parcialFacturacion !== undefined;
+
+      const prevFacturacion = useSameDayComparison ? prevM!.parcialFacturacion! : prev?.facturacion ?? 0;
+      const prevServicios = useSameDayComparison ? prevM!.parcialServicios! : prev?.servicios ?? 0;
+      const prevEfectivo = useSameDayComparison ? prevM!.parcialEfectivo! : prev?.efectivo ?? 0;
+      const prevMp = useSameDayComparison ? prevM!.parcialMp! : prev?.mp ?? 0;
+      const prevCostosFijos = useSameDayComparison ? prevM!.parcialCostosFijos! : prev?.costosFijos ?? 0;
+
       return {
         ...curr,
-        facturacionVar: prev ? calcVariation(curr.facturacion, prev.facturacion) : null,
-        serviciosVar: prev ? calcVariation(curr.servicios, prev.servicios) : null,
-        efectivoVar: prev ? calcVariation(curr.efectivo, prev.efectivo) : null,
-        mpVar: prev ? calcVariation(curr.mp, prev.mp) : null,
-        costosFijosVar: prev ? calcVariation(curr.costosFijos, prev.costosFijos) : null,
+        isCurrentMonth,
+        diasTranscurridos: isCurrentMonth ? diaActual : undefined,
+        facturacionVar: prev ? calcVariation(curr.facturacion, prevFacturacion) : null,
+        serviciosVar: prev ? calcVariation(curr.servicios, prevServicios) : null,
+        efectivoVar: prev ? calcVariation(curr.efectivo, prevEfectivo) : null,
+        mpVar: prev ? calcVariation(curr.mp, prevMp) : null,
+        costosFijosVar: prev ? calcVariation(curr.costosFijos, prevCostosFijos) : null,
+        // Non-cumulative metrics: compare directly as before
         rentabilidadVar: prev ? calcVariation(curr.rentabilidad, prev.rentabilidad) : null,
         ticketPromedioVar: prev ? calcVariation(curr.ticketPromedio, prev.ticketPromedio) : null,
         costoFijoPorServicioVar: prev ? calcVariation(curr.costoFijoPorServicio, prev.costoFijoPorServicio) : null,
