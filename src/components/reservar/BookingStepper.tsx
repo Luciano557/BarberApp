@@ -4,8 +4,7 @@ import type { OrgPublicData } from "@/pages/Reservar";
 import { SucursalStep } from "./SucursalStep";
 import { ServicioStep } from "./ServicioStep";
 import { BarberoStep } from "./BarberoStep";
-import { FechaStep } from "./FechaStep";
-import { HorarioStep } from "./HorarioStep";
+import { FechaHorarioStep } from "./FechaHorarioStep";
 import { AuthStep } from "./AuthStep";
 import { ConfirmacionStep } from "./ConfirmacionStep";
 import { MisTurnosStep } from "./MisTurnosStep";
@@ -30,7 +29,7 @@ export interface BookingState {
   horaFin: string;
 }
 
-const STEP_LABELS = ["Sucursal", "Servicio", "Barbero", "Fecha", "Horario", "Datos", "Confirmar"];
+const STEP_LABELS = ["Sucursal", "Servicio", "Barbero", "Fecha y Horario", "Datos", "Confirmar"];
 
 interface Props {
   orgData: OrgPublicData;
@@ -48,7 +47,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     servicioPrecio: 0,
     barberoId: null,
     barberoNombre: "",
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: "",
     horaInicio: "",
     horaFin: "",
   });
@@ -121,17 +120,48 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   }
 
   // === BOOK MODE ===
-  const totalSteps = isAuthenticated ? 6 : 7;
+  // Steps: 0=Sucursal, 1=Servicio, 2=Barbero, 3=Fecha+Horario, 4=Auth(if needed), 5=Confirmar
+  const totalSteps = isAuthenticated ? 5 : 6;
   const progress = ((step + 1) / totalSteps) * 100;
 
+  const resetFieldsFromStep = (fromStep: number) => {
+    setBooking((b) => {
+      const updated = { ...b };
+      if (fromStep <= 0) {
+        updated.sucursalId = null;
+        updated.sucursalNombre = "";
+      }
+      if (fromStep <= 1) {
+        updated.servicioId = null;
+        updated.servicioNombre = "";
+        updated.servicioPrecio = 0;
+      }
+      if (fromStep <= 2) {
+        updated.barberoId = null;
+        updated.barberoNombre = "";
+      }
+      if (fromStep <= 3) {
+        updated.fecha = "";
+        updated.horaInicio = "";
+        updated.horaFin = "";
+      }
+      return updated;
+    });
+  };
+
   const goBack = () => {
-    if (step > 0) setStep(step - 1);
-    else onBackToLanding();
+    if (step > 0) {
+      const newStep = step - 1;
+      resetFieldsFromStep(newStep);
+      setStep(newStep);
+    } else {
+      onBackToLanding();
+    }
   };
 
   const getActualStep = () => {
-    if (step <= 4) return step;
-    if (isAuthenticated) return step === 5 ? 6 : step;
+    if (step <= 3) return step;
+    if (isAuthenticated) return step === 4 ? 5 : step;
     return step;
   };
 
@@ -204,11 +234,11 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       <Progress value={progress} className="h-2" />
 
       <div className="flex flex-wrap gap-2">
-        {booking.sucursalNombre && <Badge variant="secondary">{booking.sucursalNombre}</Badge>}
-        {booking.servicioNombre && <Badge variant="secondary">{booking.servicioNombre}</Badge>}
-        {booking.barberoNombre && <Badge variant="secondary">{booking.barberoNombre}</Badge>}
+        {booking.sucursalNombre && step > 0 && <Badge variant="secondary">{booking.sucursalNombre}</Badge>}
+        {booking.servicioNombre && step > 1 && <Badge variant="secondary">{booking.servicioNombre}</Badge>}
+        {booking.barberoNombre && step > 2 && <Badge variant="secondary">{booking.barberoNombre}</Badge>}
         {booking.fecha && step > 3 && <Badge variant="secondary">{formatFechaLegible(booking.fecha)}</Badge>}
-        {booking.horaInicio && step > 4 && <Badge variant="secondary">{booking.horaInicio}</Badge>}
+        {booking.horaInicio && step > 3 && <Badge variant="secondary">{booking.horaInicio}</Badge>}
       </div>
 
       <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
@@ -243,44 +273,40 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         />
       )}
       {actualStep === 3 && (
-        <FechaStep
-          value={booking.fecha}
-          onSelect={(fecha) => {
-            setBooking((b) => ({ ...b, fecha }));
-            setStep(4);
-          }}
-        />
-      )}
-      {actualStep === 4 && (
-        <HorarioStep
+        <FechaHorarioStep
           organizationId={orgData.organization.id}
           sucursalId={booking.sucursalId!}
           servicioId={booking.servicioId!}
           barberoId={booking.barberoId}
-          fecha={booking.fecha}
-          onSelect={(horaInicio, horaFin, barberoId, barberoNombre) => {
+          onSelect={(horaInicio, horaFin, fecha, barberoId, barberoNombre) => {
             setBooking((b) => ({
               ...b,
               horaInicio,
               horaFin,
+              fecha,
               barberoId: barberoId || b.barberoId,
               barberoNombre: barberoNombre || b.barberoNombre,
             }));
-            setStep(5);
+            setStep(4);
           }}
-          onChangeFecha={() => setStep(3)}
-          onChangeBarbero={() => setStep(2)}
+          onChangeBarbero={() => {
+            resetFieldsFromStep(2);
+            setStep(2);
+          }}
         />
       )}
-      {actualStep === 5 && !isAuthenticated && (
-        <AuthStep onAuthenticated={() => setStep(6)} />
+      {actualStep === 4 && !isAuthenticated && (
+        <AuthStep onAuthenticated={() => setStep(5)} />
       )}
-      {(actualStep === 6 || (actualStep === 5 && isAuthenticated)) && (
+      {(actualStep === 5 || (actualStep === 4 && isAuthenticated)) && (
         <ConfirmacionStep
           booking={booking}
           orgData={orgData}
           onConfirmed={() => setConfirmed(true)}
-          onSlotTaken={() => setStep(4)}
+          onSlotTaken={() => {
+            resetFieldsFromStep(3);
+            setStep(3);
+          }}
         />
       )}
     </div>
