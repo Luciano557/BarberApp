@@ -1,32 +1,46 @@
 
 
-## Problema
+## Comparación "mismos días" para el mes en curso
 
-La tasa de ocupacion usa `barberosActivos` — un conteo estatico de los barberos activos HOY en la sucursal seleccionada — para calcular la capacidad de TODOS los meses historicos. Si en diciembre habia 2 barberos y hoy hay 2 en esa sucursal pero 9 en la org, o si en algun momento cambiaron, el dato sale mal.
+### Problema
+Las variaciones del mes actual comparan un mes incompleto contra uno completo, mostrando caídas irreales (-85%).
 
-Ademas, en modo "Todas las sucursales" (`currentSucursal === null`), la query no filtra y cuenta los 9 barberos de toda la organizacion.
+### Solución
+Para el último mes del array (si es el mes en curso), comparar solo los primeros N días de ambos meses. Ejemplo: si hoy es 2 de abril, comparar lo del 1-2 de abril contra lo del 1-2 de marzo.
 
-## Solucion
+### Cambios en `src/components/EstadisticasPanel.tsx`
 
-Calcular los barberos activos **por mes** contando los `barbero_id` distintos que aparecen en la tabla `ingresos` de ese mes. Esto refleja exactamente cuantos barberos trabajaron cada mes, sin importar altas o bajas posteriores.
+**1. Agregar `MonthlyData` parcial del mes anterior**
 
-### Cambio en `src/components/EstadisticasPanel.tsx`
+En `fetchData` (línea ~367), al construir `monthlyStats`, agregar para cada mes un sub-total de los primeros N días (`parcialPrimerosDias`). Esto se calcula filtrando `monthIngresos` y `monthEgresos` donde el día del mes (`getDate()`) sea <= `diasTranscurridos` (día actual del mes en curso).
 
-1. En la funcion `fetchData`, al procesar los ingresos agrupados por mes, agregar un campo `barberosDelMes` que cuente los `barbero_id` unicos de ese mes (requiere incluir `barbero_id` en el select de ingresos).
+Solo se necesita calcular esto para el mes anterior al actual — no para todos.
 
-2. En el calculo de la tasa de ocupacion (linea 432), reemplazar:
+**2. Modificar el cálculo de variaciones (línea ~457)**
+
+Para el último elemento del array, si su `month` coincide con el mes actual:
+- Usar los valores parciales del mes anterior (primeros N días) como base de comparación en vez de los totales completos.
+- Aplicar esto solo a métricas acumulativas: `servicios`, `facturacion`, `efectivo`, `mp`, `costosFijos`.
+- Métricas unitarias (ticket promedio, rentabilidad, etc.) se comparan directo como hasta ahora.
+
+**3. Indicador visual "(parcial)"**
+
+En las tarjetas del mes actual, agregar un badge o texto pequeño "(parcial — X días)" junto al porcentaje de variación, para que el usuario sepa que es una comparación de período equivalente, no del mes completo.
+
+### Lógica concreta
+
+```typescript
+const today = new Date();
+const diaActual = today.getDate(); // ej: 2
+
+// En el cálculo de variaciones, para el último mes:
+if (isCurrentMonth && prev) {
+  // Filtrar ingresos del mes anterior que caigan en día <= diaActual
+  const prevParcial = monthlyData[i-1] con filtro día <= diaActual
+  // Usar prevParcial para calcVariation en métricas acumulativas
+}
 ```
-const cap = capacidadDiaria * (barberosActivos || 1) * workDays;
-```
-por:
-```
-const cap = capacidadDiaria * (m.barberosDelMes || 1) * workDays;
-```
 
-3. Agregar `barbero_id` al select de la query de ingresos (linea 304) y al tipo `MonthlyData`.
-
-4. Mantener `barberosActivos` solo para mostrar el dato informativo actual, no para el calculo de ocupacion.
-
-### Archivos a modificar
-- `src/components/EstadisticasPanel.tsx` — unico archivo afectado
+### Archivo a modificar
+- `src/components/EstadisticasPanel.tsx` — único archivo afectado
 
