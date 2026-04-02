@@ -199,6 +199,41 @@ export function EquipoUnificado({
       await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
     }
 
+    // Handle user_sucursales: assign sucursal for manager/barber roles
+    const needsSucursal = newRoles.includes('manager') || newRoles.includes('barber');
+    const hadSucursalRole = currentNonOwner.includes('manager') || currentNonOwner.includes('barber');
+
+    if (needsSucursal && sucursalId) {
+      // Upsert user_sucursales
+      const { data: existing } = await supabase
+        .from('user_sucursales')
+        .select('id')
+        .eq('user_id', linkedUser.id)
+        .eq('sucursal_id', sucursalId)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from('user_sucursales').insert({
+          user_id: linkedUser.id,
+          sucursal_id: sucursalId,
+          organization_id: organizationId,
+        });
+      }
+
+      // Set default_sucursal_id
+      await supabase
+        .from('profiles')
+        .update({ default_sucursal_id: sucursalId })
+        .eq('id', linkedUser.id);
+    } else if (!needsSucursal && hadSucursalRole) {
+      // Removed all sucursal-bound roles: clean up user_sucursales
+      await supabase
+        .from('user_sucursales')
+        .delete()
+        .eq('user_id', linkedUser.id)
+        .eq('sucursal_id', sucursalId);
+    }
+
     // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
     const teamRole: TeamRole = newRoles.includes('barber') ? 'barbero' : 'otros';
     onUpdateBarber(barberId, { teamRole });
