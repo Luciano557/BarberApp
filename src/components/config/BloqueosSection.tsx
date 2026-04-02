@@ -200,7 +200,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancelar</Button>
               <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={saving}>
-                {saving ? 'Guardando...' : 'Crear bloqueo'}
+                {saving ? 'Guardando...' : 'Crear ausencia'}
               </Button>
             </div>
           </div>
