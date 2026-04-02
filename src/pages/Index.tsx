@@ -101,7 +101,7 @@ const Index = () => {
             />
           )}
 
-          {activeTab === 'finanzas' && canManageConfig && (
+          {activeTab === 'finanzas' && canViewFinanzas && (
             <PinProtectedSection sectionName="Finanzas">
               <FinanzasPanel barbers={barbers} />
             </PinProtectedSection>
