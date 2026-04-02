@@ -384,6 +384,8 @@ export function EstadisticasPanel() {
         const costosVariables = monthEgresos.filter(e => e.tipo_costo === 'variable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
         const costosSemivariables = monthEgresos.filter(e => e.tipo_costo === 'semivariable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
 
+        const barberosDelMes = new Set(monthIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
+
         return {
           month: format(monthDate, 'yyyy-MM'),
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
@@ -395,6 +397,7 @@ export function EstadisticasPanel() {
           costosVariables,
           costosSemivariables,
           totalEgresos: costosFijos + costosVariables + costosSemivariables,
+          barberosDelMes,
         };
       });
 
