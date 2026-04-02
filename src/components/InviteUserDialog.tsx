@@ -95,6 +95,11 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
       return;
     }
 
+    if (formData.role === 'manager' && !selectedSucursalId) {
+      setErrors(prev => ({ ...prev, sucursal: 'Seleccioná una sucursal para el encargado' }));
+      return;
+    }
+
     if (!organization) {
       toast.error('Error: No se encontró la organización');
       return;
