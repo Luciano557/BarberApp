@@ -156,6 +156,21 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    // Assign sucursal for manager role
+    if (sucursalId) {
+      const { error: sucursalError } = await supabaseAdmin
+        .from("user_sucursales")
+        .upsert({
+          user_id: userId,
+          sucursal_id: sucursalId,
+          organization_id: organizationId,
+        }, { onConflict: "user_id,sucursal_id" });
+
+      if (sucursalError) {
+        console.error("Sucursal assignment error:", sucursalError);
+      }
+    }
+
     // Try to send email (but don't fail if it doesn't work)
     const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Local";
     
