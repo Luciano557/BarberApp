@@ -210,28 +210,33 @@ export function MiNegocioPanel() {
             <h2 className="text-lg font-medium text-foreground">Sucursales</h2>
             <p className="text-sm text-muted-foreground">Gestiona las sucursales de tu negocio</p>
           </div>
-          <Button size="sm" onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
-          </Button>
+          {canCreateSucursal && (
+            <Button size="sm" onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Tabs por sucursal */}
-      {allSucursales.length > 0 && (
-        <Tabs defaultValue={allSucursales[0]?.id} className="w-full">
-          <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
-            {allSucursales.map(s => (
-              <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
-                {s.nombre}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {allSucursales.map(s => (
+      {visibleSucursales.length > 0 && (
+        <Tabs defaultValue={defaultTabId} className="w-full">
+          {visibleSucursales.length > 1 && (
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+              {visibleSucursales.map(s => (
+                <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                  {s.nombre}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+          {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
               <SucursalTabContent
                 sucursal={s}
                 barbers={allBarbers.filter(b => b.sucursalId === s.id)}
                 allBarbers={allBarbers}
+                allSucursales={allSucursales}
                 services={getServicesForSucursal(s.id)}
                 extras={getExtrasForSucursal(s.id)}
                 discounts={getDiscountsForSucursal(s.id)}
