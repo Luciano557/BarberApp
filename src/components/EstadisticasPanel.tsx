@@ -696,7 +696,7 @@ export function EstadisticasPanel() {
         {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
         {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
         {isPartial && (
-          <span className="ml-1 text-muted-foreground" title={`Comparación parcial: primeros ${latest.diasTranscurridos} días vs mismos días del mes anterior`}>
+          <span className="ml-1 text-muted-foreground" title={`Estimación basada en los primeros ${latest.diasTranscurridos} días del mes, comparados con los mismos ${latest.diasTranscurridos} días del mes anterior`}>
             <Clock className="h-3 w-3 inline" />
           </span>
         )}
