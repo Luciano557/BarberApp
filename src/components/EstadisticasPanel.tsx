@@ -560,7 +560,7 @@ export function EstadisticasPanel() {
         costoVariablePorServicioVar: prev ? calcVariation(curr.costoVariablePorServicio, prev.costoVariablePorServicio) : null,
         gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
         puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
-        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prev.tasaOcupacion) : null,
+        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, useSameDayComparison && prevM!.parcialTasaOcupacion !== undefined ? prevM!.parcialTasaOcupacion! : prev.tasaOcupacion) : null,
       };
     });
   })();
