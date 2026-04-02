@@ -80,10 +80,31 @@ export function MiNegocioPanel() {
     if (data) setAllBarbers(data.map(dbToBarberWithSucursal));
   }, [organization?.id]);
 
+  // Fetch manager's assigned sucursales
+  const fetchManagerSucursales = useCallback(async () => {
+    if (!isManagerOnly || !user?.id) return;
+    const { data } = await supabase
+      .from('user_sucursales')
+      .select('sucursal_id')
+      .eq('user_id', user.id);
+    if (data) setManagerSucursalIds(data.map(d => d.sucursal_id));
+  }, [isManagerOnly, user?.id]);
+
   useEffect(() => {
     fetchAllSucursales();
     fetchAllBarbers();
-  }, [fetchAllSucursales, fetchAllBarbers]);
+    fetchManagerSucursales();
+  }, [fetchAllSucursales, fetchAllBarbers, fetchManagerSucursales]);
+
+  // Filter sucursales for managers
+  const visibleSucursales = isManagerOnly
+    ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
+    : allSucursales;
+
+  // Default tab: use current sucursal from panel selector if it exists in visible list
+  const defaultTabId = (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+    ? currentSucursal.id
+    : visibleSucursales[0]?.id;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
