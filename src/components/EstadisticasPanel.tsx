@@ -32,6 +32,7 @@ interface MonthlyData {
   costosVariables: number;
   costosSemivariables: number;
   totalEgresos: number;
+  barberosDelMes: number;
 }
 
 interface DerivedMonthlyMetrics {
