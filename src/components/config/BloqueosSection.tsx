@@ -135,11 +135,11 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
             <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
               <ShieldOff className="w-4 h-4 text-destructive" />
             </div>
-            <CardTitle className="text-sm">Bloqueos y excepciones</CardTitle>
+            <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
           </div>
           {!showForm && (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowForm(true)}>
-              <Plus className="h-3 w-3 mr-1" /> Nuevo bloqueo
+              <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
             </Button>
           )}
         </div>
