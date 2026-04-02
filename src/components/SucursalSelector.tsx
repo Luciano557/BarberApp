@@ -2,7 +2,6 @@ import { Building2, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
 
 interface SucursalSelectorProps {
   collapsed?: boolean;
