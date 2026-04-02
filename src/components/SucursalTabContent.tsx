@@ -18,6 +18,7 @@ interface SucursalTabContentProps {
   sucursal: Sucursal;
   barbers: Barber[];
   allBarbers: Barber[];
+  allSucursales?: Sucursal[];
   services: Service[];
   extras: Extra[];
   discounts: Discount[];
