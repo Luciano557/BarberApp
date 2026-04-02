@@ -16,6 +16,7 @@ interface InviteRequest {
   barberoId?: string;
   organizationId: string;
   organizationName: string;
+  sucursalId?: string;
 }
 
 function generatePassword(): string {
