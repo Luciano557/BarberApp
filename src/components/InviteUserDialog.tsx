@@ -164,6 +164,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
   const handleClose = () => {
     if (!isLoading) {
       setFormData({ email: '', fullName: barber ? `${barber.firstName} ${barber.lastName}` : '', role: barber ? 'barber' : '' });
+      setSelectedSucursalId('');
       setErrors({});
       setCreatedCredentials(null);
       setShowPassword(false);
