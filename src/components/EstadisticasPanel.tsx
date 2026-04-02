@@ -33,6 +33,12 @@ interface MonthlyData {
   costosSemivariables: number;
   totalEgresos: number;
   barberosDelMes: number;
+  // Partial sums for same-day comparison (first N days only)
+  parcialFacturacion?: number;
+  parcialServicios?: number;
+  parcialEfectivo?: number;
+  parcialMp?: number;
+  parcialCostosFijos?: number;
 }
 
 interface DerivedMonthlyMetrics {
