@@ -1,81 +1,39 @@
 
+
 ## Resumen
 
-Detecté 3 causas raíz concretas en el código actual:
+Dos problemas: (1) al asignar "Encargado de Sucursal" desde el panel de Equipo, no se crea el registro en `user_sucursales`, por lo que el manager no ve sucursales; (2) el PIN se guarda pero falla al validar, probablemente porque `currentSucursal` es `null` (consecuencia del problema 1) y `validate-pin` rechaza a no-globales sin sucursal.
 
-1. `public.handle_new_user()` sigue creando organización + sucursal + rol `owner` para cualquier alta en `auth.users`, incluso usuarios invitados.
-2. El flujo de PIN está partido en dos sistemas incompatibles:
-   - validación real: `barberos.pin_hash` (`validate-pin`, `set-pin`)
-   - UI de autoconfiguración: `user_pins` (`PinConfigSection`)
-3. La visibilidad del panel depende de `AuthContext`, pero todavía hay pantallas con checks ad-hoc que no respetan del todo la matriz de cargos.
+## Problema 1: Sucursal no asignada al cambiar rol a manager
 
-## Plan
+**Causa**: `handleChangeRoles` en `EquipoUnificado.tsx` (línea 171) solo inserta/elimina en `user_roles`, pero nunca toca `user_sucursales`. Cuando un manager se logea, la RLS de `sucursales` requiere que exista un registro en `user_sucursales` → no ve nada.
 
-### 1) Arreglar el bug de “todos nacen Dueño”
-- Crear una migración para reemplazar `handle_new_user()`:
-  - si `NEW.raw_user_meta_data->>'invited_by'` existe, solo crear `profiles`
-  - no crear organización
-  - no crear sucursal
-  - no insertar `owner`
-  - no insertar `user_sucursales`
-- En la misma migración, reparar datos ya afectados:
-  - quitar `owner` duplicado a invitados que además tengan otro cargo
-  - corregir `profiles.default_sucursal_id`
-  - normalizar `user_sucursales` según la sucursal real del usuario/barbero
-- Actualizar `supabase/functions/invite-user/index.ts` para que:
-  - asigne el cargo siempre, también si el usuario ya existía
-  - no dependa de `!isExistingUser`
-  - cree/ajuste la membresía correcta en `user_sucursales`
-  - deje el perfil apuntando a la organización y sucursal correctas
+**Fix en `EquipoUnificado.tsx`**:
+- Cuando se agrega el rol `manager`, solicitar la sucursal (ya se conoce: es la sucursal actual del tab donde se está trabajando, pasada como prop `sucursalId`).
+- Insertar en `user_sucursales` con `user_id`, `sucursal_id`, `organization_id`.
+- Actualizar `profiles.default_sucursal_id`.
+- Cuando se remueve el rol `manager`, eliminar el registro de `user_sucursales` correspondiente.
 
-### 2) Unificar el sistema de PIN y habilitar primer acceso real
-- Tomar `barberos.pin_hash` como única fuente de verdad del PIN.
-- Rehacer `PinConfigSection.tsx` para que deje de consultar `user_pins` y use el `barbero_id` del usuario logueado.
-- Extender `usePinProtection.ts` para exponer:
-  - si el usuario actual tiene barbero vinculado
-  - si ese barbero ya tiene PIN
-  - si necesita setup inicial
-- En `PinProtectedSection.tsx`, cuando el usuario entra por primera vez a una sección protegida y no tiene PIN, mostrar formulario de creación de PIN inline en vez del formulario de validación.
-- Replicar esa lógica en `PinGateDialog.tsx` para acciones protegidas que hoy abren modal de PIN.
-- Endurecer `supabase/functions/set-pin/index.ts`:
-  - autogestión solo sobre el propio `barbero_id`
-  - owner/GM pueden seguir configurando PINs desde staff
-  - mantener validación de PIN actual para cambio/eliminación
+**También para barbers**: cuando se invita un barbero, el `invite-user` ya maneja `user_sucursales`, pero cuando se cambian roles desde el checkbox sin pasar por invite, hay que garantizar que también se asigne la sucursal. Agregar la misma lógica para `barber`.
 
-### 3) Hacer que cada cargo vea solo su panel permitido
-- Consolidar la matriz de permisos en `AuthContext.tsx` con flags más explícitos por módulo/acción.
-- Revisar `AppSidebar.tsx` e `Index.tsx` para que:
-  - no calculen navegación final hasta que auth/roles estén cargados
-  - siempre caigan a una pestaña válida si el cargo no puede abrir la actual
-- Reemplazar checks directos por permisos centralizados en pantallas clave:
-  - `TareasPanel.tsx`
-  - `DailySummary.tsx`
-  - `MultiDayClosingSummary.tsx`
-- Objetivo final:
-  - Dueño / Encargado General: acceso total
-  - Encargado de Sucursal: solo módulos permitidos por la matriz vigente
-  - Barbero: solo Caja + Tareas
-  - Otros: sin acceso al panel
+## Problema 2: PIN se crea pero "PIN incorrecto" al validar
 
-## Archivos a tocar
+**Causa raíz probable**: Si `user_sucursales` está vacío (problema 1), `SucursalContext` no carga sucursales → `currentSucursal` es `null` → `usePinProtection` envía `sucursal_id: null` a `validate-pin` → la función rechaza con "Este PIN no tiene acceso global" (pero el UI muestra el fallback "PIN incorrecto").
 
-- `supabase/migrations/*` — fix del trigger + reparación de datos
-- `supabase/functions/invite-user/index.ts`
-- `supabase/functions/set-pin/index.ts`
-- `src/hooks/usePinProtection.ts`
-- `src/components/PinProtectedSection.tsx`
-- `src/components/PinGateDialog.tsx`
-- `src/components/PinConfigSection.tsx`
-- `src/contexts/AuthContext.tsx`
-- `src/components/AppSidebar.tsx`
-- `src/pages/Index.tsx`
-- `src/components/TareasPanel.tsx`
-- `src/components/DailySummary.tsx`
-- `src/components/MultiDayClosingSummary.tsx`
+**Fix**: Solucionar el problema 1 debería resolver el 2 en cascada. Adicionalmente:
 
-## Validación
+1. En `PinProtectedSection.tsx`: mostrar el error real de `validate-pin` en vez del genérico. Actualmente línea 40 usa `result.error || 'PIN incorrecto'` — el error del servidor debería llegar correctamente, pero verificar que `usePinProtection.validatePin` propague `data.error` siempre.
 
-- Invitar un barbero nuevo: queda solo con `barber`, nunca con `owner`.
-- Invitar un usuario existente: recibe el cargo correcto.
-- Primer login sin PIN: puede crear PIN al intentar entrar a una sección protegida.
-- Verificación de menú y acceso real para: Dueño, Encargado General, Encargado de Sucursal, Barbero y Otros.
+2. En `validate-pin/index.ts`: para el caso de primer login donde el usuario aún no tiene sucursal asignada, buscar la sucursal del barbero directamente y usarla como fallback si `sucursal_id` no viene en el request.
+
+## Visualizar sucursal asignada
+
+**En `AppSidebar.tsx` o `SucursalSelector.tsx`**: para managers y barbers que solo tienen 1 sucursal asignada, mostrar el nombre de la sucursal como badge o texto informativo (sin dropdown, ya que no pueden cambiar).
+
+## Archivos a modificar
+
+1. **`src/components/config/EquipoUnificado.tsx`** — `handleChangeRoles`: al agregar manager/barber, insertar en `user_sucursales` y setear `default_sucursal_id`
+2. **`supabase/functions/validate-pin/index.ts`** — fallback: si `sucursal_id` es null y el barbero tiene `sucursal_id`, usar esa
+3. **`src/components/PinProtectedSection.tsx`** — mostrar error real del servidor
+4. **`src/components/SucursalSelector.tsx`** — mostrar sucursal fija para barbers/managers sin opción de cambio
+
