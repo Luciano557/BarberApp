@@ -55,6 +55,8 @@ interface DerivedMonthlyMetrics {
   gananciaPorServicio: number;
   puntoEquilibrio: number;
   tasaOcupacion: number;
+  isCurrentMonth?: boolean;
+  diasTranscurridos?: number;
   // Variation fields (% change vs previous month)
   facturacionVar: number | null;
   serviciosVar: number | null;
