@@ -21,7 +21,8 @@ const inviteSchema = z.object({
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  barber?: Barber; // Optional - if provided, prefills name and links to barber
+  barber?: Barber;
+  sucursales?: Sucursal[];
   onSuccess?: () => void;
 }
 
