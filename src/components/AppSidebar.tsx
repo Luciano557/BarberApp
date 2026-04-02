@@ -29,9 +29,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
-    ...(canManageConfig ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
+    ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
-    ...(isOwner || isGeneralManager ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
+    ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
