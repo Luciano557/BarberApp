@@ -2,34 +2,36 @@
 
 ## Problema
 
-Las variaciones del mes actual no se muestran porque `calcVariation` retorna `null` cuando el valor previo es 0. En la comparación "mismos días", si los primeros N días del mes anterior no tuvieron transacciones (o una métrica fue 0), el badge de variación desaparece por completo en vez de mostrar un porcentaje.
+La tasa de ocupación del mes en curso tiene dos defectos:
 
-**Línea culpable** (116):
-```typescript
-function calcVariation(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;  // ← retorna null, badge no se renderiza
-  ...
-}
-```
+1. **Valor absoluto inflado/desinflado**: Se dividen los servicios parciales (ej: solo 2 días) por la capacidad del mes completo (ej: 22 días laborales), dando una tasa artificialmente baja.
+2. **Variación engañosa**: Se compara esa tasa baja contra la tasa completa del mes anterior, mostrando caídas irreales.
 
 ## Solución
 
-Modificar `calcVariation` para que cuando `previous === 0` y `current > 0`, retorne un valor representativo en vez de `null`. Opciones razonables:
+Aplicar la misma lógica de "mismos días" a la tasa de ocupación:
 
-- Si `previous === 0` y `current > 0`: retornar `100` (indica crecimiento desde cero, o "nuevo")
-- Si `previous === 0` y `current === 0`: retornar `0`
-- Si `previous === 0` y `current < 0`: retornar `-100`
+### Cambios en `src/components/EstadisticasPanel.tsx`
 
-Esto asegura que siempre se muestre un badge de variación cuando hay datos.
+**1. Crear función `getWorkDaysUpTo(year, month, maxDay)`**
 
-Alternativamente, si se quiere ser más explícito, mostrar un indicador "Nuevo" o "∞" cuando el mes anterior parcial era 0 pero el actual tiene datos.
+Similar a `getWorkDaysInMonth` pero cuenta días laborales solo hasta el día `maxDay` (inclusive). Se usa para calcular la capacidad parcial.
 
-### Cambio en `src/components/EstadisticasPanel.tsx`
+**2. Ajustar el cálculo de `tasaOcupacion` para el mes actual (línea ~480)**
 
-1. **Actualizar `calcVariation`** (línea 115-117): Cuando `previous === 0` y `current !== 0`, retornar `100` (o `-100` si current < 0) en vez de `null`.
+Cuando el mes es el actual, usar `getWorkDaysUpTo(y, mo-1, diaActual)` en vez de `getWorkDaysInMonth(y, mo-1)`. Así la capacidad refleja solo los días transcurridos y la tasa es realista.
 
-2. **Alternativa visual**: En `renderVariationBadge`, si la variación es exactamente `100` y se sabe que el previo era 0, mostrar "Nuevo" en vez de "+100.0%". Esto es opcional pero más claro.
+**3. Calcular tasa de ocupación parcial del mes anterior (en la sección `needsPartial`, línea ~412)**
 
-### Archivo a modificar
-- `src/components/EstadisticasPanel.tsx` — único archivo afectado
+Agregar `parcialTasaOcupacion` al modelo: usando `parcialServicios` dividido por la capacidad de los primeros N días laborales del mes anterior (`getWorkDaysUpTo`).
+
+**4. Usar parcial en la variación (línea ~538)**
+
+Cambiar `tasaOcupacionVar` para que, cuando `useSameDayComparison`, compare contra `parcialTasaOcupacion` del mes anterior en vez de la tasa completa.
+
+### Resultado
+
+- Si hoy es 2 de abril, la tasa de ocupación de abril se calcula sobre 2 días laborales de capacidad.
+- La variación compara contra la tasa de los primeros 2 días de marzo.
+- El tooltip "(parcial — X días)" ya aplicado a las demás métricas cubrirá esta también.
 
