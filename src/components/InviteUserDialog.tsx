@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
+import { Sucursal } from '@/contexts/SucursalContext';
 
 const inviteSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }).max(255),
