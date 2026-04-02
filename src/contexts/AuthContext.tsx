@@ -29,6 +29,8 @@ interface AuthContextType {
   canViewAllClosings: boolean;
   canViewResumen: boolean;
   canViewTareas: boolean;
+  canViewMiNegocio: boolean;
+  canViewFinanzas: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
