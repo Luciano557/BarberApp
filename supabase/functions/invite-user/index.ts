@@ -158,16 +158,26 @@ serve(async (req: Request): Promise<Response> => {
 
     // Assign sucursal for manager role
     if (sucursalId) {
-      const { error: sucursalError } = await supabaseAdmin
+      // Check if already assigned
+      const { data: existing } = await supabaseAdmin
         .from("user_sucursales")
-        .upsert({
-          user_id: userId,
-          sucursal_id: sucursalId,
-          organization_id: organizationId,
-        }, { onConflict: "user_id,sucursal_id" });
+        .select("id")
+        .eq("user_id", userId)
+        .eq("sucursal_id", sucursalId)
+        .maybeSingle();
 
-      if (sucursalError) {
-        console.error("Sucursal assignment error:", sucursalError);
+      if (!existing) {
+        const { error: sucursalError } = await supabaseAdmin
+          .from("user_sucursales")
+          .insert({
+            user_id: userId,
+            sucursal_id: sucursalId,
+            organization_id: organizationId,
+          });
+
+        if (sucursalError) {
+          console.error("Sucursal assignment error:", sucursalError);
+        }
       }
     }
 
