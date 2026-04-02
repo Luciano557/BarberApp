@@ -44,7 +44,13 @@ const Index = () => {
     if (activeTab === 'tareas' && !canViewTareas) {
       setActiveTab('no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, hasNoAccess]);
+    if (activeTab === 'finanzas' && !canViewFinanzas) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+    if (activeTab === 'mi-negocio' && !canViewMiNegocio) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, hasNoAccess]);
 
   const {
     isLoading,
