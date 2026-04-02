@@ -1,71 +1,81 @@
 
-
 ## Resumen
 
-4 cambios: renombrar "Encargado de Local" a "Encargado de Sucursal", ajustar permisos del manager (sin Config, Mi Negocio limitado a su sucursal), solicitar sucursal al asignar rol manager, y abrir Mi Negocio en la pestaña de la sucursal seleccionada en el panel.
+Detecté 3 causas raíz concretas en el código actual:
 
-## 1. Renombrar "Encargado de Local" → "Encargado de Sucursal"
+1. `public.handle_new_user()` sigue creando organización + sucursal + rol `owner` para cualquier alta en `auth.users`, incluso usuarios invitados.
+2. El flujo de PIN está partido en dos sistemas incompatibles:
+   - validación real: `barberos.pin_hash` (`validate-pin`, `set-pin`)
+   - UI de autoconfiguración: `user_pins` (`PinConfigSection`)
+3. La visibilidad del panel depende de `AuthContext`, pero todavía hay pantallas con checks ad-hoc que no respetan del todo la matriz de cargos.
 
-Cambios de texto en:
-- `EquipoUnificado.tsx` línea 32: `'Encargado de Sucursal'` (ya está hecho)
-- `AppSidebar.tsx` línea 42: cambiar `'Enc. Local'` → `'Enc. Sucursal'`
-- `InviteUserDialog.tsx` línea 303: cambiar `"Encargado de Local"` → `"Encargado de Sucursal"`
-- `invite-user/index.ts` línea 159: cambiar `"Encargado de Local"` → `"Encargado de Sucursal"`
+## Plan
 
-## 2. Ajustar permisos del Encargado de Sucursal (manager)
+### 1) Arreglar el bug de “todos nacen Dueño”
+- Crear una migración para reemplazar `handle_new_user()`:
+  - si `NEW.raw_user_meta_data->>'invited_by'` existe, solo crear `profiles`
+  - no crear organización
+  - no crear sucursal
+  - no insertar `owner`
+  - no insertar `user_sucursales`
+- En la misma migración, reparar datos ya afectados:
+  - quitar `owner` duplicado a invitados que además tengan otro cargo
+  - corregir `profiles.default_sucursal_id`
+  - normalizar `user_sucursales` según la sucursal real del usuario/barbero
+- Actualizar `supabase/functions/invite-user/index.ts` para que:
+  - asigne el cargo siempre, también si el usuario ya existía
+  - no dependa de `!isExistingUser`
+  - cree/ajuste la membresía correcta en `user_sucursales`
+  - deje el perfil apuntando a la organización y sucursal correctas
 
-**En `AuthContext.tsx`**:
-- `canManageConfig`: quitar `isManager` → solo `isOwner || isGeneralManager`
-- Agregar nuevo permiso `canViewMiNegocio`: `isOwner || isGeneralManager || isManager`
+### 2) Unificar el sistema de PIN y habilitar primer acceso real
+- Tomar `barberos.pin_hash` como única fuente de verdad del PIN.
+- Rehacer `PinConfigSection.tsx` para que deje de consultar `user_pins` y use el `barbero_id` del usuario logueado.
+- Extender `usePinProtection.ts` para exponer:
+  - si el usuario actual tiene barbero vinculado
+  - si ese barbero ya tiene PIN
+  - si necesita setup inicial
+- En `PinProtectedSection.tsx`, cuando el usuario entra por primera vez a una sección protegida y no tiene PIN, mostrar formulario de creación de PIN inline en vez del formulario de validación.
+- Replicar esa lógica en `PinGateDialog.tsx` para acciones protegidas que hoy abren modal de PIN.
+- Endurecer `supabase/functions/set-pin/index.ts`:
+  - autogestión solo sobre el propio `barbero_id`
+  - owner/GM pueden seguir configurando PINs desde staff
+  - mantener validación de PIN actual para cambio/eliminación
 
-**En `AppSidebar.tsx`**:
-- Cambiar nav item "Configuración": solo mostrar si `canManageConfig` (que ahora excluye manager)
-- Cambiar nav item "Mi Negocio": mostrar si `canViewMiNegocio` (nuevo permiso que incluye manager)
-- Finanzas: mantener con `canManageConfig` (excluye manager) o crear permiso separado — dado que el usuario dijo "todo menos Configuración", Finanzas debería quedarse visible para el manager. Confirmo: `canManageConfig` actualmente controla tanto Config como Finanzas. Necesitamos separar: crear `canViewFinanzas = isOwner || isGeneralManager || isManager` y dejar `canManageConfig = isOwner || isGeneralManager`.
+### 3) Hacer que cada cargo vea solo su panel permitido
+- Consolidar la matriz de permisos en `AuthContext.tsx` con flags más explícitos por módulo/acción.
+- Revisar `AppSidebar.tsx` e `Index.tsx` para que:
+  - no calculen navegación final hasta que auth/roles estén cargados
+  - siempre caigan a una pestaña válida si el cargo no puede abrir la actual
+- Reemplazar checks directos por permisos centralizados en pantallas clave:
+  - `TareasPanel.tsx`
+  - `DailySummary.tsx`
+  - `MultiDayClosingSummary.tsx`
+- Objetivo final:
+  - Dueño / Encargado General: acceso total
+  - Encargado de Sucursal: solo módulos permitidos por la matriz vigente
+  - Barbero: solo Caja + Tareas
+  - Otros: sin acceso al panel
 
-**En `Index.tsx`**:
-- Tab `mi-negocio`: cambiar condición de `isOwner` a `canViewMiNegocio`
-- Tab `config`: mantener con `canManageConfig` (ahora solo owner/GM)
-- Tab `finanzas`: usar `canViewFinanzas`
+## Archivos a tocar
 
-## 3. Manager en Mi Negocio: solo su sucursal asignada
+- `supabase/migrations/*` — fix del trigger + reparación de datos
+- `supabase/functions/invite-user/index.ts`
+- `supabase/functions/set-pin/index.ts`
+- `src/hooks/usePinProtection.ts`
+- `src/components/PinProtectedSection.tsx`
+- `src/components/PinGateDialog.tsx`
+- `src/components/PinConfigSection.tsx`
+- `src/contexts/AuthContext.tsx`
+- `src/components/AppSidebar.tsx`
+- `src/pages/Index.tsx`
+- `src/components/TareasPanel.tsx`
+- `src/components/DailySummary.tsx`
+- `src/components/MultiDayClosingSummary.tsx`
 
-**En `MiNegocioPanel.tsx`**:
-- Importar `useAuth` y detectar si es `isManager` (sin ser owner/GM)
-- Si es manager: filtrar `allSucursales` para mostrar solo las sucursales asignadas al usuario (query `user_sucursales` por `user_id`)
-- Ocultar botón "Nueva sucursal" para managers
-- Si solo tiene 1 sucursal (caso típico del manager), no mostrar tabs, ir directo al contenido
+## Validación
 
-## 4. Solicitar sucursal al asignar rol "manager"
-
-**En `EquipoUnificado.tsx`** (formulario de roles):
-- Cuando se activa el checkbox de `manager` en la vista de detalle, mostrar un `Select` para elegir la sucursal asignada
-- Al confirmar, además de insertar el rol en `user_roles`, insertar/actualizar en `user_sucursales` con la sucursal elegida
-- Props: pasar lista de sucursales disponibles al componente
-
-**En `InviteUserDialog.tsx`**:
-- Cuando se selecciona rol `manager`, mostrar un campo adicional de selección de sucursal
-- Pasar `sucursalId` al edge function para que cree el registro en `user_sucursales`
-
-**En `invite-user/index.ts`**:
-- Aceptar nuevo campo opcional `sucursalId` en el request
-- Si viene `sucursalId`, insertar en `user_sucursales` tras crear el usuario
-
-## 5. Mi Negocio abre en la pestaña de la sucursal del panel
-
-**En `MiNegocioPanel.tsx`**:
-- Importar `useSucursal` y obtener `currentSucursal`
-- Cambiar `defaultValue` del `Tabs` de `allSucursales[0]?.id` a `currentSucursal?.id || allSucursales[0]?.id`
-- Si `currentSucursal` está seteada y existe en la lista, usar su id como tab activa inicial
-
-## Archivos a modificar
-
-1. **`src/contexts/AuthContext.tsx`** — nuevos permisos `canViewMiNegocio`, `canViewFinanzas`; `canManageConfig` sin manager
-2. **`src/components/AppSidebar.tsx`** — renombrar badge, actualizar nav items con nuevos permisos
-3. **`src/pages/Index.tsx`** — usar nuevos permisos para tabs
-4. **`src/components/MiNegocioPanel.tsx`** — filtrar sucursales para manager, abrir en pestaña de sucursal actual
-5. **`src/components/config/EquipoUnificado.tsx`** — pedir sucursal al asignar rol manager + pasar sucursales como prop
-6. **`src/components/InviteUserDialog.tsx`** — campo sucursal para rol manager, renombrar texto
-7. **`supabase/functions/invite-user/index.ts`** — aceptar `sucursalId`, insertar en `user_sucursales`
-8. **`src/components/SucursalTabContent.tsx`** — pasar sucursales a EquipoUnificado (nueva prop)
-
+- Invitar un barbero nuevo: queda solo con `barber`, nunca con `owner`.
+- Invitar un usuario existente: recibe el cargo correcto.
+- Primer login sin PIN: puede crear PIN al intentar entrar a una sección protegida.
+- Verificación de menú y acceso real para: Dueño, Encargado General, Encargado de Sucursal, Barbero y Otros.
