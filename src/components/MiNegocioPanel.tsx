@@ -50,6 +50,10 @@ export function MiNegocioPanel() {
   const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+
+  const isManagerOnly = isManager && !isOwner && !isGeneralManager;
+  const canCreateSucursal = isOwner || isGeneralManager;
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
