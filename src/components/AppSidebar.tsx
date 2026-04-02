@@ -39,7 +39,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     const badgeMap: Record<string, { label: string; icon: typeof Shield; variant: 'default' | 'secondary' | 'outline' }> = {
       owner: { label: 'Dueño', icon: Shield, variant: 'default' },
       general_manager: { label: 'Enc. General', icon: Shield, variant: 'default' },
-      manager: { label: 'Enc. Local', icon: UserCheck, variant: 'secondary' },
+      manager: { label: 'Enc. Sucursal', icon: UserCheck, variant: 'secondary' },
       barber: { label: 'Barbero', icon: Scissors, variant: 'outline' },
     };
     return roles

@@ -121,7 +121,7 @@ const Index = () => {
             </div>
           )}
 
-          {activeTab === 'mi-negocio' && isOwner && (
+          {activeTab === 'mi-negocio' && canViewMiNegocio && (
             <PinProtectedSection sectionName="Mi Negocio">
               <MiNegocioPanel />
             </PinProtectedSection>
