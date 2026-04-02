@@ -183,6 +183,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canViewAllClosings,
         canViewResumen,
         canViewTareas,
+        canViewMiNegocio,
+        canViewFinanzas,
         signIn,
         signUp,
         signOut,
