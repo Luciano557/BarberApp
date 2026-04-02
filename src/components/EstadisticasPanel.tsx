@@ -665,10 +665,16 @@ export function EstadisticasPanel() {
     if (!latest || !vKey) return null;
     const variation = latest[vKey] as number | null;
     if (variation == null) return null;
+    const isPartial = latest.isCurrentMonth && latest.diasTranscurridos;
     return (
       <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${variation > 0 ? 'text-green-600' : variation < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
         {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
         {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
+        {isPartial && (
+          <span className="ml-1 text-muted-foreground" title={`Comparación parcial: primeros ${latest.diasTranscurridos} días vs mismos días del mes anterior`}>
+            <Clock className="h-3 w-3 inline" />
+          </span>
+        )}
       </span>
     );
   };
