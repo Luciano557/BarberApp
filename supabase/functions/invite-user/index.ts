@@ -65,7 +65,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Only owners and general managers can invite users");
     }
 
-    const { email, fullName, role, barberoId, organizationId, organizationName }: InviteRequest = await req.json();
+    const { email, fullName, role, barberoId, organizationId, organizationName, sucursalId }: InviteRequest = await req.json();
 
     // Validate input
     if (!email || !fullName || !role || !organizationId) {
