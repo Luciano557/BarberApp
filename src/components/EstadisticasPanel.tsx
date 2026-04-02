@@ -528,10 +528,6 @@ export function EstadisticasPanel() {
       };
     });
 
-    const today = new Date();
-    const currentMonthStr = format(today, 'yyyy-MM');
-    const diaActual = today.getDate();
-
     // Calculate variations
     return raw.map((curr, i): DerivedMonthlyMetrics => {
       const prev = i > 0 ? raw[i - 1] : null;
