@@ -302,7 +302,10 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
             <Label htmlFor="invite-role">Rol</Label>
             <Select 
               value={formData.role} 
-              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => setFormData(prev => ({ ...prev, role: value }))}
+              onValueChange={(value: 'barber' | 'manager' | 'general_manager') => {
+                setFormData(prev => ({ ...prev, role: value }));
+                if (value !== 'manager') setSelectedSucursalId('');
+              }}
               disabled={isLoading}
             >
               <SelectTrigger>
@@ -310,12 +313,29 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="barber">Barbero</SelectItem>
-                <SelectItem value="manager">Encargado de Local</SelectItem>
+                <SelectItem value="manager">Encargado de Sucursal</SelectItem>
                 <SelectItem value="general_manager">Encargado General</SelectItem>
               </SelectContent>
             </Select>
             {errors.role && <p className="text-sm text-destructive">{errors.role}</p>}
           </div>
+
+          {formData.role === 'manager' && sucursales.length > 0 && (
+            <div className="space-y-2">
+              <Label>Sucursal asignada</Label>
+              <Select value={selectedSucursalId} onValueChange={setSelectedSucursalId} disabled={isLoading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar sucursal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sucursales.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.sucursal && <p className="text-sm text-destructive">{errors.sucursal}</p>}
+            </div>
+          )}
 
           <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground">
             <p>Se enviará un email con:</p>
