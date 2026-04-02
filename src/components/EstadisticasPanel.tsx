@@ -420,6 +420,7 @@ export function EstadisticasPanel() {
         let parcialEfectivo: number | undefined;
         let parcialMp: number | undefined;
         let parcialCostosFijos: number | undefined;
+        let parcialTasaOcupacion: number | undefined;
 
         if (needsPartial) {
           // Filter ingresos where day-of-month <= diaActual
@@ -437,6 +438,13 @@ export function EstadisticasPanel() {
           parcialEfectivo = partialIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
           parcialMp = partialIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
           parcialCostosFijos = partialEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+
+          // Partial occupancy: services in first N days / capacity of first N work days
+          const [py, pmo] = monthStr.split('-').map(Number);
+          const partialWorkDays = getWorkDaysUpTo(py, pmo - 1, diaActual);
+          const partialBarberos = new Set(partialIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
+          const partialCap = capacidadDiaria * (partialBarberos || barberosActivos || 1) * partialWorkDays;
+          parcialTasaOcupacion = partialCap > 0 ? (parcialServicios / partialCap) * 100 : 0;
         }
 
         return {
