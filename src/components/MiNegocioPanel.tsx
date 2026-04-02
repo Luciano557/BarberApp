@@ -37,7 +37,8 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
 
 export function MiNegocioPanel() {
   const { organization } = useOrganization();
-  const { refreshSucursales } = useSucursal();
+  const { currentSucursal, refreshSucursales } = useSucursal();
+  const { isOwner, isGeneralManager, isManager, user } = useAuth();
   const {
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
