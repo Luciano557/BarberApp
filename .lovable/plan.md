@@ -2,53 +2,53 @@
 
 ## Resumen
 
-3 cambios: fix barbero fantasma en booking, agregar duración en servicios, eliminar buffer antes.
+3 cambios: fusionar Fecha+Horario en un solo paso, limpiar estado al volver atras, actualizar mensaje de sin disponibilidad.
 
-## Problema 1: Barbero desactivado aparece en reservas
+## Cambio 1: Fusionar FechaStep y HorarioStep en un nuevo `FechaHorarioStep`
 
-**Causa raíz**: Hay un registro duplicado de "Luciano Garcia" con `sucursal_id = NULL` y `activo = true` (id: `0ee9bdb5`). En `BookingStepper.tsx` línea 238, el filtro `b.sucursal_id === booking.sucursalId || !b.sucursal_id` incluye barberos sin sucursal en TODAS las sucursales.
+Crear `src/components/reservar/FechaHorarioStep.tsx` que combina calendario + grilla de horarios en una sola vista:
 
-**Fix en 2 puntos**:
+- Arriba: calendario (compact) con fecha seleccionada (default: hoy)
+- Abajo: grilla de slots disponibles para la fecha seleccionada (se recarga al cambiar fecha, sin avanzar de paso)
+- Al seleccionar un slot se avanza al siguiente paso
+- Si no hay slots para hoy, mostrar: "No hay turnos disponibles para el dia de hoy. Probá seleccionando otro dia en el calendario."
+- Si no hay slots para otra fecha: "No hay turnos disponibles para el [fecha legible]."
+- Mantener botones de "Elegir otro barbero" cuando no hay slots
+- Props: mismas que HorarioStep actual + sin `onChangeFecha` (ya no hace falta, el calendario esta integrado)
 
-1. **`supabase/functions/get-org-public/index.ts`** — agregar filtro `.not('sucursal_id', 'is', null)` en la query de barberos. Un barbero sin sucursal asignada no debería ser reservable.
+## Cambio 2: Limpiar estado al volver atras
 
-2. **`BookingStepper.tsx` línea 238** — cambiar filtro a solo `b.sucursal_id === booking.sucursalId` (sin el fallback `|| !b.sucursal_id`). Esto es defensa en profundidad.
+En `BookingStepper.tsx`, modificar `goBack` para resetear los campos del paso al que se vuelve:
 
-3. **Limpiar dato huérfano** — desactivar el registro `0ee9bdb5` que tiene `sucursal_id = NULL` vía update directo.
+```text
+goBack():
+  if step > 0:
+    newStep = step - 1
+    resetear campos desde newStep en adelante:
+      step 0 (sucursal): limpiar sucursal + servicio + barbero + fecha/hora
+      step 1 (servicio): limpiar servicio + barbero + fecha/hora
+      step 2 (barbero): limpiar barbero + fecha/hora
+      step 3 (fecha+horario): limpiar fecha (reset a hoy) + hora
+    setStep(newStep)
+```
 
-## Problema 2: Agregar duración por servicio
+Tambien actualizar los badges para que solo muestren lo que corresponde al paso actual.
 
-**Cambios**:
+## Cambio 3: Ajustar stepper por fusion
 
-1. **`src/types/barbershop.ts`** — agregar `durationMin?: number` al tipo `Service`
+En `BookingStepper.tsx`:
 
-2. **`src/hooks/useSupabaseData.ts`**:
-   - `dbToService`: mapear `row.duracion_min` a `durationMin`
-   - `addService`: incluir `duracion_min: service.durationMin || 30` en el insert
-   - `updateService`: mapear `durationMin → duracion_min` en updates
+- Steps pasan de 7 a 6 (o 5 si autenticado): Sucursal → Servicio → Barbero → Fecha+Horario → Datos → Confirmar
+- Eliminar imports de FechaStep y HorarioStep separados
+- Importar nuevo FechaHorarioStep
+- `actualStep === 3` renderiza `FechaHorarioStep` (reemplaza steps 3 y 4)
+- Steps 4+ se ajustan (auth = 4, confirm = 5)
+- Actualizar `STEP_LABELS`, `totalSteps`, `getActualStep`, progress bar
+- Badge de fecha+hora: mostrar solo cuando `step > 3` (despues de fecha+horario)
 
-3. **`src/components/config/ServicesConfig.tsx`**:
-   - Agregar state `newDuration` (default `'30'`)
-   - En formulario de agregar y editar: agregar input numérico "Duración (min)" con validación (mínimo 5, obligatorio)
-   - En la lista de servicios: mostrar duración junto al precio (ej: "30 min")
-   - Validación: no permitir guardar sin duración
+## Archivos
 
-## Problema 3: Eliminar buffer antes
-
-**Cambios**:
-
-1. **`src/components/config/AgendaConfigSection.tsx`**:
-   - Eliminar `buffer_antes_min` del interface `ConfigData` y de `DEFAULTS`
-   - Eliminar la entrada del array `fields` que corresponde a buffer antes
-   - En `handleSave`: forzar `buffer_antes_min: 0` en el upsert para no romper el schema
-
-2. **`supabase/functions/get-availability/index.ts`**:
-   - Hardcodear `bufferBefore = 0` o simplemente ignorar `buffer_antes_min` del config
-   - Limpiar la lógica de slot generation que usa `bufferBefore` (simplificar sin eliminarlo para no romper si se reactiva)
-
-## Orden
-
-1. Fix barbero fantasma (get-org-public + BookingStepper + data cleanup)
-2. Duración en servicios (types + hook + UI)
-3. Eliminar buffer antes (AgendaConfig UI + edge function)
+1. **Crear** `src/components/reservar/FechaHorarioStep.tsx` — componente fusionado
+2. **Editar** `src/components/reservar/BookingStepper.tsx` — nuevo flujo de pasos + reset al volver
+3. `FechaStep.tsx` y `HorarioStep.tsx` quedan sin eliminar (HorarioStep se usa en RescheduleFlow)
 
