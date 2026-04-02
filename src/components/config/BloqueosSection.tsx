@@ -100,7 +100,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
     const { error } = await supabase.from('bloqueos_agenda').insert(insert);
     if (error) { toast.error('Error al crear bloqueo'); setSaving(false); return; }
-    toast.success('Bloqueo creado');
+    toast.success('Ausencia registrada');
     setShowForm(false);
     setForm({ fecha_inicio: '', fecha_fin: '', todo_el_dia: true, hora_inicio: '09:00', hora_fin: '18:00', motivo: '', barbero_id: '__sucursal__' });
     setSaving(false);
