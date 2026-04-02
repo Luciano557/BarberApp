@@ -48,10 +48,12 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
   });
 
   const fetchBloqueos = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('bloqueos_agenda')
       .select('*')
       .eq('sucursal_id', sucursalId)
+      .gte('fecha_fin', today)
       .order('fecha_inicio', { ascending: false });
     if (data) {
       setBloqueos(data.map(b => ({
