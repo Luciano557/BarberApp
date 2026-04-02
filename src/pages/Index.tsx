@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas } = useAuth();
   
   const getDefaultTab = () => {
     if (hasNoAccess) return 'no-access';
