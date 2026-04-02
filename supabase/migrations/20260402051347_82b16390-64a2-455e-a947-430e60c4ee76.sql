@@ -1,0 +1,2 @@
+ALTER TABLE horarios_trabajo DROP CONSTRAINT IF EXISTS horarios_trabajo_dia_semana_check;
+ALTER TABLE horarios_trabajo ADD CONSTRAINT horarios_trabajo_dia_semana_check CHECK (dia_semana BETWEEN 1 AND 7);

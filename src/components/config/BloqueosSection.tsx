@@ -208,7 +208,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
         {/* List */}
         {bloqueos.length === 0 && !showForm && (
-          <p className="text-xs text-muted-foreground text-center py-4">No hay bloqueos configurados</p>
+          <p className="text-xs text-muted-foreground text-center py-4">No hay ausencias o cierres registrados</p>
         )}
 
         {bloqueos.map(b => (
