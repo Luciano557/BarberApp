@@ -116,7 +116,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
             <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
             <div className="flex items-center gap-1">
-              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Min" className="w-20" />
+              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" />
               <span className="text-xs text-muted-foreground">min</span>
             </div>
             <div className="flex items-center gap-1">
