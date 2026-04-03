@@ -15,11 +15,12 @@ interface UnlockState {
 }
 
 export function usePinProtection() {
-  const { user, canManageConfig } = useAuth();
+  const { user, profile, canManageConfig, hasNoAccess } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPinConfigured, setHasPinConfigured] = useState<boolean | null>(null);
+  const [userHasOwnPin, setUserHasOwnPin] = useState<boolean | null>(null);
   const [unlockedBy, setUnlockedBy] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29,11 +30,13 @@ export function usePinProtection() {
   const checkHasPinConfigured = useCallback(async () => {
     if (!user || !organization) {
       setHasPinConfigured(null);
+      setUserHasOwnPin(null);
       setIsLoading(false);
       return;
     }
 
     try {
+      // Check if any barbero in org has a PIN
       const { data, error } = await supabase
         .from('barberos')
         .select('id, pin_hash')
@@ -43,13 +46,22 @@ export function usePinProtection() {
 
       if (error) throw error;
       setHasPinConfigured(data && data.length > 0);
+
+      // Check if current user's own barbero has a PIN
+      if (profile?.barbero_id) {
+        const userBarberoHasPin = data?.some(b => b.id === profile.barbero_id) ?? false;
+        setUserHasOwnPin(userBarberoHasPin);
+      } else {
+        setUserHasOwnPin(false);
+      }
     } catch (error) {
       console.error('Error checking PIN configuration:', error);
       setHasPinConfigured(false);
+      setUserHasOwnPin(false);
     } finally {
       setIsLoading(false);
     }
-  }, [user, organization]);
+  }, [user, organization, profile?.barbero_id]);
 
   // Restore session from sessionStorage
   const restoreSession = useCallback(() => {
@@ -177,12 +189,17 @@ export function usePinProtection() {
   }, [checkHasPinConfigured, restoreSession]);
 
   // Determine if PIN protection is required
-  // Required if user can manage config AND there's at least one PIN configured in the org
-  const requiresPin = canManageConfig && hasPinConfigured === true;
+  // Required if there's at least one PIN in the org and user is not 'otros' only
+  const requiresPin = !hasNoAccess && hasPinConfigured === true;
+
+  // Does the current user need to set up their own PIN first?
+  const needsPinSetup = requiresPin && profile?.barbero_id && userHasOwnPin === false;
 
   return {
     isUnlocked,
     hasPin: hasPinConfigured,
+    userHasOwnPin,
+    needsPinSetup,
     unlockedBy,
     isLoading,
     requiresPin,

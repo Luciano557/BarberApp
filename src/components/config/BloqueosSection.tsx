@@ -48,10 +48,12 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
   });
 
   const fetchBloqueos = useCallback(async () => {
+    const today = new Date().toISOString().split('T')[0];
     const { data } = await supabase
       .from('bloqueos_agenda')
       .select('*')
       .eq('sucursal_id', sucursalId)
+      .gte('fecha_fin', today)
       .order('fecha_inicio', { ascending: false });
     if (data) {
       setBloqueos(data.map(b => ({
@@ -98,7 +100,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
     const { error } = await supabase.from('bloqueos_agenda').insert(insert);
     if (error) { toast.error('Error al crear bloqueo'); setSaving(false); return; }
-    toast.success('Bloqueo creado');
+    toast.success('Ausencia registrada');
     setShowForm(false);
     setForm({ fecha_inicio: '', fecha_fin: '', todo_el_dia: true, hora_inicio: '09:00', hora_fin: '18:00', motivo: '', barbero_id: '__sucursal__' });
     setSaving(false);
@@ -133,11 +135,11 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
             <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
               <ShieldOff className="w-4 h-4 text-destructive" />
             </div>
-            <CardTitle className="text-sm">Bloqueos y excepciones</CardTitle>
+            <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
           </div>
           {!showForm && (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowForm(true)}>
-              <Plus className="h-3 w-3 mr-1" /> Nuevo bloqueo
+              <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
             </Button>
           )}
         </div>
@@ -198,7 +200,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancelar</Button>
               <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={saving}>
-                {saving ? 'Guardando...' : 'Crear bloqueo'}
+                {saving ? 'Guardando...' : 'Crear ausencia'}
               </Button>
             </div>
           </div>
@@ -206,7 +208,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
         {/* List */}
         {bloqueos.length === 0 && !showForm && (
-          <p className="text-xs text-muted-foreground text-center py-4">No hay bloqueos configurados</p>
+          <p className="text-xs text-muted-foreground text-center py-4">No hay ausencias o cierres registrados</p>
         )}
 
         {bloqueos.map(b => (

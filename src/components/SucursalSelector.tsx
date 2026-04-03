@@ -2,7 +2,6 @@ import { Building2, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
 
 interface SucursalSelectorProps {
   collapsed?: boolean;
@@ -10,14 +9,41 @@ interface SucursalSelectorProps {
 
 export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
   const { sucursales, currentSucursal, setCurrentSucursal, isAllMode } = useSucursal();
-  const { isOwner, isGeneralManager } = useAuth();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
 
-  const { isManager } = useAuth();
+  const canSwitch = isOwner || isGeneralManager;
 
-  // Managers (encargados de local) can't switch branches
-  if (isManager && !isOwner && !isGeneralManager) return null;
+  // For managers/barbers: show their fixed sucursal as static text
+  if (!canSwitch) {
+    if (!currentSucursal) return null;
 
-  // Don't show if only 1 sucursal and not owner
+    if (collapsed) {
+      return (
+        <div className="px-2 py-2">
+          <div
+            className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center mx-auto"
+            title={currentSucursal.nombre}
+          >
+            <MapPin className="h-4 w-4 text-accent-foreground" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-3 py-2 border-b border-sidebar-border">
+        <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1 block">
+          Sucursal
+        </label>
+        <div className="flex items-center gap-1.5 h-8 px-3 text-xs bg-accent rounded-md">
+          <MapPin className="h-3 w-3 text-muted-foreground" />
+          <span className="font-medium">{currentSucursal.nombre}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't show if only 1 sucursal and is owner (still show dropdown so they can see it)
   if (sucursales.length <= 1 && !isOwner && !isGeneralManager) return null;
 
   // Collapsed mode: just show icon

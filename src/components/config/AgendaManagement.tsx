@@ -3,6 +3,7 @@ import { CalendarClock } from 'lucide-react';
 import { AgendaConfigSection } from './AgendaConfigSection';
 import { HorariosTrabajoSection } from './HorariosTrabajoSection';
 import { BloqueosSection } from './BloqueosSection';
+import { AgendaViewer } from './AgendaViewer';
 import { Barber } from '@/types/barbershop';
 
 interface AgendaManagementProps {
@@ -25,6 +26,15 @@ export function AgendaManagement({ sucursalId, organizationId, barbers }: Agenda
       </div>
 
       <Accordion type="multiple" defaultValue={['config']} className="space-y-2">
+        <AccordionItem value="agenda-view" className="border rounded-lg">
+          <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
+            Visualizar agenda
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <AgendaViewer sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
+          </AccordionContent>
+        </AccordionItem>
+
         <AccordionItem value="config" className="border rounded-lg">
           <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
             Configuración general
@@ -45,7 +55,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers }: Agenda
 
         <AccordionItem value="bloqueos" className="border rounded-lg">
           <AccordionTrigger className="px-4 py-3 text-sm hover:no-underline">
-            Bloqueos y excepciones
+            Gestionar ausencias y cierres
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <BloqueosSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />

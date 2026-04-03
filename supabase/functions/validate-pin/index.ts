@@ -125,16 +125,12 @@ serve(async (req) => {
         }
       }
 
-      // If no sucursal_id sent (mode "Todas") and not global role, reject
+      // If no sucursal_id sent (mode "Todas") and not global role,
+      // fallback to barbero's own sucursal instead of rejecting
       if (!hasGlobalRole && !sucursal_id) {
-        return new Response(
-          JSON.stringify({ 
-            valid: false, 
-            error: 'Este PIN no tiene acceso global. Seleccioná una sucursal.',
-            barbero_sucursal_id: barbero.sucursal_id
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Use barbero's assigned sucursal as implicit context
+        // This handles the case where user_sucursales hasn't loaded yet
+        console.log('No sucursal_id sent, using barbero sucursal fallback:', barbero.sucursal_id);
       }
 
       // Log access

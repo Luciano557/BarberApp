@@ -16,6 +16,7 @@ interface InviteRequest {
   barberoId?: string;
   organizationId: string;
   organizationName: string;
+  sucursalId?: string;
 }
 
 function generatePassword(): string {
@@ -64,7 +65,7 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Only owners and general managers can invite users");
     }
 
-    const { email, fullName, role, barberoId, organizationId, organizationName }: InviteRequest = await req.json();
+    const { email, fullName, role, barberoId, organizationId, organizationName, sucursalId }: InviteRequest = await req.json();
 
     // Validate input
     if (!email || !fullName || !role || !organizationId) {
@@ -141,22 +142,98 @@ serve(async (req: Request): Promise<Response> => {
       console.error("Profile update error:", profileError);
     }
 
-    // Assign role (upsert to handle existing users)
-    if (!isExistingUser) {
-      const { error: roleError } = await supabaseAdmin
-        .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: role,
-        });
+    // ALWAYS assign role (upsert pattern) - for both new and existing users
+    // First remove any existing roles for this user to avoid duplicates
+    const { error: deleteRoleError } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId);
 
-      if (roleError) {
-        console.error("Role assignment error:", roleError);
+    if (deleteRoleError) {
+      console.error("Delete existing roles error:", deleteRoleError);
+    }
+
+    // Insert the correct role
+    const { error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .insert({
+        user_id: userId,
+        role: role,
+      });
+
+    if (roleError) {
+      console.error("Role assignment error:", roleError);
+    }
+
+    // Assign sucursal membership
+    if (sucursalId) {
+      // Check if already assigned
+      const { data: existing } = await supabaseAdmin
+        .from("user_sucursales")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("sucursal_id", sucursalId)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: sucursalError } = await supabaseAdmin
+          .from("user_sucursales")
+          .insert({
+            user_id: userId,
+            sucursal_id: sucursalId,
+            organization_id: organizationId,
+          });
+
+        if (sucursalError) {
+          console.error("Sucursal assignment error:", sucursalError);
+        }
       }
     }
 
+    // For barbers without explicit sucursalId, assign them to the barbero's sucursal
+    if (!sucursalId && barberoId) {
+      const { data: barbero } = await supabaseAdmin
+        .from("barberos")
+        .select("sucursal_id")
+        .eq("id", barberoId)
+        .single();
+
+      if (barbero?.sucursal_id) {
+        const { data: existing } = await supabaseAdmin
+          .from("user_sucursales")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("sucursal_id", barbero.sucursal_id)
+          .maybeSingle();
+
+        if (!existing) {
+          await supabaseAdmin
+            .from("user_sucursales")
+            .insert({
+              user_id: userId,
+              sucursal_id: barbero.sucursal_id,
+              organization_id: organizationId,
+            });
+        }
+
+        // Update default_sucursal_id on profile
+        await supabaseAdmin
+          .from("profiles")
+          .update({ default_sucursal_id: barbero.sucursal_id })
+          .eq("id", userId);
+      }
+    }
+
+    // If sucursalId provided, also set as default
+    if (sucursalId) {
+      await supabaseAdmin
+        .from("profiles")
+        .update({ default_sucursal_id: sucursalId })
+        .eq("id", userId);
+    }
+
     // Try to send email (but don't fail if it doesn't work)
-    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Local";
+    const roleLabel = role === "barber" ? "Barbero" : role === "general_manager" ? "Encargado General" : "Encargado de Sucursal";
     
     try {
       const emailResult = await resend.emails.send({

@@ -18,6 +18,7 @@ interface SucursalTabContentProps {
   sucursal: Sucursal;
   barbers: Barber[];
   allBarbers: Barber[];
+  allSucursales?: Sucursal[];
   services: Service[];
   extras: Extra[];
   discounts: Discount[];
@@ -37,7 +38,7 @@ interface SucursalTabContentProps {
 }
 
 export function SucursalTabContent({
-  sucursal, barbers, allBarbers,
+  sucursal, barbers, allBarbers, allSucursales = [],
   services, extras, discounts, lines,
   onAddBarber, onUpdateBarber,
   onAddService, onUpdateService,
@@ -157,6 +158,7 @@ export function SucursalTabContent({
         organizationId={organization?.id || ''}
         barbers={barbers}
         allBarbers={allBarbers}
+        sucursales={allSucursales}
         onAddBarber={onAddBarber}
         onUpdateBarber={onUpdateBarber}
       />

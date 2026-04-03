@@ -71,6 +71,7 @@ interface EquipoUnificadoProps {
   organizationId: string;
   barbers: Barber[];
   allBarbers: Barber[];
+  sucursales?: { id: string; nombre: string }[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
 }
@@ -81,7 +82,7 @@ interface ToggleConfirm {
 }
 
 export function EquipoUnificado({
-  sucursalId, organizationId, barbers, allBarbers, onAddBarber, onUpdateBarber,
+  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber,
 }: EquipoUnificadoProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -196,6 +197,41 @@ export function EquipoUnificado({
     }
     for (const role of toAdd) {
       await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
+    }
+
+    // Handle user_sucursales: assign sucursal for manager/barber roles
+    const needsSucursal = newRoles.includes('manager') || newRoles.includes('barber');
+    const hadSucursalRole = currentNonOwner.includes('manager') || currentNonOwner.includes('barber');
+
+    if (needsSucursal && sucursalId) {
+      // Upsert user_sucursales
+      const { data: existing } = await supabase
+        .from('user_sucursales')
+        .select('id')
+        .eq('user_id', linkedUser.id)
+        .eq('sucursal_id', sucursalId)
+        .maybeSingle();
+
+      if (!existing) {
+        await supabase.from('user_sucursales').insert({
+          user_id: linkedUser.id,
+          sucursal_id: sucursalId,
+          organization_id: organizationId,
+        });
+      }
+
+      // Set default_sucursal_id
+      await supabase
+        .from('profiles')
+        .update({ default_sucursal_id: sucursalId })
+        .eq('id', linkedUser.id);
+    } else if (!needsSucursal && hadSucursalRole) {
+      // Removed all sucursal-bound roles: clean up user_sucursales
+      await supabase
+        .from('user_sucursales')
+        .delete()
+        .eq('user_id', linkedUser.id)
+        .eq('sucursal_id', sucursalId);
     }
 
     // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
@@ -485,14 +521,14 @@ export function EquipoUnificado({
                 <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
               </Button>
 
-              {hasSystemAccess && (
+              {linkedUser && hasSystemAccess && (
                 <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
                   onClick={() => setPinDialogBarber(barber)}>
                   <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
                 </Button>
               )}
 
-              {hasSystemAccess && (
+              {(!linkedUser || !hasSystemAccess) && barber.teamRole !== 'otros' && (
                 <Button variant="ghost" size="sm" className="h-8 text-xs"
                   onClick={() => setInviteBarber(barber)}>
                   <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
@@ -557,7 +593,7 @@ export function EquipoUnificado({
       </Card>
 
       {/* Dialogs */}
-      <InviteUserDialog open={!!inviteBarber} onOpenChange={(open) => !open && setInviteBarber(null)} barber={inviteBarber || undefined} />
+      <InviteUserDialog open={!!inviteBarber} onOpenChange={(open) => !open && setInviteBarber(null)} barber={inviteBarber || undefined} sucursales={sucursales as any} />
       <StaffPinDialog open={!!pinDialogBarber} onOpenChange={(open) => !open && setPinDialogBarber(null)}
         barberId={pinDialogBarber?.id || ''} barberName={pinDialogBarber ? `${pinDialogBarber.firstName} ${pinDialogBarber.lastName}` : ''}
         hasPin={pinDialogBarber ? !!barberPinStatus[pinDialogBarber.id] : false} onPinUpdated={fetchPinStatus} />
