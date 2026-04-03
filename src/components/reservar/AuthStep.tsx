@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ interface Props {
 export const AuthStep = ({ onAuthenticated }: Props) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [waitingForSession, setWaitingForSession] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -19,6 +20,21 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     birthDate: "",
     password: "",
   });
+
+  // Listen for auth state changes to detect session after signUp
+  useEffect(() => {
+    if (!waitingForSession) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setWaitingForSession(false);
+        setLoading(false);
+        onAuthenticated();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [waitingForSession, onAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,15 +48,17 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         });
         if (error) {
           toast.error(error.message);
+          setLoading(false);
           return;
         }
         onAuthenticated();
       } else {
         if (!form.fullName || !form.email || !form.password) {
           toast.error("Completá todos los campos obligatorios");
+          setLoading(false);
           return;
         }
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: form.email,
           password: form.password,
           options: {
@@ -54,14 +72,22 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         });
         if (error) {
           toast.error(error.message);
+          setLoading(false);
           return;
         }
+
+        // If session is returned immediately (email confirmation disabled), proceed
+        if (data.session) {
+          onAuthenticated();
+          return;
+        }
+
+        // Otherwise wait for the auth state change to fire with a session
+        setWaitingForSession(true);
         toast.success("¡Cuenta creada! Revisá tu email para verificar.");
-        onAuthenticated();
       }
     } catch {
       toast.error("Ocurrió un problema. Probá nuevamente.");
-    } finally {
       setLoading(false);
     }
   };
@@ -72,12 +98,12 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-foreground">
-        {isLogin ? "Iniciá sesión" : "Ya casi terminás"}
+        {isLogin ? "Iniciá sesión" : "Creá tu cuenta"}
       </h2>
       <p className="text-sm text-muted-foreground">
         {isLogin
           ? "Ingresá con tu email y contraseña"
-          : "Confirmá tus datos para reservar el turno."}
+          : "Completá tus datos para reservar el turno."}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -153,7 +179,13 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         </div>
 
         <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
-          {loading ? "Procesando..." : isLogin ? "Iniciar sesión" : "Crear cuenta y continuar"}
+          {loading
+            ? waitingForSession
+              ? "Verificando..."
+              : "Procesando..."
+            : isLogin
+            ? "Iniciar sesión"
+            : "Crear cuenta y continuar"}
         </Button>
       </form>
 
