@@ -1,37 +1,65 @@
 
 
-## Problema
+## Plan: Ribbon de fechas estilo Fresha + validación de slug
 
-La tasa de ocupación del mes en curso tiene dos defectos:
+### 1. Slug ya es único (no requiere cambios)
 
-1. **Valor absoluto inflado/desinflado**: Se dividen los servicios parciales (ej: solo 2 días) por la capacidad del mes completo (ej: 22 días laborales), dando una tasa artificialmente baja.
-2. **Variación engañosa**: Se compara esa tasa baja contra la tasa completa del mes anterior, mostrando caídas irreales.
+La ruta `/:orgSlug/reservar` ya funciona correctamente. El campo `slug` en la tabla `organizations` tiene constraint `UNIQUE NOT NULL`. La Edge Function `get-org-public` busca por slug y devuelve 404 si no existe. No hay cambios necesarios aqui.
 
-## Solución
+### 2. Rediseño de `FechaHorarioStep` con ribbon horizontal de dias
 
-Aplicar la misma lógica de "mismos días" a la tasa de ocupación:
+Reemplazar el calendario completo por un ribbon horizontal scrolleable de dias (como en la imagen de Fresha).
 
-### Cambios en `src/components/EstadisticasPanel.tsx`
+**Archivo**: `src/components/reservar/FechaHorarioStep.tsx`
 
-**1. Crear función `getWorkDaysUpTo(year, month, maxDay)`**
+**Nuevo layout**:
+- Titulo: "Elegí fecha y horario"
+- Mes/año actual como label (ej: "abril de 2026")
+- Ribbon horizontal scrolleable con circulos para cada dia, mostrando ~7-14 dias a futuro
+  - Cada circulo muestra el numero del dia
+  - Debajo, la abreviatura del dia de la semana (lun, mar, mie...)
+  - El dia seleccionado tiene fondo `primary` con texto blanco
+  - Los demas tienen borde outline
+  - Dias no laborables (domingo tipicamente) aparecen en gris/deshabilitados
+- Debajo del ribbon, los slots de horario se muestran como lista vertical (no grilla 3 columnas) con botones full-width de h-12, estilo similar a la imagen de referencia
+- Al cargar, se selecciona automaticamente el dia actual (o el proximo dia laboral si hoy no tiene disponibilidad)
 
-Similar a `getWorkDaysInMonth` pero cuenta días laborales solo hasta el día `maxDay` (inclusive). Se usa para calcular la capacidad parcial.
+**Logica**:
+- Generar array de los proximos 14 dias desde hoy
+- Al tocar un dia, actualizar `fecha` y re-fetch slots
+- El ribbon es scrolleable horizontalmente con `overflow-x-auto` y `flex-nowrap`
+- Mantener la misma llamada a `get-availability` que ya existe
 
-**2. Ajustar el cálculo de `tasaOcupacion` para el mes actual (línea ~480)**
+**Estructura visual (ASCII)**:
+```text
+┌─────────────────────────────────┐
+│  abril de 2026                  │
+│                                 │
+│  (3)   4    5    6    7    8    │ ← scroll horizontal
+│  vie  sáb  dom  lun  mar  mié  │
+│                                 │
+│  ┌─────────────────────────┐   │
+│  │ 11:00                   │   │
+│  └─────────────────────────┘   │
+│  ┌─────────────────────────┐   │
+│  │ 11:30                   │   │
+│  └─────────────────────────┘   │
+│  ┌─────────────────────────┐   │
+│  │ 12:00                   │   │
+│  └─────────────────────────┘   │
+│  ...                           │
+└─────────────────────────────────┘
+```
 
-Cuando el mes es el actual, usar `getWorkDaysUpTo(y, mo-1, diaActual)` en vez de `getWorkDaysInMonth(y, mo-1)`. Así la capacidad refleja solo los días transcurridos y la tasa es realista.
+### 3. Archivos a modificar
 
-**3. Calcular tasa de ocupación parcial del mes anterior (en la sección `needsPartial`, línea ~412)**
+- **`src/components/reservar/FechaHorarioStep.tsx`** — reescribir completamente: quitar Calendar, implementar ribbon + lista vertical de slots
+- **`src/components/reservar/FechaStep.tsx`** y **`src/components/reservar/HorarioStep.tsx`** — ya no se usan (eran los pasos separados previos), pueden dejarse sin cambios ya que no se importan en el flujo principal
 
-Agregar `parcialTasaOcupacion` al modelo: usando `parcialServicios` dividido por la capacidad de los primeros N días laborales del mes anterior (`getWorkDaysUpTo`).
+### Detalles tecnicos
 
-**4. Usar parcial en la variación (línea ~538)**
-
-Cambiar `tasaOcupacionVar` para que, cuando `useSameDayComparison`, compare contra `parcialTasaOcupacion` del mes anterior en vez de la tasa completa.
-
-### Resultado
-
-- Si hoy es 2 de abril, la tasa de ocupación de abril se calcula sobre 2 días laborales de capacidad.
-- La variación compara contra la tasa de los primeros 2 días de marzo.
-- El tooltip "(parcial — X días)" ya aplicado a las demás métricas cubrirá esta también.
+- El ribbon usa `date-fns/locale/es` para formatear dias de la semana en español
+- Los circulos del ribbon son botones de ~48x48px con `rounded-full`
+- `useRef` + scroll horizontal nativo (no libreria externa)
+- La lista de slots usa botones `variant="outline"` full-width con texto alineado a la izquierda, estilo card
 
