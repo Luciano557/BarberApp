@@ -1,65 +1,35 @@
 
 
-## Plan: Ribbon de fechas estilo Fresha + validación de slug
+## Plan: Desactivar sucursal + Pantalla de bienvenida
 
-### 1. Slug ya es único (no requiere cambios)
+### 1. Botón "Desactivar/Activar" sucursal en `SucursalTabContent.tsx`
 
-La ruta `/:orgSlug/reservar` ya funciona correctamente. El campo `slug` en la tabla `organizations` tiene constraint `UNIQUE NOT NULL`. La Edge Function `get-org-public` busca por slug y devuelve 404 si no existe. No hay cambios necesarios aqui.
+En la sección "Información de la sucursal", al lado del botón "Editar", agregar un botón que permita activar/desactivar la sucursal:
 
-### 2. Rediseño de `FechaHorarioStep` con ribbon horizontal de dias
+- Si la sucursal está activa: botón "Desactivar" con `variant="outline"` y estilo destructivo
+- Si está inactiva: botón "Activar" con `variant="default"`
+- Al presionar, mostrar un `AlertDialog` de confirmación (siguiendo el patrón de diseño existente)
+- La acción ejecuta `supabase.from('sucursales').update({ activa: !sucursal.activa })` y llama `onSucursalUpdated()`
 
-Reemplazar el calendario completo por un ribbon horizontal scrolleable de dias (como en la imagen de Fresha).
+Cuando la sucursal está inactiva, las secciones de Equipo, Catálogo de servicios y Gestión de turnos se envuelven en un contenedor con `opacity-50 pointer-events-none` y se muestra un banner arriba de cada una (o uno solo arriba de las tres) indicando: "Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones."
 
-**Archivo**: `src/components/reservar/FechaHorarioStep.tsx`
+**Nota**: `MiNegocioPanel` ya fetch sucursales sin filtrar por `activa` (línea 63), así que las inactivas ya aparecen en las tabs.
 
-**Nuevo layout**:
-- Titulo: "Elegí fecha y horario"
-- Mes/año actual como label (ej: "abril de 2026")
-- Ribbon horizontal scrolleable con circulos para cada dia, mostrando ~7-14 dias a futuro
-  - Cada circulo muestra el numero del dia
-  - Debajo, la abreviatura del dia de la semana (lun, mar, mie...)
-  - El dia seleccionado tiene fondo `primary` con texto blanco
-  - Los demas tienen borde outline
-  - Dias no laborables (domingo tipicamente) aparecen en gris/deshabilitados
-- Debajo del ribbon, los slots de horario se muestran como lista vertical (no grilla 3 columnas) con botones full-width de h-12, estilo similar a la imagen de referencia
-- Al cargar, se selecciona automaticamente el dia actual (o el proximo dia laboral si hoy no tiene disponibilidad)
+### 2. Pantalla de bienvenida en `Index.tsx`
 
-**Logica**:
-- Generar array de los proximos 14 dias desde hoy
-- Al tocar un dia, actualizar `fecha` y re-fetch slots
-- El ribbon es scrolleable horizontalmente con `overflow-x-auto` y `flex-nowrap`
-- Mantener la misma llamada a `get-availability` que ya existe
+El problema actual: cuando el usuario inicia sesión, los roles se cargan asincrónicamente. Durante ese breve periodo, `roles` es un array vacío, lo que hace que `getDefaultTab()` retorne `'no-access'` y se muestre el mensaje hostil "Sin acceso".
 
-**Estructura visual (ASCII)**:
-```text
-┌─────────────────────────────────┐
-│  abril de 2026                  │
-│                                 │
-│  (3)   4    5    6    7    8    │ ← scroll horizontal
-│  vie  sáb  dom  lun  mar  mié  │
-│                                 │
-│  ┌─────────────────────────┐   │
-│  │ 11:00                   │   │
-│  └─────────────────────────┘   │
-│  ┌─────────────────────────┐   │
-│  │ 11:30                   │   │
-│  └─────────────────────────┘   │
-│  ┌─────────────────────────┐   │
-│  │ 12:00                   │   │
-│  └─────────────────────────┘   │
-│  ...                           │
-└─────────────────────────────────┘
-```
+**Solución**: Reemplazar la pantalla de "Sin acceso" por una pantalla de bienvenida con el nombre "Scissors":
 
-### 3. Archivos a modificar
+- Logo/nombre de la app "Scissors" con un icono de tijeras
+- Mensaje de bienvenida amigable
+- Si `roles.length === 0` (aún no se cargaron o el usuario realmente no tiene roles): mostrar la pantalla de bienvenida con un spinner sutil y texto como "Preparando tu espacio de trabajo..."
+- Si `hasNoAccess` (tiene rol 'otros'): mostrar un mensaje diferente indicando que debe contactar al dueño
 
-- **`src/components/reservar/FechaHorarioStep.tsx`** — reescribir completamente: quitar Calendar, implementar ribbon + lista vertical de slots
-- **`src/components/reservar/FechaStep.tsx`** y **`src/components/reservar/HorarioStep.tsx`** — ya no se usan (eran los pasos separados previos), pueden dejarse sin cambios ya que no se importan en el flujo principal
+Esto distingue entre "cargando roles" y "sin permisos reales".
 
-### Detalles tecnicos
+### Archivos a modificar
 
-- El ribbon usa `date-fns/locale/es` para formatear dias de la semana en español
-- Los circulos del ribbon son botones de ~48x48px con `rounded-full`
-- `useRef` + scroll horizontal nativo (no libreria externa)
-- La lista de slots usa botones `variant="outline"` full-width con texto alineado a la izquierda, estilo card
+- **`src/components/SucursalTabContent.tsx`**: Agregar botón desactivar/activar con AlertDialog, y overlay de inhabilitación sobre las secciones cuando `sucursal.activa === false`
+- **`src/pages/Index.tsx`**: Reemplazar la pantalla "no-access" por una pantalla de bienvenida diferenciada
 
