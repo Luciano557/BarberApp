@@ -150,7 +150,10 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   };
 
   const goBack = () => {
-    if (step > 0) {
+    if (step === 1 && orgData.sucursales.length === 1) {
+      resetFieldsFromStep(0);
+      onBackToLanding();
+    } else if (step > 0) {
       const newStep = step - 1;
       resetFieldsFromStep(newStep);
       setStep(newStep);
