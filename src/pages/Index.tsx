@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lock } from 'lucide-react';
+import { Scissors, Lock, Loader2 } from 'lucide-react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
@@ -16,9 +16,12 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, roles, isLoading: authLoading } = useAuth();
   
+  const rolesLoaded = roles.length > 0;
+
   const getDefaultTab = () => {
+    if (!rolesLoaded) return 'welcome';
     if (hasNoAccess) return 'no-access';
     if (canManagePayments) return 'registro';
     if (canViewResumen) return 'resumen';
@@ -28,8 +31,18 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState(getDefaultTab);
 
   useEffect(() => {
+    if (!rolesLoaded) {
+      setActiveTab('welcome');
+      return;
+    }
     if (hasNoAccess) {
       setActiveTab('no-access');
+      return;
+    }
+    // Once roles load and we're still on welcome, navigate to correct default
+    if (activeTab === 'welcome') {
+      if (canManagePayments) setActiveTab('registro');
+      else if (canViewResumen) setActiveTab('resumen');
       return;
     }
     if (activeTab === 'registro' && !canManagePayments) {
@@ -50,7 +63,7 @@ const Index = () => {
     if (activeTab === 'mi-negocio' && !canViewMiNegocio) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, hasNoAccess]);
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, hasNoAccess, rolesLoaded]);
 
   const {
     isLoading,
@@ -117,6 +130,24 @@ const Index = () => {
             <TareasPanel barbers={allBarbers} />
           )}
 
+          {/* Welcome / loading screen */}
+          {activeTab === 'welcome' && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
+                <Scissors className="h-10 w-10 text-primary" />
+              </div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Scissors</h1>
+              <p className="text-muted-foreground mb-8 max-w-sm">
+                Tu sistema de gestión integral para barberías
+              </p>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Preparando tu espacio de trabajo...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Real no-access (role is 'otros') */}
           {activeTab === 'no-access' && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <Lock className="h-16 w-16 text-muted-foreground mb-4" />
