@@ -10,7 +10,7 @@ interface Props {
 }
 
 export const AuthStep = ({ onAuthenticated }: Props) => {
-  const [isLogin, setIsLogin] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
