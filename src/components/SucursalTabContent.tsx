@@ -4,7 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Phone, Edit2, Save, X, Building2 } from 'lucide-react';
+import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
@@ -57,6 +62,7 @@ export function SucursalTabContent({
     telefono: sucursal.telefono || '',
   });
   const [isSavingInfo, setIsSavingInfo] = useState(false);
+  const [isTogglingActive, setIsTogglingActive] = useState(false);
 
   useEffect(() => {
     setInfoForm({
@@ -87,6 +93,24 @@ export function SucursalTabContent({
     setIsSavingInfo(false);
   };
 
+  const handleToggleActive = async () => {
+    setIsTogglingActive(true);
+    const newState = !sucursal.activa;
+    const { error } = await supabase
+      .from('sucursales')
+      .update({ activa: newState })
+      .eq('id', sucursal.id);
+    if (error) {
+      toast.error('Error al cambiar el estado');
+    } else {
+      toast.success(newState ? 'Sucursal activada' : 'Sucursal desactivada');
+      onSucursalUpdated();
+    }
+    setIsTogglingActive(false);
+  };
+
+  const isInactive = !sucursal.activa;
+
   return (
     <div className="space-y-6 mt-6">
       {/* Información de la sucursal */}
@@ -99,11 +123,45 @@ export function SucursalTabContent({
               </div>
               <CardTitle className="text-base">Información de la sucursal</CardTitle>
             </div>
-            {!isEditingInfo && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)}>
-                <Edit2 className="h-4 w-4 mr-1" /> Editar
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {!isEditingInfo && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)}>
+                  <Edit2 className="h-4 w-4 mr-1" /> Editar
+                </Button>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
+                    disabled={isTogglingActive}
+                  >
+                    <Power className="h-4 w-4 mr-1" />
+                    {isInactive ? 'Activar' : 'Desactivar'}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {isInactive ? 'Activar sucursal' : 'Desactivar sucursal'}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {isInactive
+                        ? `¿Querés volver a activar "${sucursal.nombre}"? Se habilitarán nuevamente todas sus secciones.`
+                        : `¿Estás seguro de que querés desactivar "${sucursal.nombre}"? Las secciones de equipo, servicios y agenda quedarán inhabilitadas hasta que la reactives.`
+                      }
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleToggleActive}>
+                      {isInactive ? 'Activar' : 'Desactivar'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -152,36 +210,51 @@ export function SucursalTabContent({
         </CardContent>
       </Card>
 
-      {/* Equipo unificado */}
-      <EquipoUnificado
-        sucursalId={sucursal.id}
-        organizationId={organization?.id || ''}
-        barbers={barbers}
-        allBarbers={allBarbers}
-        sucursales={allSucursales}
-        onAddBarber={onAddBarber}
-        onUpdateBarber={onUpdateBarber}
-      />
+      {/* Banner de sucursal inactiva */}
+      {isInactive && (
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+          <p className="text-sm text-destructive">
+            Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones.
+          </p>
+        </div>
+      )}
 
-      {/* Catálogo de Servicios */}
-      <div className="space-y-4">
-        <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
-        <CobrarConfig
-          services={services} extras={extras} discounts={discounts} lines={lines}
-          onAddService={onAddService} onUpdateService={onUpdateService}
-          onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
-          onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
-          onDeleteDiscount={onDeleteDiscount}
-          onAddLine={onAddLine} onUpdateLine={onUpdateLine}
+      {/* Secciones inhabilitadas si la sucursal está inactiva */}
+      <div className={isInactive ? 'opacity-50 pointer-events-none select-none' : ''}>
+        {/* Equipo unificado */}
+        <EquipoUnificado
+          sucursalId={sucursal.id}
+          organizationId={organization?.id || ''}
+          barbers={barbers}
+          allBarbers={allBarbers}
+          sucursales={allSucursales}
+          onAddBarber={onAddBarber}
+          onUpdateBarber={onUpdateBarber}
         />
-      </div>
 
-      {/* Gestión de Turnos y Agenda */}
-      <AgendaManagement
-        sucursalId={sucursal.id}
-        organizationId={organization?.id || ''}
-        barbers={barbers}
-      />
+        {/* Catálogo de Servicios */}
+        <div className="space-y-4 mt-6">
+          <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
+          <CobrarConfig
+            services={services} extras={extras} discounts={discounts} lines={lines}
+            onAddService={onAddService} onUpdateService={onUpdateService}
+            onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
+            onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
+            onDeleteDiscount={onDeleteDiscount}
+            onAddLine={onAddLine} onUpdateLine={onUpdateLine}
+          />
+        </div>
+
+        {/* Gestión de Turnos y Agenda */}
+        <div className="mt-6">
+          <AgendaManagement
+            sucursalId={sucursal.id}
+            organizationId={organization?.id || ''}
+            barbers={barbers}
+          />
+        </div>
+      </div>
     </div>
   );
 }
