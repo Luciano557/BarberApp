@@ -1,35 +1,34 @@
 
 
-## Plan: Desactivar sucursal + Pantalla de bienvenida
+## Plan: Fixes en flujo de reserva + cancelar turnos desde agenda
 
-### 1. Botón "Desactivar/Activar" sucursal en `SucursalTabContent.tsx`
+### 1. Fix "Volver" cuando hay 1 sola sucursal
 
-En la sección "Información de la sucursal", al lado del botón "Editar", agregar un botón que permita activar/desactivar la sucursal:
+**Problema**: `goBack` va de step 1 a step 0, pero el `useEffect` auto-skip vuelve a step 1 inmediatamente.
 
-- Si la sucursal está activa: botón "Desactivar" con `variant="outline"` y estilo destructivo
-- Si está inactiva: botón "Activar" con `variant="default"`
-- Al presionar, mostrar un `AlertDialog` de confirmación (siguiendo el patrón de diseño existente)
-- La acción ejecuta `supabase.from('sucursales').update({ activa: !sucursal.activa })` y llama `onSucursalUpdated()`
+**Solución** en `BookingStepper.tsx`: En `goBack`, si `step === 1` y `orgData.sucursales.length === 1`, llamar `onBackToLanding()` directamente en vez de ir a step 0.
 
-Cuando la sucursal está inactiva, las secciones de Equipo, Catálogo de servicios y Gestión de turnos se envuelven en un contenedor con `opacity-50 pointer-events-none` y se muestra un banner arriba de cada una (o uno solo arriba de las tres) indicando: "Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones."
+### 2. Fix cuenta nueva no queda logueada
 
-**Nota**: `MiNegocioPanel` ya fetch sucursales sin filtrar por `activa` (línea 63), así que las inactivas ya aparecen en las tabs.
+**Problema**: En `AuthStep`, tras `signUp` se llama `onAuthenticated()` inmediatamente, pero Supabase no crea sesión activa hasta que el usuario confirme email (o si email confirmation está desactivado, la sesión se crea pero puede no estar lista aún). Luego en `ConfirmacionStep`, `getSession()` retorna `null` y el turno se crea sin `user_id`.
 
-### 2. Pantalla de bienvenida en `Index.tsx`
+**Solución** en `AuthStep.tsx`: Después de `signUp`, esperar a que `onAuthStateChange` dispare con una sesión válida antes de llamar `onAuthenticated()`. Si la confirmación por email está habilitada, mostrar mensaje de verificación sin avanzar. Si no, el listener detectará la sesión y avanzará automáticamente.
 
-El problema actual: cuando el usuario inicia sesión, los roles se cargan asincrónicamente. Durante ese breve periodo, `roles` es un array vacío, lo que hace que `getDefaultTab()` retorne `'no-access'` y se muestre el mensaje hostil "Sin acceso".
+### 3. Invertir orden: login primero, registro después
 
-**Solución**: Reemplazar la pantalla de "Sin acceso" por una pantalla de bienvenida con el nombre "Scissors":
+**Cambio** en `AuthStep.tsx`: Cambiar `isLogin` default a `true` (iniciar sesión por defecto). El texto del toggle queda: "No tengo cuenta → Crear una" (cuando está en login) y "Ya tengo cuenta → Iniciar sesión" (cuando está en registro). Ya está así, solo cambiar el `useState(false)` a `useState(true)`.
 
-- Logo/nombre de la app "Scissors" con un icono de tijeras
-- Mensaje de bienvenida amigable
-- Si `roles.length === 0` (aún no se cargaron o el usuario realmente no tiene roles): mostrar la pantalla de bienvenida con un spinner sutil y texto como "Preparando tu espacio de trabajo..."
-- Si `hasNoAccess` (tiene rol 'otros'): mostrar un mensaje diferente indicando que debe contactar al dueño
+### 4. Botón "Cancelar turno" en AgendaViewer
 
-Esto distingue entre "cargando roles" y "sin permisos reales".
+**Cambio** en `AgendaViewer.tsx`:
+- Eliminar `getEstadoBadge` y el badge de estado de cada turno
+- Agregar botón "Cancelar" (icono X o texto) en cada turno con estado `pendiente` o `confirmado`
+- Al presionar, mostrar `AlertDialog` de confirmación con motivo opcional (reutilizar patrón de `CancelTurnoDialog`)
+- Ejecutar update directo: `supabase.from('turnos').update({ estado: 'cancelado', cancelado_at, cancelado_motivo }).eq('id', turno.id)`
+- Refrescar lista tras cancelar
 
 ### Archivos a modificar
-
-- **`src/components/SucursalTabContent.tsx`**: Agregar botón desactivar/activar con AlertDialog, y overlay de inhabilitación sobre las secciones cuando `sucursal.activa === false`
-- **`src/pages/Index.tsx`**: Reemplazar la pantalla "no-access" por una pantalla de bienvenida diferenciada
+- `src/components/reservar/BookingStepper.tsx` — fix goBack con 1 sucursal
+- `src/components/reservar/AuthStep.tsx` — invertir default a login, fix signUp sin sesión
+- `src/components/config/AgendaViewer.tsx` — reemplazar badge estado por botón cancelar con AlertDialog
 

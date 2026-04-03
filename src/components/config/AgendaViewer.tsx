@@ -4,11 +4,23 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { ChevronLeft, ChevronRight, CalendarIcon, User, Clock } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { ChevronLeft, ChevronRight, CalendarIcon, User, Clock, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
+import { toast } from 'sonner';
 
 interface AgendaViewerProps {
   sucursalId: string;
@@ -38,6 +50,9 @@ export function AgendaViewer({ sucursalId, organizationId, barbers }: AgendaView
   const [servicios, setServicios] = useState<ServicioMap>({});
   const [loading, setLoading] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [cancelDialog, setCancelDialog] = useState<{ turno: Turno; servicioNombre: string } | null>(null);
+  const [cancelMotivo, setCancelMotivo] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
   const weekEnd = useMemo(() => endOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
@@ -89,13 +104,73 @@ export function AgendaViewer({ sucursalId, organizationId, barbers }: AgendaView
 
   const isToday = (day: Date) => isSameDay(day, new Date());
 
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'confirmado': return <Badge variant="default" className="text-[10px] h-4 px-1">Confirmado</Badge>;
-      case 'completado': return <Badge variant="secondary" className="text-[10px] h-4 px-1">Completado</Badge>;
-      default: return <Badge variant="outline" className="text-[10px] h-4 px-1">Pendiente</Badge>;
+  const canCancel = (estado: string) => ['pendiente', 'confirmado'].includes(estado);
+
+  const handleCancelTurno = async () => {
+    if (!cancelDialog) return;
+    setCancelling(true);
+    try {
+      const { error } = await supabase
+        .from('turnos')
+        .update({
+          estado: 'cancelado',
+          cancelado_at: new Date().toISOString(),
+          cancelado_motivo: cancelMotivo.trim() || null,
+        })
+        .eq('id', cancelDialog.turno.id);
+
+      if (error) {
+        toast.error('Error al cancelar el turno');
+        return;
+      }
+      toast.success('Turno cancelado correctamente');
+      setCancelDialog(null);
+      setCancelMotivo('');
+      fetchTurnos();
+    } catch {
+      toast.error('Error al cancelar el turno');
+    } finally {
+      setCancelling(false);
     }
   };
+
+  const renderTurnoRow = (turno: Turno) => (
+    <div key={turno.id} className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+      <span className="flex items-center gap-1 font-mono">
+        <Clock className="h-3 w-3" />
+        {turno.hora_inicio.slice(0, 5)} - {turno.hora_fin.slice(0, 5)}
+      </span>
+      <span className="text-foreground">{turno.cliente_nombre || 'Sin nombre'}</span>
+      <span className="text-muted-foreground">·</span>
+      <span>{servicios[turno.servicio_id] || 'Servicio'}</span>
+      {canCancel(turno.estado) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 px-1.5 text-[10px] text-destructive hover:text-destructive hover:bg-destructive/10 gap-0.5"
+          onClick={() => {
+            setCancelDialog({ turno, servicioNombre: servicios[turno.servicio_id] || 'Servicio' });
+            setCancelMotivo('');
+          }}
+        >
+          <X className="h-3 w-3" />
+          Cancelar
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderBarberBlock = (barberId: string, barberName: string, barberTurnos: Turno[]) => (
+    <div key={barberId} className="pl-2">
+      <div className="flex items-center gap-1.5 mb-1">
+        <User className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs font-medium text-foreground">{barberName}</span>
+      </div>
+      <div className="space-y-1 pl-5">
+        {barberTurnos.map(renderTurnoRow)}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -140,7 +215,6 @@ export function AgendaViewer({ sucursalId, organizationId, barbers }: AgendaView
             const dayTurnos = turnos.filter(t => t.fecha === dateStr);
             const dayLabel = format(day, "EEEE dd/MM", { locale: es });
 
-            // Group by barber
             const turnosByBarber: Record<string, Turno[]> = {};
             dayTurnos.forEach(t => {
               if (!turnosByBarber[t.barbero_id]) turnosByBarber[t.barbero_id] = [];
@@ -166,53 +240,14 @@ export function AgendaViewer({ sucursalId, organizationId, barbers }: AgendaView
                     <div className="space-y-2">
                       {activeBarbers
                         .filter(b => turnosByBarber[b.id]?.length > 0)
-                        .map(barber => (
-                          <div key={barber.id} className="pl-2">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs font-medium text-foreground">{barber.firstName} {barber.lastName}</span>
-                            </div>
-                            <div className="space-y-1 pl-5">
-                              {turnosByBarber[barber.id].map(turno => (
-                                <div key={turno.id} className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                                  <span className="flex items-center gap-1 font-mono">
-                                    <Clock className="h-3 w-3" />
-                                    {turno.hora_inicio.slice(0, 5)} - {turno.hora_fin.slice(0, 5)}
-                                  </span>
-                                  <span className="text-foreground">{turno.cliente_nombre || 'Sin nombre'}</span>
-                                  <span className="text-muted-foreground">·</span>
-                                  <span>{servicios[turno.servicio_id] || 'Servicio'}</span>
-                                  {getEstadoBadge(turno.estado)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                        .map(barber => renderBarberBlock(
+                          barber.id,
+                          `${barber.firstName} ${barber.lastName}`,
+                          turnosByBarber[barber.id]
                         ))}
-                      {/* Show turnos for barbers not in activeBarbers */}
                       {Object.keys(turnosByBarber)
                         .filter(bid => !activeBarbers.some(b => b.id === bid))
-                        .map(bid => (
-                          <div key={bid} className="pl-2">
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-xs font-medium text-foreground">{getBarberName(bid)}</span>
-                            </div>
-                            <div className="space-y-1 pl-5">
-                              {turnosByBarber[bid].map(turno => (
-                                <div key={turno.id} className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                                  <span className="flex items-center gap-1 font-mono">
-                                    <Clock className="h-3 w-3" />
-                                    {turno.hora_inicio.slice(0, 5)} - {turno.hora_fin.slice(0, 5)}
-                                  </span>
-                                  <span className="text-foreground">{turno.cliente_nombre || 'Sin nombre'}</span>
-                                  <span className="text-muted-foreground">·</span>
-                                  <span>{servicios[turno.servicio_id] || 'Servicio'}</span>
-                                  {getEstadoBadge(turno.estado)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
+                        .map(bid => renderBarberBlock(bid, getBarberName(bid), turnosByBarber[bid]))}
                     </div>
                   )}
                 </CardContent>
@@ -221,6 +256,42 @@ export function AgendaViewer({ sucursalId, organizationId, barbers }: AgendaView
           })}
         </div>
       )}
+
+      {/* Cancel confirmation dialog */}
+      <AlertDialog open={!!cancelDialog} onOpenChange={(open) => { if (!open) setCancelDialog(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar este turno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelDialog && (
+                <>
+                  {cancelDialog.servicioNombre} — {cancelDialog.turno.cliente_nombre || 'Sin nombre'}
+                  <br />
+                  {cancelDialog.turno.fecha} a las {cancelDialog.turno.hora_inicio.slice(0, 5)}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="Motivo de cancelación (opcional)"
+              value={cancelMotivo}
+              onChange={(e) => setCancelMotivo(e.target.value)}
+              rows={2}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelTurno}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling ? 'Cancelando...' : 'Sí, cancelar turno'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
