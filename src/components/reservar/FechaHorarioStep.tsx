@@ -44,7 +44,7 @@ export const FechaHorarioStep = ({
   organizationId, sucursalId, servicioId, barberoId,
   onSelect, onChangeBarbero,
 }: Props) => {
-  const days = useRef(buildDays(14)).current;
+  const days = useRef(buildDays(30)).current;
   const [fecha, setFecha] = useState(days[0].dateStr);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
