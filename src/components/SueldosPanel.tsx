@@ -76,6 +76,13 @@ interface IngresoRaw {
   created_at: string;
 }
 
+interface ComisionEquipoDetalle {
+  barberoOrigenId: string;
+  barberoOrigenNombre: string;
+  porcentajeActual: number; // Most recent percentage for display
+  montoTotal: number;
+}
+
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
@@ -86,6 +93,7 @@ interface BarberSalaryData {
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
   fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
+  comisionExtraEquipo?: ComisionEquipoDetalle[];
 }
 
 interface IngresoDetalle {
@@ -164,6 +172,22 @@ function BarberDetailRow({
           {barber.fixedSalaryInfo && (
             <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
               <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+            </div>
+          )}
+          {/* Comision extra por equipo */}
+          {barber.comisionExtraEquipo && barber.comisionExtraEquipo.length > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm space-y-1">
+              <span className="font-medium">Comisión extra por equipo</span>
+              {barber.comisionExtraEquipo.map(ce => (
+                <div key={ce.barberoOrigenId} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{ce.barberoOrigenNombre} ({ce.porcentajeActual}%)</span>
+                  <span className="font-medium">{formatCurrency(ce.montoTotal)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t border-primary/10 font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(barber.comisionExtraEquipo.reduce((s, c) => s + c.montoTotal, 0))}</span>
+              </div>
             </div>
           )}
           {/* Ingresos Detail */}
@@ -366,6 +390,103 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         }
       });
 
+      // === Comision Extra por Equipo: fetch configs + rules ===
+      const { data: comisionConfigs } = await supabase
+        .from('comision_equipo_config')
+        .select('id, encargado_id, activa, scope_type, sucursal_id')
+        .eq('organization_id', organization.id)
+        .eq('activa', true);
+
+      // For each active config, fetch ALL rules that overlap with the period (for filtered view)
+      // and ALL rules (for historical saldo)
+      let allComisionReglas: { config_id: string; barbero_origen_id: string; porcentaje: number; vigencia_desde: string; vigencia_hasta: string | null }[] = [];
+      if (comisionConfigs && comisionConfigs.length > 0) {
+        const configIds = comisionConfigs.map(c => c.id);
+        const { data: reglasData } = await supabase
+          .from('comision_equipo_reglas')
+          .select('config_id, barbero_origen_id, porcentaje, vigencia_desde, vigencia_hasta')
+          .in('config_id', configIds)
+          .eq('activa', true);
+        allComisionReglas = reglasData || [];
+      }
+
+      // Helper: find applicable rule for a given date
+      const findRegla = (configId: string, barberoOrigenId: string, fechaCierre: string) => {
+        return allComisionReglas.find(r =>
+          r.config_id === configId &&
+          r.barbero_origen_id === barberoOrigenId &&
+          r.vigencia_desde <= fechaCierre &&
+          (r.vigencia_hasta === null || r.vigencia_hasta >= fechaCierre)
+        );
+      };
+
+      // Pre-compute comision extra per encargado using ALL ingresos (historical) and filtered ingresos
+      // We need ALL active ingresos for historical calc, and filtered ones for display
+      // The historical ingresos are already fetched (ingresosHistoricos) but without full detail
+      // We need total_facturado + created_at per barbero_id for commission calc
+      // Fetch these separately for commission
+      let comisionIngresosForCalc: { barbero_id: string; total_facturado: number; created_at: string }[] = [];
+      if (comisionConfigs && comisionConfigs.length > 0) {
+        // Get all unique barbero_origen_ids from rules
+        const origenIds = [...new Set(allComisionReglas.map(r => r.barbero_origen_id))];
+        if (origenIds.length > 0) {
+          let comIngQuery = supabase
+            .from('ingresos')
+            .select('barbero_id, total_facturado, created_at')
+            .eq('organization_id', organization.id)
+            .eq('estado', 'activo')
+            .in('barbero_id', origenIds);
+          if (currentSucursal) comIngQuery = comIngQuery.eq('sucursal_id', currentSucursal.id);
+          const { data: comIngData } = await comIngQuery;
+          comisionIngresosForCalc = (comIngData || []).map(i => ({
+            barbero_id: i.barbero_id || '',
+            total_facturado: Number(i.total_facturado) || 0,
+            created_at: i.created_at,
+          }));
+        }
+      }
+
+      // Calculate per-encargado commission (historical and filtered)
+      type ComisionResult = { historico: Record<string, { nombre: string; porcentaje: number; monto: number }>; filtrado: Record<string, { nombre: string; porcentaje: number; monto: number }> };
+      const comisionPorEncargado: Record<string, ComisionResult> = {};
+
+      if (comisionConfigs) {
+        for (const cfg of comisionConfigs) {
+          const encargadoId = cfg.encargado_id;
+          const configId = cfg.id;
+          const result: ComisionResult = { historico: {}, filtrado: {} };
+
+          for (const ingreso of comisionIngresosForCalc) {
+            const fechaCierre = format(new Date(ingreso.created_at), 'yyyy-MM-dd');
+            const regla = findRegla(configId, ingreso.barbero_id, fechaCierre);
+            if (!regla) continue;
+
+            const comision = ingreso.total_facturado * regla.porcentaje / 100;
+            const barberOrigen = barbers.find(b => b.id === ingreso.barbero_id);
+            const nombre = barberOrigen ? `${barberOrigen.firstName} ${barberOrigen.lastName}`.trim() : 'Barbero';
+
+            // Historical
+            if (!result.historico[ingreso.barbero_id]) {
+              result.historico[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
+            }
+            result.historico[ingreso.barbero_id].monto += comision;
+            result.historico[ingreso.barbero_id].porcentaje = regla.porcentaje; // last one wins
+
+            // Filtered (only if within period)
+            const inPeriod = !periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd');
+            if (inPeriod) {
+              if (!result.filtrado[ingreso.barbero_id]) {
+                result.filtrado[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
+              }
+              result.filtrado[ingreso.barbero_id].monto += comision;
+              result.filtrado[ingreso.barbero_id].porcentaje = regla.porcentaje;
+            }
+          }
+
+          comisionPorEncargado[encargadoId] = result;
+        }
+      }
+
       // Build salary data for active barbers
       const now = new Date();
       const data: BarberSalaryData[] = barbers.map(barber => {
@@ -386,6 +507,24 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           totalDevengado += devengadoFijo;
           fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
         }
+
+        // Comision extra por equipo (filtered)
+        let comisionExtraEquipo: ComisionEquipoDetalle[] | undefined;
+        const comisionData = comisionPorEncargado[barber.id];
+        if (comisionData) {
+          const filtrado = comisionData.filtrado;
+          const entries = Object.entries(filtrado).filter(([, v]) => v.monto > 0);
+          if (entries.length > 0) {
+            comisionExtraEquipo = entries.map(([barberoOrigenId, v]) => ({
+              barberoOrigenId,
+              barberoOrigenNombre: v.nombre,
+              porcentajeActual: v.porcentaje,
+              montoTotal: v.monto,
+            }));
+            const totalComisionExtra = entries.reduce((sum, [, v]) => sum + v.monto, 0);
+            totalDevengado += totalComisionExtra;
+          }
+        }
         
         // HISTORICAL saldo - real debt that NEVER changes with filter
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
@@ -394,6 +533,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
           const devengadoHistoricoFijo = calcularDevengadoFijo(barber.fixedSalary, createdAt, now);
           saldoHistorico += devengadoHistoricoFijo;
+        }
+        // Add historical comision extra to saldo
+        if (comisionData) {
+          const totalHistorico = Object.values(comisionData.historico).reduce((sum, v) => sum + v.monto, 0);
+          saldoHistorico += totalHistorico;
         }
         
         // Get detailed ingresos for this barber by barbero_id
@@ -432,6 +576,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           detalleIngresos,
           detallePagos,
           fixedSalaryInfo,
+          comisionExtraEquipo,
         };
       });
 
@@ -442,7 +587,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [organization, barbers, periodStartDate]);
+  }, [organization, barbers, periodStartDate, currentSucursal]);
 
   useEffect(() => {
     fetchData();
