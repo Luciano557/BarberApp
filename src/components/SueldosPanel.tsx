@@ -529,6 +529,85 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         }
       }
 
+      // === Bono Fijo: sync pending occurrences ===
+      const hoyStr = format(new Date(), 'yyyy-MM-dd');
+      let bonoQuery = supabase
+        .from('bono_fijo_config')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .eq('activa', true)
+        .lte('proxima_fecha', hoyStr);
+      
+      const { data: bonosPendientes } = await bonoQuery;
+      if (bonosPendientes && bonosPendientes.length > 0) {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+
+        for (const bono of bonosPendientes) {
+          let nextDate = new Date(bono.proxima_fecha + 'T12:00:00');
+          const endDate = bono.fecha_fin ? new Date(bono.fecha_fin + 'T12:00:00') : new Date('9999-12-31T12:00:00');
+
+          while (nextDate <= today && nextDate <= endDate) {
+            const fechaStr = format(nextDate, 'yyyy-MM-dd');
+            // Insert with ON CONFLICT DO NOTHING (upsert-safe)
+            await supabase
+              .from('bono_fijo_ocurrencias')
+              .upsert({
+                organization_id: bono.organization_id,
+                sucursal_id: bono.sucursal_id,
+                config_id: bono.id,
+                barbero_id: bono.barbero_id,
+                monto: bono.monto,
+                fecha: fechaStr,
+              }, { onConflict: 'config_id,fecha', ignoreDuplicates: true });
+
+            nextDate = calcNextDate(
+              nextDate,
+              bono.repeat_preset,
+              bono.repeat_frequency,
+              bono.repeat_interval,
+              bono.repeat_byweekday,
+            );
+          }
+
+          // Update proxima_fecha
+          await supabase
+            .from('bono_fijo_config')
+            .update({ proxima_fecha: format(nextDate, 'yyyy-MM-dd') })
+            .eq('id', bono.id);
+        }
+      }
+
+      // Fetch ALL bono fijo ocurrencias for the org (historical)
+      let bonoOcurrenciasQuery = supabase
+        .from('bono_fijo_ocurrencias')
+        .select('barbero_id, monto, fecha')
+        .eq('organization_id', organization.id);
+      if (currentSucursal) bonoOcurrenciasQuery = bonoOcurrenciasQuery.eq('sucursal_id', currentSucursal.id);
+      const { data: allBonoOcurrencias } = await bonoOcurrenciasQuery;
+
+      // Group by barbero_id
+      const bonoHistoricoPorId: Record<string, number> = {};
+      const bonoOcurrenciasPorId: Record<string, BonoFijoOcurrencia[]> = {};
+      const bonoFiltradoPorId: Record<string, { total: number; ocurrencias: BonoFijoOcurrencia[] }> = {};
+
+      (allBonoOcurrencias || []).forEach((o: any) => {
+        const bid = o.barbero_id;
+        const m = Number(o.monto) || 0;
+        // Historical total
+        bonoHistoricoPorId[bid] = (bonoHistoricoPorId[bid] || 0) + m;
+        if (!bonoOcurrenciasPorId[bid]) bonoOcurrenciasPorId[bid] = [];
+        bonoOcurrenciasPorId[bid].push({ fecha: o.fecha, monto: m });
+
+        // Filtered
+        const inPeriod = !periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd');
+        if (inPeriod) {
+          if (!bonoFiltradoPorId[bid]) bonoFiltradoPorId[bid] = { total: 0, ocurrencias: [] };
+          bonoFiltradoPorId[bid].total += m;
+          bonoFiltradoPorId[bid].ocurrencias.push({ fecha: o.fecha, monto: m });
+        }
+      });
+
       // Build salary data for active barbers
       const now = new Date();
       const data: BarberSalaryData[] = barbers.map(barber => {
