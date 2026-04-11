@@ -506,6 +506,21 @@ export function EquipoUnificado({
               </div>
             )}
 
+            {/* Extras de compensación — only for managers/GMs */}
+            {(() => {
+              const barberRoles = getBarberRoles(barber);
+              const isEncargado = barberRoles.includes('manager') || barberRoles.includes('general_manager');
+              if (!isEncargado) return null;
+              return (
+                <ExtrasCompensacion
+                  barber={barber}
+                  organizationId={organizationId}
+                  sucursalId={sucursalId}
+                  allBarbers={allBarbers}
+                />
+              );
+            })()}
+
             {/* Actions with text labels */}
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
