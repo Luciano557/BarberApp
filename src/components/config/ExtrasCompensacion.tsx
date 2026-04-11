@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Barber } from '@/types/barbershop';
 import { ComisionEquipoConfig } from './ComisionEquipoConfig';
+import { BonoFijoConfig } from './BonoFijoConfig';
 
-type ExtraType = 'comision_equipo';
+type ExtraType = 'comision_equipo' | 'bono_fijo';
 
 interface ExtrasCompensacionProps {
   barber: Barber;
@@ -15,15 +16,14 @@ interface ExtrasCompensacionProps {
 }
 
 export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarbers }: ExtrasCompensacionProps) {
-  const [activeExtras, setActiveExtras] = useState<ExtraType[]>([]);
   const [showComisionEquipo, setShowComisionEquipo] = useState(false);
+  const [showBonoFijo, setShowBonoFijo] = useState(false);
 
   const handleAddExtra = (type: ExtraType) => {
     if (type === 'comision_equipo') {
       setShowComisionEquipo(true);
-      if (!activeExtras.includes(type)) {
-        setActiveExtras(prev => [...prev, type]);
-      }
+    } else if (type === 'bono_fijo') {
+      setShowBonoFijo(true);
     }
   };
 
@@ -42,7 +42,7 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
               <Users className="h-4 w-4 mr-2" />
               Comisión extra por equipo
             </DropdownMenuItem>
-            <DropdownMenuItem disabled className="text-muted-foreground">
+            <DropdownMenuItem onClick={() => handleAddExtra('bono_fijo')}>
               <DollarSign className="h-4 w-4 mr-2" />
               Bono fijo
             </DropdownMenuItem>
@@ -66,6 +66,16 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
         allBarbers={allBarbers}
         forceShow={showComisionEquipo}
       />
+
+      {/* Bono Fijo — auto-loads if config exists */}
+      <div className="mt-2">
+        <BonoFijoConfig
+          barberId={barber.id}
+          organizationId={organizationId}
+          sucursalId={sucursalId}
+          forceShow={showBonoFijo}
+        />
+      </div>
     </div>
   );
 }
