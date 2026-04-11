@@ -76,6 +76,13 @@ interface IngresoRaw {
   created_at: string;
 }
 
+interface ComisionEquipoDetalle {
+  barberoOrigenId: string;
+  barberoOrigenNombre: string;
+  porcentajeActual: number; // Most recent percentage for display
+  montoTotal: number;
+}
+
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
@@ -86,6 +93,7 @@ interface BarberSalaryData {
   detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
   detallePagos: PagoDetalle[];       // Individual payments for the period
   fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
+  comisionExtraEquipo?: ComisionEquipoDetalle[];
 }
 
 interface IngresoDetalle {
