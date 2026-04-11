@@ -232,6 +232,22 @@ function BarberDetailRow({
               </div>
             </div>
           )}
+          {/* Bono fijo */}
+          {barber.bonoFijoOcurrencias && barber.bonoFijoOcurrencias.length > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm space-y-1">
+              <span className="font-medium">Bono fijo</span>
+              {barber.bonoFijoOcurrencias.map((o, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{format(new Date(o.fecha + 'T12:00:00'), "dd/MM", { locale: es })}</span>
+                  <span className="font-medium">+{formatCurrency(o.monto)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t border-primary/10 font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(barber.bonoFijoTotal || 0)}</span>
+              </div>
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
