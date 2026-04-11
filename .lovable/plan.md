@@ -1,86 +1,72 @@
 
 
-## Plan actualizado: Comision extra por equipo para encargados (V1.3.2)
+## Plan actualizado: Comision extra por equipo para encargados (V1.3.3)
 
-### Unico cambio respecto a V1.3.1: calculo por tramos de vigencia
-
-Se corrige la logica de calculo en `SueldosPanel.tsx` para que respete los cambios de comision dentro del periodo liquidado.
+Dos cambios respecto a V1.3.2. Todo lo demas se mantiene.
 
 ---
 
-### Logica anterior (incorrecta)
+### Cambio 1: Calculo cierre por cierre, no por tramos agregados
 
-Tomaba la regla vigente al momento de liquidar y la aplicaba a todo el periodo. Si el porcentaje cambiaba el 11/04, recalculaba todo el mes con 7%.
+**Antes (V1.3.2)**: Se agrupaban cierres por tramo de vigencia, se sumaba `total_facturado` del tramo, y se multiplicaba por el porcentaje del tramo.
 
-### Logica nueva (correcta)
+**Ahora (V1.3.3)**: Para cada cierre individual del barbero origen, se busca la regla cuyo rango `[vigencia_desde, vigencia_hasta]` contenga la fecha de ese cierre, y se aplica ese porcentaje al `total_facturado` de ese cierre.
 
-El calculo debe segmentar el periodo liquidado en tramos segun las reglas de vigencia de cada par encargado-barbero.
-
-**Algoritmo**:
-
-Para cada regla vigente durante alguna parte del periodo `[inicio_periodo, fin_periodo]`:
-
-1. Calcular el tramo efectivo: `max(vigencia_desde, inicio_periodo)` hasta `min(vigencia_hasta ?? fin_periodo, fin_periodo)`
-2. Filtrar los cierres de caja (`ingresos`) del barbero origen cuya fecha (`dia`) caiga dentro de ese tramo, con `estado = 'activo'`
-3. Sumar `total_facturado` de esos cierres
-4. Multiplicar por `porcentaje / 100`
-5. Sumar todos los tramos para obtener el total de comision extra de ese barbero origen
-
-**Ejemplo**:
-
-Periodo liquidado: 01/04 al 14/04
-
-Reglas de Tommy sobre Oscar:
-- 5% vigente desde 01/03 hasta 10/04
-- 7% vigente desde 11/04 (abierta)
-
-Calculo:
-- Tramo 1: 01/04–10/04 → sumar cierres de Oscar en esos dias × 5%
-- Tramo 2: 11/04–14/04 → sumar cierres de Oscar en esos dias × 7%
-- Total = suma de ambos tramos
-
-### Query de reglas vigentes para el periodo
-
-Cambiar de:
+Algoritmo en `SueldosPanel.tsx`:
 
 ```
-vigencia_desde <= hoy
+Para cada cierre del barbero origen (con estado = 'activo'):
+  1. Extraer la fecha del cierre (ver Cambio 2)
+  2. Buscar la regla donde vigencia_desde <= fecha_cierre AND (vigencia_hasta IS NULL OR vigencia_hasta >= fecha_cierre)
+  3. Si hay regla: comision += total_facturado * porcentaje / 100
+  4. Si no hay regla vigente para esa fecha: no se computa comision
 ```
 
-A:
+El resultado es equivalente al calculo por tramos cuando no hay gaps, pero es mas preciso y mas simple de implementar. No requiere armar rangos ni intersectarlos.
+
+### Cambio 2: Usar la fecha real del cierre de caja
+
+La fecha de referencia para determinar que porcentaje aplica es la **fecha de negocio del cierre**, almacenada en `ingresos.created_at`.
+
+En el sistema actual, `created_at` se graba con `getEndOfDayLocal(date, tz)` al momento de cerrar caja, representando el fin del dia de trabajo (ej: `2026-04-11T23:59:59-03:00` para un cierre del 11/04). Esta es la fecha correcta de negocio.
+
+Para extraer la fecha comparable con `vigencia_desde`/`vigencia_hasta` (que son tipo `date`):
+
+```typescript
+// Extraer fecha local del cierre
+const fechaCierre = format(new Date(ingreso.created_at), 'yyyy-MM-dd');
+```
+
+Solo se computan cierres con `estado = 'activo'`.
+
+### Query de reglas: sin cambios
+
+Se mantiene el fetch de todas las reglas que se solapan con el periodo:
 
 ```sql
 vigencia_desde <= fin_periodo
 AND (vigencia_hasta IS NULL OR vigencia_hasta >= inicio_periodo)
 ```
 
-Esto trae todas las reglas que tuvieron vigencia durante alguna parte del periodo, incluyendo reglas ya cerradas que aplican parcialmente.
+La diferencia es que ahora las reglas se usan como lookup table para cada cierre, no para armar tramos.
 
-### Desglose en UI
+### Desglose en UI: sin cambios
 
-En el desglose por barbero dentro de Sueldos, si hubo cambio de porcentaje en el periodo, mostrar el resultado consolidado por barbero (suma de tramos). El porcentaje mostrado sera el vigente al cierre del periodo (la regla mas reciente).
+Se muestra el monto total consolidado por barbero origen. El porcentaje mostrado es el vigente al cierre del periodo (la regla mas reciente).
 
-```
-Oscar (7%*): $35.000
-* Porcentaje vigente al cierre. Hubo cambios de comision durante el periodo.
-```
-
-Alternativa mas simple para V1: mostrar solo el monto total por barbero sin asterisco, con el porcentaje actual. El historial de tramos queda como dato interno de calculo, no se expone en UI.
-
-### Todo lo demas de V1.3.1 se mantiene sin cambios
+### Todo lo demas de V1.3.2 se mantiene
 
 - Tablas, indices, 3 triggers, RLS, CHECK constraint scope/sucursal
 - Reglas abiertas hasta nuevo aviso
-- Calculo dinamico sobre cierres de caja validos
-- UI de configuracion y desglose en Sueldos
+- UI de configuracion (ExtrasCompensacion + ComisionEquipoConfig)
 - Una sola config activa por encargado
 
-### Archivos a crear/modificar (sin cambios)
+### Archivos a crear/modificar
 
 | Archivo | Accion |
 |---|---|
-| Migracion SQL | Crear tablas, indices, 3 triggers, RLS |
 | `src/components/config/ComisionEquipoConfig.tsx` | Nuevo: UI config reglas por barbero |
-| `src/components/config/EquipoUnificado.tsx` | Integrar ComisionEquipoConfig en ficha de encargados |
-| `src/components/SueldosPanel.tsx` | Fetch reglas por tramos, calcular comision extra segmentada, mostrar desglose |
+| `src/components/config/ExtrasCompensacion.tsx` | Nuevo: seccion wrapper escalable |
+| `src/components/config/EquipoUnificado.tsx` | Integrar ExtrasCompensacion en ficha de encargados |
+| `src/components/SueldosPanel.tsx` | Fetch reglas, calcular comision cierre por cierre usando fecha de negocio, mostrar desglose |
 
