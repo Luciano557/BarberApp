@@ -79,21 +79,28 @@ interface IngresoRaw {
 interface ComisionEquipoDetalle {
   barberoOrigenId: string;
   barberoOrigenNombre: string;
-  porcentajeActual: number; // Most recent percentage for display
+  porcentajeActual: number;
   montoTotal: number;
+}
+
+interface BonoFijoOcurrencia {
+  fecha: string;
+  monto: number;
 }
 
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
   compensationType: string;
-  totalDevengado: number;           // Filtered by period (or all time if no filter)
-  totalPagado: number;              // Filtered by period (or all time if no filter)
-  saldo: number;                    // ALWAYS historical: total devengado - total pagado (real debt)
-  detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
-  detallePagos: PagoDetalle[];       // Individual payments for the period
-  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
+  totalDevengado: number;
+  totalPagado: number;
+  saldo: number;
+  detalleIngresos: IngresoDetalle[];
+  detallePagos: PagoDetalle[];
+  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number };
   comisionExtraEquipo?: ComisionEquipoDetalle[];
+  bonoFijoOcurrencias?: BonoFijoOcurrencia[];
+  bonoFijoTotal?: number;
 }
 
 interface IngresoDetalle {
