@@ -1,34 +1,86 @@
 
 
-## Plan: Fixes en flujo de reserva + cancelar turnos desde agenda
+## Plan actualizado: Comision extra por equipo para encargados (V1.3.2)
 
-### 1. Fix "Volver" cuando hay 1 sola sucursal
+### Unico cambio respecto a V1.3.1: calculo por tramos de vigencia
 
-**Problema**: `goBack` va de step 1 a step 0, pero el `useEffect` auto-skip vuelve a step 1 inmediatamente.
+Se corrige la logica de calculo en `SueldosPanel.tsx` para que respete los cambios de comision dentro del periodo liquidado.
 
-**Solución** en `BookingStepper.tsx`: En `goBack`, si `step === 1` y `orgData.sucursales.length === 1`, llamar `onBackToLanding()` directamente en vez de ir a step 0.
+---
 
-### 2. Fix cuenta nueva no queda logueada
+### Logica anterior (incorrecta)
 
-**Problema**: En `AuthStep`, tras `signUp` se llama `onAuthenticated()` inmediatamente, pero Supabase no crea sesión activa hasta que el usuario confirme email (o si email confirmation está desactivado, la sesión se crea pero puede no estar lista aún). Luego en `ConfirmacionStep`, `getSession()` retorna `null` y el turno se crea sin `user_id`.
+Tomaba la regla vigente al momento de liquidar y la aplicaba a todo el periodo. Si el porcentaje cambiaba el 11/04, recalculaba todo el mes con 7%.
 
-**Solución** en `AuthStep.tsx`: Después de `signUp`, esperar a que `onAuthStateChange` dispare con una sesión válida antes de llamar `onAuthenticated()`. Si la confirmación por email está habilitada, mostrar mensaje de verificación sin avanzar. Si no, el listener detectará la sesión y avanzará automáticamente.
+### Logica nueva (correcta)
 
-### 3. Invertir orden: login primero, registro después
+El calculo debe segmentar el periodo liquidado en tramos segun las reglas de vigencia de cada par encargado-barbero.
 
-**Cambio** en `AuthStep.tsx`: Cambiar `isLogin` default a `true` (iniciar sesión por defecto). El texto del toggle queda: "No tengo cuenta → Crear una" (cuando está en login) y "Ya tengo cuenta → Iniciar sesión" (cuando está en registro). Ya está así, solo cambiar el `useState(false)` a `useState(true)`.
+**Algoritmo**:
 
-### 4. Botón "Cancelar turno" en AgendaViewer
+Para cada regla vigente durante alguna parte del periodo `[inicio_periodo, fin_periodo]`:
 
-**Cambio** en `AgendaViewer.tsx`:
-- Eliminar `getEstadoBadge` y el badge de estado de cada turno
-- Agregar botón "Cancelar" (icono X o texto) en cada turno con estado `pendiente` o `confirmado`
-- Al presionar, mostrar `AlertDialog` de confirmación con motivo opcional (reutilizar patrón de `CancelTurnoDialog`)
-- Ejecutar update directo: `supabase.from('turnos').update({ estado: 'cancelado', cancelado_at, cancelado_motivo }).eq('id', turno.id)`
-- Refrescar lista tras cancelar
+1. Calcular el tramo efectivo: `max(vigencia_desde, inicio_periodo)` hasta `min(vigencia_hasta ?? fin_periodo, fin_periodo)`
+2. Filtrar los cierres de caja (`ingresos`) del barbero origen cuya fecha (`dia`) caiga dentro de ese tramo, con `estado = 'activo'`
+3. Sumar `total_facturado` de esos cierres
+4. Multiplicar por `porcentaje / 100`
+5. Sumar todos los tramos para obtener el total de comision extra de ese barbero origen
 
-### Archivos a modificar
-- `src/components/reservar/BookingStepper.tsx` — fix goBack con 1 sucursal
-- `src/components/reservar/AuthStep.tsx` — invertir default a login, fix signUp sin sesión
-- `src/components/config/AgendaViewer.tsx` — reemplazar badge estado por botón cancelar con AlertDialog
+**Ejemplo**:
+
+Periodo liquidado: 01/04 al 14/04
+
+Reglas de Tommy sobre Oscar:
+- 5% vigente desde 01/03 hasta 10/04
+- 7% vigente desde 11/04 (abierta)
+
+Calculo:
+- Tramo 1: 01/04–10/04 → sumar cierres de Oscar en esos dias × 5%
+- Tramo 2: 11/04–14/04 → sumar cierres de Oscar en esos dias × 7%
+- Total = suma de ambos tramos
+
+### Query de reglas vigentes para el periodo
+
+Cambiar de:
+
+```
+vigencia_desde <= hoy
+```
+
+A:
+
+```sql
+vigencia_desde <= fin_periodo
+AND (vigencia_hasta IS NULL OR vigencia_hasta >= inicio_periodo)
+```
+
+Esto trae todas las reglas que tuvieron vigencia durante alguna parte del periodo, incluyendo reglas ya cerradas que aplican parcialmente.
+
+### Desglose en UI
+
+En el desglose por barbero dentro de Sueldos, si hubo cambio de porcentaje en el periodo, mostrar el resultado consolidado por barbero (suma de tramos). El porcentaje mostrado sera el vigente al cierre del periodo (la regla mas reciente).
+
+```
+Oscar (7%*): $35.000
+* Porcentaje vigente al cierre. Hubo cambios de comision durante el periodo.
+```
+
+Alternativa mas simple para V1: mostrar solo el monto total por barbero sin asterisco, con el porcentaje actual. El historial de tramos queda como dato interno de calculo, no se expone en UI.
+
+### Todo lo demas de V1.3.1 se mantiene sin cambios
+
+- Tablas, indices, 3 triggers, RLS, CHECK constraint scope/sucursal
+- Reglas abiertas hasta nuevo aviso
+- Calculo dinamico sobre cierres de caja validos
+- UI de configuracion y desglose en Sueldos
+- Una sola config activa por encargado
+
+### Archivos a crear/modificar (sin cambios)
+
+| Archivo | Accion |
+|---|---|
+| Migracion SQL | Crear tablas, indices, 3 triggers, RLS |
+| `src/components/config/ComisionEquipoConfig.tsx` | Nuevo: UI config reglas por barbero |
+| `src/components/config/EquipoUnificado.tsx` | Integrar ComisionEquipoConfig en ficha de encargados |
+| `src/components/SueldosPanel.tsx` | Fetch reglas por tramos, calcular comision extra segmentada, mostrar desglose |
 
