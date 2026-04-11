@@ -294,6 +294,93 @@ export type Database = {
           },
         ]
       }
+      bono_fijo_config: {
+        Row: {
+          activa: boolean
+          barbero_id: string
+          created_at: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          monto: number
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          barbero_id: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          monto: number
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          barbero_id?: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bono_fijo_ocurrencias: {
+        Row: {
+          barbero_id: string
+          config_id: string
+          created_at: string
+          fecha: string
+          id: string
+          monto: number
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          barbero_id: string
+          config_id: string
+          created_at?: string
+          fecha: string
+          id?: string
+          monto: number
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          config_id?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: []
+      }
       comision_equipo_config: {
         Row: {
           activa: boolean
