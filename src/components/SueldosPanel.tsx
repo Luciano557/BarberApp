@@ -174,6 +174,22 @@ function BarberDetailRow({
               <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
             </div>
           )}
+          {/* Comision extra por equipo */}
+          {barber.comisionExtraEquipo && barber.comisionExtraEquipo.length > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm space-y-1">
+              <span className="font-medium">Comisión extra por equipo</span>
+              {barber.comisionExtraEquipo.map(ce => (
+                <div key={ce.barberoOrigenId} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{ce.barberoOrigenNombre} ({ce.porcentajeActual}%)</span>
+                  <span className="font-medium">{formatCurrency(ce.montoTotal)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t border-primary/10 font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(barber.comisionExtraEquipo.reduce((s, c) => s + c.montoTotal, 0))}</span>
+              </div>
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
