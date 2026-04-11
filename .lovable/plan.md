@@ -1,35 +1,60 @@
 
 
-## Plan: Fix barber filtering in ComisionEquipoConfig + add bulk action
+## Plan actualizado: Bono Fijo en Extras de Compensacion (V2)
 
-### Problem
-`ComisionEquipoConfig` receives `allBarbers` as a prop, but this list is not filtered by sucursal. A branch manager (`branch_only`) sees barbers from all branches in the dropdown.
+Todo lo definido en el plan anterior se mantiene. Se agregan dos puntos.
 
-### Solution
+---
 
-**File: `src/components/config/ComisionEquipoConfig.tsx`**
+### Ajuste 1: Indice unico parcial en base de datos
 
-1. **Fetch filtered barbers directly from DB** instead of relying on the `allBarbers` prop for the dropdown. After loading the config, query `barberos` table:
-   - If `scope_type === 'branch_only'`: filter by `sucursal_id = config.sucursal_id` (or the passed `sucursalId`)
-   - If `scope_type === 'multi_branch'`: fetch all active barbers for the organization
-   - Always exclude the `barberId` (the encargado) and barbers already with open rules
+Agregar en la migracion de `bono_fijo_config` un indice unico parcial que impida mas de un bono activo por empleado:
 
-2. **Keep `allBarbers` prop** only for display (resolving names in existing rules list), since a rule might reference a barber from any branch historically.
+```sql
+CREATE UNIQUE INDEX uq_bono_fijo_activo_por_barbero
+  ON bono_fijo_config (barbero_id)
+  WHERE (activa = true);
+```
 
-3. **Add "Agregar todos" bulk action** for `branch_only` configs:
-   - Button below the dropdown: "Agregar todos los barberos de esta sucursal"
-   - Only visible when `scope_type === 'branch_only'` and there are available barbers without open rules
-   - Requires a percentage input before clicking
-   - Inserts one rule per available barber with the same percentage and `vigencia_desde = hoy`
+Esto garantiza a nivel de base de datos que nunca puedan existir dos registros con `activa = true` para el mismo `barbero_id`, sin importar lo que haga el frontend. Las configuraciones historicas con `activa = false` no se ven afectadas.
 
-### Technical details
+El frontend sigue haciendo la validacion previa (query antes de insert) como cortesia UX, pero la proteccion real es el indice.
 
-- New state: `filteredBarbers: Barber[]` populated by a `fetchFilteredBarbers()` called after config is loaded
-- Query: `supabase.from('barberos').select('*').eq('organization_id', organizationId).eq('activo', true)` + `.eq('sucursal_id', sucursalId)` for branch_only
-- Map results with the existing `dbToBarber`-style mapping inline (or import it)
-- The `availableBarbers` derivation changes from filtering `allBarbers` to filtering `filteredBarbers`
-- Bulk insert uses `supabase.from('comision_equipo_reglas').insert([...])` with an array of rows
+### Ajuste 2: Generacion retroactiva explicita de ocurrencias pendientes
 
-### No other files change
-The filtering logic is fully contained within `ComisionEquipoConfig.tsx`. Props interface stays the same.
+La logica de generacion de ocurrencias en `SueldosPanel.tsx` debe contemplar explicitamente el caso de multiples ocurrencias atrasadas.
+
+Comportamiento:
+
+1. Al abrir Sueldos, se consultan todas las `bono_fijo_config` activas de la organizacion donde `proxima_fecha <= hoy`
+2. Para cada config pendiente, se ejecuta un loop:
+   - Mientras `proxima_fecha <= min(hoy, fecha_fin ?? '9999-12-31')`:
+     - Insertar ocurrencia en `bono_fijo_ocurrencias` con `fecha = proxima_fecha` y `monto = config.monto`
+     - Avanzar `proxima_fecha` usando `calcNextDate`
+   - Actualizar `proxima_fecha` en la config
+3. Despues del sync, se fetchean las ocurrencias para calcular saldos
+
+Ejemplo: bono de $20.000 todos los lunes, no se abrio Sueldos por 3 semanas. Al abrir, el loop genera 3 ocurrencias (una por cada lunes pasado), cada una con su fecha real, y el saldo refleja +$60.000.
+
+Proteccion contra duplicados: el indice unico `(config_id, fecha)` ya definido en el plan original previene que se inserten dos ocurrencias para la misma config y fecha. Se usa upsert o insert con `ON CONFLICT DO NOTHING`.
+
+### Todo lo demas se mantiene sin cambios
+
+- Tablas `bono_fijo_config` y `bono_fijo_ocurrencias` con RLS
+- Recurrencia reutilizando `RepeatPicker`, `CustomRepeatSheet` y `calcNextDate`
+- Un solo bono activo por empleado (ahora blindado por indice)
+- Cambio de bono: cierra anterior (`activa = false`, `fecha_fin = hoy - 1`), crea nuevo
+- Baja sin borrar historial
+- Ocurrencias suman al saldo general unico
+- Desglose individual en vista ampliada de Sueldos
+- UI en perfil del empleado dentro de Extras de compensacion
+
+### Archivos a crear/modificar
+
+| Archivo | Accion |
+|---|---|
+| Migracion SQL | Crear tablas, indice unico parcial, indice de duplicados, RLS |
+| `src/components/config/BonoFijoConfig.tsx` | Nuevo: UI config del bono por empleado |
+| `src/components/config/ExtrasCompensacion.tsx` | Habilitar bono fijo en selector |
+| `src/components/SueldosPanel.tsx` | Sync retroactivo de ocurrencias + fetch + calculo + desglose |
 
