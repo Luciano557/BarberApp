@@ -646,6 +646,16 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             totalDevengado += totalComisionExtra;
           }
         }
+
+        // Bono fijo (filtered)
+        let bonoFijoOcurrencias: BonoFijoOcurrencia[] | undefined;
+        let bonoFijoTotal: number | undefined;
+        const bonoFiltrado = bonoFiltradoPorId[barber.id];
+        if (bonoFiltrado && bonoFiltrado.total > 0) {
+          bonoFijoOcurrencias = bonoFiltrado.ocurrencias.sort((a, b) => a.fecha.localeCompare(b.fecha));
+          bonoFijoTotal = bonoFiltrado.total;
+          totalDevengado += bonoFijoTotal;
+        }
         
         // HISTORICAL saldo - real debt that NEVER changes with filter
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
@@ -660,6 +670,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const totalHistorico = Object.values(comisionData.historico).reduce((sum, v) => sum + v.monto, 0);
           saldoHistorico += totalHistorico;
         }
+        // Add historical bono fijo to saldo
+        saldoHistorico += (bonoHistoricoPorId[barber.id] || 0);
         
         // Get detailed ingresos for this barber by barbero_id
         const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
@@ -698,6 +710,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           detallePagos,
           fixedSalaryInfo,
           comisionExtraEquipo,
+          bonoFijoOcurrencias,
+          bonoFijoTotal,
         };
       });
 
