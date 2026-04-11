@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
 import { AppRole } from '@/contexts/AuthContext';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
+import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
