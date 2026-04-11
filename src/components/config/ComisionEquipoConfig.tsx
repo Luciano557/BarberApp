@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Percent, Trash2 } from 'lucide-react';
+import { Users, Percent, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,16 +33,52 @@ interface Regla {
   activa: boolean;
 }
 
+function mapDbBarber(row: any): Barber {
+  return {
+    id: row.id,
+    uid: row.id,
+    firstName: row.nombre,
+    lastName: row.apellido,
+    phone: row.telefono || '',
+    commission: Number(row.comision) || 0,
+    compensationType: row.tipo_compensacion as any,
+    fixedSalary: row.sueldo_fijo ? Number(row.sueldo_fijo) : undefined,
+    teamRole: row.rol_equipo as any,
+    payDay: row.fecha_cobro_dia,
+    address: undefined,
+    dni: row.dni || undefined,
+    active: row.activo,
+  };
+}
+
 export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, allBarbers, forceShow }: ComisionEquipoConfigProps) {
   const [config, setConfig] = useState<Config | null>(null);
   const [reglas, setReglas] = useState<Regla[]>([]);
+  const [filteredBarbers, setFilteredBarbers] = useState<Barber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedBarbero, setSelectedBarbero] = useState('');
   const [newPorcentaje, setNewPorcentaje] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  // Available barbers: active, not the encargado, not already with an open rule
   const openRuleBarberIds = reglas.filter(r => r.activa && !r.vigencia_hasta).map(r => r.barbero_origen_id);
-  const availableBarbers = allBarbers.filter(b => b.active && b.id !== barberId && !openRuleBarberIds.includes(b.id));
+  const availableBarbers = filteredBarbers.filter(b => b.active && b.id !== barberId && !openRuleBarberIds.includes(b.id));
+
+  const fetchFilteredBarbers = useCallback(async (scopeType: string, configSucursalId: string | null) => {
+    let query = supabase
+      .from('barberos')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('activo', true)
+      .neq('id', barberId);
+
+    if (scopeType === 'branch_only') {
+      const sId = configSucursalId || sucursalId;
+      query = query.eq('sucursal_id', sId);
+    }
+
+    const { data } = await query;
+    setFilteredBarbers((data || []).map(mapDbBarber));
+  }, [organizationId, barberId, sucursalId]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -68,19 +103,20 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           .order('created_at', { ascending: false });
 
         setReglas(reglasData || []);
+        await fetchFilteredBarbers(configData.scope_type, configData.sucursal_id);
       } else {
         setReglas([]);
+        setFilteredBarbers([]);
       }
     } catch (e) {
       console.error('Error loading comision equipo config:', e);
     } finally {
       setIsLoading(false);
     }
-  }, [barberId, organizationId]);
+  }, [barberId, organizationId, fetchFilteredBarbers]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Don't render if no config exists and not forced to show
   if (isLoading) return null;
   if (!config && !forceShow) return null;
 
@@ -100,6 +136,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
 
       if (error) throw error;
       setConfig(data);
+      await fetchFilteredBarbers(data.scope_type, data.sucursal_id);
       toast.success('Comisión extra por equipo activada');
     } catch (e: any) {
       console.error(e);
@@ -154,6 +191,42 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
     }
   };
 
+  const handleBulkAdd = async () => {
+    if (!config || !newPorcentaje || availableBarbers.length === 0) return;
+    const porcentaje = parseFloat(newPorcentaje);
+    if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
+      toast.error('Ingresá un porcentaje válido antes de agregar todos');
+      return;
+    }
+
+    setBulkLoading(true);
+    try {
+      const hoy = format(new Date(), 'yyyy-MM-dd');
+      const rows = availableBarbers.map(b => ({
+        config_id: config.id,
+        barbero_origen_id: b.id,
+        porcentaje,
+        organization_id: organizationId,
+        sucursal_id: sucursalId,
+        vigencia_desde: hoy,
+      }));
+
+      const { error } = await supabase
+        .from('comision_equipo_reglas')
+        .insert(rows);
+
+      if (error) throw error;
+      setNewPorcentaje('');
+      toast.success(`${rows.length} barberos agregados`);
+      fetchData();
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Error al agregar barberos');
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const handleUpdatePorcentaje = async (regla: Regla, newValue: string) => {
     const porcentaje = parseFloat(newValue);
     if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) return;
@@ -164,13 +237,11 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
     const ayer = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
 
     try {
-      // Close old rule
       await supabase
         .from('comision_equipo_reglas')
         .update({ vigencia_hasta: ayer })
         .eq('id', regla.id);
 
-      // Insert new rule
       const { error } = await supabase
         .from('comision_equipo_reglas')
         .insert({
@@ -206,7 +277,6 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
     }
   };
 
-  // No config yet — show create button
   if (!config) {
     return (
       <div className="p-3 rounded-md border border-dashed border-border bg-muted/20">
@@ -223,9 +293,10 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
     );
   }
 
+  const isBranchOnly = config.scope_type === 'branch_only';
+
   return (
     <div className="p-3 rounded-md border border-border bg-muted/20 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
@@ -236,11 +307,11 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
 
       {config.activa && (
         <>
-          {/* Current rules */}
           {reglas.length > 0 && (
             <div className="space-y-2">
               {reglas.map(regla => {
-                const barberOrigen = allBarbers.find(b => b.id === regla.barbero_origen_id);
+                const barberOrigen = allBarbers.find(b => b.id === regla.barbero_origen_id)
+                  || filteredBarbers.find(b => b.id === regla.barbero_origen_id);
                 return (
                   <div key={regla.id} className="flex items-center justify-between gap-2 p-2 rounded bg-background border border-border">
                     <span className="text-sm truncate">
@@ -275,39 +346,53 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
             </div>
           )}
 
-          {/* Add new rule */}
           {availableBarbers.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Select value={selectedBarbero} onValueChange={setSelectedBarbero}>
-                <SelectTrigger className="h-8 text-xs flex-1">
-                  <SelectValue placeholder="Seleccionar barbero" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableBarbers.map(b => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {getBarberDisplayName(b)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1">
-                <Input
-                  type="number"
-                  className="w-16 h-8 text-xs text-right"
-                  placeholder="%"
-                  value={newPorcentaje}
-                  onChange={(e) => setNewPorcentaje(e.target.value)}
-                  min={0.01}
-                  max={100}
-                  step={0.5}
-                />
-                <Percent className="h-3 w-3 text-muted-foreground" />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Select value={selectedBarbero} onValueChange={setSelectedBarbero}>
+                  <SelectTrigger className="h-8 text-xs flex-1">
+                    <SelectValue placeholder="Seleccionar barbero" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableBarbers.map(b => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {getBarberDisplayName(b)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    className="w-16 h-8 text-xs text-right"
+                    placeholder="%"
+                    value={newPorcentaje}
+                    onChange={(e) => setNewPorcentaje(e.target.value)}
+                    min={0.01}
+                    max={100}
+                    step={0.5}
+                  />
+                  <Percent className="h-3 w-3 text-muted-foreground" />
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-xs"
+                  disabled={!selectedBarbero || !newPorcentaje}
+                  onClick={handleAddRegla}>
+                  Agregar
+                </Button>
               </div>
-              <Button variant="outline" size="sm" className="h-8 text-xs"
-                disabled={!selectedBarbero || !newPorcentaje}
-                onClick={handleAddRegla}>
-                Agregar
-              </Button>
+
+              {isBranchOnly && availableBarbers.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs w-full"
+                  disabled={!newPorcentaje || bulkLoading}
+                  onClick={handleBulkAdd}
+                >
+                  <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                  Agregar todos los barberos de esta sucursal ({availableBarbers.length})
+                </Button>
+              )}
             </div>
           )}
 
