@@ -19,85 +19,84 @@
     --color-900: 234 75% 15%;
     --color-950: 234 80% 6%;
 
-    /* Semantic tokens */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+  /* Semantic tokens */
+--background: 0 0% 100%;           /* Blanco */
+--foreground: 0 0% 10%;            /* Negro */
 
+--card: 0 0% 100%;
+--card-foreground: 0 0% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
+--popover: 0 0% 100%;
+--popover-foreground: 0 0% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
+--primary: 0 85% 50%;              /* Rojo McDonald's */
+--primary-foreground: 48 100% 50%; /* Amarillo */
 
-    --primary: 234 70% 19%;
-    --primary-foreground: 0 0% 100%;
+--secondary: 48 100% 50%;          /* Amarillo */
+--secondary-foreground: 0 0% 10%;  /* Negro */
 
-    --secondary: 234 50% 85%;
-    --secondary-foreground: 234 70% 19%;
+--muted: 48 100% 90%;              /* Amarillo claro */
+--muted-foreground: 0 0% 30%;
 
-    --muted: 234 60% 95%;
-    --muted-foreground: var(--color-600);
+--accent: 0 0% 100%;               /* Blanco */
+--accent-foreground: 0 85% 50%;    /* Rojo */
 
-    --accent: 234 60% 95%;
-    --accent-foreground: 234 60% 32%;
+--destructive: 0 85% 50%;          /* Rojo */
+--destructive-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 100%;
+--success: 142 76% 36%;            /* Verde (puedes ajustar si quieres) */
+--success-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+--border: 48 100% 80%;             /* Amarillo suave */
+--input: 48 100% 90%;
+--ring: 0 85% 50%;                 /* Rojo */
 
-    --border: 234 50% 85%;
-    --input: 234 42% 75%;
-    --ring: 234 60% 32%;
+--radius: 0.5rem;
 
-    --radius: 0.5rem;
+/* Sidebar tokens */
+--sidebar-background: 0 0% 100%;
+--sidebar-foreground: 0 0% 10%;
+--sidebar-border: 48 100% 80%;
+--sidebar-accent: 48 100% 90%;
+--sidebar-accent-foreground: 0 85% 50%;
+--sidebar-primary: 0 85% 50%;
+--sidebar-primary-foreground: 48 100% 50%;
+--sidebar-ring: 0 85% 50%;
+--sidebar: 0 0% 100%;
 
-    /* Sidebar tokens */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 0%;
-    --sidebar-border: 234 50% 85%;
-    --sidebar-accent: 234 60% 95%;
-    --sidebar-accent-foreground: 234 70% 19%;
-    --sidebar-primary: 234 70% 19%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-ring: 234 60% 32%;
-    --sidebar: 0 0% 100%;
+/* Chart tokens */
+--chart-1: 0 85% 50%;      /* Rojo */
+--chart-2: 48 100% 50%;    /* Amarillo */
+--chart-3: 0 0% 10%;       /* Negro */
+--chart-4: 0 0% 100%;      /* Blanco */
+--chart-5: 48 100% 80%;    /* Amarillo suave */
 
-    /* Chart tokens */
-    --chart-1: 234 70% 19%;
-    --chart-2: 234 50% 45%;
-    --chart-3: 234 42% 75%;
-    --chart-4: 234 55% 38%;
-    --chart-5: 234 60% 32%;
+/* Shadow scale */
+--shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+--shadow-md: 0 2px 8px 0 hsl(0 0% 0% / 0.06);
+--shadow-lg: 0 4px 16px 0 hsl(0 0% 0% / 0.08);
 
-    /* Shadow scale */
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
-    --shadow-md: 0 2px 8px 0 hsl(0 0% 0% / 0.06);
-    --shadow-lg: 0 4px 16px 0 hsl(0 0% 0% / 0.08);
-
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+--font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 
   .dark {
     --background: 234 30% 8%;
     --foreground: 234 20% 95%;
 
-    --card: 234 30% 12%;
---card-foreground: var(--color-900);
-
-    --popover: 234 30% 12%;
-    --popover-foreground: 234 20% 95%;
-
-    --primary: 234 50% 65%;
-    --primary-foreground: 234 80% 6%;
-
-    --secondary: 234 30% 20%;
+    --card: 0 0% 20%;
+    --card-foreground: 0 0% 100%;
+    
+    --popover: 0 0% 20%;
+    --popover-foreground: 0 0% 100%;
+    
+    --primary: 48 100% 50%;           /* Amarillo */
+    --primary-foreground: 0 85% 50%;  /* Rojo */
+    
+    --secondary: 0 85% 50;
     --secondary-foreground: 234 20% 90%;
 
     --muted: 234 25% 18%;
-    --muted-foreground: 0 0% 40%;
+    --muted-foreground: 234 20% 60%;
 
     --accent: 234 25% 18%;
     --accent-foreground: 234 20% 75%;
@@ -114,7 +113,7 @@
 
     /* Sidebar dark */
     --sidebar-background: 234 30% 6%;
-    --sidebar-foreground: var(--color-900);
+    --sidebar-foreground: 234 20% 95%;
     --sidebar-border: 234 25% 22%;
     --sidebar-accent: 234 25% 18%;
     --sidebar-accent-foreground: 234 20% 90%;
