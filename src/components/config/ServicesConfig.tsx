@@ -246,7 +246,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
                     key={c.value}
                     type="button"
                     onClick={() => setNewLineColor(newLineColor === c.value ? '' : c.value)}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${newLineColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                    className={`w-8 h-8 rounded-full border-2 transition-colors ${newLineColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
                     style={{ backgroundColor: c.value }}
                     title={c.label}
                   />

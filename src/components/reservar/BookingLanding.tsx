@@ -10,7 +10,7 @@ export const BookingLanding = ({ onStart, onManage }: Props) => {
   return (
     <div className="space-y-4">
       <Card
-        className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98] border-primary/30"
+        className="cursor-pointer hover:shadow-md transition-colors active:scale-[0.98] border-primary/30"
         onClick={onStart}
       >
         <CardContent className="flex items-center gap-4 p-6">
@@ -25,7 +25,7 @@ export const BookingLanding = ({ onStart, onManage }: Props) => {
       </Card>
 
       <Card
-        className="cursor-pointer hover:shadow-md transition-all active:scale-[0.98] border-muted-foreground/20"
+        className="cursor-pointer hover:shadow-md transition-colors active:scale-[0.98] border-muted-foreground/20"
         onClick={onManage}
       >
         <CardContent className="flex items-center gap-4 p-6">
