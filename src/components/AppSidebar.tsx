@@ -25,7 +25,6 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     if (isMobile) setCollapsed(true);
   }, [isMobile]);
 
-  // Filter nav items based on permissions
   const navItems = [
     ...(canManagePayments ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
@@ -54,11 +53,11 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     if (!organization) return null;
     switch (organization.plan) {
       case 'premium':
-        return { label: 'Premium', className: 'bg-amber-500/20 text-amber-600 border-amber-500/30' };
+        return { label: 'Premium', variant: 'default' as const };
       case 'basic':
-        return { label: 'Basic', className: 'bg-blue-500/20 text-blue-600 border-blue-500/30' };
+        return { label: 'Basic', variant: 'secondary' as const };
       default:
-        return { label: 'Free', className: 'bg-muted text-muted-foreground' };
+        return { label: 'Free', variant: 'outline' as const };
     }
   };
 
@@ -72,7 +71,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   return (
     <aside
       className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-200 z-10",
+        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-10",
         isMobile ? "fixed top-0 left-0" : "sticky top-0",
         collapsed ? "w-16" : "w-56"
       )}
@@ -81,15 +80,15 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       <div className="h-14 flex items-center justify-between px-3 border-b border-sidebar-border">
         {!collapsed && (
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
-              <Building2 className="h-4 w-4 text-secondary-foreground" />
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+              <Building2 className="h-4 w-4 text-primary-foreground" />
             </div>
             <div className="min-w-0 flex-1">
               <span className="font-semibold text-sidebar-foreground text-sm block truncate">
                 {organization?.name || 'Barbería'}
               </span>
               {planBadge && (
-                <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", planBadge.className)}>
+                <Badge variant={planBadge.variant} className="text-[10px] px-1.5 py-0">
                   {planBadge.label}
                 </Badge>
               )}
@@ -97,8 +96,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           </div>
         )}
         {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center mx-auto">
-            <Building2 className="h-4 w-4 text-secondary-foreground" />
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
+            <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
       </div>
@@ -129,14 +128,17 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               <button
                 onClick={() => handleTabChange(item.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
                   collapsed && "justify-center px-2",
                   activeTab === item.id
-                    ? "bg-secondary text-secondary-foreground"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-muted"
+                    ? "bg-accent text-primary"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent"
                 )}
                 title={collapsed ? item.label : undefined}
               >
+                {activeTab === item.id && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+                )}
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {!collapsed && <span>{item.label}</span>}
               </button>
@@ -147,14 +149,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
       {/* Lock, Logout & Toggle */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
-        {/* Lock Button - only show when unlocked and PIN is required */}
         {requiresPin && isUnlocked && (
           <Button
             variant="ghost"
             size="sm"
             onClick={lock}
             className={cn(
-              "w-full h-9 text-amber-600 hover:text-amber-700 hover:bg-amber-50 justify-start",
+              "w-full h-9 text-muted-foreground hover:text-foreground justify-start",
               collapsed && "px-2 justify-center"
             )}
             title={collapsed ? `Bloquear (${unlockedBy})` : undefined}
