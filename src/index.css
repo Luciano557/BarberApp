@@ -21,8 +21,8 @@
 
     /* Semantic tokens */
     --background: 0 0% 100%;
-    --foreground: 234 80% 6%;
-
+    --foreground: var(--color-900);
+    
     --card: 0 0% 100%;
     --card-foreground: 234 80% 6%;
 
