@@ -1,60 +1,49 @@
 
 
-## Plan actualizado: Bono Fijo en Extras de Compensacion (V2)
+## Refined Plan: Full UI Refactor — Design System V2.1 (Transition Hardening)
 
-Todo lo definido en el plan anterior se mantiene. Se agregan dos puntos.
+All previous V2.1 rules remain unchanged. This adds one strict rule to the Animation/Transition section.
 
 ---
 
-### Ajuste 1: Indice unico parcial en base de datos
+### TRANSITION RESTRICTION (replaces `transition-all` usage)
 
-Agregar en la migracion de `bono_fijo_config` un indice unico parcial que impida mas de un bono activo por empleado:
+**Rule**: `transition-all` is FORBIDDEN across the entire codebase.
 
-```sql
-CREATE UNIQUE INDEX uq_bono_fijo_activo_por_barbero
-  ON bono_fijo_config (barbero_id)
-  WHERE (activa = true);
-```
+Every component must declare only the specific properties it animates:
 
-Esto garantiza a nivel de base de datos que nunca puedan existir dos registros con `activa = true` para el mismo `barbero_id`, sin importar lo que haga el frontend. Las configuraciones historicas con `activa = false` no se ven afectadas.
+| Component | Allowed transition class | Reason |
+|---|---|---|
+| Button | `transition-colors duration-150` | Only bg/text color changes on hover |
+| Input | `transition-colors duration-150` | Only border/ring color on focus |
+| Card (interactive) | `transition-colors duration-150` | Only border-color on hover |
+| Card (pressable) | `transition-transform duration-200` | Only scale on active |
+| Tabs trigger | `transition-colors duration-150` | Only bg/text swap |
+| Badge | No transition | Static element |
+| Dialog/Sheet overlay | `transition-opacity duration-200` | Only fade |
+| Table row | `transition-colors duration-150` | Only bg on hover |
+| Sidebar nav item | `transition-colors duration-150` | Only bg/text on hover/active |
 
-El frontend sigue haciendo la validacion previa (query antes de insert) como cortesia UX, pero la proteccion real es el indice.
+**Allowed transition utilities** (only these four):
+- `transition-colors` — for background-color, border-color, color, fill, stroke
+- `transition-opacity` — for opacity only
+- `transition-transform` — for transform (scale, translate) only
+- `transition-shadow` — for box-shadow only
 
-### Ajuste 2: Generacion retroactiva explicita de ocurrencias pendientes
+**If a component needs two properties** (e.g., color + transform), combine them explicitly: `transition-[color,transform] duration-150` — still no `transition-all`.
 
-La logica de generacion de ocurrencias en `SueldosPanel.tsx` debe contemplar explicitamente el caso de multiples ocurrencias atrasadas.
+**Implementation impact on existing plan files**:
 
-Comportamiento:
+- `button.tsx`: Change `transition-all duration-150` → `transition-colors duration-150`
+- `input.tsx`: Use `transition-colors duration-150`
+- `card.tsx`: Interactive cards use `transition-colors duration-150`
+- `tabs.tsx`: Use `transition-colors duration-150`
+- `dialog.tsx` / `sheet.tsx`: Overlay uses `transition-opacity duration-200`
+- All page-level components: Replace any `transition-all` with the specific property class
 
-1. Al abrir Sueldos, se consultan todas las `bono_fijo_config` activas de la organizacion donde `proxima_fecha <= hoy`
-2. Para cada config pendiente, se ejecuta un loop:
-   - Mientras `proxima_fecha <= min(hoy, fecha_fin ?? '9999-12-31')`:
-     - Insertar ocurrencia en `bono_fijo_ocurrencias` con `fecha = proxima_fecha` y `monto = config.monto`
-     - Avanzar `proxima_fecha` usando `calcNextDate`
-   - Actualizar `proxima_fecha` en la config
-3. Despues del sync, se fetchean las ocurrencias para calcular saldos
+**Enforcement**: After refactor, grep for `transition-all` across all `.tsx` and `.css` files. Any match is a bug.
 
-Ejemplo: bono de $20.000 todos los lunes, no se abrio Sueldos por 3 semanas. Al abrir, el loop genera 3 ocurrencias (una por cada lunes pasado), cada una con su fecha real, y el saldo refleja +$60.000.
+### Everything else from V2.1 remains intact
 
-Proteccion contra duplicados: el indice unico `(config_id, fecha)` ya definido en el plan original previene que se inserten dos ocurrencias para la misma config y fecha. Se usa upsert o insert con `ON CONFLICT DO NOTHING`.
-
-### Todo lo demas se mantiene sin cambios
-
-- Tablas `bono_fijo_config` y `bono_fijo_ocurrencias` con RLS
-- Recurrencia reutilizando `RepeatPicker`, `CustomRepeatSheet` y `calcNextDate`
-- Un solo bono activo por empleado (ahora blindado por indice)
-- Cambio de bono: cierra anterior (`activa = false`, `fecha_fin = hoy - 1`), crea nuevo
-- Baja sin borrar historial
-- Ocurrencias suman al saldo general unico
-- Desglose individual en vista ampliada de Sueldos
-- UI en perfil del empleado dentro de Extras de compensacion
-
-### Archivos a crear/modificar
-
-| Archivo | Accion |
-|---|---|
-| Migracion SQL | Crear tablas, indice unico parcial, indice de duplicados, RLS |
-| `src/components/config/BonoFijoConfig.tsx` | Nuevo: UI config del bono por empleado |
-| `src/components/config/ExtrasCompensacion.tsx` | Habilitar bono fijo en selector |
-| `src/components/SueldosPanel.tsx` | Sync retroactivo de ocurrencias + fetch + calculo + desglose |
+- Override rules, composition rules, state consistency, typography, spacing, theme architecture, enforcement checklist — all unchanged.
 
