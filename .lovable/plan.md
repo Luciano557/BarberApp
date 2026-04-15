@@ -1,49 +1,90 @@
 
 
-## Refined Plan: Full UI Refactor — Design System V2.1 (Transition Hardening)
+## Enhanced Plan: Centralize All Colors to CSS Variables (V2)
 
-All previous V2.1 rules remain unchanged. This adds one strict rule to the Animation/Transition section.
+The existing plan (Steps 1–4) is preserved. Two new steps and one constraint are added. The scope is confirmed by a full codebase scan.
 
 ---
 
-### TRANSITION RESTRICTION (replaces `transition-all` usage)
+### Scan Results Summary
 
-**Rule**: `transition-all` is FORBIDDEN across the entire codebase.
+The codebase has **zero** instances of `bg-white`, `text-black`, `text-gray-*`, `border-gray-*`, `text-slate-*`, `bg-slate-*`. These were already cleaned in the previous refactor.
 
-Every component must declare only the specific properties it animates:
+All remaining hardcoded colors fall into two categories:
 
-| Component | Allowed transition class | Reason |
-|---|---|---|
-| Button | `transition-colors duration-150` | Only bg/text color changes on hover |
-| Input | `transition-colors duration-150` | Only border/ring color on focus |
-| Card (interactive) | `transition-colors duration-150` | Only border-color on hover |
-| Card (pressable) | `transition-transform duration-200` | Only scale on active |
-| Tabs trigger | `transition-colors duration-150` | Only bg/text swap |
-| Badge | No transition | Static element |
-| Dialog/Sheet overlay | `transition-opacity duration-200` | Only fade |
-| Table row | `transition-colors duration-150` | Only bg on hover |
-| Sidebar nav item | `transition-colors duration-150` | Only bg/text on hover/active |
+1. **Status/chart colors** — already covered by existing Steps 1–4 (7 component files)
+2. **Data colors** — `ServicesConfig.tsx` LINE_COLORS (user-selectable, stored in DB) and `chart.tsx` Recharts selector overrides (library internals targeting `#ccc` and `#fff`). Both are excluded as justified.
 
-**Allowed transition utilities** (only these four):
-- `transition-colors` — for background-color, border-color, color, fill, stroke
-- `transition-opacity` — for opacity only
-- `transition-transform` — for transform (scale, translate) only
-- `transition-shadow` — for box-shadow only
+---
 
-**If a component needs two properties** (e.g., color + transform), combine them explicitly: `transition-[color,transform] duration-150` — still no `transition-all`.
+### NEW Step 5: Enforce Semantic Color Usage
 
-**Implementation impact on existing plan files**:
+After completing Steps 1–4 (status + chart token migration), run a final validation pass across ALL `.tsx` files to confirm zero remaining hardcoded Tailwind color utilities.
 
-- `button.tsx`: Change `transition-all duration-150` → `transition-colors duration-150`
-- `input.tsx`: Use `transition-colors duration-150`
-- `card.tsx`: Interactive cards use `transition-colors duration-150`
-- `tabs.tsx`: Use `transition-colors duration-150`
-- `dialog.tsx` / `sheet.tsx`: Overlay uses `transition-opacity duration-200`
-- All page-level components: Replace any `transition-all` with the specific property class
+**Forbidden patterns** (must return zero matches):
+- `bg-white`, `bg-black`
+- `text-white` (except inside component variants that reference `--*-foreground`)
+- `text-gray-*`, `bg-gray-*`, `border-gray-*`
+- `text-slate-*`, `bg-slate-*`, `border-slate-*`
+- `text-zinc-*`, `bg-zinc-*`, `border-zinc-*`
+- `text-green-*`, `bg-green-*`, `border-green-*`
+- `text-red-*`, `bg-red-*`, `border-red-*`
+- `text-blue-*`, `bg-blue-*`, `border-blue-*`
+- `text-amber-*`, `bg-amber-*`, `border-amber-*`
+- `text-orange-*`, `bg-orange-*`, `border-orange-*`
+- `text-purple-*`, `bg-purple-*`, `border-purple-*`
+- `text-yellow-*`, `bg-yellow-*`, `border-yellow-*`
+- Hardcoded `hsl(...)` with literal values (not `hsl(var(...))`)
 
-**Enforcement**: After refactor, grep for `transition-all` across all `.tsx` and `.css` files. Any match is a bug.
+**Allowed exceptions** (documented, not bugs):
+- `ServicesConfig.tsx` LINE_COLORS — user-selectable data colors stored in DB
+- `chart.tsx` — Recharts CSS selector overrides targeting library-internal `#ccc`/`#fff` strokes
+- `toast.tsx` — Radix `group-[.destructive]` selectors (library-managed)
 
-### Everything else from V2.1 remains intact
+**Replacement rules** (if any new violations are found during pass):
+- `bg-white` → `bg-background` or `bg-card`
+- `text-black` → `text-foreground`
+- `text-gray-*` → `text-muted-foreground`
+- `border-gray-*` → `border-border`
+- Any `text-{color}-*` → `text-status-{semantic}-foreground`
+- Any `bg-{color}-*` → `bg-status-{semantic}-bg`
+- Any `border-{color}-*` → `border-status-{semantic}`
+- Any `hsl(literal)` → `hsl(var(--chart-*))`
 
-- Override rules, composition rules, state consistency, typography, spacing, theme architecture, enforcement checklist — all unchanged.
+### NEW Step 6: Validation
+
+After all migrations, verify the system works by temporarily changing CSS variables in `:root`:
+
+1. Change `--background` → all page backgrounds must update
+2. Change `--foreground` → all text must update
+3. Change `--card` → all card backgrounds must update
+4. Change `--primary` → all primary buttons and accents must update
+5. Change `--status-success` → all success indicators must update
+6. Change `--chart-cash` → all cash chart colors must update
+
+Any element that does not respond is a bug and must be fixed.
+
+### NEW Constraint
+
+Added to the existing constraints section:
+
+- Zero hardcoded Tailwind default color palette classes in any component (gray, blue, green, red, amber, orange, purple, yellow, slate, zinc)
+- The only allowed color usage is via semantic tokens defined in `index.css` and mapped in `tailwind.config.ts`
+- Exceptions must be explicitly documented (data colors, library internals)
+
+### Files Changed
+
+Same as existing plan — no new files added:
+
+| File | Action |
+|---|---|
+| `src/index.css` | Add status + chart CSS variables (Step 1) |
+| `tailwind.config.ts` | Add status + chart color mappings (Step 2) |
+| `src/lib/theme.ts` | Include new variables in preset (Step 2) |
+| `src/components/TareasPanel.tsx` | Replace hardcoded status colors (Step 3) |
+| `src/components/EstadisticasPanel.tsx` | Replace hardcoded chart/status colors + hsl literals (Step 3) |
+| `src/components/InviteUserDialog.tsx` | Replace hardcoded status colors (Step 3) |
+| `src/components/OrganizationSettings.tsx` | Replace hardcoded status colors (Step 3) |
+| `src/components/SueldosPanel.tsx` | Replace hardcoded status colors (Step 3) |
+| `src/components/tareas/TareaFormDialog.tsx` | Replace hardcoded status colors (Step 3) |
 
