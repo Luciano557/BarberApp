@@ -142,7 +142,7 @@ export const FechaHorarioStep = ({
               key={slot.hora_inicio}
               variant={isSelected ? "default" : "outline"}
               className={cn(
-                "w-full h-12 text-base font-medium justify-start transition-all",
+                "w-full h-12 text-base font-medium justify-start transition-colors",
                 isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
               )}
               onClick={() => {
@@ -179,7 +179,7 @@ export const FechaHorarioStep = ({
               key={d.dateStr}
               onClick={() => setFecha(d.dateStr)}
               className={cn(
-                "flex flex-col items-center justify-center shrink-0 w-12 h-16 rounded-xl text-sm font-medium transition-all",
+                "flex flex-col items-center justify-center shrink-0 w-12 h-16 rounded-xl text-sm font-medium transition-colors",
                 active
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted/50 text-foreground hover:bg-accent"

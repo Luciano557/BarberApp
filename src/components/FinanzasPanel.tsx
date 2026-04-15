@@ -14,7 +14,7 @@ interface FinanzasPanelProps {
 export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
   return (
     <div>
-      <h2 className="text-2xl font-bold text-foreground mb-6">Finanzas</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-6">Finanzas</h2>
       <Tabs defaultValue="gastos">
         <TabsList className="mb-6 flex-wrap h-auto gap-1">
           <TabsTrigger value="gastos" className="flex items-center gap-2">
