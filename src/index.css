@@ -22,7 +22,7 @@
     /* Semantic tokens */
     --background: 0 0% 100%;
     --foreground: var(--color-900);
-    
+
     --card: 0 0% 100%;
     --card-foreground: 234 80% 6%;
 
@@ -55,7 +55,7 @@
 
     /* Sidebar tokens */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 234 80% 6%;
+--sidebar-foreground: var(--color-900);
     --sidebar-border: 234 50% 85%;
     --sidebar-accent: 234 60% 95%;
     --sidebar-accent-foreground: 234 70% 19%;
