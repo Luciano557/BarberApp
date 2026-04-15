@@ -78,8 +78,8 @@ export function OrganizationSettings() {
 
   const getPlanColor = () => {
     switch (organization.plan) {
-      case 'premium': return 'bg-amber-500/20 text-amber-600 border-amber-500/30';
-      case 'basic': return 'bg-blue-500/20 text-blue-600 border-blue-500/30';
+      case 'premium': return 'bg-status-warning-bg text-status-warning-foreground border-status-warning';
+      case 'basic': return 'bg-status-info-bg text-status-info-foreground border-status-info';
       default: return 'bg-muted text-muted-foreground';
     }
   };

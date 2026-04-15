@@ -67,22 +67,22 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (tarea && tarea.tipo === 'peticion' && estado === 'pendiente') {
       const { vencida, diasRestantes } = getPeticionVencimiento(tarea);
       if (vencida) {
-        return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50"><AlertTriangle className="w-3 h-3 mr-1" />Vencida</Badge>;
+        return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg"><AlertTriangle className="w-3 h-3 mr-1" />Vencida</Badge>;
       }
       if (diasRestantes <= 7) {
-        return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="w-3 h-3 mr-1" />Vence en {diasRestantes}d</Badge>;
+        return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg"><Clock className="w-3 h-3 mr-1" />Vence en {diasRestantes}d</Badge>;
       }
     }
 
     switch (estado) {
       case 'pendiente':
-        return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>;
+        return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>;
       case 'en_progreso':
-        return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50"><RefreshCw className="w-3 h-3 mr-1" />En progreso</Badge>;
+        return <Badge variant="outline" className="text-status-info-foreground border-status-info bg-status-info-bg"><RefreshCw className="w-3 h-3 mr-1" />En progreso</Badge>;
       case 'completada':
-        return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50"><CheckCircle className="w-3 h-3 mr-1" />Completada</Badge>;
+        return <Badge variant="outline" className="text-status-success-foreground border-status-success bg-status-success-bg"><CheckCircle className="w-3 h-3 mr-1" />Completada</Badge>;
       case 'rechazada':
-        return <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50"><XCircle className="w-3 h-3 mr-1" />Rechazada</Badge>;
+        return <Badge variant="outline" className="text-status-error-foreground border-status-error bg-status-error-bg"><XCircle className="w-3 h-3 mr-1" />Rechazada</Badge>;
       default:
         return <Badge variant="outline">{estado}</Badge>;
     }
@@ -208,7 +208,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                   </Button>
                 )}
                 {(t.estado === 'pendiente' || t.estado === 'en_progreso') && (
-                  <Button size="sm" variant="ghost" className="text-green-600" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
+                  <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })} title="Completar">
                     <CheckCircle className="h-4 w-4" />
                   </Button>
                 )}
@@ -259,7 +259,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               <TableCell className="text-xs text-muted-foreground">
                 {t.estado === 'pendiente' && venc ? (
                   venc.vencida 
-                    ? <span className="text-orange-600 font-medium">Vencida</span>
+                    ? <span className="text-status-warning-foreground font-medium">Vencida</span>
                     : <span>{venc.diasRestantes}d restantes</span>
                 ) : '—'}
               </TableCell>
@@ -269,7 +269,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
                   {t.estado === 'pendiente' && (
-                    <Button size="sm" variant="ghost" className="text-green-600" onClick={() => requestPeticionAction(t.id, 'completada')} title="Completar">
+                    <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => requestPeticionAction(t.id, 'completada')} title="Completar">
                       <CheckCircle className="h-4 w-4" />
                     </Button>
                   )}

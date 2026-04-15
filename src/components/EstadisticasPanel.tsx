@@ -76,16 +76,16 @@ interface DerivedMonthlyMetrics {
 const chartConfig = {
   facturacion: { label: "Facturación", color: "hsl(var(--primary))" },
   servicios: { label: "Servicios", color: "hsl(var(--secondary))" },
-  efectivo: { label: "Efectivo", color: "hsl(142 76% 36%)" },
-  mp: { label: "Mercado Pago", color: "hsl(217 91% 60%)" },
-  costosFijos: { label: "Costos Fijos", color: "hsl(0 84% 60%)" },
-  rentabilidad: { label: "Rentabilidad", color: "hsl(142 76% 36%)" },
-  ticketPromedio: { label: "Ticket Promedio", color: "hsl(217 91% 60%)" },
-  costoFijoPorServicio: { label: "Costo Fijo/Servicio", color: "hsl(25 95% 53%)" },
-  costoVariablePorServicio: { label: "Costo Variable/Servicio", color: "hsl(45 93% 47%)" },
-  gananciaPorServicio: { label: "Ganancia/Servicio", color: "hsl(142 76% 36%)" },
-  puntoEquilibrio: { label: "Punto de Equilibrio", color: "hsl(270 70% 60%)" },
-  tasaOcupacion: { label: "Tasa de Ocupación", color: "hsl(230 70% 55%)" },
+  efectivo: { label: "Efectivo", color: "hsl(var(--chart-cash))" },
+  mp: { label: "Mercado Pago", color: "hsl(var(--chart-mp))" },
+  costosFijos: { label: "Costos Fijos", color: "hsl(var(--chart-cost))" },
+  rentabilidad: { label: "Rentabilidad", color: "hsl(var(--chart-cash))" },
+  ticketPromedio: { label: "Ticket Promedio", color: "hsl(var(--chart-mp))" },
+  costoFijoPorServicio: { label: "Costo Fijo/Servicio", color: "hsl(var(--chart-orange))" },
+  costoVariablePorServicio: { label: "Costo Variable/Servicio", color: "hsl(var(--chart-amber))" },
+  gananciaPorServicio: { label: "Ganancia/Servicio", color: "hsl(var(--chart-cash))" },
+  puntoEquilibrio: { label: "Punto de Equilibrio", color: "hsl(var(--chart-purple))" },
+  tasaOcupacion: { label: "Tasa de Ocupación", color: "hsl(var(--chart-indigo))" },
 };
 
 const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
@@ -237,7 +237,7 @@ function MetricDetailDialog({
                       {variation == null ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
-                        <span className={`inline-flex items-center gap-0.5 ${variation > 0 ? 'text-green-600' : variation < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                        <span className={`inline-flex items-center gap-0.5 ${variation > 0 ? 'text-status-success-foreground' : variation < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
                           {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
                           {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
                         </span>
@@ -584,8 +584,8 @@ export function EstadisticasPanel() {
       title: 'Facturación',
       dataKey: 'facturacion',
       icon: DollarSign,
-      color: 'text-green-600',
-      chartColor: 'hsl(142 76% 36%)',
+      color: 'text-status-success-foreground',
+      chartColor: 'hsl(var(--chart-cash))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto dinero entró al negocio cada mes.',
@@ -594,8 +594,8 @@ export function EstadisticasPanel() {
       title: 'Ticket Promedio',
       dataKey: 'ticketPromedio',
       icon: Receipt,
-      color: 'text-blue-600',
-      chartColor: 'hsl(217 91% 60%)',
+      color: 'text-status-info-foreground',
+      chartColor: 'hsl(var(--chart-mp))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto gasta cada cliente en promedio por visita.',
@@ -604,8 +604,8 @@ export function EstadisticasPanel() {
       title: 'Efectivo',
       dataKey: 'efectivo',
       icon: DollarSign,
-      color: 'text-green-600',
-      chartColor: 'hsl(142 76% 36%)',
+      color: 'text-status-success-foreground',
+      chartColor: 'hsl(var(--chart-cash))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Ingresos mensuales cobrados en efectivo.',
@@ -614,8 +614,8 @@ export function EstadisticasPanel() {
       title: 'Mercado Pago',
       dataKey: 'mp',
       icon: DollarSign,
-      color: 'text-blue-600',
-      chartColor: 'hsl(217 91% 60%)',
+      color: 'text-status-info-foreground',
+      chartColor: 'hsl(var(--chart-mp))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Ingresos mensuales cobrados por Mercado Pago.',
@@ -627,8 +627,8 @@ export function EstadisticasPanel() {
       title: 'Costos Fijos',
       dataKey: 'costosFijos',
       icon: PiggyBank,
-      color: 'text-red-500',
-      chartColor: 'hsl(0 84% 60%)',
+      color: 'text-status-error-foreground',
+      chartColor: 'hsl(var(--chart-cost))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Gastos mensuales independientes de la cantidad de clientes.',
@@ -637,8 +637,8 @@ export function EstadisticasPanel() {
       title: 'Costo Fijo por Servicio',
       dataKey: 'costoFijoPorServicio',
       icon: BarChart3,
-      color: 'text-orange-500',
-      chartColor: 'hsl(25 95% 53%)',
+      color: 'text-chart-orange',
+      chartColor: 'hsl(var(--chart-orange))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto te cuesta cada cliente solo en costos fijos.',
@@ -647,8 +647,8 @@ export function EstadisticasPanel() {
       title: 'Costo Variable por Servicio',
       dataKey: 'costoVariablePorServicio',
       icon: Scissors,
-      color: 'text-amber-600',
-      chartColor: 'hsl(45 93% 47%)',
+      color: 'text-chart-amber',
+      chartColor: 'hsl(var(--chart-amber))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Lo que gastás por cada cliente en insumos y comisiones.',
@@ -657,8 +657,8 @@ export function EstadisticasPanel() {
       title: 'Ganancia por Servicio',
       dataKey: 'gananciaPorServicio',
       icon: TrendingUp,
-      color: latest && latest.gananciaPorServicio >= 0 ? 'text-green-600' : 'text-red-600',
-      chartColor: 'hsl(142 76% 36%)',
+      color: latest && latest.gananciaPorServicio >= 0 ? 'text-status-success-foreground' : 'text-status-error-foreground',
+      chartColor: 'hsl(var(--chart-cash))',
       formatFn: formatCurrency,
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto ganás realmente por cada cliente después de costos.',
@@ -667,8 +667,8 @@ export function EstadisticasPanel() {
       title: 'Rentabilidad',
       dataKey: 'rentabilidad',
       icon: Percent,
-      color: latest && latest.rentabilidad >= 0 ? 'text-green-600' : 'text-red-600',
-      chartColor: 'hsl(142 76% 36%)',
+      color: latest && latest.rentabilidad >= 0 ? 'text-status-success-foreground' : 'text-status-error-foreground',
+      chartColor: 'hsl(var(--chart-cash))',
       formatFn: (v) => `${v.toFixed(1)}%`,
       shortFormatFn: (v) => `${v.toFixed(0)}%`,
       description: 'Porcentaje de lo facturado que queda como ganancia real.',
@@ -677,8 +677,8 @@ export function EstadisticasPanel() {
       title: 'Punto de Equilibrio',
       dataKey: 'puntoEquilibrio',
       icon: Target,
-      color: 'text-purple-600',
-      chartColor: 'hsl(270 70% 60%)',
+      color: 'text-status-purple-foreground',
+      chartColor: 'hsl(var(--chart-purple))',
       formatFn: (v) => `${v} clientes`,
       shortFormatFn: (v) => `${v}`,
       description: 'Clientes necesarios para cubrir todos los costos fijos.',
@@ -692,7 +692,7 @@ export function EstadisticasPanel() {
     if (variation == null) return null;
     const isPartial = latest.isCurrentMonth && latest.diasTranscurridos;
     return (
-      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${variation > 0 ? 'text-green-600' : variation < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${variation > 0 ? 'text-status-success-foreground' : variation < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
         {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
         {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
         {isPartial && (
@@ -877,7 +877,7 @@ export function EstadisticasPanel() {
               <CardTitle className="text-sm font-medium">Horarios Pico</CardTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Los 3 momentos de mayor demanda. Basado en cobros en tiempo real.</p>
             </div>
-            <Trophy className="h-4 w-4 text-amber-500 shrink-0" />
+            <Trophy className="h-4 w-4 text-status-warning-foreground shrink-0" />
           </CardHeader>
           <CardContent>
             {behaviorData.peakSlots.length === 0 ? (
@@ -887,7 +887,7 @@ export function EstadisticasPanel() {
                 {behaviorData.peakSlots.map((slot, i) => (
                   <div key={i} className="flex items-center gap-3 rounded-lg border p-3">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${
-                      i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground'
+                      i === 0 ? 'bg-status-warning-bg text-status-warning-foreground' : 'bg-muted text-muted-foreground'
                     }`}>
                       #{i + 1}
                     </div>
@@ -909,8 +909,8 @@ export function EstadisticasPanel() {
     title: 'Tasa de Ocupación',
     dataKey: 'tasaOcupacion',
     icon: Users,
-    color: 'text-indigo-600',
-    chartColor: 'hsl(230 70% 55%)',
+    color: 'text-status-indigo-foreground',
+    chartColor: 'hsl(var(--chart-indigo))',
     formatFn: (v) => `${v.toFixed(1)}%`,
     shortFormatFn: (v) => `${v.toFixed(0)}%`,
     description: 'Qué tan llena está tu agenda mes a mes.',
@@ -1040,12 +1040,12 @@ export function EstadisticasPanel() {
                 <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">Qué tan llena está tu agenda mes a mes.</p>
               </div>
-              <Users className="h-4 w-4 text-indigo-600 shrink-0" />
+              <Users className="h-4 w-4 text-status-indigo-foreground shrink-0" />
             </CardHeader>
             <CardContent>
               {latest && (
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-2xl font-bold text-indigo-600">
+                  <span className="text-2xl font-bold text-status-indigo-foreground">
                     {latest.tasaOcupacion.toFixed(1)}%
                   </span>
                   {renderVariationBadge(ocupacionMetricDef)}
@@ -1054,7 +1054,7 @@ export function EstadisticasPanel() {
               <MetricChart
                 data={derivedMetrics}
                 dataKey="tasaOcupacion"
-                color="hsl(230 70% 55%)"
+                color="hsl(var(--chart-indigo))"
                 formatValue={(v) => `${v.toFixed(0)}%`}
               />
 
