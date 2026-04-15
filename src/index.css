@@ -21,14 +21,14 @@
 
     /* Semantic tokens */
     --background: 0 0% 100%;
-    --foreground: var(--color-900);
+    --foreground: 0 0% 0%;
 
 
     --card: 0 0% 100%;
-    --card-foreground: 234 80% 6%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: var(--color-900);
+    --popover-foreground: 0 0% 0%;
 
     --primary: 234 70% 19%;
     --primary-foreground: 0 0% 100%;
@@ -56,7 +56,7 @@
 
     /* Sidebar tokens */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 234 80% 6%;
+    --sidebar-foreground: 0 0% 0%;
     --sidebar-border: 234 50% 85%;
     --sidebar-accent: 234 60% 95%;
     --sidebar-accent-foreground: 234 70% 19%;
@@ -97,7 +97,7 @@
     --secondary-foreground: 234 20% 90%;
 
     --muted: 234 25% 18%;
-    --muted-foreground: 234 20% 60%;
+    --muted-foreground: 0 0% 40%;
 
     --accent: 234 25% 18%;
     --accent-foreground: 234 20% 75%;
