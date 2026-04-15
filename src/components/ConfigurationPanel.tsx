@@ -27,7 +27,7 @@ export function ConfigurationPanel() {
           </Button>
         )}
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{sectionTitles[activeSection]}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{sectionTitles[activeSection]}</h1>
           {activeSection === 'menu' && (
             <p className="text-muted-foreground text-sm mt-1">Configuración de servicios y operaciones</p>
           )}
