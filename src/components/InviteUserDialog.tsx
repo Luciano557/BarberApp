@@ -180,9 +180,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
-              <Check className="w-5 h-5" />
-              ¡Usuario creado!
+            <DialogTitle className="flex items-center gap-2 text-status-success-foreground">
+              <Check className="w-5 h-5" /> ¡Usuario creado!
             </DialogTitle>
             <DialogDescription>
               Compartí estas credenciales con {formData.fullName || 'el usuario'}. Deberá cambiar la contraseña en su primer inicio de sesión.
@@ -204,7 +203,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
                     onClick={copyEmail}
                     title="Copiar email"
                   >
-                    {copiedEmail ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {copiedEmail ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
@@ -230,13 +229,13 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
                     onClick={copyPassword}
                     title="Copiar contraseña"
                   >
-                    {copiedPassword ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    {copiedPassword ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
             </div>
 
-            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200">
+            <div className="bg-status-warning-bg border border-status-warning rounded-lg p-3 text-sm text-status-warning-foreground">
               ⚠️ <strong>Importante:</strong> Esta contraseña solo se muestra una vez. Asegurate de compartirla de forma segura.
             </div>
           </div>

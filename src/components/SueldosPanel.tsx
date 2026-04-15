@@ -199,7 +199,7 @@ function BarberDetailRow({
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Pagado</p>
-              <p className="font-medium text-green-600">{formatCurrency(barber.totalPagado)}</p>
+              <p className="font-medium text-status-success-foreground">{formatCurrency(barber.totalPagado)}</p>
             </div>
             <div className="text-right min-w-[140px]">
               <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
@@ -299,7 +299,7 @@ function BarberDetailRow({
                       <TableRow key={pago.id}>
                         <TableCell>{format(new Date(pago.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
                         <TableCell className="text-muted-foreground">{pago.concepto || '-'}</TableCell>
-                        <TableCell className="text-right font-medium text-green-600">{formatCurrency(pago.monto)}</TableCell>
+                        <TableCell className="text-right font-medium text-status-success-foreground">{formatCurrency(pago.monto)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -812,7 +812,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       );
     } else if (saldo < 0) {
       return (
-        <Badge variant="secondary" className="flex items-center gap-1 bg-amber-500/20 text-amber-600 border-amber-500/30">
+        <Badge variant="secondary" className="flex items-center gap-1 bg-status-warning-bg text-status-warning-foreground border-status-warning">
           <TrendingDown className="h-3 w-3" />
           A favor: {formatCurrency(Math.abs(saldo))}
         </Badge>
@@ -991,7 +991,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-status-success-foreground">
               {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalPagado, 0))}
             </p>
           </CardContent>
@@ -1007,7 +1007,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <p className={cn(
               "text-2xl font-bold",
               salaryData.reduce((acc, b) => acc + b.saldo, 0) > 0 ? "text-destructive" : 
-              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-amber-500" : "text-muted-foreground"
+              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-status-warning-foreground" : "text-muted-foreground"
             )}>
               {formatCurrency(salaryData.reduce((acc, b) => acc + b.saldo, 0))}
             </p>
@@ -1062,7 +1062,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                   <TableCell className="text-muted-foreground">
                     {pago.concepto || '-'}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-green-600">
+                  <TableCell className="text-right font-medium text-status-success-foreground">
                     {formatCurrency(pago.monto)}
                   </TableCell>
                 </TableRow>
