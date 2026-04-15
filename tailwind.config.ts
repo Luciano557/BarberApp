@@ -61,6 +61,44 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        status: {
+          success: {
+            DEFAULT: "hsl(var(--status-success))",
+            foreground: "hsl(var(--status-success-foreground))",
+            bg: "hsl(var(--status-success-bg))",
+          },
+          warning: {
+            DEFAULT: "hsl(var(--status-warning))",
+            foreground: "hsl(var(--status-warning-foreground))",
+            bg: "hsl(var(--status-warning-bg))",
+          },
+          error: {
+            DEFAULT: "hsl(var(--status-error))",
+            foreground: "hsl(var(--status-error-foreground))",
+            bg: "hsl(var(--status-error-bg))",
+          },
+          info: {
+            DEFAULT: "hsl(var(--status-info))",
+            foreground: "hsl(var(--status-info-foreground))",
+            bg: "hsl(var(--status-info-bg))",
+          },
+          purple: {
+            DEFAULT: "hsl(var(--status-purple))",
+            foreground: "hsl(var(--status-purple-foreground))",
+            bg: "hsl(var(--status-purple-bg))",
+          },
+          indigo: {
+            DEFAULT: "hsl(var(--status-indigo))",
+            foreground: "hsl(var(--status-indigo-foreground))",
+          },
+        },
+        "chart-cash": "hsl(var(--chart-cash))",
+        "chart-mp": "hsl(var(--chart-mp))",
+        "chart-cost": "hsl(var(--chart-cost))",
+        "chart-orange": "hsl(var(--chart-orange))",
+        "chart-amber": "hsl(var(--chart-amber))",
+        "chart-purple": "hsl(var(--chart-purple))",
+        "chart-indigo": "hsl(var(--chart-indigo))",
       },
       borderRadius: {
         lg: "var(--radius)",
