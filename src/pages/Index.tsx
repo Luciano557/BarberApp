@@ -140,7 +140,7 @@ const Index = () => {
               <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-6">
                 <Scissors className="h-10 w-10 text-primary" />
               </div>
-              <h1 className="text-2xl font-semibold text-foreground mb-2">Scissors</h1>
+              <h1 className="text-2xl font-semibold text-foreground mb-2">Vittro</h1>
               <p className="text-muted-foreground mb-8 max-w-sm">
                 Tu sistema de gestión integral para barberías
               </p>
