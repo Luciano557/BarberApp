@@ -1,39 +1,53 @@
 
 
-## Plan: Move "Gestión de Turnos y Agenda" to a new sidebar panel
+## Plan: UI improvements to Turnos y Agenda panel
 
-### What changes
+### Changes summary
 
-1. **New panel component `src/components/TurnosAgendaPanel.tsx`**
-   - Reuses the same multi-sucursal tab pattern from `MiNegocioPanel` (fetches sucursales, filters by manager assignment, tabs navigation)
-   - Each tab renders `AgendaManagement` for that sucursal with its barbers
-   - Owner/GM see all sucursales; Manager sees only assigned ones
+No database changes needed. The `turnos.barbero_id` column already exists and supports UPDATE for reassignment.
 
-2. **Add permission flag in `AuthContext.tsx`**
-   - Add `canViewTurnosAgenda` = `isOwner || isGeneralManager || isManager` (same as `canViewMiNegocio`)
+---
 
-3. **Add sidebar entry in `AppSidebar.tsx`**
-   - New nav item `{ id: 'turnos-agenda', label: 'Turnos y Agenda', icon: CalendarClock }` visible when `canViewTurnosAgenda`
-   - Positioned after "Tareas" and before "Mi Negocio"
+### 1. Remove duplicate header in `AgendaManagement.tsx`
 
-4. **Register tab in `Index.tsx`**
-   - Add `turnos-agenda` tab rendering `TurnosAgendaPanel` wrapped in `PinProtectedSection`
-   - Add permission guard in the `useEffect` block
+Remove lines 17–26 (the icon + title + subtitle block). Keep only the sections inside, and change from `Accordion` to plain stacked sections (no collapsibles).
 
-5. **Remove from `SucursalTabContent.tsx`**
-   - Delete the `AgendaManagement` import and the block at lines 249–256
-   - Remove unused `AgendaManagement` import
+Reorder sections:
+1. Configuración General (`AgendaConfigSection`)
+2. Visualizar agenda (`AgendaViewer`)
+3. Gestionar ausencias y cierres (`BloqueosSection`)
+4. Horarios de trabajo (`HorariosTrabajoSection`)
+
+Each section wrapped in a titled `div` with a heading, rendered fully expanded (no accordion).
+
+### 2. Rename "Buffer después" → "Tiempo de espera" in `AgendaConfigSection.tsx`
+
+Change the label in the `fields` array from `'Buffer después'` to `'Tiempo de espera'`.
+
+### 3. Rename "Rango" → "Agregar un rango horario" in `HorariosTrabajoSection.tsx`
+
+In the `ScheduleGrid` component, change the button text from `Rango` to `Agregar un rango horario`.
+
+### 4. Add subtitle to `BloqueosSection.tsx`
+
+Below the card title "Gestionar ausencias y cierres", add a descriptive subtitle:
+`"Registrá días o franjas horarias en las que la sucursal o un barbero no estarán disponibles para recibir turnos."`
+
+### 5. Add barber reassignment to `AgendaViewer.tsx`
+
+In each turno row, add a barber reassignment dropdown (small `Select`) that:
+- Shows active barbers from the sucursal
+- On change, calls `supabase.from('turnos').update({ barbero_id: newId }).eq('id', turnoId)`
+- Shows a toast on success and refreshes the list
+- Only visible for turnos with status `pendiente` or `confirmado`
 
 ### Files changed
 
 | File | Action |
 |---|---|
-| `src/components/TurnosAgendaPanel.tsx` | **New** — panel with sucursal tabs + AgendaManagement |
-| `src/contexts/AuthContext.tsx` | Add `canViewTurnosAgenda` permission |
-| `src/components/AppSidebar.tsx` | Add nav item for turnos-agenda |
-| `src/pages/Index.tsx` | Add tab + permission guard |
-| `src/components/SucursalTabContent.tsx` | Remove AgendaManagement section |
-
-### No changes to
-- Business logic, data structures, AgendaManagement internals, or any other existing flows
+| `src/components/config/AgendaManagement.tsx` | Remove duplicate header, replace Accordion with stacked sections, reorder |
+| `src/components/config/AgendaConfigSection.tsx` | Rename "Buffer después" → "Tiempo de espera" |
+| `src/components/config/HorariosTrabajoSection.tsx` | Rename button "Rango" → "Agregar un rango horario" |
+| `src/components/config/BloqueosSection.tsx` | Add descriptive subtitle |
+| `src/components/config/AgendaViewer.tsx` | Add barber reassignment Select per turno row |
 
