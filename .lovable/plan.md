@@ -1,53 +1,36 @@
 
 
-## Plan: UI improvements to Turnos y Agenda panel
+## Plan: Add daily turnos viewer to "Cobrar" panel
 
-### Changes summary
+### What it does
 
-No database changes needed. The `turnos.barbero_id` column already exists and supports UPDATE for reassignment.
+Adds a read-only daily appointments section at the top of the `PaymentRegistration` component. Shows turnos for one day at a time with back/forward arrows to navigate between days (same UX pattern as the existing week navigation but for single days).
 
----
+### New component: `src/components/DailyTurnosViewer.tsx`
 
-### 1. Remove duplicate header in `AgendaManagement.tsx`
+A self-contained, read-only component that:
+- Receives `sucursalId` and `organizationId` from context (via `useSucursal` and `useOrganization`)
+- Fetches turnos for a single date from `turnos` table (reuses same query pattern as `AgendaViewer`)
+- Fetches servicios map for display names
+- Shows current date with left/right `ChevronLeft`/`ChevronRight` arrows (like existing week navigation)
+- Displays each turno as a compact card: time, client name, barber, service, status badge
+- No cancel, reassign, or edit actions — purely read-only
+- Shows empty state when no turnos for the day
+- Defaults to today
 
-Remove lines 17–26 (the icon + title + subtitle block). Keep only the sections inside, and change from `Accordion` to plain stacked sections (no collapsibles).
+### Changes to `PaymentRegistration.tsx`
 
-Reorder sections:
-1. Configuración General (`AgendaConfigSection`)
-2. Visualizar agenda (`AgendaViewer`)
-3. Gestionar ausencias y cierres (`BloqueosSection`)
-4. Horarios de trabajo (`HorariosTrabajoSection`)
-
-Each section wrapped in a titled `div` with a heading, rendered fully expanded (no accordion).
-
-### 2. Rename "Buffer después" → "Tiempo de espera" in `AgendaConfigSection.tsx`
-
-Change the label in the `fields` array from `'Buffer después'` to `'Tiempo de espera'`.
-
-### 3. Rename "Rango" → "Agregar un rango horario" in `HorariosTrabajoSection.tsx`
-
-In the `ScheduleGrid` component, change the button text from `Rango` to `Agregar un rango horario`.
-
-### 4. Add subtitle to `BloqueosSection.tsx`
-
-Below the card title "Gestionar ausencias y cierres", add a descriptive subtitle:
-`"Registrá días o franjas horarias en las que la sucursal o un barbero no estarán disponibles para recibir turnos."`
-
-### 5. Add barber reassignment to `AgendaViewer.tsx`
-
-In each turno row, add a barber reassignment dropdown (small `Select`) that:
-- Shows active barbers from the sucursal
-- On change, calls `supabase.from('turnos').update({ barbero_id: newId }).eq('id', turnoId)`
-- Shows a toast on success and refreshes the list
-- Only visible for turnos with status `pendiente` or `confirmado`
+- Import and render `<DailyTurnosViewer />` at the top of the component, before the step flow
+- No changes to the payment flow logic
 
 ### Files changed
 
 | File | Action |
 |---|---|
-| `src/components/config/AgendaManagement.tsx` | Remove duplicate header, replace Accordion with stacked sections, reorder |
-| `src/components/config/AgendaConfigSection.tsx` | Rename "Buffer después" → "Tiempo de espera" |
-| `src/components/config/HorariosTrabajoSection.tsx` | Rename button "Rango" → "Agregar un rango horario" |
-| `src/components/config/BloqueosSection.tsx` | Add descriptive subtitle |
-| `src/components/config/AgendaViewer.tsx` | Add barber reassignment Select per turno row |
+| `src/components/DailyTurnosViewer.tsx` | **New** — read-only daily turnos viewer |
+| `src/components/PaymentRegistration.tsx` | Add `<DailyTurnosViewer />` before the step flow |
+
+### No database or permission changes needed
+
+The turnos query already works with existing RLS policies. The component uses the current sucursal from `SucursalContext`.
 
