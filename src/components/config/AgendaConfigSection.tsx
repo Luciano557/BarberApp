@@ -100,7 +100,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
 
   const fields: { key: keyof ConfigData; label: string; suffix: string; description: string }[] = [
     { key: 'duracion_base_min', label: 'Duración base', suffix: 'min', description: 'Unidad mínima de tiempo para turnos' },
-    { key: 'buffer_despues_min', label: 'Buffer después', suffix: 'min', description: 'Tiempo libre después de cada turno' },
+    { key: 'buffer_despues_min', label: 'Tiempo de espera', suffix: 'min', description: 'Tiempo libre después de cada turno' },
     { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
     { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
     { key: 'dias_anticipacion', label: 'Días de anticipación', suffix: 'días', description: 'Cuántos días hacia adelante se puede reservar' },

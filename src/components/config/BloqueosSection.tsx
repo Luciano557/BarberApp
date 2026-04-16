@@ -135,7 +135,12 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
             <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
               <ShieldOff className="w-4 h-4 text-destructive" />
             </div>
-            <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
+            <div>
+              <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Registrá días o franjas horarias en las que la sucursal o un barbero no estarán disponibles para recibir turnos.
+              </p>
+            </div>
           </div>
           {!showForm && (
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowForm(true)}>
