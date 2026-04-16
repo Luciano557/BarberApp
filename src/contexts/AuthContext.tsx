@@ -162,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canViewTareas = !hasNoAccess && roles.length > 0;
   const canViewMiNegocio = isOwner || isGeneralManager || isManager;
   const canViewFinanzas = isOwner || isGeneralManager || isManager;
+  const canViewTurnosAgenda = isOwner || isGeneralManager || isManager;
 
   return (
     <AuthContext.Provider
@@ -185,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canViewTareas,
         canViewMiNegocio,
         canViewFinanzas,
+        canViewTurnosAgenda,
         signIn,
         signUp,
         signOut,
