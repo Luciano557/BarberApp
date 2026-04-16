@@ -276,6 +276,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   return (
     <div className="space-y-8 animate-fade-in">
 
+      {/* Daily Turnos Viewer */}
+      <DailyTurnosViewer />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
