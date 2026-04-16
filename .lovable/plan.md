@@ -1,36 +1,31 @@
 
 
-## Plan: Add daily turnos viewer to "Cobrar" panel
+## Plan: Move turnos viewer, remove client name, rebrand to Vittro
 
-### What it does
+### 1. Move `DailyTurnosViewer` below the payment flow in `PaymentRegistration.tsx`
+- Move `<DailyTurnosViewer />` from above the "Nuevo Cobro" header to below the entire step flow (end of the component's JSX)
 
-Adds a read-only daily appointments section at the top of the `PaymentRegistration` component. Shows turnos for one day at a time with back/forward arrows to navigate between days (same UX pattern as the existing week navigation but for single days).
+### 2. Remove client name from turno rows in `DailyTurnosViewer.tsx`
+- Remove the `<span>` showing `turno.cliente_nombre` (line 129) and the separator dot (line 130)
+- Resulting row order: time → service → barber → status badge
 
-### New component: `src/components/DailyTurnosViewer.tsx`
+### 3. Rebrand "Scissors" → "Vittro"
 
-A self-contained, read-only component that:
-- Receives `sucursalId` and `organizationId` from context (via `useSucursal` and `useOrganization`)
-- Fetches turnos for a single date from `turnos` table (reuses same query pattern as `AgendaViewer`)
-- Fetches servicios map for display names
-- Shows current date with left/right `ChevronLeft`/`ChevronRight` arrows (like existing week navigation)
-- Displays each turno as a compact card: time, client name, barber, service, status badge
-- No cancel, reassign, or edit actions — purely read-only
-- Shows empty state when no turnos for the day
-- Defaults to today
+**`index.html`** — Update all meta tags:
+- `<title>Vittro</title>`
+- description: "Reserva tu turno fácilmente con Vittro"
+- author, og:title, og:description, twitter:site → Vittro
 
-### Changes to `PaymentRegistration.tsx`
+**`src/pages/Index.tsx`** — Change the welcome screen text from "Scissors" to "Vittro"
 
-- Import and render `<DailyTurnosViewer />` at the top of the component, before the step flow
-- No changes to the payment flow logic
+Note: Lucide icon imports named `Scissors` (the scissor icon) used for barbero role badges across other components are unrelated to the app name and will NOT be changed.
 
 ### Files changed
 
 | File | Action |
 |---|---|
-| `src/components/DailyTurnosViewer.tsx` | **New** — read-only daily turnos viewer |
-| `src/components/PaymentRegistration.tsx` | Add `<DailyTurnosViewer />` before the step flow |
-
-### No database or permission changes needed
-
-The turnos query already works with existing RLS policies. The component uses the current sucursal from `SucursalContext`.
+| `src/components/PaymentRegistration.tsx` | Move `<DailyTurnosViewer />` to below the flow |
+| `src/components/DailyTurnosViewer.tsx` | Remove client name field from turno rows |
+| `index.html` | Rebrand all meta tags to Vittro |
+| `src/pages/Index.tsx` | Change welcome screen title to Vittro |
 
