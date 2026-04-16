@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
+import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -274,6 +275,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
   return (
     <div className="space-y-8 animate-fade-in">
+
+      {/* Daily Turnos Viewer */}
+      <DailyTurnosViewer />
 
       {/* Header */}
       <div>
