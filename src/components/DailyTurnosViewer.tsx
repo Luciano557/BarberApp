@@ -126,8 +126,6 @@ export function DailyTurnosViewer() {
                     <Clock className="h-3 w-3" />
                     {turno.hora_inicio.slice(0, 5)} - {turno.hora_fin.slice(0, 5)}
                   </span>
-                  <span className="text-foreground font-medium">{turno.cliente_nombre || 'Sin nombre'}</span>
-                  <span className="text-muted-foreground">·</span>
                   <span className="text-muted-foreground">{servicios[turno.servicio_id] || 'Servicio'}</span>
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <User className="h-3 w-3" />

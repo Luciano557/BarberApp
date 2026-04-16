@@ -276,9 +276,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   return (
     <div className="space-y-8 animate-fade-in">
 
-      {/* Daily Turnos Viewer */}
-      <DailyTurnosViewer />
-
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
@@ -616,6 +613,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       )}
 
       {/* Pending Tasks Bubble - fixed bottom */}
+      {/* Daily Turnos Viewer */}
+      <DailyTurnosViewer />
+
       {showTasksBubble && pendingTasks.length > 0 && (
         <div
           onClick={() => { setShowTasksBubble(false); onNavigateToTareas?.(); }}
