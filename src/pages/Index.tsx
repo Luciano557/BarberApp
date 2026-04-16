@@ -6,6 +6,7 @@ import { DailySummary } from '@/components/DailySummary';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
 import { MiNegocioPanel } from '@/components/MiNegocioPanel';
+import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
@@ -63,7 +64,10 @@ const Index = () => {
     if (activeTab === 'mi-negocio' && !canViewMiNegocio) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, hasNoAccess, rolesLoaded]);
+    if (activeTab === 'turnos-agenda' && !canViewTurnosAgenda) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, hasNoAccess, rolesLoaded]);
 
   const {
     isLoading,
@@ -156,6 +160,12 @@ const Index = () => {
                 No tenés permisos para acceder al sistema. Contactá al dueño o encargado de tu negocio para que te asigne un cargo.
               </p>
             </div>
+          )}
+
+          {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
+            <PinProtectedSection sectionName="Turnos y Agenda">
+              <TurnosAgendaPanel />
+            </PinProtectedSection>
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (

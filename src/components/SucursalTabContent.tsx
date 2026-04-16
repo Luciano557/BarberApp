@@ -17,7 +17,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EquipoUnificado } from './config/EquipoUnificado';
 import { CobrarConfig } from './config/CobrarConfig';
-import { AgendaManagement } from './config/AgendaManagement';
 
 interface SucursalTabContentProps {
   sucursal: Sucursal;
@@ -246,14 +245,6 @@ export function SucursalTabContent({
           />
         </div>
 
-        {/* Gestión de Turnos y Agenda */}
-        <div className="mt-6">
-          <AgendaManagement
-            sucursalId={sucursal.id}
-            organizationId={organization?.id || ''}
-            barbers={barbers}
-          />
-        </div>
       </div>
     </div>
   );
