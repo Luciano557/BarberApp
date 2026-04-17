@@ -295,7 +295,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum]);
 
   // Keyboard shortcuts
   useEffect(() => {
