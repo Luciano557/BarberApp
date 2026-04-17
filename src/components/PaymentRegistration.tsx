@@ -52,6 +52,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [selectedDiscount, setSelectedDiscount] = useState('none');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [splitMode, setSplitMode] = useState(false);
+  const [efectivoAmount, setEfectivoAmount] = useState<string>('');
+  const [mpAmount, setMpAmount] = useState<string>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
