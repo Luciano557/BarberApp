@@ -612,7 +612,13 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                 {summary.transactions.map((tx) => {
                   const isVoided = tx.estado === 'anulado';
                   const canVoid = !isVoided && canVoidTransaction(tx);
-                  
+                  const txPayments = tx.payments && tx.payments.length > 0
+                    ? tx.payments
+                    : [{ method: tx.paymentMethod, amount: tx.total }];
+                  const isMixed = txPayments.length > 1 && txPayments.every(p => p.amount > 0);
+                  const efectivoAmt = txPayments.filter(p => p.method === 'efectivo').reduce((s, p) => s + p.amount, 0);
+                  const mpAmt = txPayments.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+
                   return (
                     <div
                       key={tx.id}
@@ -627,6 +633,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
                             <Ban className="h-4 w-4 text-destructive" />
                           </div>
+                        ) : isMixed ? (
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center gap-0.5">
+                            <Banknote className="h-3 w-3 text-success" />
+                            <CreditCard className="h-3 w-3 text-secondary" />
+                          </div>
                         ) : tx.paymentMethod === 'efectivo' ? (
                           <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                             <Banknote className="h-4 w-4 text-success" />
@@ -638,7 +649,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-medium ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                             {tx.serviceName}
                           </span>
@@ -646,6 +657,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
                               +{tx.extras.length}
                             </span>
+                          )}
+                          {isMixed && !isVoided && (
+                            <Badge variant="outline" className="text-[10px] py-0 h-4">
+                              Mixto
+                            </Badge>
                           )}
                           {isVoided && (
                             <Badge variant="destructive" className="text-xs">
@@ -655,6 +671,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
                           {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
+                          {isMixed && !isVoided && (
+                            <span className="ml-2">
+                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">MP ${mpAmt.toLocaleString()}</span>
+                            </span>
+                          )}
                           {isVoided && tx.anuladoPor && (
                             <span className="ml-2 text-destructive">• Anulado por {tx.anuladoPor}</span>
                           )}
