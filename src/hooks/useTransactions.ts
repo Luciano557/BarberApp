@@ -72,10 +72,12 @@ export function useTransactions() {
 
     // Cargar extras de cada venta
     const ventaIds = ventas.map(v => v.id);
-    const { data: ventaExtras } = await supabase
-      .from('venta_extra')
-      .select('*')
-      .in('venta_id', ventaIds);
+    const [extrasRes, pagosRes] = await Promise.all([
+      supabase.from('venta_extra').select('*').in('venta_id', ventaIds),
+      supabase.from('venta_pagos').select('*').in('venta_id', ventaIds).order('orden', { ascending: true }),
+    ]);
+    const ventaExtras = extrasRes.data;
+    const ventaPagos = pagosRes.data;
 
     const extrasMap = new Map<string, { uid: string; name: string; price: number }[]>();
     ventaExtras?.forEach(ve => {
@@ -88,25 +90,46 @@ export function useTransactions() {
       extrasMap.set(ve.venta_id, list);
     });
 
-    const txs: Transaction[] = ventas.map(v => ({
-      id: v.id,
-      barberId: v.barbero_id,
-      barberName: v.barbero_nombre,
-      serviceId: v.servicio_id,
-      serviceName: v.servicio_nombre,
-      servicePrice: Number(v.precio_servicio),
-      extras: extrasMap.get(v.id) || [],
-      discount: Number(v.descuento_pct) || 0,
-      discountType: 'percentage' as const,
-      paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
-      subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
-      total: Number(v.total_final),
-      createdAt: new Date(v.fecha_hora),
-      estado: (v as any).estado || 'activo',
-      anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
-      anuladoPor: (v as any).anulado_por || undefined,
-      anuladoPorId: (v as any).anulado_por_id || undefined,
-    }));
+    const pagosMap = new Map<string, { method: 'efectivo' | 'mercado_pago'; amount: number }[]>();
+    ventaPagos?.forEach((p: any) => {
+      const list = pagosMap.get(p.venta_id) || [];
+      list.push({
+        method: p.metodo_pago as 'efectivo' | 'mercado_pago',
+        amount: Number(p.monto),
+      });
+      pagosMap.set(p.venta_id, list);
+    });
+
+    const txs: Transaction[] = ventas.map(v => {
+      // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
+      const pagos = pagosMap.get(v.id);
+      const payments = pagos && pagos.length > 0
+        ? pagos
+        : [{
+            method: v.metodo_pago as 'efectivo' | 'mercado_pago',
+            amount: Number(v.total_final),
+          }];
+      return {
+        id: v.id,
+        barberId: v.barbero_id,
+        barberName: v.barbero_nombre,
+        serviceId: v.servicio_id,
+        serviceName: v.servicio_nombre,
+        servicePrice: Number(v.precio_servicio),
+        extras: extrasMap.get(v.id) || [],
+        discount: Number(v.descuento_pct) || 0,
+        discountType: 'percentage' as const,
+        paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
+        payments,
+        subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
+        total: Number(v.total_final),
+        createdAt: new Date(v.fecha_hora),
+        estado: (v as any).estado || 'activo',
+        anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
+        anuladoPor: (v as any).anulado_por || undefined,
+        anuladoPorId: (v as any).anulado_por_id || undefined,
+      };
+    });
 
     setTransactions(txs);
     setIsLoading(false);
