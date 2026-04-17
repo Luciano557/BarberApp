@@ -83,18 +83,23 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     : new Date();
 
   // Get transactions for selected barber (only active transactions)
+  // Mixed payments: a tx can appear in both lists if it has parts in both methods
   const barberTransactions = useMemo(() => {
     if (!closingBarber) return { efectivo: [], mercadoPago: [] };
     
-    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
-    const efectivo = activeTransactions.filter(
-      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'efectivo'
+    const activeTransactions = summary.transactions.filter(
+      tx => tx.estado !== 'anulado' && tx.barberId === closingBarber.barberId
     );
-    const mercadoPago = activeTransactions.filter(
-      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'mercado_pago'
-    );
-    
-    return { efectivo, mercadoPago };
+    const hasMethod = (tx: Transaction, method: 'efectivo' | 'mercado_pago') => {
+      const payments = tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+      return payments.some(p => p.method === method && p.amount > 0);
+    };
+    return {
+      efectivo: activeTransactions.filter(tx => hasMethod(tx, 'efectivo')),
+      mercadoPago: activeTransactions.filter(tx => hasMethod(tx, 'mercado_pago')),
+    };
   }, [closingBarber, summary.transactions]);
 
   // Check which barbers have their cash closed for the selected date
