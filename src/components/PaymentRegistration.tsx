@@ -589,32 +589,89 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Payment Step */}
         {currentStep === 'payment' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => handleSelectPayment('efectivo')}
-                className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
-                  paymentMethod === 'efectivo'
-                    ? 'border-success bg-success/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
-                <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-center text-foreground">Efectivo</p>
-              </button>
-              <button
-                onClick={() => handleSelectPayment('mercado_pago')}
-                className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
-                  paymentMethod === 'mercado_pago'
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
-                <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-center text-foreground">Mercado Pago</p>
-              </button>
-            </div>
+            {!splitMode ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => handleSelectPayment('efectivo')}
+                    className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
+                      paymentMethod === 'efectivo'
+                        ? 'border-success bg-success/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
+                    <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
+                    <p className="font-medium text-center text-foreground">Efectivo</p>
+                  </button>
+                  <button
+                    onClick={() => handleSelectPayment('mercado_pago')}
+                    className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
+                      paymentMethod === 'mercado_pago'
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
+                    <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
+                    <p className="font-medium text-center text-foreground">Mercado Pago</p>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={enableSplitMode}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <Split className="h-4 w-4" />
+                  Combinar métodos de pago
+                </button>
+              </>
+            ) : (
+              <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Split className="h-4 w-4 text-foreground" />
+                    <span className="font-medium text-foreground">Pago combinado</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={cancelSplitMode}>
+                    <X className="h-4 w-4 mr-1" /> Cancelar
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-success" /> Efectivo
+                    </label>
+                    <CurrencyInput
+                      value={efectivoAmount}
+                      onChange={handleEfectivoChange}
+                      placeholder="0"
+                      className="h-12 text-lg"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-secondary" /> Mercado Pago
+                    </label>
+                    <CurrencyInput
+                      value={mpAmount}
+                      onChange={handleMpChange}
+                      placeholder="0"
+                      className="h-12 text-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className={`flex items-center justify-between p-3 rounded-lg text-sm ${
+                  splitValid ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <span>Suma: ${splitSum.toLocaleString()} / Total: ${total.toLocaleString()}</span>
+                  {splitValid ? <Check className="h-4 w-4" /> : <span className="text-xs">Debe coincidir exacto</span>}
+                </div>
+              </div>
+            )}
 
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
@@ -667,7 +724,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               <Button
                 onClick={handleSubmit}
                 className="w-full mt-6 h-14 text-base font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                disabled={!paymentMethod || isSubmitting}
+                disabled={!paymentMethod || isSubmitting || (splitMode && !splitValid)}
               >
                 {isSubmitting ? (
                   <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Guardando...</>
