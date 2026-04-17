@@ -318,12 +318,17 @@ export function useTransactions() {
   const getDailySummary = useCallback(() => {
     // Solo contar transacciones activas para el resumen
     const activeTx = transactions.filter(t => t.estado !== 'anulado');
-    const totalEfectivo = activeTx
-      .filter(t => t.paymentMethod === 'efectivo')
-      .reduce((sum, t) => sum + t.total, 0);
-    const totalMercadoPago = activeTx
-      .filter(t => t.paymentMethod === 'mercado_pago')
-      .reduce((sum, t) => sum + t.total, 0);
+    let totalEfectivo = 0;
+    let totalMercadoPago = 0;
+    activeTx.forEach(t => {
+      const payments = t.payments && t.payments.length > 0
+        ? t.payments
+        : [{ method: t.paymentMethod, amount: t.total }];
+      payments.forEach(p => {
+        if (p.method === 'efectivo') totalEfectivo += p.amount;
+        else if (p.method === 'mercado_pago') totalMercadoPago += p.amount;
+      });
+    });
 
     return {
       count: activeTx.length,
