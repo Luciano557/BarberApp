@@ -139,7 +139,9 @@ export function useTransactions() {
     loadTransactionsByDate(selectedDate);
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
-  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+  const addTransaction = useCallback(async (
+    transaction: Omit<Transaction, 'id' | 'createdAt'>
+  ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
       return null;
@@ -159,6 +161,14 @@ export function useTransactions() {
     const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
     const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
 
+    // Determine payments array (always at least 1)
+    const payments = transaction.payments && transaction.payments.length > 0
+      ? transaction.payments
+      : [{ method: transaction.paymentMethod, amount: transaction.total }];
+
+    // Legacy field: use the method with the largest amount as primary
+    const primaryMethod = [...payments].sort((a, b) => b.amount - a.amount)[0].method;
+
     // Insertar venta principal
     const ventaData: VentaInsert = {
       barbero_id: transaction.barberId,
@@ -167,7 +177,7 @@ export function useTransactions() {
       servicio_nombre: normalizedServiceName,
       precio_servicio: transaction.servicePrice,
       descuento_pct: transaction.discount,
-      metodo_pago: transaction.paymentMethod,
+      metodo_pago: primaryMethod,
       total_final: transaction.total,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
@@ -182,6 +192,24 @@ export function useTransactions() {
     if (ventaError) {
       console.error('Error inserting venta:', ventaError);
       return null;
+    }
+
+    // Insertar pagos (siempre, incluso para método único)
+    const pagosData = payments.map((p, idx) => ({
+      venta_id: venta.id,
+      organization_id: organization.id,
+      sucursal_id: currentSucursal.id,
+      metodo_pago: p.method,
+      monto: p.amount,
+      orden: idx + 1,
+    }));
+
+    const { error: pagosError } = await supabase
+      .from('venta_pagos')
+      .insert(pagosData);
+
+    if (pagosError) {
+      console.error('Error inserting venta_pagos:', pagosError);
     }
 
     // Insertar extras si hay
@@ -206,6 +234,8 @@ export function useTransactions() {
     // Agregar al estado local
     const newTransaction: Transaction = {
       ...transaction,
+      payments,
+      paymentMethod: primaryMethod,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
