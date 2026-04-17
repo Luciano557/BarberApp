@@ -164,32 +164,35 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       });
     });
 
-    // Aggregate only active transactions
+    // Aggregate only active transactions, splitting amounts by payments array
     const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    const txPayments = (tx: Transaction) =>
+      tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+
     activeTransactions.forEach(tx => {
-      const existing = summaryMap.get(tx.barberId);
-      if (existing) {
-        existing.count += 1;
-        existing.total += tx.total;
-        if (tx.paymentMethod === 'efectivo') {
-          existing.totalEfectivo += tx.total;
-        } else {
-          existing.totalMercadoPago += tx.total;
-        }
-      } else {
-        // Handle transactions from barbers not in current list
+      let existing = summaryMap.get(tx.barberId);
+      if (!existing) {
         const barberData = barbers.find(b => b.id === tx.barberId);
-        summaryMap.set(tx.barberId, {
+        existing = {
           barberId: tx.barberId,
           barberName: tx.barberName,
-          count: 1,
-          totalEfectivo: tx.paymentMethod === 'efectivo' ? tx.total : 0,
-          totalMercadoPago: tx.paymentMethod === 'mercado_pago' ? tx.total : 0,
-          total: tx.total,
+          count: 0,
+          totalEfectivo: 0,
+          totalMercadoPago: 0,
+          total: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
-        });
+        };
+        summaryMap.set(tx.barberId, existing);
       }
+      existing.count += 1;
+      existing.total += tx.total;
+      txPayments(tx).forEach(p => {
+        if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
+        else if (p.method === 'mercado_pago') existing!.totalMercadoPago += p.amount;
+      });
     });
 
     // Calculate commission amounts
