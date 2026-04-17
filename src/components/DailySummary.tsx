@@ -811,20 +811,30 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   Mercado Pago ({barberTransactions.mercadoPago.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                  {barberTransactions.mercadoPago.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <div>
-                        <span className="font-medium text-sm">{tx.serviceName}</span>
-                        {tx.extras.length > 0 && (
-                          <span className="text-xs ml-2 text-muted-foreground">
-                            + {tx.extras.map(e => e.name).join(', ')}
-                          </span>
-                        )}
-                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                  {barberTransactions.mercadoPago.map((tx) => {
+                    const pagos = tx.payments && tx.payments.length > 0
+                      ? tx.payments
+                      : [{ method: tx.paymentMethod, amount: tx.total }];
+                    const amt = pagos.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+                    const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                        <div>
+                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          {tx.extras.length > 0 && (
+                            <span className="text-xs ml-2 text-muted-foreground">
+                              + {tx.extras.map(e => e.name).join(', ')}
+                            </span>
+                          )}
+                          {isMixed && (
+                            <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4">Parte de mixto</Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                        </div>
+                        <span className="font-semibold text-secondary">${amt.toLocaleString()}</span>
                       </div>
-                      <span className="font-semibold text-secondary">${tx.total.toLocaleString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
