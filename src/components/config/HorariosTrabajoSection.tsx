@@ -128,7 +128,7 @@ function ScheduleGrid({
                   <span className="text-xs text-muted-foreground">Sin horario</span>
                 )}
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addRange(dia.num)}>
-                  <Plus className="h-3 w-3 mr-1" /> Rango
+                  <Plus className="h-3 w-3 mr-1" /> Agregar un rango horario
                 </Button>
               </div>
             </div>

@@ -138,7 +138,7 @@ export const HorarioStep = ({
               key={slot.hora_inicio}
               variant={isSelected ? "default" : "outline"}
               className={cn(
-                "h-12 text-base font-medium transition-all",
+                "h-12 text-base font-medium transition-colors",
                 isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
               )}
               onClick={() => {

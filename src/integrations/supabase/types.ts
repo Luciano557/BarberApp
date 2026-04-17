@@ -294,6 +294,219 @@ export type Database = {
           },
         ]
       }
+      bono_fijo_config: {
+        Row: {
+          activa: boolean
+          barbero_id: string
+          created_at: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          monto: number
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          barbero_id: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          monto: number
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          barbero_id?: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bono_fijo_ocurrencias: {
+        Row: {
+          barbero_id: string
+          config_id: string
+          created_at: string
+          fecha: string
+          id: string
+          monto: number
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          barbero_id: string
+          config_id: string
+          created_at?: string
+          fecha: string
+          id?: string
+          monto: number
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          config_id?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto?: number
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: []
+      }
+      comision_equipo_config: {
+        Row: {
+          activa: boolean
+          created_at: string
+          encargado_id: string
+          id: string
+          organization_id: string
+          scope_type: string
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          encargado_id: string
+          id?: string
+          organization_id: string
+          scope_type?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          encargado_id?: string
+          id?: string
+          organization_id?: string
+          scope_type?: string
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comision_equipo_config_encargado_id_fkey"
+            columns: ["encargado_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_equipo_config_encargado_id_fkey"
+            columns: ["encargado_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_equipo_config_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comision_equipo_reglas: {
+        Row: {
+          activa: boolean
+          barbero_origen_id: string
+          config_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          porcentaje: number
+          sucursal_id: string
+          updated_at: string
+          vigencia_desde: string
+          vigencia_hasta: string | null
+        }
+        Insert: {
+          activa?: boolean
+          barbero_origen_id: string
+          config_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          porcentaje?: number
+          sucursal_id: string
+          updated_at?: string
+          vigencia_desde?: string
+          vigencia_hasta?: string | null
+        }
+        Update: {
+          activa?: boolean
+          barbero_origen_id?: string
+          config_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          porcentaje?: number
+          sucursal_id?: string
+          updated_at?: string
+          vigencia_desde?: string
+          vigencia_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comision_equipo_reglas_barbero_origen_id_fkey"
+            columns: ["barbero_origen_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_equipo_reglas_barbero_origen_id_fkey"
+            columns: ["barbero_origen_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_equipo_reglas_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "comision_equipo_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comision_equipo_reglas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       descuentos: {
         Row: {
           activo: boolean

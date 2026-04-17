@@ -18,7 +18,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth } from 'date-fns';
+import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth, addDays, addWeeks, addYears } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +63,41 @@ function calcularDevengadoFijo(sueldoFijo: number, desde: Date, hasta: Date): nu
   return total;
 }
 
+function calcNextDate(current: Date, preset: string, frequency?: string | null, interval?: number | null, byweekday?: number[] | null): Date {
+  const n = interval || 1;
+  switch (preset) {
+    case 'daily': return addDays(current, 1);
+    case 'weekdays': { let next = addDays(current, 1); while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1); return next; }
+    case 'weekends': { let next = addDays(current, 1); while (next.getDay() !== 0 && next.getDay() !== 6) next = addDays(next, 1); return next; }
+    case 'weekly': return addWeeks(current, 1);
+    case 'biweekly': return addWeeks(current, 2);
+    case 'monthly': return addMonths(current, 1);
+    case 'quarterly': return addMonths(current, 3);
+    case 'semiannual': return addMonths(current, 6);
+    case 'yearly': return addYears(current, 1);
+    case 'custom': {
+      const freq = frequency || 'monthly';
+      switch (freq) {
+        case 'daily': return addDays(current, n);
+        case 'weekly': {
+          if (byweekday?.length) {
+            const sorted = [...byweekday].sort((a, b) => a - b);
+            const currentDay = current.getDay();
+            const nextDay = sorted.find(d => d > currentDay);
+            if (nextDay !== undefined) return addDays(current, nextDay - currentDay);
+            return addDays(current, 7 * (n - 1) + (7 - currentDay + sorted[0]));
+          }
+          return addWeeks(current, n);
+        }
+        case 'monthly': return addMonths(current, n);
+        case 'yearly': return addYears(current, n);
+        default: return addMonths(current, n);
+      }
+    }
+    default: return addMonths(current, 1);
+  }
+}
+
 // Define interface for raw ingresos data from Supabase
 interface IngresoRaw {
   id: number;
@@ -76,16 +111,31 @@ interface IngresoRaw {
   created_at: string;
 }
 
+interface ComisionEquipoDetalle {
+  barberoOrigenId: string;
+  barberoOrigenNombre: string;
+  porcentajeActual: number;
+  montoTotal: number;
+}
+
+interface BonoFijoOcurrencia {
+  fecha: string;
+  monto: number;
+}
+
 interface BarberSalaryData {
   barberId: string;
   barberName: string;
   compensationType: string;
-  totalDevengado: number;           // Filtered by period (or all time if no filter)
-  totalPagado: number;              // Filtered by period (or all time if no filter)
-  saldo: number;                    // ALWAYS historical: total devengado - total pagado (real debt)
-  detalleIngresos: IngresoDetalle[]; // Individual cash closings for the period
-  detallePagos: PagoDetalle[];       // Individual payments for the period
-  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number }; // For display
+  totalDevengado: number;
+  totalPagado: number;
+  saldo: number;
+  detalleIngresos: IngresoDetalle[];
+  detallePagos: PagoDetalle[];
+  fixedSalaryInfo?: { sueldoFijo: number; dias: number; devengado: number };
+  comisionExtraEquipo?: ComisionEquipoDetalle[];
+  bonoFijoOcurrencias?: BonoFijoOcurrencia[];
+  bonoFijoTotal?: number;
 }
 
 interface IngresoDetalle {
@@ -149,7 +199,7 @@ function BarberDetailRow({
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground">Pagado</p>
-              <p className="font-medium text-green-600">{formatCurrency(barber.totalPagado)}</p>
+              <p className="font-medium text-status-success-foreground">{formatCurrency(barber.totalPagado)}</p>
             </div>
             <div className="text-right min-w-[140px]">
               <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
@@ -164,6 +214,38 @@ function BarberDetailRow({
           {barber.fixedSalaryInfo && (
             <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
               <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+            </div>
+          )}
+          {/* Comision extra por equipo */}
+          {barber.comisionExtraEquipo && barber.comisionExtraEquipo.length > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm space-y-1">
+              <span className="font-medium">Comisión extra por equipo</span>
+              {barber.comisionExtraEquipo.map(ce => (
+                <div key={ce.barberoOrigenId} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{ce.barberoOrigenNombre} ({ce.porcentajeActual}%)</span>
+                  <span className="font-medium">{formatCurrency(ce.montoTotal)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t border-primary/10 font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(barber.comisionExtraEquipo.reduce((s, c) => s + c.montoTotal, 0))}</span>
+              </div>
+            </div>
+          )}
+          {/* Bono fijo */}
+          {barber.bonoFijoOcurrencias && barber.bonoFijoOcurrencias.length > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm space-y-1">
+              <span className="font-medium">Bono fijo</span>
+              {barber.bonoFijoOcurrencias.map((o, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{format(new Date(o.fecha + 'T12:00:00'), "dd/MM", { locale: es })}</span>
+                  <span className="font-medium">+{formatCurrency(o.monto)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-1 border-t border-primary/10 font-medium">
+                <span>Total</span>
+                <span>{formatCurrency(barber.bonoFijoTotal || 0)}</span>
+              </div>
             </div>
           )}
           {/* Ingresos Detail */}
@@ -217,7 +299,7 @@ function BarberDetailRow({
                       <TableRow key={pago.id}>
                         <TableCell>{format(new Date(pago.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
                         <TableCell className="text-muted-foreground">{pago.concepto || '-'}</TableCell>
-                        <TableCell className="text-right font-medium text-green-600">{formatCurrency(pago.monto)}</TableCell>
+                        <TableCell className="text-right font-medium text-status-success-foreground">{formatCurrency(pago.monto)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -366,6 +448,182 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         }
       });
 
+      // === Comision Extra por Equipo: fetch configs + rules ===
+      const { data: comisionConfigs } = await supabase
+        .from('comision_equipo_config')
+        .select('id, encargado_id, activa, scope_type, sucursal_id')
+        .eq('organization_id', organization.id)
+        .eq('activa', true);
+
+      // For each active config, fetch ALL rules that overlap with the period (for filtered view)
+      // and ALL rules (for historical saldo)
+      let allComisionReglas: { config_id: string; barbero_origen_id: string; porcentaje: number; vigencia_desde: string; vigencia_hasta: string | null }[] = [];
+      if (comisionConfigs && comisionConfigs.length > 0) {
+        const configIds = comisionConfigs.map(c => c.id);
+        const { data: reglasData } = await supabase
+          .from('comision_equipo_reglas')
+          .select('config_id, barbero_origen_id, porcentaje, vigencia_desde, vigencia_hasta')
+          .in('config_id', configIds)
+          .eq('activa', true);
+        allComisionReglas = reglasData || [];
+      }
+
+      // Helper: find applicable rule for a given date
+      const findRegla = (configId: string, barberoOrigenId: string, fechaCierre: string) => {
+        return allComisionReglas.find(r =>
+          r.config_id === configId &&
+          r.barbero_origen_id === barberoOrigenId &&
+          r.vigencia_desde <= fechaCierre &&
+          (r.vigencia_hasta === null || r.vigencia_hasta >= fechaCierre)
+        );
+      };
+
+      // Pre-compute comision extra per encargado using ALL ingresos (historical) and filtered ingresos
+      // We need ALL active ingresos for historical calc, and filtered ones for display
+      // The historical ingresos are already fetched (ingresosHistoricos) but without full detail
+      // We need total_facturado + created_at per barbero_id for commission calc
+      // Fetch these separately for commission
+      let comisionIngresosForCalc: { barbero_id: string; total_facturado: number; created_at: string }[] = [];
+      if (comisionConfigs && comisionConfigs.length > 0) {
+        // Get all unique barbero_origen_ids from rules
+        const origenIds = [...new Set(allComisionReglas.map(r => r.barbero_origen_id))];
+        if (origenIds.length > 0) {
+          let comIngQuery = supabase
+            .from('ingresos')
+            .select('barbero_id, total_facturado, created_at')
+            .eq('organization_id', organization.id)
+            .eq('estado', 'activo')
+            .in('barbero_id', origenIds);
+          if (currentSucursal) comIngQuery = comIngQuery.eq('sucursal_id', currentSucursal.id);
+          const { data: comIngData } = await comIngQuery;
+          comisionIngresosForCalc = (comIngData || []).map(i => ({
+            barbero_id: i.barbero_id || '',
+            total_facturado: Number(i.total_facturado) || 0,
+            created_at: i.created_at,
+          }));
+        }
+      }
+
+      // Calculate per-encargado commission (historical and filtered)
+      type ComisionResult = { historico: Record<string, { nombre: string; porcentaje: number; monto: number }>; filtrado: Record<string, { nombre: string; porcentaje: number; monto: number }> };
+      const comisionPorEncargado: Record<string, ComisionResult> = {};
+
+      if (comisionConfigs) {
+        for (const cfg of comisionConfigs) {
+          const encargadoId = cfg.encargado_id;
+          const configId = cfg.id;
+          const result: ComisionResult = { historico: {}, filtrado: {} };
+
+          for (const ingreso of comisionIngresosForCalc) {
+            const fechaCierre = format(new Date(ingreso.created_at), 'yyyy-MM-dd');
+            const regla = findRegla(configId, ingreso.barbero_id, fechaCierre);
+            if (!regla) continue;
+
+            const comision = ingreso.total_facturado * regla.porcentaje / 100;
+            const barberOrigen = barbers.find(b => b.id === ingreso.barbero_id);
+            const nombre = barberOrigen ? `${barberOrigen.firstName} ${barberOrigen.lastName}`.trim() : 'Barbero';
+
+            // Historical
+            if (!result.historico[ingreso.barbero_id]) {
+              result.historico[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
+            }
+            result.historico[ingreso.barbero_id].monto += comision;
+            result.historico[ingreso.barbero_id].porcentaje = regla.porcentaje; // last one wins
+
+            // Filtered (only if within period)
+            const inPeriod = !periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd');
+            if (inPeriod) {
+              if (!result.filtrado[ingreso.barbero_id]) {
+                result.filtrado[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
+              }
+              result.filtrado[ingreso.barbero_id].monto += comision;
+              result.filtrado[ingreso.barbero_id].porcentaje = regla.porcentaje;
+            }
+          }
+
+          comisionPorEncargado[encargadoId] = result;
+        }
+      }
+
+      // === Bono Fijo: sync pending occurrences ===
+      const hoyStr = format(new Date(), 'yyyy-MM-dd');
+      let bonoQuery = supabase
+        .from('bono_fijo_config')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .eq('activa', true)
+        .lte('proxima_fecha', hoyStr);
+      
+      const { data: bonosPendientes } = await bonoQuery;
+      if (bonosPendientes && bonosPendientes.length > 0) {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999);
+
+        for (const bono of bonosPendientes) {
+          let nextDate = new Date(bono.proxima_fecha + 'T12:00:00');
+          const endDate = bono.fecha_fin ? new Date(bono.fecha_fin + 'T12:00:00') : new Date('9999-12-31T12:00:00');
+
+          while (nextDate <= today && nextDate <= endDate) {
+            const fechaStr = format(nextDate, 'yyyy-MM-dd');
+            // Insert with ON CONFLICT DO NOTHING (upsert-safe)
+            await supabase
+              .from('bono_fijo_ocurrencias')
+              .upsert({
+                organization_id: bono.organization_id,
+                sucursal_id: bono.sucursal_id,
+                config_id: bono.id,
+                barbero_id: bono.barbero_id,
+                monto: bono.monto,
+                fecha: fechaStr,
+              }, { onConflict: 'config_id,fecha', ignoreDuplicates: true });
+
+            nextDate = calcNextDate(
+              nextDate,
+              bono.repeat_preset,
+              bono.repeat_frequency,
+              bono.repeat_interval,
+              bono.repeat_byweekday,
+            );
+          }
+
+          // Update proxima_fecha
+          await supabase
+            .from('bono_fijo_config')
+            .update({ proxima_fecha: format(nextDate, 'yyyy-MM-dd') })
+            .eq('id', bono.id);
+        }
+      }
+
+      // Fetch ALL bono fijo ocurrencias for the org (historical)
+      let bonoOcurrenciasQuery = supabase
+        .from('bono_fijo_ocurrencias')
+        .select('barbero_id, monto, fecha')
+        .eq('organization_id', organization.id);
+      if (currentSucursal) bonoOcurrenciasQuery = bonoOcurrenciasQuery.eq('sucursal_id', currentSucursal.id);
+      const { data: allBonoOcurrencias } = await bonoOcurrenciasQuery;
+
+      // Group by barbero_id
+      const bonoHistoricoPorId: Record<string, number> = {};
+      const bonoOcurrenciasPorId: Record<string, BonoFijoOcurrencia[]> = {};
+      const bonoFiltradoPorId: Record<string, { total: number; ocurrencias: BonoFijoOcurrencia[] }> = {};
+
+      (allBonoOcurrencias || []).forEach((o: any) => {
+        const bid = o.barbero_id;
+        const m = Number(o.monto) || 0;
+        // Historical total
+        bonoHistoricoPorId[bid] = (bonoHistoricoPorId[bid] || 0) + m;
+        if (!bonoOcurrenciasPorId[bid]) bonoOcurrenciasPorId[bid] = [];
+        bonoOcurrenciasPorId[bid].push({ fecha: o.fecha, monto: m });
+
+        // Filtered
+        const inPeriod = !periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd');
+        if (inPeriod) {
+          if (!bonoFiltradoPorId[bid]) bonoFiltradoPorId[bid] = { total: 0, ocurrencias: [] };
+          bonoFiltradoPorId[bid].total += m;
+          bonoFiltradoPorId[bid].ocurrencias.push({ fecha: o.fecha, monto: m });
+        }
+      });
+
       // Build salary data for active barbers
       const now = new Date();
       const data: BarberSalaryData[] = barbers.map(barber => {
@@ -386,6 +644,34 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           totalDevengado += devengadoFijo;
           fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
         }
+
+        // Comision extra por equipo (filtered)
+        let comisionExtraEquipo: ComisionEquipoDetalle[] | undefined;
+        const comisionData = comisionPorEncargado[barber.id];
+        if (comisionData) {
+          const filtrado = comisionData.filtrado;
+          const entries = Object.entries(filtrado).filter(([, v]) => v.monto > 0);
+          if (entries.length > 0) {
+            comisionExtraEquipo = entries.map(([barberoOrigenId, v]) => ({
+              barberoOrigenId,
+              barberoOrigenNombre: v.nombre,
+              porcentajeActual: v.porcentaje,
+              montoTotal: v.monto,
+            }));
+            const totalComisionExtra = entries.reduce((sum, [, v]) => sum + v.monto, 0);
+            totalDevengado += totalComisionExtra;
+          }
+        }
+
+        // Bono fijo (filtered)
+        let bonoFijoOcurrencias: BonoFijoOcurrencia[] | undefined;
+        let bonoFijoTotal: number | undefined;
+        const bonoFiltrado = bonoFiltradoPorId[barber.id];
+        if (bonoFiltrado && bonoFiltrado.total > 0) {
+          bonoFijoOcurrencias = bonoFiltrado.ocurrencias.sort((a, b) => a.fecha.localeCompare(b.fecha));
+          bonoFijoTotal = bonoFiltrado.total;
+          totalDevengado += bonoFijoTotal;
+        }
         
         // HISTORICAL saldo - real debt that NEVER changes with filter
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
@@ -395,6 +681,13 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const devengadoHistoricoFijo = calcularDevengadoFijo(barber.fixedSalary, createdAt, now);
           saldoHistorico += devengadoHistoricoFijo;
         }
+        // Add historical comision extra to saldo
+        if (comisionData) {
+          const totalHistorico = Object.values(comisionData.historico).reduce((sum, v) => sum + v.monto, 0);
+          saldoHistorico += totalHistorico;
+        }
+        // Add historical bono fijo to saldo
+        saldoHistorico += (bonoHistoricoPorId[barber.id] || 0);
         
         // Get detailed ingresos for this barber by barbero_id
         const detalleIngresos: IngresoDetalle[] = ((ingresosFiltrados || []) as IngresoRaw[])
@@ -432,6 +725,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           detalleIngresos,
           detallePagos,
           fixedSalaryInfo,
+          comisionExtraEquipo,
+          bonoFijoOcurrencias,
+          bonoFijoTotal,
         };
       });
 
@@ -442,7 +738,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [organization, barbers, periodStartDate]);
+  }, [organization, barbers, periodStartDate, currentSucursal]);
 
   useEffect(() => {
     fetchData();
@@ -516,7 +812,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       );
     } else if (saldo < 0) {
       return (
-        <Badge variant="secondary" className="flex items-center gap-1 bg-amber-500/20 text-amber-600 border-amber-500/30">
+        <Badge variant="secondary" className="flex items-center gap-1 bg-status-warning-bg text-status-warning-foreground border-status-warning">
           <TrendingDown className="h-3 w-3" />
           A favor: {formatCurrency(Math.abs(saldo))}
         </Badge>
@@ -695,7 +991,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-2xl font-bold text-status-success-foreground">
               {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalPagado, 0))}
             </p>
           </CardContent>
@@ -711,7 +1007,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <p className={cn(
               "text-2xl font-bold",
               salaryData.reduce((acc, b) => acc + b.saldo, 0) > 0 ? "text-destructive" : 
-              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-amber-500" : "text-muted-foreground"
+              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-status-warning-foreground" : "text-muted-foreground"
             )}>
               {formatCurrency(salaryData.reduce((acc, b) => acc + b.saldo, 0))}
             </p>
@@ -766,7 +1062,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
                   <TableCell className="text-muted-foreground">
                     {pago.concepto || '-'}
                   </TableCell>
-                  <TableCell className="text-right font-medium text-green-600">
+                  <TableCell className="text-right font-medium text-status-success-foreground">
                     {formatCurrency(pago.monto)}
                   </TableCell>
                 </TableRow>

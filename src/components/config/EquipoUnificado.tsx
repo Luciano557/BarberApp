@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
 import { AppRole } from '@/contexts/AuthContext';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
+import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -504,6 +505,21 @@ export function EquipoUnificado({
                 ))}
               </div>
             )}
+
+            {/* Extras de compensación — only for managers/GMs */}
+            {(() => {
+              const barberRoles = getBarberRoles(barber);
+              const isEncargado = barberRoles.includes('manager') || barberRoles.includes('general_manager');
+              if (!isEncargado) return null;
+              return (
+                <ExtrasCompensacion
+                  barber={barber}
+                  organizationId={organizationId}
+                  sucursalId={sucursalId}
+                  allBarbers={allBarbers}
+                />
+              );
+            })()}
 
             {/* Actions with text labels */}
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
+import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -291,7 +292,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   setCurrentStep(step);
                 }
               }}
-              className={`flex-1 h-1.5 rounded-full transition-all ${
+              className={`flex-1 h-1.5 rounded-full transition-colors ${
                 index < currentStepIndex
                   ? 'bg-secondary cursor-pointer'
                   : index === currentStepIndex
@@ -327,7 +328,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               <button
                 key={barber.uid}
                 onClick={() => handleSelectBarber(barber.uid)}
-                className={`relative p-6 rounded-lg border transition-all hover:border-secondary ${
+                className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
                   selectedBarber === barber.uid
                     ? 'border-secondary bg-secondary/5'
                     : 'border-border bg-card hover:bg-muted/50'
@@ -393,7 +394,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                         <button
                           key={service.id}
                           onClick={() => handleSelectService(service.id)}
-                          className={`relative p-5 rounded-lg border transition-all text-left hover:border-secondary ${
+                          className={`relative p-5 rounded-lg border transition-colors text-left hover:border-secondary ${
                             selectedService === service.id
                               ? 'border-secondary bg-secondary/5'
                               : 'border-border bg-card hover:bg-muted/50'
@@ -425,7 +426,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 <button
                   key={extra.id}
                   onClick={() => handleToggleExtra(extra.id)}
-                  className={`relative p-4 rounded-lg border transition-all hover:border-secondary ${
+                  className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
                     selectedExtras.includes(extra.id)
                       ? 'border-secondary bg-secondary/5'
                       : 'border-border bg-card hover:bg-muted/50'
@@ -473,7 +474,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 <button
                   key={discount.id}
                   onClick={() => handleSelectDiscount(discount.id)}
-                  className={`relative p-6 rounded-lg border transition-all hover:border-secondary ${
+                  className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
                     selectedDiscount === discount.id
                       ? 'border-secondary bg-secondary/5'
                       : 'border-border bg-card hover:bg-muted/50'
@@ -514,7 +515,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => handleSelectPayment('efectivo')}
-                className={`relative p-8 rounded-lg border transition-all hover:border-success ${
+                className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
                   paymentMethod === 'efectivo'
                     ? 'border-success bg-success/5'
                     : 'border-border bg-card hover:bg-muted/50'
@@ -526,7 +527,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               </button>
               <button
                 onClick={() => handleSelectPayment('mercado_pago')}
-                className={`relative p-8 rounded-lg border transition-all hover:border-secondary ${
+                className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
                   paymentMethod === 'mercado_pago'
                     ? 'border-secondary bg-secondary/5'
                     : 'border-border bg-card hover:bg-muted/50'
@@ -612,6 +613,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       )}
 
       {/* Pending Tasks Bubble - fixed bottom */}
+      {/* Daily Turnos Viewer */}
+      <DailyTurnosViewer />
+
       {showTasksBubble && pendingTasks.length > 0 && (
         <div
           onClick={() => { setShowTasksBubble(false); onNavigateToTareas?.(); }}

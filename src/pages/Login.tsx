@@ -17,11 +17,9 @@ export default function Login() {
   const { signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Register form state
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
@@ -78,13 +76,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
             <Scissors className="w-6 h-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Barbería</CardTitle>
+          <CardTitle className="text-2xl font-semibold">Barbería</CardTitle>
           <CardDescription>Sistema de gestión</CardDescription>
         </CardHeader>
         <CardContent>
@@ -124,7 +122,7 @@ export default function Login() {
                 <div className="text-center">
                   <button
                     type="button"
-                    className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline transition-colors duration-150"
                     onClick={async () => {
                       if (!loginEmail) {
                         toast.error('Ingresá tu email primero');
