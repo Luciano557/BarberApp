@@ -162,8 +162,57 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   }, [goToNextStep]);
 
   const handleSelectPayment = useCallback((method: PaymentMethod) => {
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
     setPaymentMethod(method);
   }, []);
+
+  const enableSplitMode = useCallback(() => {
+    setSplitMode(true);
+    setPaymentMethod('efectivo');
+    setEfectivoAmount('');
+    setMpAmount('');
+  }, []);
+
+  const cancelSplitMode = useCallback(() => {
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
+    setPaymentMethod('');
+  }, []);
+
+  const handleEfectivoChange = useCallback((val: string) => {
+    setEfectivoAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && total > 0) {
+      const remainder = Math.max(0, total - num);
+      setMpAmount(remainder > 0 ? remainder.toString() : '');
+    } else if (val === '') {
+      setMpAmount('');
+    }
+  }, [total]);
+
+  const handleMpChange = useCallback((val: string) => {
+    setMpAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && total > 0) {
+      const remainder = Math.max(0, total - num);
+      setEfectivoAmount(remainder > 0 ? remainder.toString() : '');
+    } else if (val === '') {
+      setEfectivoAmount('');
+    }
+  }, [total]);
+
+  const splitEfectivoNum = parseFloat(efectivoAmount) || 0;
+  const splitMpNum = parseFloat(mpAmount) || 0;
+  const splitSum = splitEfectivoNum + splitMpNum;
+  const splitValid = splitMode
+    && splitEfectivoNum > 0
+    && splitMpNum > 0
+    && Math.abs(splitSum - total) < 0.01
+    && splitEfectivoNum <= total
+    && splitMpNum <= total;
 
   const resetForm = useCallback(() => {
     setSelectedBarber('');
@@ -171,6 +220,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setSelectedExtras([]);
     setSelectedDiscount('none');
     setPaymentMethod('');
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
     setCurrentStep('barber');
   }, []);
 
@@ -184,9 +236,28 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       return;
     }
 
+    if (splitMode && !splitValid) {
+      toast({
+        title: "Pagos inválidos",
+        description: "La suma debe ser igual al total y ambos métodos mayores a cero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const payments = splitMode
+        ? [
+            { method: 'efectivo' as PaymentMethod, amount: splitEfectivoNum },
+            { method: 'mercado_pago' as PaymentMethod, amount: splitMpNum },
+          ]
+        : [{ method: paymentMethod, amount: total }];
+      const primaryMethod = splitMode
+        ? (splitEfectivoNum >= splitMpNum ? 'efectivo' : 'mercado_pago')
+        : paymentMethod;
+
       const result = await onSubmit({
         barberId: barber!.id,
         barberName: `${barber!.firstName} ${barber!.lastName}`,
@@ -196,7 +267,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
         discount: selectedDiscountData?.value || 0,
         discountType: selectedDiscountData?.type || 'percentage',
-        paymentMethod,
+        paymentMethod: primaryMethod,
+        payments,
         subtotal,
         total,
       });
