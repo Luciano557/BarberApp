@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -24,6 +25,7 @@ interface PaymentRegistrationProps {
     discount: number;
     discountType: DiscountType;
     paymentMethod: PaymentMethod;
+    payments?: { method: PaymentMethod; amount: number }[];
     subtotal: number;
     total: number;
   }) => Promise<any | null>;
@@ -50,6 +52,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedExtras, setSelectedExtras] = useState<string[]>([]);
   const [selectedDiscount, setSelectedDiscount] = useState('none');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [splitMode, setSplitMode] = useState(false);
+  const [efectivoAmount, setEfectivoAmount] = useState<string>('');
+  const [mpAmount, setMpAmount] = useState<string>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -157,8 +162,57 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   }, [goToNextStep]);
 
   const handleSelectPayment = useCallback((method: PaymentMethod) => {
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
     setPaymentMethod(method);
   }, []);
+
+  const enableSplitMode = useCallback(() => {
+    setSplitMode(true);
+    setPaymentMethod('efectivo');
+    setEfectivoAmount('');
+    setMpAmount('');
+  }, []);
+
+  const cancelSplitMode = useCallback(() => {
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
+    setPaymentMethod('');
+  }, []);
+
+  const handleEfectivoChange = useCallback((val: string) => {
+    setEfectivoAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && total > 0) {
+      const remainder = Math.max(0, total - num);
+      setMpAmount(remainder > 0 ? remainder.toString() : '');
+    } else if (val === '') {
+      setMpAmount('');
+    }
+  }, [total]);
+
+  const handleMpChange = useCallback((val: string) => {
+    setMpAmount(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && total > 0) {
+      const remainder = Math.max(0, total - num);
+      setEfectivoAmount(remainder > 0 ? remainder.toString() : '');
+    } else if (val === '') {
+      setEfectivoAmount('');
+    }
+  }, [total]);
+
+  const splitEfectivoNum = parseFloat(efectivoAmount) || 0;
+  const splitMpNum = parseFloat(mpAmount) || 0;
+  const splitSum = splitEfectivoNum + splitMpNum;
+  const splitValid = splitMode
+    && splitEfectivoNum > 0
+    && splitMpNum > 0
+    && Math.abs(splitSum - total) < 0.01
+    && splitEfectivoNum <= total
+    && splitMpNum <= total;
 
   const resetForm = useCallback(() => {
     setSelectedBarber('');
@@ -166,6 +220,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setSelectedExtras([]);
     setSelectedDiscount('none');
     setPaymentMethod('');
+    setSplitMode(false);
+    setEfectivoAmount('');
+    setMpAmount('');
     setCurrentStep('barber');
   }, []);
 
@@ -179,9 +236,28 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       return;
     }
 
+    if (splitMode && !splitValid) {
+      toast({
+        title: "Pagos inválidos",
+        description: "La suma debe ser igual al total y ambos métodos mayores a cero.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const payments = splitMode
+        ? [
+            { method: 'efectivo' as PaymentMethod, amount: splitEfectivoNum },
+            { method: 'mercado_pago' as PaymentMethod, amount: splitMpNum },
+          ]
+        : [{ method: paymentMethod, amount: total }];
+      const primaryMethod = splitMode
+        ? (splitEfectivoNum >= splitMpNum ? 'efectivo' : 'mercado_pago')
+        : paymentMethod;
+
       const result = await onSubmit({
         barberId: barber!.id,
         barberName: `${barber!.firstName} ${barber!.lastName}`,
@@ -191,7 +267,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
         discount: selectedDiscountData?.value || 0,
         discountType: selectedDiscountData?.type || 'percentage',
-        paymentMethod,
+        paymentMethod: primaryMethod,
+        payments,
         subtotal,
         total,
       });
@@ -218,7 +295,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -512,32 +589,89 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Payment Step */}
         {currentStep === 'payment' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => handleSelectPayment('efectivo')}
-                className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
-                  paymentMethod === 'efectivo'
-                    ? 'border-success bg-success/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
-                <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-center text-foreground">Efectivo</p>
-              </button>
-              <button
-                onClick={() => handleSelectPayment('mercado_pago')}
-                className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
-                  paymentMethod === 'mercado_pago'
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
-                <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
-                <p className="font-medium text-center text-foreground">Mercado Pago</p>
-              </button>
-            </div>
+            {!splitMode ? (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => handleSelectPayment('efectivo')}
+                    className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
+                      paymentMethod === 'efectivo'
+                        ? 'border-success bg-success/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
+                    <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
+                    <p className="font-medium text-center text-foreground">Efectivo</p>
+                  </button>
+                  <button
+                    onClick={() => handleSelectPayment('mercado_pago')}
+                    className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
+                      paymentMethod === 'mercado_pago'
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
+                    <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
+                    <p className="font-medium text-center text-foreground">Mercado Pago</p>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={enableSplitMode}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <Split className="h-4 w-4" />
+                  Combinar métodos de pago
+                </button>
+              </>
+            ) : (
+              <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Split className="h-4 w-4 text-foreground" />
+                    <span className="font-medium text-foreground">Pago combinado</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={cancelSplitMode}>
+                    <X className="h-4 w-4 mr-1" /> Cancelar
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-success" /> Efectivo
+                    </label>
+                    <CurrencyInput
+                      value={efectivoAmount}
+                      onChange={handleEfectivoChange}
+                      placeholder="0"
+                      className="h-12 text-lg"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 text-secondary" /> Mercado Pago
+                    </label>
+                    <CurrencyInput
+                      value={mpAmount}
+                      onChange={handleMpChange}
+                      placeholder="0"
+                      className="h-12 text-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className={`flex items-center justify-between p-3 rounded-lg text-sm ${
+                  splitValid ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                }`}>
+                  <span>Suma: ${splitSum.toLocaleString()} / Total: ${total.toLocaleString()}</span>
+                  {splitValid ? <Check className="h-4 w-4" /> : <span className="text-xs">Debe coincidir exacto</span>}
+                </div>
+              </div>
+            )}
 
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
@@ -590,7 +724,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               <Button
                 onClick={handleSubmit}
                 className="w-full mt-6 h-14 text-base font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                disabled={!paymentMethod || isSubmitting}
+                disabled={!paymentMethod || isSubmitting || (splitMode && !splitValid)}
               >
                 {isSubmitting ? (
                   <><Loader2 className="h-5 w-5 mr-2 animate-spin" /> Guardando...</>

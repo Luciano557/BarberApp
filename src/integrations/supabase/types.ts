@@ -2073,6 +2073,47 @@ export type Database = {
           },
         ]
       }
+      venta_pagos: {
+        Row: {
+          created_at: string
+          id: string
+          metodo_pago: string
+          monto: number
+          orden: number
+          organization_id: string
+          sucursal_id: string | null
+          venta_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metodo_pago: string
+          monto?: number
+          orden?: number
+          organization_id: string
+          sucursal_id?: string | null
+          venta_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metodo_pago?: string
+          monto?: number
+          orden?: number
+          organization_id?: string
+          sucursal_id?: string | null
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_pagos_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "venta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       barberos_safe: {

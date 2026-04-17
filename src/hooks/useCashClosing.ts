@@ -68,17 +68,24 @@ export function useCashClosing() {
       return false;
     }
     
-    // Filter transactions for this barber
-    const barberTxs = transactions.filter(tx => tx.barberId === barber.barberId);
+    // Filter transactions for this barber (only active)
+    const barberTxs = transactions.filter(tx => tx.barberId === barber.barberId && tx.estado !== 'anulado');
     
-    // Calculate totals
-    const mp = barberTxs
-      .filter(tx => tx.paymentMethod === 'mercado_pago')
-      .reduce((sum, tx) => sum + tx.total, 0);
-    
-    const efectivo = barberTxs
-      .filter(tx => tx.paymentMethod === 'efectivo')
-      .reduce((sum, tx) => sum + tx.total, 0);
+    // Helper to read payments for a tx (with legacy fallback)
+    const txPayments = (tx: typeof barberTxs[number]) =>
+      tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+
+    // Calculate totals using payments array (supports mixed payments)
+    let mp = 0;
+    let efectivo = 0;
+    barberTxs.forEach(tx => {
+      txPayments(tx).forEach(p => {
+        if (p.method === 'mercado_pago') mp += p.amount;
+        else if (p.method === 'efectivo') efectivo += p.amount;
+      });
+    });
     
     const totalFacturado = mp + efectivo;
     

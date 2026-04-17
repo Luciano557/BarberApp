@@ -83,18 +83,23 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     : new Date();
 
   // Get transactions for selected barber (only active transactions)
+  // Mixed payments: a tx can appear in both lists if it has parts in both methods
   const barberTransactions = useMemo(() => {
     if (!closingBarber) return { efectivo: [], mercadoPago: [] };
     
-    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
-    const efectivo = activeTransactions.filter(
-      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'efectivo'
+    const activeTransactions = summary.transactions.filter(
+      tx => tx.estado !== 'anulado' && tx.barberId === closingBarber.barberId
     );
-    const mercadoPago = activeTransactions.filter(
-      tx => tx.barberId === closingBarber.barberId && tx.paymentMethod === 'mercado_pago'
-    );
-    
-    return { efectivo, mercadoPago };
+    const hasMethod = (tx: Transaction, method: 'efectivo' | 'mercado_pago') => {
+      const payments = tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+      return payments.some(p => p.method === method && p.amount > 0);
+    };
+    return {
+      efectivo: activeTransactions.filter(tx => hasMethod(tx, 'efectivo')),
+      mercadoPago: activeTransactions.filter(tx => hasMethod(tx, 'mercado_pago')),
+    };
   }, [closingBarber, summary.transactions]);
 
   // Check which barbers have their cash closed for the selected date
@@ -159,32 +164,35 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       });
     });
 
-    // Aggregate only active transactions
+    // Aggregate only active transactions, splitting amounts by payments array
     const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    const txPayments = (tx: Transaction) =>
+      tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+
     activeTransactions.forEach(tx => {
-      const existing = summaryMap.get(tx.barberId);
-      if (existing) {
-        existing.count += 1;
-        existing.total += tx.total;
-        if (tx.paymentMethod === 'efectivo') {
-          existing.totalEfectivo += tx.total;
-        } else {
-          existing.totalMercadoPago += tx.total;
-        }
-      } else {
-        // Handle transactions from barbers not in current list
+      let existing = summaryMap.get(tx.barberId);
+      if (!existing) {
         const barberData = barbers.find(b => b.id === tx.barberId);
-        summaryMap.set(tx.barberId, {
+        existing = {
           barberId: tx.barberId,
           barberName: tx.barberName,
-          count: 1,
-          totalEfectivo: tx.paymentMethod === 'efectivo' ? tx.total : 0,
-          totalMercadoPago: tx.paymentMethod === 'mercado_pago' ? tx.total : 0,
-          total: tx.total,
+          count: 0,
+          totalEfectivo: 0,
+          totalMercadoPago: 0,
+          total: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
-        });
+        };
+        summaryMap.set(tx.barberId, existing);
       }
+      existing.count += 1;
+      existing.total += tx.total;
+      txPayments(tx).forEach(p => {
+        if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
+        else if (p.method === 'mercado_pago') existing!.totalMercadoPago += p.amount;
+      });
     });
 
     // Calculate commission amounts
@@ -604,7 +612,13 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                 {summary.transactions.map((tx) => {
                   const isVoided = tx.estado === 'anulado';
                   const canVoid = !isVoided && canVoidTransaction(tx);
-                  
+                  const txPayments = tx.payments && tx.payments.length > 0
+                    ? tx.payments
+                    : [{ method: tx.paymentMethod, amount: tx.total }];
+                  const isMixed = txPayments.length > 1 && txPayments.every(p => p.amount > 0);
+                  const efectivoAmt = txPayments.filter(p => p.method === 'efectivo').reduce((s, p) => s + p.amount, 0);
+                  const mpAmt = txPayments.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+
                   return (
                     <div
                       key={tx.id}
@@ -619,6 +633,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
                             <Ban className="h-4 w-4 text-destructive" />
                           </div>
+                        ) : isMixed ? (
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center gap-0.5">
+                            <Banknote className="h-3 w-3 text-success" />
+                            <CreditCard className="h-3 w-3 text-secondary" />
+                          </div>
                         ) : tx.paymentMethod === 'efectivo' ? (
                           <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                             <Banknote className="h-4 w-4 text-success" />
@@ -630,7 +649,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-medium ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                             {tx.serviceName}
                           </span>
@@ -638,6 +657,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
                               +{tx.extras.length}
                             </span>
+                          )}
+                          {isMixed && !isVoided && (
+                            <Badge variant="outline" className="text-[10px] py-0 h-4">
+                              Mixto
+                            </Badge>
                           )}
                           {isVoided && (
                             <Badge variant="destructive" className="text-xs">
@@ -647,6 +671,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
                           {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
+                          {isMixed && !isVoided && (
+                            <span className="ml-2">
+                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">MP ${mpAmt.toLocaleString()}</span>
+                            </span>
+                          )}
                           {isVoided && tx.anuladoPor && (
                             <span className="ml-2 text-destructive">• Anulado por {tx.anuladoPor}</span>
                           )}
@@ -746,20 +775,30 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   Efectivo ({barberTransactions.efectivo.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                  {barberTransactions.efectivo.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <div>
-                        <span className="font-medium text-sm">{tx.serviceName}</span>
-                        {tx.extras.length > 0 && (
-                          <span className="text-xs ml-2 text-muted-foreground">
-                            + {tx.extras.map(e => e.name).join(', ')}
-                          </span>
-                        )}
-                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                  {barberTransactions.efectivo.map((tx) => {
+                    const pagos = tx.payments && tx.payments.length > 0
+                      ? tx.payments
+                      : [{ method: tx.paymentMethod, amount: tx.total }];
+                    const amt = pagos.filter(p => p.method === 'efectivo').reduce((s, p) => s + p.amount, 0);
+                    const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                        <div>
+                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          {tx.extras.length > 0 && (
+                            <span className="text-xs ml-2 text-muted-foreground">
+                              + {tx.extras.map(e => e.name).join(', ')}
+                            </span>
+                          )}
+                          {isMixed && (
+                            <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4">Parte de mixto</Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                        </div>
+                        <span className="font-semibold text-success">${amt.toLocaleString()}</span>
                       </div>
-                      <span className="font-semibold text-success">${tx.total.toLocaleString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -772,20 +811,30 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   Mercado Pago ({barberTransactions.mercadoPago.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                  {barberTransactions.mercadoPago.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                      <div>
-                        <span className="font-medium text-sm">{tx.serviceName}</span>
-                        {tx.extras.length > 0 && (
-                          <span className="text-xs ml-2 text-muted-foreground">
-                            + {tx.extras.map(e => e.name).join(', ')}
-                          </span>
-                        )}
-                        <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                  {barberTransactions.mercadoPago.map((tx) => {
+                    const pagos = tx.payments && tx.payments.length > 0
+                      ? tx.payments
+                      : [{ method: tx.paymentMethod, amount: tx.total }];
+                    const amt = pagos.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+                    const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                        <div>
+                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          {tx.extras.length > 0 && (
+                            <span className="text-xs ml-2 text-muted-foreground">
+                              + {tx.extras.map(e => e.name).join(', ')}
+                            </span>
+                          )}
+                          {isMixed && (
+                            <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4">Parte de mixto</Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
+                        </div>
+                        <span className="font-semibold text-secondary">${amt.toLocaleString()}</span>
                       </div>
-                      <span className="font-semibold text-secondary">${tx.total.toLocaleString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
