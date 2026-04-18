@@ -1,129 +1,80 @@
 
 
-## Plan: Pagos Combinados (Mixed Payments)
+## Plan: Homepage en `/` + app interna en `/app/:orgSlug`
 
-### Architecture Overview
-
-```text
-BEFORE:  venta.metodo_pago = 'efectivo' | 'mercado_pago'  (single value)
-AFTER:   venta.metodo_pago = 'efectivo' | 'mercado_pago'  (legacy, kept for backward compat)
-         + NEW TABLE: venta_pagos (source of truth for new sales)
-```
-
-### Database Changes
-
-**1. New table `venta_pagos`**
-```sql
-CREATE TABLE public.venta_pagos (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  venta_id uuid NOT NULL REFERENCES public.venta(id) ON DELETE CASCADE,
-  organization_id uuid NOT NULL,
-  sucursal_id uuid,
-  metodo_pago text NOT NULL,  -- 'efectivo', 'mercado_pago', future: 'transferencia', 'tarjeta'
-  monto numeric NOT NULL DEFAULT 0,
-  orden integer NOT NULL DEFAULT 1,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.venta_pagos ENABLE ROW LEVEL SECURITY;
-
--- Same RLS as venta
-CREATE POLICY "Owner GM manager full access venta_pagos" ON public.venta_pagos
-  FOR ALL TO authenticated
-  USING (organization_id = get_user_organization_id(auth.uid()) AND (has_role(auth.uid(),'owner') OR has_role(auth.uid(),'general_manager') OR has_role(auth.uid(),'manager')))
-  WITH CHECK (organization_id = get_user_organization_id(auth.uid()) AND (has_role(auth.uid(),'owner') OR has_role(auth.uid(),'general_manager') OR has_role(auth.uid(),'manager')));
-
-CREATE POLICY "Barber can view own venta_pagos" ON public.venta_pagos
-  FOR SELECT TO authenticated
-  USING (venta_id IN (SELECT id FROM venta WHERE barbero_id = get_user_barbero_id(auth.uid())));
-```
-
-**2. Legacy field `venta.metodo_pago`**: Keep as-is. For mixed payments, store `'efectivo'` (the primary/larger amount). New sales always write to `venta_pagos` as source of truth.
-
-**3. No changes to `ingresos`**: Cash closing already stores `efectivo` and `mp` as separate numeric fields. The calculation logic just needs to read from `venta_pagos` instead of `tx.paymentMethod`.
-
-### Frontend Data Model Changes
-
-**`src/types/barbershop.ts`** -- Extend `Transaction`:
-```ts
-// Add to Transaction interface:
-payments?: { method: PaymentMethod; amount: number }[];
-```
-
-- Single-method sales: `payments` has 1 entry (or is undefined for historical data)
-- Combined sales: `payments` has 2 entries
-- The existing `paymentMethod` field stays for backward compat / simple display
-
-**`PaymentRegistration` `onSubmit` signature`**: Add optional `payments` array.
-
-### Component Changes
-
-**1. `PaymentRegistration.tsx` -- Payment step UI**
-- Keep current Efectivo / Mercado Pago buttons for simple selection
-- Add "Combinar métodos" link/button below the two buttons
-- When activated: show two `CurrencyInput` fields (one per method), auto-complete the second field
-- Validation: sum must equal total exactly; no amount > total
-- On submit: pass `payments` array alongside legacy `paymentMethod`
-
-**2. `useTransactions.ts`**
-- `addTransaction`: After inserting `venta`, also insert rows into `venta_pagos` (always, even for single-method -- 1 row)
-- `loadTransactionsByDate`: Also fetch `venta_pagos` for each venta and populate `Transaction.payments`
-- For historical ventas without `venta_pagos` rows: synthesize from `metodo_pago` + `total_final`
-
-**3. `useCashClosing.ts`**
-- Change efectivo/mp calculation: use `tx.payments` array to split amounts instead of `tx.paymentMethod === 'efectivo'`
-- Fallback for historical: if no `payments`, use legacy single-method logic
-
-**4. `DailySummary.tsx`**
-- `barberSummaries` aggregation: use `tx.payments` to split amounts per method
-- Transaction list display: for mixed payments, show both icons + amounts inline (e.g., "Efectivo $16.000 / MP $1.000")
-- `getDailySummary` in `useTransactions.ts`: split totals using `payments` array
-
-**5. `BackfillWizard` / `useBackfillClosing.ts`**: No changes needed -- backfill doesn't go through `venta_pagos` (it writes directly to `ingresos`).
-
-**6. `EstadisticasPanel.tsx`**: No changes -- reads from `ingresos` table which already has split `efectivo`/`mp` fields.
-
-### UX Flow
+### Routing
 
 ```text
-Payment Step (current):
-  [ Efectivo ]  [ Mercado Pago ]
-  
-  [ Combinar métodos de pago ]   <-- new link
-
-When "Combinar" is tapped:
-  ┌──────────────────────────────┐
-  │ Efectivo      [___16.000___] │  <- CurrencyInput, auto-fills remainder
-  │ Mercado Pago  [____1.000___] │  <- CurrencyInput, auto-fills remainder
-  │                              │
-  │ Total: $17.000    ✓ OK       │
-  │                              │
-  │ [ Cancelar combinación ]     │
-  └──────────────────────────────┘
+/                      → Homepage pública (NUEVO)
+/login                 → Login
+/reset-password        → ResetPassword
+/:orgSlug/reservar     → Reservar (sin cambios)
+/app/:orgSlug          → Index (app interna, protegida)
 ```
 
-### Files to Create/Modify
+Tras login exitoso, redirigir a `/app/{orgSlug}` usando el slug de la organización del usuario (disponible vía `OrganizationContext`).
 
-| File | Action |
+### Cambios por archivo
+
+**`src/App.tsx`**
+- Agregar `<Route path="/" element={<Homepage />} />`
+- Cambiar la ruta protegida de `/` a `/app/:orgSlug`
+
+**`src/pages/Login.tsx`**
+- Tras login: leer slug de la org del usuario y redirigir a `/app/{slug}` (en vez de `/`)
+- Soportar `?mode=signup` (querystring) para abrir directo en la pestaña de registro
+
+**`src/components/ProtectedRoute.tsx`**
+- Validar que `:orgSlug` de la URL coincide con la org del usuario logueado; si no, redirigir al slug correcto
+
+**`src/pages/Homepage.tsx`** (NUEVO) — landing pública mobile-first:
+1. **Header sticky**: Logo "Vittro" + botón "Iniciar sesión"
+2. **Hero**: 
+   - H1 "Sabé exactamente cuánto gana tu barbería"
+   - Subtítulo de beneficio (turnos + ingresos + rendimiento en un lugar)
+   - Pills con preguntas: "¿Cuánto ganaste realmente esta semana?" · "¿Qué barbero te genera más ingresos?" · "¿Cuál es tu servicio más rentable?"
+   - CTAs: "Registrar mi barbería" → `/login?mode=signup` · "Iniciar sesión" → `/login`
+3. **Problema → Solución**: 3 dolores (turnos desordenados / números a ojo / sin control del equipo) + bloque de solución
+4. **Funcionalidades** (4 cards, iconos lucide):
+   - Gestión de turnos (Calendar)
+   - Control de finanzas (TrendingUp)
+   - Gestión de barberos (Users)
+   - Trazabilidad y estadísticas (BarChart3)
+5. **Valor diferencial**: 3 puntos — "No es solo una agenda" / "Entendé tu negocio" / "Decidí con datos reales"
+6. **Registra tu barbería**: 3 cards de planes (Free / Basic / Premium, alineado con `mem://features/config/plans-and-corrections`) con CTA "Registrar mi barbería"
+7. **CTA final**: "Empezá a tener control real de tu barbería hoy" + "Crear cuenta"
+8. **Footer minimal**: Logo + © Vittro
+
+**`src/index.css`**
+- Actualizar variables de color al nuevo azul/índigo de Vittro (modo light), conversión hex→HSL:
+```text
+--color-50:  231 80% 95%
+--color-100: 232 78% 86%
+--color-200: 232 76% 77%
+--color-300: 232 74% 68%
+--color-400: 232 75% 59%
+--color-500: 232 74% 50%
+--color-600: 232 74% 41%
+--color-700: 232 74% 32%
+--color-800: 232 74% 19%
+--color-900: 232 75% 14%
+--color-950: 232 79% 5%
+```
+- Esto actualiza `--primary`, `--ring`, etc. derivadas. Modo dark intacto.
+
+### Archivos a crear/modificar
+
+| Archivo | Acción |
 |---|---|
-| **Migration SQL** | Create `venta_pagos` table + RLS |
-| `src/types/barbershop.ts` | Add `payments` to `Transaction` |
-| `src/components/PaymentRegistration.tsx` | Add combined payment UI in payment step |
-| `src/hooks/useTransactions.ts` | Insert/read `venta_pagos`, populate `payments` |
-| `src/hooks/useCashClosing.ts` | Use `payments` array for efectivo/mp split |
-| `src/components/DailySummary.tsx` | Display mixed payments, fix aggregation |
+| `src/pages/Homepage.tsx` | Nuevo — landing pública |
+| `src/App.tsx` | Ruta `/` para Homepage; mover Index a `/app/:orgSlug` |
+| `src/pages/Login.tsx` | Redirect post-login a `/app/{slug}`; soportar `?mode=signup` |
+| `src/components/ProtectedRoute.tsx` | Validar `:orgSlug` vs org del usuario |
+| `src/index.css` | Nueva paleta azul/índigo de Vittro |
 
-### What stays unchanged
-- `ingresos` table and structure
-- `EstadisticasPanel` (reads from `ingresos`)
-- `BackfillWizard` / `useBackfillClosing`
-- Commission calculation (still based on `total`)
-- Discount logic (unchanged)
-- Turnos / agenda system
-- All existing historical data
-
-### Risks & Decisions
-- **Legacy compat**: Historical ventas without `venta_pagos` rows fall back to synthesizing a single payment from `metodo_pago` + `total_final`
-- **Discount by payment method**: For combined payments, the discount step happens before payment, so payment-restricted discounts will show a warning if the user later combines methods. The discount validation already exists and will be preserved.
-- **Future extensibility**: `venta_pagos.metodo_pago` is `text` not enum, allowing easy addition of `transferencia`, `tarjeta` later
+### Notas
+- Sin cambios en DB, edge functions, ni en la lógica interna de la app
+- Componentes UI existentes: `Button`, `Card`, `Badge`
+- Iconos: `Scissors`, `Calendar`, `TrendingUp`, `Users`, `BarChart3`, `Check`, `ArrowRight`
+- Copy en español rioplatense (vos), tono directo, sin marketing genérico
 
