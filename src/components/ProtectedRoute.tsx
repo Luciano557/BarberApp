@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { useAuth, AppRole } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { ChangePasswordForm } from './ChangePasswordForm';
 
 interface ProtectedRouteProps {
@@ -10,9 +11,11 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { user, roles, isLoading } = useAuth();
+  const { organization, isLoading: orgLoading } = useOrganization();
+  const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
 
-  if (isLoading) {
+  if (isLoading || orgLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -32,6 +35,11 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   
   if (mustChangePassword && !passwordChanged) {
     return <ChangePasswordForm onSuccess={() => setPasswordChanged(true)} />;
+  }
+
+  // Validate :orgSlug matches user's organization
+  if (orgSlug && organization && orgSlug !== organization.slug) {
+    return <Navigate to={`/app/${organization.slug}`} replace />;
   }
 
   if (requiredRoles && requiredRoles.length > 0) {

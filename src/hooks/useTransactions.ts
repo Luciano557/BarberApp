@@ -72,10 +72,12 @@ export function useTransactions() {
 
     // Cargar extras de cada venta
     const ventaIds = ventas.map(v => v.id);
-    const { data: ventaExtras } = await supabase
-      .from('venta_extra')
-      .select('*')
-      .in('venta_id', ventaIds);
+    const [extrasRes, pagosRes] = await Promise.all([
+      supabase.from('venta_extra').select('*').in('venta_id', ventaIds),
+      supabase.from('venta_pagos').select('*').in('venta_id', ventaIds).order('orden', { ascending: true }),
+    ]);
+    const ventaExtras = extrasRes.data;
+    const ventaPagos = pagosRes.data;
 
     const extrasMap = new Map<string, { uid: string; name: string; price: number }[]>();
     ventaExtras?.forEach(ve => {
@@ -88,25 +90,46 @@ export function useTransactions() {
       extrasMap.set(ve.venta_id, list);
     });
 
-    const txs: Transaction[] = ventas.map(v => ({
-      id: v.id,
-      barberId: v.barbero_id,
-      barberName: v.barbero_nombre,
-      serviceId: v.servicio_id,
-      serviceName: v.servicio_nombre,
-      servicePrice: Number(v.precio_servicio),
-      extras: extrasMap.get(v.id) || [],
-      discount: Number(v.descuento_pct) || 0,
-      discountType: 'percentage' as const,
-      paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
-      subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
-      total: Number(v.total_final),
-      createdAt: new Date(v.fecha_hora),
-      estado: (v as any).estado || 'activo',
-      anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
-      anuladoPor: (v as any).anulado_por || undefined,
-      anuladoPorId: (v as any).anulado_por_id || undefined,
-    }));
+    const pagosMap = new Map<string, { method: 'efectivo' | 'mercado_pago'; amount: number }[]>();
+    ventaPagos?.forEach((p: any) => {
+      const list = pagosMap.get(p.venta_id) || [];
+      list.push({
+        method: p.metodo_pago as 'efectivo' | 'mercado_pago',
+        amount: Number(p.monto),
+      });
+      pagosMap.set(p.venta_id, list);
+    });
+
+    const txs: Transaction[] = ventas.map(v => {
+      // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
+      const pagos = pagosMap.get(v.id);
+      const payments = pagos && pagos.length > 0
+        ? pagos
+        : [{
+            method: v.metodo_pago as 'efectivo' | 'mercado_pago',
+            amount: Number(v.total_final),
+          }];
+      return {
+        id: v.id,
+        barberId: v.barbero_id,
+        barberName: v.barbero_nombre,
+        serviceId: v.servicio_id,
+        serviceName: v.servicio_nombre,
+        servicePrice: Number(v.precio_servicio),
+        extras: extrasMap.get(v.id) || [],
+        discount: Number(v.descuento_pct) || 0,
+        discountType: 'percentage' as const,
+        paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
+        payments,
+        subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
+        total: Number(v.total_final),
+        createdAt: new Date(v.fecha_hora),
+        estado: (v as any).estado || 'activo',
+        anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
+        anuladoPor: (v as any).anulado_por || undefined,
+        anuladoPorId: (v as any).anulado_por_id || undefined,
+      };
+    });
 
     setTransactions(txs);
     setIsLoading(false);
@@ -116,7 +139,9 @@ export function useTransactions() {
     loadTransactionsByDate(selectedDate);
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
-  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+  const addTransaction = useCallback(async (
+    transaction: Omit<Transaction, 'id' | 'createdAt'>
+  ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
       return null;
@@ -136,6 +161,14 @@ export function useTransactions() {
     const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
     const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
 
+    // Determine payments array (always at least 1)
+    const payments = transaction.payments && transaction.payments.length > 0
+      ? transaction.payments
+      : [{ method: transaction.paymentMethod, amount: transaction.total }];
+
+    // Legacy field: use the method with the largest amount as primary
+    const primaryMethod = [...payments].sort((a, b) => b.amount - a.amount)[0].method;
+
     // Insertar venta principal
     const ventaData: VentaInsert = {
       barbero_id: transaction.barberId,
@@ -144,7 +177,7 @@ export function useTransactions() {
       servicio_nombre: normalizedServiceName,
       precio_servicio: transaction.servicePrice,
       descuento_pct: transaction.discount,
-      metodo_pago: transaction.paymentMethod,
+      metodo_pago: primaryMethod,
       total_final: transaction.total,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
@@ -159,6 +192,24 @@ export function useTransactions() {
     if (ventaError) {
       console.error('Error inserting venta:', ventaError);
       return null;
+    }
+
+    // Insertar pagos (siempre, incluso para método único)
+    const pagosData = payments.map((p, idx) => ({
+      venta_id: venta.id,
+      organization_id: organization.id,
+      sucursal_id: currentSucursal.id,
+      metodo_pago: p.method,
+      monto: p.amount,
+      orden: idx + 1,
+    }));
+
+    const { error: pagosError } = await supabase
+      .from('venta_pagos')
+      .insert(pagosData);
+
+    if (pagosError) {
+      console.error('Error inserting venta_pagos:', pagosError);
     }
 
     // Insertar extras si hay
@@ -183,6 +234,8 @@ export function useTransactions() {
     // Agregar al estado local
     const newTransaction: Transaction = {
       ...transaction,
+      payments,
+      paymentMethod: primaryMethod,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
@@ -265,12 +318,17 @@ export function useTransactions() {
   const getDailySummary = useCallback(() => {
     // Solo contar transacciones activas para el resumen
     const activeTx = transactions.filter(t => t.estado !== 'anulado');
-    const totalEfectivo = activeTx
-      .filter(t => t.paymentMethod === 'efectivo')
-      .reduce((sum, t) => sum + t.total, 0);
-    const totalMercadoPago = activeTx
-      .filter(t => t.paymentMethod === 'mercado_pago')
-      .reduce((sum, t) => sum + t.total, 0);
+    let totalEfectivo = 0;
+    let totalMercadoPago = 0;
+    activeTx.forEach(t => {
+      const payments = t.payments && t.payments.length > 0
+        ? t.payments
+        : [{ method: t.paymentMethod, amount: t.total }];
+      payments.forEach(p => {
+        if (p.method === 'efectivo') totalEfectivo += p.amount;
+        else if (p.method === 'mercado_pago') totalMercadoPago += p.amount;
+      });
+    });
 
     return {
       count: activeTx.length,

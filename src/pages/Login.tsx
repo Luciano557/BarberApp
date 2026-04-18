@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,10 @@ import { COUNTRIES } from '@/lib/dateUtils';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const defaultTab = searchParams.get('mode') === 'signup' ? 'register' : 'login';
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -38,12 +40,33 @@ export default function Login() {
           ? 'Email o contraseña incorrectos' 
           : error.message
       });
+      setIsLoading(false);
     } else {
       toast.success('¡Bienvenido!');
+      // Fetch the user's org slug to redirect to /app/:slug
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+        if (profile?.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('slug')
+            .eq('id', profile.organization_id)
+            .single();
+          if (org?.slug) {
+            navigate(`/app/${org.slug}`);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
       navigate('/');
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -86,7 +109,7 @@ export default function Login() {
           <CardDescription>Sistema de gestión</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue={defaultTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
               <TabsTrigger value="register">Registrarse</TabsTrigger>

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import Homepage from "./pages/Homepage";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -25,11 +26,12 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
               <Routes>
+                <Route path="/" element={<Homepage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/:orgSlug/reservar" element={<Reservar />} />
                 <Route
-                  path="/"
+                  path="/app/:orgSlug"
                   element={
                     <ProtectedRoute>
                       <Index />

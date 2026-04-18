@@ -1,31 +1,80 @@
 
 
-## Plan: Move turnos viewer, remove client name, rebrand to Vittro
+## Plan: Homepage en `/` + app interna en `/app/:orgSlug`
 
-### 1. Move `DailyTurnosViewer` below the payment flow in `PaymentRegistration.tsx`
-- Move `<DailyTurnosViewer />` from above the "Nuevo Cobro" header to below the entire step flow (end of the component's JSX)
+### Routing
 
-### 2. Remove client name from turno rows in `DailyTurnosViewer.tsx`
-- Remove the `<span>` showing `turno.cliente_nombre` (line 129) and the separator dot (line 130)
-- Resulting row order: time → service → barber → status badge
+```text
+/                      → Homepage pública (NUEVO)
+/login                 → Login
+/reset-password        → ResetPassword
+/:orgSlug/reservar     → Reservar (sin cambios)
+/app/:orgSlug          → Index (app interna, protegida)
+```
 
-### 3. Rebrand "Scissors" → "Vittro"
+Tras login exitoso, redirigir a `/app/{orgSlug}` usando el slug de la organización del usuario (disponible vía `OrganizationContext`).
 
-**`index.html`** — Update all meta tags:
-- `<title>Vittro</title>`
-- description: "Reserva tu turno fácilmente con Vittro"
-- author, og:title, og:description, twitter:site → Vittro
+### Cambios por archivo
 
-**`src/pages/Index.tsx`** — Change the welcome screen text from "Scissors" to "Vittro"
+**`src/App.tsx`**
+- Agregar `<Route path="/" element={<Homepage />} />`
+- Cambiar la ruta protegida de `/` a `/app/:orgSlug`
 
-Note: Lucide icon imports named `Scissors` (the scissor icon) used for barbero role badges across other components are unrelated to the app name and will NOT be changed.
+**`src/pages/Login.tsx`**
+- Tras login: leer slug de la org del usuario y redirigir a `/app/{slug}` (en vez de `/`)
+- Soportar `?mode=signup` (querystring) para abrir directo en la pestaña de registro
 
-### Files changed
+**`src/components/ProtectedRoute.tsx`**
+- Validar que `:orgSlug` de la URL coincide con la org del usuario logueado; si no, redirigir al slug correcto
 
-| File | Action |
+**`src/pages/Homepage.tsx`** (NUEVO) — landing pública mobile-first:
+1. **Header sticky**: Logo "Vittro" + botón "Iniciar sesión"
+2. **Hero**: 
+   - H1 "Sabé exactamente cuánto gana tu barbería"
+   - Subtítulo de beneficio (turnos + ingresos + rendimiento en un lugar)
+   - Pills con preguntas: "¿Cuánto ganaste realmente esta semana?" · "¿Qué barbero te genera más ingresos?" · "¿Cuál es tu servicio más rentable?"
+   - CTAs: "Registrar mi barbería" → `/login?mode=signup` · "Iniciar sesión" → `/login`
+3. **Problema → Solución**: 3 dolores (turnos desordenados / números a ojo / sin control del equipo) + bloque de solución
+4. **Funcionalidades** (4 cards, iconos lucide):
+   - Gestión de turnos (Calendar)
+   - Control de finanzas (TrendingUp)
+   - Gestión de barberos (Users)
+   - Trazabilidad y estadísticas (BarChart3)
+5. **Valor diferencial**: 3 puntos — "No es solo una agenda" / "Entendé tu negocio" / "Decidí con datos reales"
+6. **Registra tu barbería**: 3 cards de planes (Free / Basic / Premium, alineado con `mem://features/config/plans-and-corrections`) con CTA "Registrar mi barbería"
+7. **CTA final**: "Empezá a tener control real de tu barbería hoy" + "Crear cuenta"
+8. **Footer minimal**: Logo + © Vittro
+
+**`src/index.css`**
+- Actualizar variables de color al nuevo azul/índigo de Vittro (modo light), conversión hex→HSL:
+```text
+--color-50:  231 80% 95%
+--color-100: 232 78% 86%
+--color-200: 232 76% 77%
+--color-300: 232 74% 68%
+--color-400: 232 75% 59%
+--color-500: 232 74% 50%
+--color-600: 232 74% 41%
+--color-700: 232 74% 32%
+--color-800: 232 74% 19%
+--color-900: 232 75% 14%
+--color-950: 232 79% 5%
+```
+- Esto actualiza `--primary`, `--ring`, etc. derivadas. Modo dark intacto.
+
+### Archivos a crear/modificar
+
+| Archivo | Acción |
 |---|---|
-| `src/components/PaymentRegistration.tsx` | Move `<DailyTurnosViewer />` to below the flow |
-| `src/components/DailyTurnosViewer.tsx` | Remove client name field from turno rows |
-| `index.html` | Rebrand all meta tags to Vittro |
-| `src/pages/Index.tsx` | Change welcome screen title to Vittro |
+| `src/pages/Homepage.tsx` | Nuevo — landing pública |
+| `src/App.tsx` | Ruta `/` para Homepage; mover Index a `/app/:orgSlug` |
+| `src/pages/Login.tsx` | Redirect post-login a `/app/{slug}`; soportar `?mode=signup` |
+| `src/components/ProtectedRoute.tsx` | Validar `:orgSlug` vs org del usuario |
+| `src/index.css` | Nueva paleta azul/índigo de Vittro |
+
+### Notas
+- Sin cambios en DB, edge functions, ni en la lógica interna de la app
+- Componentes UI existentes: `Button`, `Card`, `Badge`
+- Iconos: `Scissors`, `Calendar`, `TrendingUp`, `Users`, `BarChart3`, `Check`, `ArrowRight`
+- Copy en español rioplatense (vos), tono directo, sin marketing genérico
 

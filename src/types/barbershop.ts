@@ -72,6 +72,7 @@ export interface Transaction {
   discount: number;
   discountType: 'fixed' | 'percentage';
   paymentMethod: 'efectivo' | 'mercado_pago';
+  payments?: { method: 'efectivo' | 'mercado_pago'; amount: number }[];
   subtotal: number;
   total: number;
   createdAt: Date;
