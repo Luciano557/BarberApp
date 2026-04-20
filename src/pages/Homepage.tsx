@@ -541,36 +541,36 @@ export default function Homepage() {
             <div className="text-center mb-12">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Planes</p>
               <h2 className="text-4xl font-semibold tracking-tight mb-4">Registrá tu barbería en minutos</h2>
-              <p className="text-slate-500 text-base">Empezás gratis. Cuando crezcas, escalás.</p>
+              <p className="text-slate-500 text-base">Empeza a tener control sobre tu barberia</p>
             </div>
           </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               {
-                tier: 'Free',
-                price: 'Gratis',
-                sub: 'para siempre',
+                tier: 'Basico',
+                price: '$20.000',
+                sub: 'Para empezar a ordenar tu barbería',
                 desc: 'Para arrancar y probar sin compromiso.',
-                features: ['1 sucursal', 'Hasta 3 barberos', 'Agenda online', 'Cierre de caja diario'],
+                features: ['1 sucursal', 'Hasta 2 barberos', 'Agenda de turnos', 'Registro de cobros', 'Cierre de caja diario'],
                 featured: false,
-                cta: 'Empezar gratis',
+                cta: 'Empezar Ahora',
               },
               {
-                tier: 'Basic',
-                price: 'Pago mensual',
-                sub: 'para barberías en crecimiento',
+                tier: 'Profesional',
+                price: '$40.000',
+                sub: 'Para barberías que quieren crecer y entender su negocio',
                 desc: 'Más barberos, más control, más datos.',
-                features: ['1 sucursal', 'Más barberos y servicios', 'Estadísticas avanzadas', 'Reportes exportables'],
+                features: ['1 sucursal', 'Más barberos y servicios', 'Control completo de finanzas', 'Estadísticas avanzadas', 'Historial de cortes y ventas'],
                 featured: true,
                 cta: 'Registrar mi barbería',
               },
               {
                 tier: 'Premium',
-                price: 'Pago mensual',
-                sub: 'para múltiples sedes',
+                price: '$60.000',
+                sub: 'Para barberías con múltiples sucursales',
                 desc: 'Para cadenas que necesitan control total.',
-                features: ['Múltiples sucursales', 'Barberos ilimitados', 'Encargados por sede', 'Soporte prioritario'],
+                features: ['Múltiples sucursales', 'Barberos ilimitados', 'Encargados por sede', 'Soporte prioritario', 'Reportes avanzados'],
                 featured: false,
                 cta: 'Registrar mi barbería',
               },
