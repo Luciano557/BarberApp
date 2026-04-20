@@ -1,14 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Scissors, Store, Globe } from 'lucide-react';
+import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTRIES } from '@/lib/dateUtils';
 
@@ -17,7 +14,10 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const { signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const defaultTab = searchParams.get('mode') === 'signup' ? 'register' : 'login';
+  const [mode, setMode] = useState<'login' | 'register'>(
+    searchParams.get('mode') === 'signup' ? 'register' : 'login'
+  );
+  const [showPassword, setShowPassword] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -31,19 +31,16 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     const { error } = await signIn(loginEmail, loginPassword);
-
     if (error) {
       toast.error('Error al iniciar sesión', {
-        description: error.message === 'Invalid login credentials' 
-          ? 'Email o contraseña incorrectos' 
-          : error.message
+        description: error.message === 'Invalid login credentials'
+          ? 'Email o contraseña incorrectos'
+          : error.message,
       });
       setIsLoading(false);
     } else {
       toast.success('¡Bienvenido!');
-      // Fetch the user's org slug to redirect to /app/:slug
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -72,183 +69,366 @@ export default function Login() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     if (registerPassword.length < 6) {
       toast.error('La contraseña debe tener al menos 6 caracteres');
       setIsLoading(false);
       return;
     }
-
     if (!businessName.trim()) {
       toast.error('Ingresá el nombre de tu barbería');
       setIsLoading(false);
       return;
     }
-
     const { error } = await signUp(registerEmail, registerPassword, registerName, businessName, country);
-
     if (error) {
       toast.error('Error al registrarse', { description: error.message });
     } else {
       toast.success('Cuenta creada', {
-        description: 'Revisá tu email para confirmar tu cuenta'
+        description: 'Revisá tu email para confirmar tu cuenta',
       });
     }
-
     setIsLoading(false);
   };
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-4">
-            <Scissors className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl font-semibold">Barbería</CardTitle>
-          <CardDescription>Sistema de gestión</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue={defaultTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>
-              <TabsTrigger value="register">Registrarse</TabsTrigger>
-            </TabsList>
+  const handleForgotPassword = async () => {
+    if (!loginEmail) {
+      toast.error('Ingresá tu email primero');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error('Error al enviar el email', { description: error.message });
+    } else {
+      toast.success('Email enviado', {
+        description: 'Revisá tu bandeja de entrada para resetear tu contraseña',
+      });
+    }
+  };
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                  />
+  return (
+    <div className="min-h-screen bg-white flex">
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in { animation: fadeIn 0.4s ease both; }
+        .input-field {
+          width: 100%;
+          height: 42px;
+          padding: 0 14px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          font-size: 14px;
+          color: #0f172a;
+          background: #fff;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          outline: none;
+        }
+        .input-field:focus {
+          border-color: #1e2a4a;
+          box-shadow: 0 0 0 3px rgba(30,42,74,0.08);
+        }
+        .input-field::placeholder { color: #94a3b8; }
+        .submit-btn {
+          width: 100%;
+          height: 44px;
+          background: #1e2a4a;
+          color: #fff;
+          border: none;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: background 0.15s, opacity 0.15s;
+        }
+        .submit-btn:hover:not(:disabled) { background: #2a3a60; }
+        .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .tab-btn {
+          flex: 1;
+          padding: 8px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 500;
+          border: none;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .tab-btn.active {
+          background: #fff;
+          color: #0f172a;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+      `}</style>
+
+      {/* ── Left panel — branding ────────────────────────────────────────── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[480px] flex-shrink-0 p-10"
+        style={{ background: '#1e2a4a' }}
+      >
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+            <Scissors size={15} className="text-white" />
+          </div>
+          <span className="text-white font-semibold text-base">Vittro</span>
+        </Link>
+
+        {/* Center content */}
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/70 text-xs mb-6">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            Sistema de gestión para barberías
+          </div>
+          <h2 className="text-3xl font-semibold text-white leading-tight mb-4 tracking-tight">
+            Todo lo que necesitás<br />para operar tu barbería
+          </h2>
+          <p className="text-white/50 text-sm leading-relaxed mb-8">
+            Cobros, cierre de caja, comisiones, estadísticas y agenda online. Sin planillas, sin estimaciones.
+          </p>
+
+          {/* Mini feature list */}
+          <div className="space-y-3">
+            {[
+              { icon: '▦', label: 'Cierre de caja por barbero' },
+              { icon: '↗', label: 'Estadísticas y facturación real' },
+              { icon: '📅', label: 'Agenda online sin WhatsApp' },
+              { icon: '%', label: 'Comisiones calculadas automáticamente' },
+            ].map(f => (
+              <div key={f.label} className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-[11px] text-white/70">
+                  {f.icon}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Contraseña</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Ingresando...' : 'Ingresar'}
-                </Button>
-                <div className="text-center">
+                <span className="text-white/70 text-sm">{f.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom */}
+        <p className="text-white/30 text-xs">© {new Date().getFullYear()} Vittro</p>
+      </div>
+
+      {/* ── Right panel — form ───────────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm animate-in">
+
+          {/* Mobile logo */}
+          <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
+            <div className="w-8 h-8 bg-[#1e2a4a] rounded-lg flex items-center justify-center">
+              <Scissors size={14} className="text-white" />
+            </div>
+            <span className="font-semibold text-base">Vittro</span>
+          </div>
+
+          {/* Heading */}
+          <div className="mb-7">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-1">
+              {mode === 'login' ? 'Bienvenido de nuevo' : 'Creá tu barbería'}
+            </h1>
+            <p className="text-sm text-slate-400">
+              {mode === 'login'
+                ? 'Ingresá a tu cuenta para continuar'
+                : 'Empezás gratis, sin tarjeta de crédito'}
+            </p>
+          </div>
+
+          {/* Tab switcher */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-6">
+            <button className={`tab-btn ${mode === 'login' ? 'active' : ''}`} onClick={() => setMode('login')}>
+              Iniciar sesión
+            </button>
+            <button className={`tab-btn ${mode === 'register' ? 'active' : ''}`} onClick={() => setMode('register')}>
+              Registrarse
+            </button>
+          </div>
+
+          {/* ── LOGIN FORM ── */}
+          {mode === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-4 animate-in">
+              <div>
+                <Label htmlFor="login-email" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Email
+                </Label>
+                <input
+                  id="login-email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label htmlFor="login-password" className="text-xs font-medium text-slate-600">
+                    Contraseña
+                  </Label>
                   <button
                     type="button"
-                    className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline transition-colors duration-150"
-                    onClick={async () => {
-                      if (!loginEmail) {
-                        toast.error('Ingresá tu email primero');
-                        return;
-                      }
-                      const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
-                        redirectTo: `${window.location.origin}/reset-password`,
-                      });
-                      if (error) {
-                        toast.error('Error al enviar el email', { description: error.message });
-                      } else {
-                        toast.success('Email enviado', { description: 'Revisá tu bandeja de entrada para resetear tu contraseña' });
-                      }
-                    }}
+                    onClick={handleForgotPassword}
+                    className="text-xs text-slate-400 hover:text-slate-700 transition-colors"
                   >
                     ¿Olvidaste tu contraseña?
                   </button>
                 </div>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="country" className="flex items-center gap-1">
-                    <Globe className="w-3.5 h-3.5" />
-                    País
-                  </Label>
-                  <Select value={country} onValueChange={setCountry}>
-                    <SelectTrigger id="country">
-                      <SelectValue placeholder="Seleccionar país" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                          <span className="flex items-center gap-2">
-                            <span>{c.flag}</span>
-                            <span>{c.name}</span>
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="business-name" className="flex items-center gap-1">
-                    <Store className="w-3.5 h-3.5" />
-                    Nombre de tu barbería
-                  </Label>
-                  <Input
-                    id="business-name"
-                    type="text"
-                    placeholder="Ej: Sir Fausto, Barbería Premium..."
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-name">Tu nombre completo</Label>
-                  <Input
-                    id="register-name"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    value={registerName}
-                    onChange={(e) => setRegisterName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-email">Email</Label>
-                  <Input
-                    id="register-email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={registerEmail}
-                    onChange={(e) => setRegisterEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-password">Contraseña</Label>
-                  <Input
-                    id="register-password"
-                    type="password"
+                <div className="relative">
+                  <input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={e => setLoginPassword(e.target.value)}
+                    className="input-field pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" className="submit-btn" disabled={isLoading}>
+                {isLoading ? 'Ingresando...' : (<>Ingresar <ArrowRight size={15} /></>)}
+              </button>
+
+              <p className="text-center text-xs text-slate-400">
+                ¿No tenés cuenta?{' '}
+                <button type="button" onClick={() => setMode('register')} className="text-[#1e2a4a] font-medium hover:underline">
+                  Registrate gratis
+                </button>
+              </p>
+            </form>
+          )}
+
+          {/* ── REGISTER FORM ── */}
+          {mode === 'register' && (
+            <form onSubmit={handleRegister} className="space-y-4 animate-in">
+              <div>
+                <Label htmlFor="country" className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <Globe size={12} /> País
+                </Label>
+                <Select value={country} onValueChange={setCountry}>
+                  <SelectTrigger id="country" className="h-[42px] rounded-[10px] border-slate-200 text-sm">
+                    <SelectValue placeholder="Seleccionar país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map(c => (
+                      <SelectItem key={c.code} value={c.code}>
+                        <span className="flex items-center gap-2">
+                          <span>{c.flag}</span>
+                          <span>{c.name}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="business-name" className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <Store size={12} /> Nombre de tu barbería
+                </Label>
+                <input
+                  id="business-name"
+                  type="text"
+                  placeholder="Ej: Sir Fausto, Barbería Premium..."
+                  value={businessName}
+                  onChange={e => setBusinessName(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="register-name" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Tu nombre completo
+                </Label>
+                <input
+                  id="register-name"
+                  type="text"
+                  placeholder="Juan Pérez"
+                  value={registerName}
+                  onChange={e => setRegisterName(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="register-email" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Email
+                </Label>
+                <input
+                  id="register-email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={registerEmail}
+                  onChange={e => setRegisterEmail(e.target.value)}
+                  className="input-field"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="register-password" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                  Contraseña
+                </Label>
+                <div className="relative">
+                  <input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••  (mín. 6 caracteres)"
                     value={registerPassword}
-                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    onChange={e => setRegisterPassword(e.target.value)}
+                    className="input-field pr-10"
                     required
                     minLength={6}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
                 </div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creando cuenta...' : 'Crear mi barbería'}
-                </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  Al registrarte, se creará tu barbería con un plan gratuito
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              </div>
+
+              <button type="submit" className="submit-btn" disabled={isLoading}>
+                {isLoading ? 'Creando cuenta...' : (<>Crear mi barbería <ArrowRight size={15} /></>)}
+              </button>
+
+              <p className="text-center text-[11px] text-slate-400 leading-relaxed">
+                Al registrarte, se creará tu barbería con un plan gratuito.
+              </p>
+
+              <p className="text-center text-xs text-slate-400">
+                ¿Ya tenés cuenta?{' '}
+                <button type="button" onClick={() => setMode('login')} className="text-[#1e2a4a] font-medium hover:underline">
+                  Iniciá sesión
+                </button>
+              </p>
+            </form>
+          )}
+
+        </div>
+      </div>
     </div>
   );
 }
