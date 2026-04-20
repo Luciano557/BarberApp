@@ -34,6 +34,7 @@ export default function Login() {
   const [registerName, setRegisterName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [country, setCountry] = useState('AR');
+  const [plan, setPlan] = useState<PlanId>('basico');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
