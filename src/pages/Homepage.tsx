@@ -66,7 +66,7 @@ const screens = {
         <div className="grid grid-cols-2 gap-2">
           {[
             { init: 'S', name: 'Sebastian Tello', svcs: 10, total: '$183.500', com: '$91.750' },
-            { init: 'T', name: 'Tomas Bazante', svcs: 9, total: '$175.000', com: '$87.500' },
+            { init: 'T', name: 'Luciano Garcia', svcs: 9, total: '$175.000', com: '$87.500' },
           ].map(b => (
             <div key={b.name} className="bg-white border border-slate-100 rounded-lg p-2.5">
               <div className="flex items-center gap-1.5 mb-2">
@@ -106,7 +106,7 @@ const screens = {
         </div>
         <p className="text-[10px] font-medium text-slate-500">👤 Barbero · Seleccioná quién atendió</p>
         <div className="grid grid-cols-2 gap-2">
-          {[{ init: 'S', name: 'Sebastian Tello', selected: true }, { init: 'T', name: 'Tomas Bazante', selected: false }].map(b => (
+          {[{ init: 'S', name: 'Sebastian Tello', selected: true }, { init: 'T', name: 'Luciano Garcia', selected: false }].map(b => (
             <div key={b.name} className={`rounded-lg p-3 text-center border cursor-pointer ${b.selected ? 'border-slate-800 bg-slate-50' : 'border-slate-100 bg-white'}`}>
               <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-600 mx-auto mb-1.5">{b.init}</div>
               <p className="text-[10px] font-medium">{b.name}</p>
@@ -181,7 +181,7 @@ const screens = {
         </div>
         {[
           { day: 'Lunes 13/04', count: 0, rows: [] },
-          { day: 'Jueves 16/04', count: 5, rows: ['09:00 – Deluxe Cut · Sebastian Tello', '11:00 – Deluxe Cut · Tomas Bazante', '12:00 – Deluxe Cut · Sebastian Tello'] },
+          { day: 'Jueves 16/04', count: 5, rows: ['09:00 – Deluxe Cut · Sebastian Tello', '11:00 – Deluxe Cut · Luciano Garcia', '12:00 – Deluxe Cut · Sebastian Tello'] },
         ].map(d => (
           <div key={d.day} className="bg-white border border-slate-100 rounded-lg p-2.5">
             <div className="flex items-center justify-between mb-1.5">
@@ -358,8 +358,8 @@ export default function Homepage() {
             className="text-lg text-slate-500 max-w-lg mx-auto mb-8 leading-relaxed"
             style={{ animation: 'fadeSlideIn 0.5s ease 0.16s both' }}
           >
-            Vittro reúne cobros, caja, sueldos y estadísticas en un solo lugar.
-            Sin planillas, sin estimaciones.
+            Vittro reúne turnos, cobros, caja, sueldos y estadísticas en un solo lugar.
+            Completamente GRATIS el primer mes.
           </p>
 
           <div
@@ -411,8 +411,8 @@ export default function Homepage() {
           <Reveal>
             <div className="grid grid-cols-3 divide-x divide-slate-100">
               {[
-                { num: '+500', label: 'barberías registradas' },
-                { num: '2 min', label: 'para registrarte y empezar' },
+                { num: '+100', label: 'barberías registradas' },
+                { num: '2 minutos', label: 'para registrarte y empezar' },
                 { num: '100%', label: 'hecho para barberías' },
               ].map(s => (
                 <div key={s.label} className="text-center px-8">
@@ -541,7 +541,7 @@ export default function Homepage() {
             <div className="text-center mb-12">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3">Planes</p>
               <h2 className="text-4xl font-semibold tracking-tight mb-4">Registrá tu barbería en minutos</h2>
-              <p className="text-slate-500 text-base">Empeza a tener control sobre tu barberia</p>
+              <p className="text-slate-500 text-base">¡El primer mes es completamente GRATIS!</p>
             </div>
           </Reveal>
 
@@ -549,16 +549,16 @@ export default function Homepage() {
             {[
               {
                 tier: 'Basico',
-                price: '$20.000',
+                price: '$30.000',
                 sub: 'Para empezar a ordenar tu barbería',
                 desc: 'Para arrancar y probar sin compromiso.',
                 features: ['1 sucursal', 'Hasta 2 barberos', 'Agenda de turnos', 'Registro de cobros', 'Cierre de caja diario'],
                 featured: false,
-                cta: 'Empezar Ahora',
+                cta: 'Registrar mi barbería',
               },
               {
                 tier: 'Profesional',
-                price: '$40.000',
+                price: '$50.000',
                 sub: 'Para barberías que quieren crecer y entender su negocio',
                 desc: 'Más barberos, más control, más datos.',
                 features: ['1 sucursal', 'Más barberos y servicios', 'Control completo de finanzas', 'Estadísticas avanzadas', 'Historial de cortes y ventas'],
@@ -567,7 +567,7 @@ export default function Homepage() {
               },
               {
                 tier: 'Premium',
-                price: '$60.000',
+                price: '$100.000',
                 sub: 'Para barberías con múltiples sucursales',
                 desc: 'Para cadenas que necesitan control total.',
                 features: ['Múltiples sucursales', 'Barberos ilimitados', 'Encargados por sede', 'Soporte prioritario', 'Reportes avanzados'],
