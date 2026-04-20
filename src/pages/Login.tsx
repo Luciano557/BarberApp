@@ -5,7 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
+
+const PLANS = [
+  { id: 'basico',      label: 'Básico',      price: '$30.000'  },
+  { id: 'profesional', label: 'Profesional', price: '$50.000'  },
+  { id: 'premium',     label: 'Premium',     price: '$100.000' },
+] as const;
+type PlanId = typeof PLANS[number]['id'];
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTRIES } from '@/lib/dateUtils';
 
