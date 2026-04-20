@@ -348,6 +348,54 @@ export default function Login() {
                 </Select>
               </div>
 
+              {/* TODO: Persistir el plan elegido al crear la organización (requiere ajustar AuthContext.signUp) */}
+              <div>
+                <Label htmlFor="plan" className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
+                  <Sparkles size={12} /> Plan
+                </Label>
+                <Select value={plan} onValueChange={(v) => setPlan(v as PlanId)}>
+                  <SelectTrigger id="plan" className="h-[42px] rounded-[10px] border-slate-200 text-sm">
+                    <SelectValue>
+                      {(() => {
+                        const p = PLANS.find(p => p.id === plan)!;
+                        return (
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium">{p.label}</span>
+                            <span
+                              className="text-white text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgb(30, 42, 74)' }}
+                            >
+                              Gratis
+                            </span>
+                            <span className="text-slate-400 text-xs truncate">
+                              <span className="line-through">{p.price}</span> después del primer mes
+                            </span>
+                          </span>
+                        );
+                      })()}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLANS.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        <span className="flex items-center gap-2">
+                          <span className="font-medium">{p.label}</span>
+                          <span
+                            className="text-white text-[11px] font-semibold px-1.5 py-0.5 rounded"
+                            style={{ background: 'rgb(30, 42, 74)' }}
+                          >
+                            Gratis
+                          </span>
+                          <span className="text-slate-400 text-xs">
+                            <span className="line-through">{p.price}</span> después del primer mes
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div>
                 <Label htmlFor="business-name" className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
                   <Store size={12} /> Nombre de tu barbería
