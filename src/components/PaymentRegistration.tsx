@@ -632,8 +632,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 : rounding === 'cliente' ? Math.floor(rawCalc) : Math.ceil(rawCalc);
               
               const paymentRestriction = discount.paymentMethod !== 'todos' && discount.id !== 'none';
-              const paymentLabel = discount.paymentMethod === 'efectivo' ? 'Efectivo' : 
-                                   discount.paymentMethod === 'mercado_pago' ? 'MP' : '';
+              const paymentLabel = paymentRestriction ? getMethodLabel(discount.paymentMethod as PaymentMethod) : '';
               
               return (
                 <button
@@ -677,39 +676,56 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Payment Step */}
         {currentStep === 'payment' && (
           <div className="space-y-6">
-            {!splitMode ? (
+            {methodsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : activeMethods.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
+                <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  No hay métodos de pago activos. Activá al menos uno en Mi Negocio.
+                </p>
+              </div>
+            ) : !splitMode ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={() => handleSelectPayment('efectivo')}
-                    className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
-                      paymentMethod === 'efectivo'
-                        ? 'border-success bg-success/5'
-                        : 'border-border bg-card hover:bg-muted/50'
-                    }`}
-                  >
-                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
-                    <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-center text-foreground">Efectivo</p>
-                  </button>
-                  <button
-                    onClick={() => handleSelectPayment('mercado_pago')}
-                    className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
-                      paymentMethod === 'mercado_pago'
-                        ? 'border-secondary bg-secondary/5'
-                        : 'border-border bg-card hover:bg-muted/50'
-                    }`}
-                  >
-                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
-                    <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-center text-foreground">Mercado Pago</p>
-                  </button>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {activeMethods.map((m, idx) => {
+                    const isEfectivo = m.method === 'efectivo';
+                    const isSelected = paymentMethod === m.method;
+                    const Icon = isEfectivo ? Banknote : CreditCard;
+                    const selectedClass = isEfectivo
+                      ? 'border-success bg-success/5'
+                      : 'border-secondary bg-secondary/5';
+                    const hoverClass = isEfectivo ? 'hover:border-success' : 'hover:border-secondary';
+                    const iconColor = isSelected
+                      ? (isEfectivo ? 'text-success' : 'text-secondary')
+                      : 'text-muted-foreground';
+                    return (
+                      <button
+                        key={m.method}
+                        onClick={() => handleSelectPayment(m.method)}
+                        className={`relative p-6 rounded-lg border transition-colors ${hoverClass} ${
+                          isSelected ? selectedClass : 'border-border bg-card hover:bg-muted/50'
+                        }`}
+                      >
+                        <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">{idx + 1}</span>
+                        <Icon className={`h-9 w-9 mx-auto mb-2 ${iconColor}`} />
+                        <p className="font-medium text-center text-foreground">{m.label}</p>
+                        {m.recargoPct > 0 && (
+                          <p className="text-[11px] text-center text-muted-foreground mt-1">+{m.recargoPct}%</p>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button
                   type="button"
                   onClick={enableSplitMode}
-                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  disabled={!isEfectivoActive || electronicMethods.length === 0}
+                  title={!isEfectivoActive || electronicMethods.length === 0 ? 'Activá efectivo y al menos un método electrónico en Mi Negocio' : undefined}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                 >
                   <Split className="h-4 w-4" />
                   Combinar métodos de pago
@@ -727,10 +743,34 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </Button>
                 </div>
 
+                {electronicMethods.length > 1 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Método electrónico</label>
+                    <div className="flex flex-wrap gap-2">
+                      {electronicMethods.map(m => (
+                        <button
+                          key={m.method}
+                          type="button"
+                          onClick={() => setSelectedDigitalMethod(m.method)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            selectedDigitalMethod === m.method
+                              ? 'border-secondary bg-secondary/10 text-foreground'
+                              : 'border-border text-muted-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          {getMethodLabel(m.method)}
+                          {m.recargoPct > 0 && <span className="ml-1 opacity-70">+{m.recargoPct}%</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Banknote className="h-4 w-4 text-success" /> Efectivo
+                      {pctEfectivo > 0 && <span className="text-[11px] text-muted-foreground">+{pctEfectivo}%</span>}
                     </label>
                     <CurrencyInput
                       value={efectivoAmount}
@@ -738,10 +778,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       placeholder="0"
                       className="h-12 text-lg"
                     />
+                    {pctEfectivo > 0 && splitEfectivoNum > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        → ${(splitEfectivoNum + Math.round(splitEfectivoNum * pctEfectivo / 100)).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-secondary" /> Mercado Pago
+                      <CreditCard className="h-4 w-4 text-secondary" />
+                      {selectedDigitalMethod ? getMethodLabel(selectedDigitalMethod) : 'Electrónico'}
+                      {pctDigital > 0 && <span className="text-[11px] text-muted-foreground">+{pctDigital}%</span>}
                     </label>
                     <CurrencyInput
                       value={mpAmount}
@@ -749,6 +796,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       placeholder="0"
                       className="h-12 text-lg"
                     />
+                    {pctDigital > 0 && splitMpNum > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        → ${(splitMpNum + Math.round(splitMpNum * pctDigital / 100)).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
 
