@@ -373,24 +373,44 @@ export function useTransactions() {
   const getDailySummary = useCallback(() => {
     // Solo contar transacciones activas para el resumen
     const activeTx = transactions.filter(t => t.estado !== 'anulado');
+    // BASE legacy (sin recargos) — alimenta lógica de comisiones/sueldos
     let totalEfectivo = 0;
     let totalMercadoPago = 0;
+    // Real cobrado (con recargos) — para arqueo
+    let totalEfectivoCobrado = 0;
+    let totalDigitalCobrado = 0;
+    let totalRecargos = 0;
+
     activeTx.forEach(t => {
       const payments = t.payments && t.payments.length > 0
         ? t.payments
-        : [{ method: t.paymentMethod, amount: t.total }];
+        : [{ method: t.paymentMethod, amount: t.total, basePago: t.total, recargoMonto: 0, recargoPct: 0 }];
       payments.forEach(p => {
-        if (p.method === 'efectivo') totalEfectivo += p.amount;
-        else if (p.method === 'mercado_pago') totalMercadoPago += p.amount;
+        const basePago = p.basePago != null ? p.basePago : p.amount;
+        const recargoMonto = p.recargoMonto ?? 0;
+        const cobrado = basePago + recargoMonto;
+        totalRecargos += recargoMonto;
+        if (p.method === 'efectivo') {
+          totalEfectivo += basePago;
+          totalEfectivoCobrado += cobrado;
+        } else {
+          // mercado_pago / transferencia / debito / credito → digital
+          totalMercadoPago += basePago;
+          totalDigitalCobrado += cobrado;
+        }
       });
     });
 
     return {
       count: activeTx.length,
-      totalEfectivo,
-      totalMercadoPago,
-      total: totalEfectivo + totalMercadoPago,
-      transactions: transactions, // Devolver todas para mostrar anuladas
+      totalEfectivo,                  // BASE — sin cambios de significado
+      totalMercadoPago,               // BASE — sin cambios de significado
+      total: totalEfectivo + totalMercadoPago, // BASE total — alimenta comisiones
+      totalEfectivoCobrado,           // NUEVO snapshot
+      totalDigitalCobrado,            // NUEVO snapshot
+      totalRecargos,                  // NUEVO snapshot
+      totalCobrado: totalEfectivoCobrado + totalDigitalCobrado, // NUEVO
+      transactions: transactions,
     };
   }, [transactions]);
 
