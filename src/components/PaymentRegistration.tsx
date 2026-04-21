@@ -319,15 +319,31 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setIsSubmitting(true);
 
     try {
-      const payments = splitMode
-        ? [
-            { method: 'efectivo' as PaymentMethod, amount: splitEfectivoNum },
-            { method: 'mercado_pago' as PaymentMethod, amount: splitMpNum },
-          ]
-        : [{ method: paymentMethod, amount: total }];
-      const primaryMethod = splitMode
-        ? (splitEfectivoNum >= splitMpNum ? 'efectivo' : 'mercado_pago')
-        : paymentMethod;
+      let payments: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
+      let primaryMethod: PaymentMethod;
+
+      if (splitMode) {
+        if (!selectedDigitalMethod) {
+          toast({
+            title: 'Falta método electrónico',
+            description: 'Seleccioná el método electrónico para el split.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        const recE = Math.round((splitEfectivoNum * pctEfectivo) / 100);
+        const recD = Math.round((splitMpNum * pctDigital) / 100);
+        payments = [
+          { method: 'efectivo', basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
+          { method: selectedDigitalMethod, basePago: splitMpNum, recargoPct: pctDigital, recargoMonto: recD, amount: splitMpNum + recD },
+        ];
+        primaryMethod = splitEfectivoNum >= splitMpNum ? 'efectivo' : selectedDigitalMethod;
+      } else {
+        const recargoMonto = Math.round((total * pctSimple) / 100);
+        payments = [{ method: paymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
+        primaryMethod = paymentMethod;
+      }
 
       const result = await onSubmit({
         barberId: barber!.id,
@@ -347,7 +363,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       if (result) {
         toast({
           title: "✅ Cobro guardado correctamente",
-          description: `$${total.toLocaleString()} - ${service!.name}`,
+          description: recargoTotal > 0
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${service!.name}`
+            : `$${total.toLocaleString()} - ${service!.name}`,
         });
         resetForm();
       } else {
@@ -366,7 +384,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -383,9 +401,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           handleToggleExtra(extras[index].id);
         } else if (currentStep === 'discount' && discounts[index]) {
           handleSelectDiscount(discounts[index].id);
-        } else if (currentStep === 'payment') {
-          if (index === 0) handleSelectPayment('efectivo');
-          if (index === 1) handleSelectPayment('mercado_pago');
+        } else if (currentStep === 'payment' && activeMethods[index]) {
+          handleSelectPayment(activeMethods[index].method);
         }
       }
 
@@ -417,7 +434,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
