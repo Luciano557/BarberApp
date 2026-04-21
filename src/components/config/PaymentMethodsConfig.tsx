@@ -202,7 +202,7 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
               {onGoToGeneral && (
                 <Button onClick={onGoToGeneral} className="gap-2">
                   <Settings className="h-4 w-4" />
-                  Ir a configuración general
+                  Editar configuración general
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               )}
