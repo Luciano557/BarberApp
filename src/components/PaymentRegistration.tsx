@@ -56,8 +56,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [splitMode, setSplitMode] = useState(false);
   const [efectivoAmount, setEfectivoAmount] = useState<string>('');
   const [mpAmount, setMpAmount] = useState<string>('');
+  const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
+  const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
+  const electronicMethods = useMemo(
+    () => activeMethods.filter(m => m.method !== 'efectivo'),
+    [activeMethods],
+  );
+  const isEfectivoActive = useMemo(
+    () => activeMethods.some(m => m.method === 'efectivo'),
+    [activeMethods],
+  );
 
   const pendingTasks = useMemo(() => 
     tareas.filter(t => t.estado === 'pendiente' && t.tipo === 'tarea'),
@@ -214,6 +226,64 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     && Math.abs(splitSum - total) < 0.01
     && splitEfectivoNum <= total
     && splitMpNum <= total;
+
+  // Recargos
+  const pctSimple = paymentMethod ? getRecargoPct(paymentMethod) : 0;
+  const pctEfectivo = getRecargoPct('efectivo');
+  const pctDigital = selectedDigitalMethod ? getRecargoPct(selectedDigitalMethod) : 0;
+
+  const recargoTotal = useMemo(() => {
+    if (splitMode) {
+      return Math.round((splitEfectivoNum * pctEfectivo) / 100)
+        + Math.round((splitMpNum * pctDigital) / 100);
+    }
+    if (!paymentMethod) return 0;
+    return Math.round((total * pctSimple) / 100);
+  }, [splitMode, splitEfectivoNum, splitMpNum, pctEfectivo, pctDigital, total, pctSimple, paymentMethod]);
+
+  const totalACobrar = total + recargoTotal;
+
+  const recargoLabel = useMemo(() => {
+    if (recargoTotal <= 0) return '';
+    if (splitMode) {
+      const partsActive = [pctEfectivo > 0, pctDigital > 0].filter(Boolean).length;
+      if (partsActive > 1) return 'Recargo (mixto)';
+      if (pctEfectivo > 0) return `Recargo (Efectivo ${pctEfectivo}%)`;
+      if (pctDigital > 0 && selectedDigitalMethod) return `Recargo (${getMethodLabel(selectedDigitalMethod)} ${pctDigital}%)`;
+      return 'Recargo';
+    }
+    if (paymentMethod) return `Recargo (${getMethodLabel(paymentMethod)} ${pctSimple}%)`;
+    return 'Recargo';
+  }, [recargoTotal, splitMode, pctEfectivo, pctDigital, selectedDigitalMethod, paymentMethod, pctSimple]);
+
+  // Inicializar / sincronizar selectedDigitalMethod con la lista activa
+  useEffect(() => {
+    if (electronicMethods.length === 0) {
+      if (selectedDigitalMethod !== '') setSelectedDigitalMethod('');
+      return;
+    }
+    const stillActive = selectedDigitalMethod
+      && electronicMethods.some(m => m.method === selectedDigitalMethod);
+    if (!stillActive) {
+      const mp = electronicMethods.find(m => m.method === 'mercado_pago');
+      setSelectedDigitalMethod(mp ? mp.method : electronicMethods[0].method);
+    }
+  }, [electronicMethods, selectedDigitalMethod]);
+
+  // Self-healing: si el método elegido se desactivó en otra pestaña
+  useEffect(() => {
+    if (methodsLoading) return;
+    const activeSet = new Set(activeMethods.map(m => m.method));
+    if (!splitMode && paymentMethod && !activeSet.has(paymentMethod)) {
+      setPaymentMethod('');
+    }
+    if (splitMode && !activeSet.has('efectivo')) {
+      setSplitMode(false);
+      setEfectivoAmount('');
+      setMpAmount('');
+      setPaymentMethod('');
+    }
+  }, [methodsLoading, activeMethods, paymentMethod, splitMode]);
 
   const resetForm = useCallback(() => {
     setSelectedBarber('');
