@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Transaction, Barber, Service, Line } from '@/types/barbershop';
+import { Transaction, Barber, Service, Line, PaymentMethod, isDigitalMethod } from '@/types/barbershop';
 import { format, addDays, subDays, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useMemo, useState, useCallback } from 'react';
@@ -85,20 +85,26 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   // Get transactions for selected barber (only active transactions)
   // Mixed payments: a tx can appear in both lists if it has parts in both methods
   const barberTransactions = useMemo(() => {
-    if (!closingBarber) return { efectivo: [], mercadoPago: [] };
+    if (!closingBarber) return { efectivo: [] as Transaction[], digital: [] as Transaction[] };
     
     const activeTransactions = summary.transactions.filter(
       tx => tx.estado !== 'anulado' && tx.barberId === closingBarber.barberId
     );
-    const hasMethod = (tx: Transaction, method: 'efectivo' | 'mercado_pago') => {
+    const hasEfectivo = (tx: Transaction) => {
       const payments = tx.payments && tx.payments.length > 0
         ? tx.payments
         : [{ method: tx.paymentMethod, amount: tx.total }];
-      return payments.some(p => p.method === method && p.amount > 0);
+      return payments.some(p => p.method === 'efectivo' && p.amount > 0);
+    };
+    const hasDigital = (tx: Transaction) => {
+      const payments = tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+      return payments.some(p => isDigitalMethod(p.method) && p.amount > 0);
     };
     return {
-      efectivo: activeTransactions.filter(tx => hasMethod(tx, 'efectivo')),
-      mercadoPago: activeTransactions.filter(tx => hasMethod(tx, 'mercado_pago')),
+      efectivo: activeTransactions.filter(hasEfectivo),
+      digital: activeTransactions.filter(hasDigital),
     };
   }, [closingBarber, summary.transactions]);
 
@@ -191,7 +197,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       existing.total += tx.total;
       txPayments(tx).forEach(p => {
         if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
-        else if (p.method === 'mercado_pago') existing!.totalMercadoPago += p.amount;
+        else if (isDigitalMethod(p.method)) existing!.totalMercadoPago += p.amount;
       });
     });
 
@@ -432,7 +438,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Mercado Pago</p>
+                <p className="text-sm text-muted-foreground">Digital</p>
                 <p className="text-2xl font-bold text-secondary">${summary.totalMercadoPago.toLocaleString()}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
@@ -506,7 +512,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm text-muted-foreground flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-secondary" />
-                      Mercado Pago
+                      Digital
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
@@ -617,7 +623,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     : [{ method: tx.paymentMethod, amount: tx.total }];
                   const isMixed = txPayments.length > 1 && txPayments.every(p => p.amount > 0);
                   const efectivoAmt = txPayments.filter(p => p.method === 'efectivo').reduce((s, p) => s + p.amount, 0);
-                  const mpAmt = txPayments.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+                  const mpAmt = txPayments.filter(p => isDigitalMethod(p.method)).reduce((s, p) => s + p.amount, 0);
 
                   return (
                     <div
@@ -673,7 +679,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
                           {isMixed && !isVoided && (
                             <span className="ml-2">
-                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">MP ${mpAmt.toLocaleString()}</span>
+                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">Dig. ${mpAmt.toLocaleString()}</span>
                             </span>
                           )}
                           {isVoided && tx.anuladoPor && (
@@ -757,9 +763,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                 <p className="text-xs text-muted-foreground mt-1">{barberTransactions.efectivo.length} servicios</p>
               </div>
               <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
-                <p className="text-sm text-muted-foreground">Mercado Pago</p>
+                <p className="text-sm text-muted-foreground">Digital</p>
                 <p className="text-xl font-bold text-secondary">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-1">{barberTransactions.mercadoPago.length} servicios</p>
+                <p className="text-xs text-muted-foreground mt-1">{barberTransactions.digital.length} servicios</p>
               </div>
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                 <p className="text-sm text-muted-foreground">Comisión ({closingBarber?.commissionPct}%)</p>
@@ -803,19 +809,19 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               </div>
             )}
 
-            {/* Mercado Pago Transactions */}
-            {barberTransactions.mercadoPago.length > 0 && (
+            {/* Digital Transactions */}
+            {barberTransactions.digital.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-secondary" />
-                  Mercado Pago ({barberTransactions.mercadoPago.length})
+                  Digital ({barberTransactions.digital.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
-                  {barberTransactions.mercadoPago.map((tx) => {
+                  {barberTransactions.digital.map((tx) => {
                     const pagos = tx.payments && tx.payments.length > 0
                       ? tx.payments
                       : [{ method: tx.paymentMethod, amount: tx.total }];
-                    const amt = pagos.filter(p => p.method === 'mercado_pago').reduce((s, p) => s + p.amount, 0);
+                    const amt = pagos.filter(p => isDigitalMethod(p.method)).reduce((s, p) => s + p.amount, 0);
                     const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
                     return (
                       <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
