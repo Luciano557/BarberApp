@@ -438,7 +438,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Mercado Pago</p>
+                <p className="text-sm text-muted-foreground">Digital</p>
                 <p className="text-2xl font-bold text-secondary">${summary.totalMercadoPago.toLocaleString()}</p>
               </div>
               <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
