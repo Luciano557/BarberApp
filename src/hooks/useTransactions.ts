@@ -177,13 +177,44 @@ export function useTransactions() {
     const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
     const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
 
-    // Determine payments array (always at least 1)
-    const payments = transaction.payments && transaction.payments.length > 0
+    // BASE = transaction.total. Cada pago trae basePago + recargo (o sólo amount = base si legacy).
+    // Normalizar: garantizar basePago, recargoMonto, recargoPct y amount = basePago + recargoMonto.
+    const rawPayments = transaction.payments && transaction.payments.length > 0
       ? transaction.payments
-      : [{ method: transaction.paymentMethod, amount: transaction.total }];
+      : [{ method: transaction.paymentMethod, amount: transaction.total, basePago: transaction.total, recargoPct: 0, recargoMonto: 0 }];
 
-    // Legacy field: use the method with the largest amount as primary
-    const primaryMethod = [...payments].sort((a, b) => b.amount - a.amount)[0].method;
+    const normalizedPayments = rawPayments.map((p) => {
+      const recargoPct = Number(p.recargoPct ?? 0) || 0;
+      let basePago = p.basePago;
+      let recargoMonto = p.recargoMonto;
+      if (basePago == null) {
+        // Pago legacy: amount es base, sin recargo
+        basePago = Number(p.amount) || 0;
+        recargoMonto = recargoMonto ?? 0;
+      }
+      if (recargoMonto == null) {
+        recargoMonto = Math.round((basePago * recargoPct) / 100);
+      }
+      const amount = basePago + recargoMonto;
+      return {
+        method: p.method,
+        amount,
+        basePago,
+        recargoMonto,
+        recargoPct,
+      };
+    });
+
+    const sumBase = normalizedPayments.reduce((s, p) => s + p.basePago, 0);
+    const sumRecargo = normalizedPayments.reduce((s, p) => s + p.recargoMonto, 0);
+    const sumCobrado = sumBase + sumRecargo;
+
+    const baseTotal = sumBase || transaction.total;
+    const recargoTotal = sumRecargo;
+    const totalCobrado = sumCobrado || baseTotal;
+
+    // Legacy field: usar el método con mayor monto cobrado como primary
+    const primaryMethod = [...normalizedPayments].sort((a, b) => b.amount - a.amount)[0].method;
 
     // Insertar venta principal
     const ventaData: VentaInsert = {
@@ -194,14 +225,16 @@ export function useTransactions() {
       precio_servicio: transaction.servicePrice,
       descuento_pct: transaction.discount,
       metodo_pago: primaryMethod,
-      total_final: transaction.total,
+      total_final: baseTotal,           // BASE comisionable (intacto)
+      recargo_total: recargoTotal,      // NUEVO
+      total_cobrado: totalCobrado,      // NUEVO
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
     };
 
     const { data: venta, error: ventaError } = await supabase
       .from('venta')
-      .insert(ventaData)
+      .insert(ventaData as any)
       .select()
       .single();
 
@@ -210,19 +243,22 @@ export function useTransactions() {
       return null;
     }
 
-    // Insertar pagos (siempre, incluso para método único)
-    const pagosData = payments.map((p, idx) => ({
+    // Insertar pagos con desglose recargo / base
+    const pagosData = normalizedPayments.map((p, idx) => ({
       venta_id: venta.id,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       metodo_pago: p.method,
-      monto: p.amount,
+      monto: p.amount,                  // base + recargo (lo que entra a caja)
+      base_pago: p.basePago,
+      recargo_pct: p.recargoPct,
+      recargo_monto: p.recargoMonto,
       orden: idx + 1,
     }));
 
     const { error: pagosError } = await supabase
       .from('venta_pagos')
-      .insert(pagosData);
+      .insert(pagosData as any);
 
     if (pagosError) {
       console.error('Error inserting venta_pagos:', pagosError);
@@ -250,8 +286,11 @@ export function useTransactions() {
     // Agregar al estado local
     const newTransaction: Transaction = {
       ...transaction,
-      payments,
+      payments: normalizedPayments,
       paymentMethod: primaryMethod,
+      total: baseTotal,
+      recargoTotal,
+      totalCobrado,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
