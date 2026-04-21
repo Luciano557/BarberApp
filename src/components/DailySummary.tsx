@@ -85,20 +85,26 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   // Get transactions for selected barber (only active transactions)
   // Mixed payments: a tx can appear in both lists if it has parts in both methods
   const barberTransactions = useMemo(() => {
-    if (!closingBarber) return { efectivo: [], mercadoPago: [] };
+    if (!closingBarber) return { efectivo: [] as Transaction[], digital: [] as Transaction[] };
     
     const activeTransactions = summary.transactions.filter(
       tx => tx.estado !== 'anulado' && tx.barberId === closingBarber.barberId
     );
-    const hasMethod = (tx: Transaction, method: 'efectivo' | 'mercado_pago') => {
+    const hasEfectivo = (tx: Transaction) => {
       const payments = tx.payments && tx.payments.length > 0
         ? tx.payments
         : [{ method: tx.paymentMethod, amount: tx.total }];
-      return payments.some(p => p.method === method && p.amount > 0);
+      return payments.some(p => p.method === 'efectivo' && p.amount > 0);
+    };
+    const hasDigital = (tx: Transaction) => {
+      const payments = tx.payments && tx.payments.length > 0
+        ? tx.payments
+        : [{ method: tx.paymentMethod, amount: tx.total }];
+      return payments.some(p => isDigitalMethod(p.method) && p.amount > 0);
     };
     return {
-      efectivo: activeTransactions.filter(tx => hasMethod(tx, 'efectivo')),
-      mercadoPago: activeTransactions.filter(tx => hasMethod(tx, 'mercado_pago')),
+      efectivo: activeTransactions.filter(hasEfectivo),
+      digital: activeTransactions.filter(hasDigital),
     };
   }, [closingBarber, summary.transactions]);
 
