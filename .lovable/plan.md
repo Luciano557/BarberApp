@@ -1,68 +1,63 @@
 
 
-## Plan: Separar configuración general de métodos de pago en su propia sección
+## Diagnóstico
 
-### Diagnóstico
+**Dónde falla exactamente:** la inserción en la tabla `venta` falla cuando el método primario es `transferencia`, `debito` o `credito`. La inserción en `venta_pagos` ya funciona (su CHECK acepta los 5).
 
-Hoy la configuración general de métodos de pago vive **embebida dentro de `OrganizationSettings`** (panel "Plan y Suscripción"). El botón "Ir a configuración general" desde una sucursal manda al **menú raíz de Configuración**, no a un lugar concreto. Resultado: navegación ambigua y UX confusa.
+**Causa raíz (DB, CHECK constraint):**
+- Tabla `venta` tiene un CHECK constraint viejo:
+  ```
+  venta_metodo_pago_check
+  CHECK (metodo_pago = ANY (ARRAY['efectivo','mercado_pago']))
+  ```
+- Tabla `venta_pagos` ya tiene el CHECK correcto con los 5 métodos (`venta_pagos_metodo_pago_valido`).
+- Tabla `payment_methods_config` también ya está actualizada con los 5 (`pmc_metodo_pago_valido`).
+- **No hay enum** de Postgres involucrado: `metodo_pago` es `text` con CHECK. El "enum" en `types.ts` de Supabase es solo el tipado generado del cliente, derivado del CHECK; se regenera automáticamente al cambiar el CHECK en DB.
 
-### Archivos a tocar
+**No es problema de:** enum Postgres, RLS, código frontend (`useTransactions` ya manda el método correcto), ni de `venta_pagos`.
 
-1. **`src/components/config/ConfigMenu.tsx`** — agregar nueva entrada "Métodos de pago y recargos".
-2. **`src/components/ConfigurationPanel.tsx`** — agregar sección `'payments'` que renderiza `PaymentMethodsConfig` con `sucursalId={null}`. Aceptar prop opcional `initialSection` para deep-link.
-3. **`src/components/OrganizationSettings.tsx`** — **quitar** `<PaymentMethodsConfig sucursalId={null} />` (deja de vivir acá). Plan y Suscripción queda solo con datos del negocio + plan.
-4. **`src/pages/Index.tsx`** — exponer estado `configInitialSection`. El callback `onGoToGeneralConfig` que se pasa a Mi Negocio ahora hace `setConfigInitialSection('payments'); setActiveTab('config')`. `ConfigurationPanel` recibe `initialSection`.
-5. **`src/components/config/PaymentMethodsConfig.tsx`** — pequeños retoques de copy en estado heredado:
-   - Botón primario pasa a llamarse **"Editar configuración general"** (el usuario lo pidió textual).
-   - Sin cambios de lógica.
+## Cambio puntual
 
-### Cómo queda la navegación
+**Una sola migración de schema** que reemplaza el CHECK obsoleto en `venta`:
 
-- **Configuración → Métodos de pago y recargos** — nueva entrada del menú principal de Configuración. Subtítulo: "Configuración general del negocio". Renderiza `<PaymentMethodsConfig sucursalId={null} />`.
-- **Mi Negocio → sucursal X**, botón "Editar configuración general" → abre directo `Configuración → Métodos de pago y recargos` (no el menú raíz).
-- **Configuración → Plan y Suscripción** — vuelve a contener solo los datos del negocio y del plan. Limpio.
+```sql
+ALTER TABLE public.venta
+  DROP CONSTRAINT venta_metodo_pago_check;
 
-### Ficha de sucursal — estado HEREDA general
-
-Sin cambios estructurales (ya está bien implementado). Solo:
-- Texto: "Esta sucursal usa la configuración general del negocio. Los métodos activos y los recargos se administran en un solo lugar."
-- Botón primario: **"Editar configuración general"** (icon `Settings` + flecha).
-- Botón secundario: **"Personalizar esta sucursal"** (outline). Al click → toggle off + aparece la grilla.
-- Sin grilla gris.
-
-### Ficha de sucursal — estado OVERRIDE propio
-
-Sin cambios. Banner sutil arriba: "Esta sucursal tiene configuración propia. Los cambios acá no afectan a las demás." + acción inline "Volver a usar la configuración general". Debajo, la grilla editable de los 5 métodos.
-
-### Navegación directa: cómo se resuelve
-
-`Index.tsx` mantiene un estado adicional:
-```text
-configInitialSection: 'menu' | 'payments' | …
+ALTER TABLE public.venta
+  ADD CONSTRAINT venta_metodo_pago_valido
+  CHECK (metodo_pago = ANY (ARRAY[
+    'efectivo','mercado_pago','transferencia','debito','credito'
+  ]));
 ```
 
-Al pulsar "Editar configuración general" desde una sucursal:
-1. `setConfigInitialSection('payments')`
-2. `setActiveTab('config')`
+- Mismo nombre de constraint nuevo (`venta_metodo_pago_valido`) que el de `venta_pagos` y `payment_methods_config` para mantener consistencia.
+- Acepta los 5 métodos válidos del sistema.
+- No toca columnas, datos, índices, triggers, ni RLS.
+- Las ventas históricas con `efectivo` o `mercado_pago` siguen siendo válidas (están dentro del nuevo conjunto).
 
-`ConfigurationPanel` lee `initialSection` como prop y arranca en esa sección directa, no en el menú. Si el usuario abre Configuración por el sidebar, `initialSection` es `undefined` y arranca en `menu` como hoy.
+## Lo que NO se toca
 
-### Lo que NO se toca
+- `useTransactions`, `useCashClosing`, `SueldosPanel`, comisiones, recargos, historial.
+- `venta.total_final` (BASE), `recargo_total`, `total_cobrado`.
+- `venta_pagos`, `payment_methods_config` (ya están bien).
+- Frontend: ni una línea. El bug es 100% en DB.
+- Tipos de Supabase: el archivo `src/integrations/supabase/types.ts` se regenera automáticamente tras la migración, sin intervención manual.
 
-- DB, RLS, hooks (`usePaymentMethodsConfig`, `useTransactions`, `useCashClosing`).
-- `SueldosPanel`, cierres, historial, comisiones.
-- `venta.total_final` sigue siendo BASE; `recargo_total` y `total_cobrado` intactos.
-- `PaymentRegistration` (ya migrado en pasos previos).
-- Modelo de 5 métodos. Métodos desactivados siguen apareciendo en historial/cierres.
-- Etiqueta "QR" (ya está aplicada).
+## Verificación post-cambio
 
-### Verificación
+1. **DB:** correr
+   ```sql
+   SELECT conname, pg_get_constraintdef(oid)
+   FROM pg_constraint
+   WHERE conrelid = 'public.venta'::regclass
+     AND conname LIKE '%metodo_pago%';
+   ```
+   debe devolver `venta_metodo_pago_valido` con los 5 métodos.
 
-1. **Sidebar → Configuración**: aparece nueva tarjeta "Métodos de pago y recargos" entre Plan y PIN.
-2. **Configuración → Métodos de pago y recargos**: muestra `PaymentMethodsConfig` con la grilla general editable (5 métodos, recargos, switches).
-3. **Configuración → Plan y Suscripción**: ya NO muestra métodos de pago. Solo datos del negocio + plan.
-4. **Mi Negocio → sucursal heredando**: bloque sin grilla, con botón "Editar configuración general" + "Personalizar esta sucursal".
-5. **Click en "Editar configuración general"**: aterriza directo en `Configuración → Métodos de pago y recargos`. No se ve el menú intermedio.
-6. **Mi Negocio → sucursal con override**: banner + grilla editable de la sucursal.
-7. **Etiquetas**: en toda la UI sigue diciendo "QR", nunca "Mercado Pago" / "MP".
+2. **App — flujo manual:** activar transferencia/débito/crédito en *Configuración → Métodos de pago y recargos*, ir a *Cobrar*, registrar una venta con cada uno de los 3 métodos antes rotos. Cada cobro debe persistir sin error y aparecer en *Resumen del día*.
+
+3. **App — split:** registrar venta mixta efectivo + débito (o + transferencia / crédito). Debe guardar correctamente en `venta` y `venta_pagos`.
+
+4. **Historial intacto:** ventas viejas con `mercado_pago` siguen visibles y editables como hasta ahora.
 
