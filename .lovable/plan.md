@@ -1,63 +1,56 @@
 
 
-## Diagnóstico
+## Plan: agrupar todo lo no-efectivo como "Digital" en Caja
 
-**Dónde falla exactamente:** la inserción en la tabla `venta` falla cuando el método primario es `transferencia`, `debito` o `credito`. La inserción en `venta_pagos` ya funciona (su CHECK acepta los 5).
+### Diagnóstico — dónde está el bug
 
-**Causa raíz (DB, CHECK constraint):**
-- Tabla `venta` tiene un CHECK constraint viejo:
-  ```
-  venta_metodo_pago_check
-  CHECK (metodo_pago = ANY (ARRAY['efectivo','mercado_pago']))
-  ```
-- Tabla `venta_pagos` ya tiene el CHECK correcto con los 5 métodos (`venta_pagos_metodo_pago_valido`).
-- Tabla `payment_methods_config` también ya está actualizada con los 5 (`pmc_metodo_pago_valido`).
-- **No hay enum** de Postgres involucrado: `metodo_pago` es `text` con CHECK. El "enum" en `types.ts` de Supabase es solo el tipado generado del cliente, derivado del CHECK; se regenera automáticamente al cambiar el CHECK en DB.
+`useTransactions.ts` ya agrega correctamente: la variable `totalMercadoPago` que devuelve el summary suma `mercado_pago + transferencia + debito + credito` (line 397-398). El bug es 100% de presentación dentro de `DailySummary.tsx`, que:
 
-**No es problema de:** enum Postgres, RLS, código frontend (`useTransactions` ya manda el método correcto), ni de `venta_pagos`.
+1. **Filtra por método exacto `'mercado_pago'`** en la agregación por barbero (`barberSummaries`, lines 192-195) → cobros con débito/crédito/transferencia no entran al total digital del barbero (queda en $0).
+2. **Filtra por método exacto `'mercado_pago'`** para construir `barberTransactions.mercadoPago` (lines 93-102) → en el modal "Cerrar Caja" esos cobros no aparecen en ninguna lista.
+3. **Suma solo `'mercado_pago'`** en `mpAmt` para el desglose por fila (line 620) y en la sección de transacciones del modal de cierre (lines 782, 818).
+4. **Muestra el label "Mercado Pago"** en 3 lugares: card general (435), card por barbero (509), card del modal de cierre (760), título de la sección de transacciones (811).
+5. **Detecta "mixto" comparando solo a `efectivo`/`mercado_pago`** → un cobro split efectivo + débito no se reconoce como mixto.
 
-## Cambio puntual
+### Cambios a aplicar — solo `src/components/DailySummary.tsx`
 
-**Una sola migración de schema** que reemplaza el CHECK obsoleto en `venta`:
+**Helpers:** definir un único criterio:
 
-```sql
-ALTER TABLE public.venta
-  DROP CONSTRAINT venta_metodo_pago_check;
-
-ALTER TABLE public.venta
-  ADD CONSTRAINT venta_metodo_pago_valido
-  CHECK (metodo_pago = ANY (ARRAY[
-    'efectivo','mercado_pago','transferencia','debito','credito'
-  ]));
+```ts
+const isDigital = (m: PaymentMethod) => m !== 'efectivo';
 ```
 
-- Mismo nombre de constraint nuevo (`venta_metodo_pago_valido`) que el de `venta_pagos` y `payment_methods_config` para mantener consistencia.
-- Acepta los 5 métodos válidos del sistema.
-- No toca columnas, datos, índices, triggers, ni RLS.
-- Las ventas históricas con `efectivo` o `mercado_pago` siguen siendo válidas (están dentro del nuevo conjunto).
+(usando el helper `isDigitalMethod` ya existente en `src/types/barbershop.ts`).
 
-## Lo que NO se toca
+**Agregaciones a corregir:**
 
-- `useTransactions`, `useCashClosing`, `SueldosPanel`, comisiones, recargos, historial.
-- `venta.total_final` (BASE), `recargo_total`, `total_cobrado`.
-- `venta_pagos`, `payment_methods_config` (ya están bien).
-- Frontend: ni una línea. El bug es 100% en DB.
-- Tipos de Supabase: el archivo `src/integrations/supabase/types.ts` se regenera automáticamente tras la migración, sin intervención manual.
+- `barberTransactions` (lines 87-103): renombrar `mercadoPago` → `digital`; filtrar con `isDigital(p.method)`.
+- `barberSummaries` (lines 192-195): sumar `else existing.totalMercadoPago += p.amount` para cualquier método que cumpla `isDigital`. (Mantengo el nombre del campo `totalMercadoPago` en la interfaz interna `BarberSummary` para no propagar el rename a `useCashClosing` y otros lugares; solo cambia el label visible).
+- En la lista de transacciones (lines 619-620): `digitalAmt = txPayments.filter(p => isDigital(p.method)).reduce(...)`.
+- Sección "Mercado Pago Transactions" del modal de cierre (lines 806-840): renombrar lista a `digital`, sumar todos los digitales.
 
-## Verificación post-cambio
+**Labels visibles a actualizar a "Digital":**
 
-1. **DB:** correr
-   ```sql
-   SELECT conname, pg_get_constraintdef(oid)
-   FROM pg_constraint
-   WHERE conrelid = 'public.venta'::regclass
-     AND conname LIKE '%metodo_pago%';
-   ```
-   debe devolver `venta_metodo_pago_valido` con los 5 métodos.
+- Line 435 — card general superior.
+- Line 509 — card por barbero.
+- Line 676 — desglose mixto inline (`Dig. $X` en lugar de `MP $X`).
+- Line 760 — card del modal "Cerrar Caja".
+- Line 811 — header de la sección de transacciones digitales del modal.
 
-2. **App — flujo manual:** activar transferencia/débito/crédito en *Configuración → Métodos de pago y recargos*, ir a *Cobrar*, registrar una venta con cada uno de los 3 métodos antes rotos. Cada cobro debe persistir sin error y aparecer en *Resumen del día*.
+**Iconos:** mantener `CreditCard` (genérico para digital) — ya es apropiado.
 
-3. **App — split:** registrar venta mixta efectivo + débito (o + transferencia / crédito). Debe guardar correctamente en `venta` y `venta_pagos`.
+### Lo que NO se toca
 
-4. **Historial intacto:** ventas viejas con `mercado_pago` siguen visibles y editables como hasta ahora.
+- `useTransactions`, `useCashClosing`, `useBackfillClosing`, `useBarbershopStore` (este último es legacy local, sin uso real de DB).
+- Persistencia: campos `efectivo` y `mp` en `ingresos` siguen guardando lo mismo (BASE efectivo / BASE digital agregado).
+- Comisiones, sueldos, `total_final`, `recargo_total`, `total_cobrado`, historial.
+- Nombre del campo interno `totalMercadoPago` en `BarberSummary` y en el resumen de `useTransactions` (refactor cosmético costoso, sin valor funcional). Solo cambia lo visible y la lógica de filtrado.
+
+### Verificación
+
+1. Cobro con débito → en card general "Digital" suma; en card del barbero "Digital" suma; en el modal "Cerrar Caja" aparece bajo la sección "Digital".
+2. Cobro mixto efectivo + crédito → badge "Mixto" aparece, desglose dice "Ef. $X / Dig. $Y", y aparece en ambas listas del modal.
+3. Cobro QR (`mercado_pago`) → sigue contando en "Digital" como antes.
+4. En toda la pantalla de Caja no aparece más el texto "Mercado Pago" ni "MP".
+5. Sueldos, comisiones y cierres ya guardados siguen idénticos.
 
