@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Transaction } from '@/types/barbershop';
+import { Transaction, PaymentMethod } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -14,8 +14,10 @@ interface VentaInsert {
   servicio_nombre: string;
   precio_servicio: number;
   descuento_pct: number;
-  metodo_pago: 'efectivo' | 'mercado_pago';
+  metodo_pago: PaymentMethod;
   total_final: number;
+  recargo_total: number;
+  total_cobrado: number;
   organization_id: string;
   sucursal_id?: string | null;
 }
@@ -90,12 +92,18 @@ export function useTransactions() {
       extrasMap.set(ve.venta_id, list);
     });
 
-    const pagosMap = new Map<string, { method: 'efectivo' | 'mercado_pago'; amount: number }[]>();
+    const pagosMap = new Map<string, { method: PaymentMethod; amount: number; recargoPct: number; recargoMonto: number; basePago: number }[]>();
     ventaPagos?.forEach((p: any) => {
       const list = pagosMap.get(p.venta_id) || [];
+      const monto = Number(p.monto);
+      const recargoMonto = Number(p.recargo_monto) || 0;
+      const basePago = p.base_pago != null ? Number(p.base_pago) : Math.max(0, monto - recargoMonto);
       list.push({
-        method: p.metodo_pago as 'efectivo' | 'mercado_pago',
-        amount: Number(p.monto),
+        method: p.metodo_pago as PaymentMethod,
+        amount: monto,
+        recargoPct: Number(p.recargo_pct) || 0,
+        recargoMonto,
+        basePago,
       });
       pagosMap.set(p.venta_id, list);
     });
@@ -103,11 +111,17 @@ export function useTransactions() {
     const txs: Transaction[] = ventas.map(v => {
       // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
       const pagos = pagosMap.get(v.id);
+      const baseTotal = Number(v.total_final);
+      const recargoTotal = Number((v as any).recargo_total) || 0;
+      const totalCobrado = (v as any).total_cobrado != null ? Number((v as any).total_cobrado) : baseTotal + recargoTotal;
       const payments = pagos && pagos.length > 0
         ? pagos
         : [{
-            method: v.metodo_pago as 'efectivo' | 'mercado_pago',
-            amount: Number(v.total_final),
+            method: v.metodo_pago as PaymentMethod,
+            amount: baseTotal,
+            recargoPct: 0,
+            recargoMonto: 0,
+            basePago: baseTotal,
           }];
       return {
         id: v.id,
@@ -119,10 +133,12 @@ export function useTransactions() {
         extras: extrasMap.get(v.id) || [],
         discount: Number(v.descuento_pct) || 0,
         discountType: 'percentage' as const,
-        paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
+        paymentMethod: v.metodo_pago as PaymentMethod,
         payments,
         subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
-        total: Number(v.total_final),
+        total: baseTotal,
+        recargoTotal,
+        totalCobrado,
         createdAt: new Date(v.fecha_hora),
         estado: (v as any).estado || 'activo',
         anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
@@ -161,13 +177,44 @@ export function useTransactions() {
     const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
     const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
 
-    // Determine payments array (always at least 1)
-    const payments = transaction.payments && transaction.payments.length > 0
+    // BASE = transaction.total. Cada pago trae basePago + recargo (o sólo amount = base si legacy).
+    // Normalizar: garantizar basePago, recargoMonto, recargoPct y amount = basePago + recargoMonto.
+    const rawPayments = transaction.payments && transaction.payments.length > 0
       ? transaction.payments
-      : [{ method: transaction.paymentMethod, amount: transaction.total }];
+      : [{ method: transaction.paymentMethod, amount: transaction.total, basePago: transaction.total, recargoPct: 0, recargoMonto: 0 }];
 
-    // Legacy field: use the method with the largest amount as primary
-    const primaryMethod = [...payments].sort((a, b) => b.amount - a.amount)[0].method;
+    const normalizedPayments = rawPayments.map((p) => {
+      const recargoPct = Number(p.recargoPct ?? 0) || 0;
+      let basePago = p.basePago;
+      let recargoMonto = p.recargoMonto;
+      if (basePago == null) {
+        // Pago legacy: amount es base, sin recargo
+        basePago = Number(p.amount) || 0;
+        recargoMonto = recargoMonto ?? 0;
+      }
+      if (recargoMonto == null) {
+        recargoMonto = Math.round((basePago * recargoPct) / 100);
+      }
+      const amount = basePago + recargoMonto;
+      return {
+        method: p.method,
+        amount,
+        basePago,
+        recargoMonto,
+        recargoPct,
+      };
+    });
+
+    const sumBase = normalizedPayments.reduce((s, p) => s + p.basePago, 0);
+    const sumRecargo = normalizedPayments.reduce((s, p) => s + p.recargoMonto, 0);
+    const sumCobrado = sumBase + sumRecargo;
+
+    const baseTotal = sumBase || transaction.total;
+    const recargoTotal = sumRecargo;
+    const totalCobrado = sumCobrado || baseTotal;
+
+    // Legacy field: usar el método con mayor monto cobrado como primary
+    const primaryMethod = [...normalizedPayments].sort((a, b) => b.amount - a.amount)[0].method;
 
     // Insertar venta principal
     const ventaData: VentaInsert = {
@@ -178,14 +225,16 @@ export function useTransactions() {
       precio_servicio: transaction.servicePrice,
       descuento_pct: transaction.discount,
       metodo_pago: primaryMethod,
-      total_final: transaction.total,
+      total_final: baseTotal,           // BASE comisionable (intacto)
+      recargo_total: recargoTotal,      // NUEVO
+      total_cobrado: totalCobrado,      // NUEVO
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
     };
 
     const { data: venta, error: ventaError } = await supabase
       .from('venta')
-      .insert(ventaData)
+      .insert(ventaData as any)
       .select()
       .single();
 
@@ -194,19 +243,22 @@ export function useTransactions() {
       return null;
     }
 
-    // Insertar pagos (siempre, incluso para método único)
-    const pagosData = payments.map((p, idx) => ({
+    // Insertar pagos con desglose recargo / base
+    const pagosData = normalizedPayments.map((p, idx) => ({
       venta_id: venta.id,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       metodo_pago: p.method,
-      monto: p.amount,
+      monto: p.amount,                  // base + recargo (lo que entra a caja)
+      base_pago: p.basePago,
+      recargo_pct: p.recargoPct,
+      recargo_monto: p.recargoMonto,
       orden: idx + 1,
     }));
 
     const { error: pagosError } = await supabase
       .from('venta_pagos')
-      .insert(pagosData);
+      .insert(pagosData as any);
 
     if (pagosError) {
       console.error('Error inserting venta_pagos:', pagosError);
@@ -234,8 +286,11 @@ export function useTransactions() {
     // Agregar al estado local
     const newTransaction: Transaction = {
       ...transaction,
-      payments,
+      payments: normalizedPayments,
       paymentMethod: primaryMethod,
+      total: baseTotal,
+      recargoTotal,
+      totalCobrado,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
@@ -318,24 +373,44 @@ export function useTransactions() {
   const getDailySummary = useCallback(() => {
     // Solo contar transacciones activas para el resumen
     const activeTx = transactions.filter(t => t.estado !== 'anulado');
+    // BASE legacy (sin recargos) — alimenta lógica de comisiones/sueldos
     let totalEfectivo = 0;
     let totalMercadoPago = 0;
+    // Real cobrado (con recargos) — para arqueo
+    let totalEfectivoCobrado = 0;
+    let totalDigitalCobrado = 0;
+    let totalRecargos = 0;
+
     activeTx.forEach(t => {
       const payments = t.payments && t.payments.length > 0
         ? t.payments
-        : [{ method: t.paymentMethod, amount: t.total }];
+        : [{ method: t.paymentMethod, amount: t.total, basePago: t.total, recargoMonto: 0, recargoPct: 0 }];
       payments.forEach(p => {
-        if (p.method === 'efectivo') totalEfectivo += p.amount;
-        else if (p.method === 'mercado_pago') totalMercadoPago += p.amount;
+        const basePago = p.basePago != null ? p.basePago : p.amount;
+        const recargoMonto = p.recargoMonto ?? 0;
+        const cobrado = basePago + recargoMonto;
+        totalRecargos += recargoMonto;
+        if (p.method === 'efectivo') {
+          totalEfectivo += basePago;
+          totalEfectivoCobrado += cobrado;
+        } else {
+          // mercado_pago / transferencia / debito / credito → digital
+          totalMercadoPago += basePago;
+          totalDigitalCobrado += cobrado;
+        }
       });
     });
 
     return {
       count: activeTx.length,
-      totalEfectivo,
-      totalMercadoPago,
-      total: totalEfectivo + totalMercadoPago,
-      transactions: transactions, // Devolver todas para mostrar anuladas
+      totalEfectivo,                  // BASE — sin cambios de significado
+      totalMercadoPago,               // BASE — sin cambios de significado
+      total: totalEfectivo + totalMercadoPago, // BASE total — alimenta comisiones
+      totalEfectivoCobrado,           // NUEVO snapshot
+      totalDigitalCobrado,            // NUEVO snapshot
+      totalRecargos,                  // NUEVO snapshot
+      totalCobrado: totalEfectivoCobrado + totalDigitalCobrado, // NUEVO
+      transactions: transactions,
     };
   }, [transactions]);
 

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Phone, MapPin, Crown, Sparkles, Zap, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { COUNTRIES, COUNTRY_TIMEZONES } from '@/lib/dateUtils';
+import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 
 export function OrganizationSettings() {
   const { organization, planFeatures, updateOrganization } = useOrganization();
@@ -252,6 +253,9 @@ export function OrganizationSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Métodos de pago y recargos — configuración general */}
+      <PaymentMethodsConfig sucursalId={null} />
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EquipoUnificado } from './config/EquipoUnificado';
 import { CobrarConfig } from './config/CobrarConfig';
+import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 
 interface SucursalTabContentProps {
   sucursal: Sucursal;
@@ -243,6 +244,11 @@ export function SucursalTabContent({
             onDeleteDiscount={onDeleteDiscount}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
           />
+        </div>
+
+        {/* Métodos de pago y recargos (override por sucursal) */}
+        <div className="mt-6">
+          <PaymentMethodsConfig sucursalId={sucursal.id} />
         </div>
 
       </div>
