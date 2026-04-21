@@ -545,68 +545,74 @@ export default function Homepage() {
             </div>
           </Reveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              {
-                tier: 'Basico',
-                price: '$30.000',
-                sub: 'Para empezar a ordenar tu barbería',
-                desc: 'Para arrancar y probar sin compromiso.',
-                features: ['1 sucursal', 'Hasta 2 barberos', 'Agenda de turnos', 'Registro de cobros', 'Cierre de caja diario'],
-                featured: false,
-                cta: 'Registrar mi barbería',
-              },
-              {
-                tier: 'Profesional',
-                price: '$50.000',
-                sub: 'Para barberías que quieren crecer y entender su negocio',
-                desc: 'Más barberos, más control, más datos.',
-                features: ['1 sucursal', 'Más barberos y servicios', 'Control completo de finanzas', 'Estadísticas avanzadas', 'Historial de cortes y ventas'],
-                featured: true,
-                cta: 'Registrar mi barbería',
-              },
-              {
-                tier: 'Premium',
-                price: '$100.000',
-                sub: 'Para barberías con múltiples sucursales',
-                desc: 'Para cadenas que necesitan control total.',
-                features: ['Múltiples sucursales', 'Barberos ilimitados', 'Encargados por sede', 'Soporte prioritario', 'Reportes avanzados'],
-                featured: false,
-                cta: 'Registrar mi barbería',
-              },
-            ].map((plan, i) => (
-              <Reveal key={plan.tier} delay={i * 80}>
-                <div className={`relative bg-white rounded-xl p-5 flex flex-col h-full transition-shadow hover:shadow-md ${plan.featured ? 'border-2 border-[#1e2a4a] shadow-sm' : 'border border-slate-200'}`}>
-                  {plan.featured && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#1e2a4a] text-white text-[10px] px-3 py-1 rounded-full font-medium">
-                      Recomendado
-                    </div>
-                  )}
-                  <div className="mb-4">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">{plan.tier}</p>
-                    <p className="text-2xl font-semibold tracking-tight">{plan.price}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{plan.sub}</p>
-                  </div>
-                  <div className="h-px bg-slate-100 mb-4" />
-                  <ul className="space-y-2.5 flex-1 mb-5">
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                        <div className="w-3.5 h-3.5 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                          <Check size={8} className="text-slate-700" strokeWidth={3} />
-                        </div>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link to="/login?mode=signup">
-                    <button className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${plan.featured ? 'bg-[#1e2a4a] text-white hover:bg-[#2a3a60]' : 'border border-slate-200 hover:bg-slate-50'}`}>
-                      {plan.cta}
-                    </button>
-                  </Link>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+  {[
+    {
+      tier: 'Basico',
+      price: '$30.000',
+      sub: 'Para empezar a ordenar tu barbería',
+      desc: 'Para arrancar y probar sin compromiso.',
+      features: ['1 sucursal', 'Hasta 2 barberos', 'Agenda de turnos', 'Registro de cobros', 'Cierre de caja diario'],
+      featured: false,
+      cta: 'Registrar mi barbería',
+    },
+    {
+      tier: 'Profesional',
+      price: '$50.000',
+      sub: 'Para barberías que quieren crecer y entender su negocio',
+      desc: 'Más barberos, más control, más datos.',
+      features: ['1 sucursal', 'Más barberos y servicios', 'Control completo de finanzas', 'Estadísticas avanzadas', 'Historial de cortes y ventas'],
+      featured: true,
+      cta: 'Registrar mi barbería',
+    },
+    {
+      tier: 'Premium',
+      price: '$100.000',
+      sub: 'Para barberías con múltiples sucursales',
+      desc: 'Para cadenas que necesitan control total.',
+      features: ['Múltiples sucursales', 'Barberos ilimitados', 'Encargados por sede', 'Soporte prioritario', 'Reportes avanzados'],
+      featured: false,
+      cta: 'Registrar mi barbería',
+    },
+  ].map((plan, i) => (
+    <Reveal key={plan.tier} delay={i * 80}>
+      <div
+        className={`flex flex-col items-center bg-white rounded-xl shadow p-6 h-full transition-all ${
+          plan.featured
+            ? 'border-2 border-[#1e2a4a] scale-105'
+            : 'border border-slate-200'
+        }`}
+      >
+        {plan.featured && (
+          <span className="absolute top-4 right-4 bg-[#1e2a4a] text-white text-xs px-3 py-1 rounded-full font-semibold">
+            Recomendado
+          </span>
+        )}
+        <h3 className="text-xl font-bold mb-2">{plan.tier}</h3>
+        <p className="text-blue-600 text-3xl font-extrabold mb-1">{plan.price}</p>
+        <p className="text-slate-500 text-sm mb-2 text-center">{plan.sub}</p>
+        <p className="text-slate-400 text-xs mb-4 text-center">{plan.desc}</p>
+        <ul className="mb-6 w-full">
+          {plan.features.map((f, idx) => (
+            <li key={idx} className="flex items-center gap-2 text-slate-600 text-sm mb-2">
+              <span className="inline-block w-2 h-2 bg-blue-500 rounded-full" />
+              {f}
+            </li>
+          ))}
+        </ul>
+        <button
+          className={`w-full py-2 rounded font-semibold ${
+            plan.featured
+              ? 'bg-[#1e2a4a] text-white hover:bg-blue-700'
+              : 'bg-slate-100 text-blue-600 hover:bg-blue-200'
+          } transition`}
+        >
+          {plan.cta}
+        </button>
+      </div>
+    </Reveal>
+  ))}
+</div>
         </div>
       </section>
 
