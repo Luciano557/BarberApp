@@ -197,7 +197,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       existing.total += tx.total;
       txPayments(tx).forEach(p => {
         if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
-        else if (p.method === 'mercado_pago') existing!.totalMercadoPago += p.amount;
+        else if (isDigitalMethod(p.method)) existing!.totalMercadoPago += p.amount;
       });
     });
 
