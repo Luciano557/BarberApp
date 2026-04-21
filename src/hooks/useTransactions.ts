@@ -92,12 +92,18 @@ export function useTransactions() {
       extrasMap.set(ve.venta_id, list);
     });
 
-    const pagosMap = new Map<string, { method: 'efectivo' | 'mercado_pago'; amount: number }[]>();
+    const pagosMap = new Map<string, { method: PaymentMethod; amount: number; recargoPct: number; recargoMonto: number; basePago: number }[]>();
     ventaPagos?.forEach((p: any) => {
       const list = pagosMap.get(p.venta_id) || [];
+      const monto = Number(p.monto);
+      const recargoMonto = Number(p.recargo_monto) || 0;
+      const basePago = p.base_pago != null ? Number(p.base_pago) : Math.max(0, monto - recargoMonto);
       list.push({
-        method: p.metodo_pago as 'efectivo' | 'mercado_pago',
-        amount: Number(p.monto),
+        method: p.metodo_pago as PaymentMethod,
+        amount: monto,
+        recargoPct: Number(p.recargo_pct) || 0,
+        recargoMonto,
+        basePago,
       });
       pagosMap.set(p.venta_id, list);
     });
@@ -105,11 +111,17 @@ export function useTransactions() {
     const txs: Transaction[] = ventas.map(v => {
       // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
       const pagos = pagosMap.get(v.id);
+      const baseTotal = Number(v.total_final);
+      const recargoTotal = Number((v as any).recargo_total) || 0;
+      const totalCobrado = (v as any).total_cobrado != null ? Number((v as any).total_cobrado) : baseTotal + recargoTotal;
       const payments = pagos && pagos.length > 0
         ? pagos
         : [{
-            method: v.metodo_pago as 'efectivo' | 'mercado_pago',
-            amount: Number(v.total_final),
+            method: v.metodo_pago as PaymentMethod,
+            amount: baseTotal,
+            recargoPct: 0,
+            recargoMonto: 0,
+            basePago: baseTotal,
           }];
       return {
         id: v.id,
@@ -121,10 +133,12 @@ export function useTransactions() {
         extras: extrasMap.get(v.id) || [],
         discount: Number(v.descuento_pct) || 0,
         discountType: 'percentage' as const,
-        paymentMethod: v.metodo_pago as 'efectivo' | 'mercado_pago',
+        paymentMethod: v.metodo_pago as PaymentMethod,
         payments,
         subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
-        total: Number(v.total_final),
+        total: baseTotal,
+        recargoTotal,
+        totalCobrado,
         createdAt: new Date(v.fecha_hora),
         estado: (v as any).estado || 'activo',
         anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
