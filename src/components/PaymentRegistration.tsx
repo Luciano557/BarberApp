@@ -3,10 +3,11 @@ import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -25,7 +26,7 @@ interface PaymentRegistrationProps {
     discount: number;
     discountType: DiscountType;
     paymentMethod: PaymentMethod;
-    payments?: { method: PaymentMethod; amount: number }[];
+    payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     subtotal: number;
     total: number;
   }) => Promise<any | null>;
