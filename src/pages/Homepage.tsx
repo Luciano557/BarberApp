@@ -47,7 +47,7 @@ const screens = {
     url: 'app.vittro.com/caja',
     content: (
       <div className="space-y-3">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="flex flex-col gap-2"> {/* Changed from grid to flex-col */}
           {[
             { label: 'Total General', val: '$358.500', cls: '' },
             { label: 'Efectivo', val: '$173.000', cls: 'text-emerald-600' },
