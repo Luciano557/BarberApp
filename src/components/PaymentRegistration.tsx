@@ -3,10 +3,11 @@ import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -25,7 +26,7 @@ interface PaymentRegistrationProps {
     discount: number;
     discountType: DiscountType;
     paymentMethod: PaymentMethod;
-    payments?: { method: PaymentMethod; amount: number }[];
+    payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     subtotal: number;
     total: number;
   }) => Promise<any | null>;
@@ -55,8 +56,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [splitMode, setSplitMode] = useState(false);
   const [efectivoAmount, setEfectivoAmount] = useState<string>('');
   const [mpAmount, setMpAmount] = useState<string>('');
+  const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
+  const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
+  const electronicMethods = useMemo(
+    () => activeMethods.filter(m => m.method !== 'efectivo'),
+    [activeMethods],
+  );
+  const isEfectivoActive = useMemo(
+    () => activeMethods.some(m => m.method === 'efectivo'),
+    [activeMethods],
+  );
 
   const pendingTasks = useMemo(() => 
     tareas.filter(t => t.estado === 'pendiente' && t.tipo === 'tarea'),
@@ -214,6 +227,64 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     && splitEfectivoNum <= total
     && splitMpNum <= total;
 
+  // Recargos
+  const pctSimple = paymentMethod ? getRecargoPct(paymentMethod) : 0;
+  const pctEfectivo = getRecargoPct('efectivo');
+  const pctDigital = selectedDigitalMethod ? getRecargoPct(selectedDigitalMethod) : 0;
+
+  const recargoTotal = useMemo(() => {
+    if (splitMode) {
+      return Math.round((splitEfectivoNum * pctEfectivo) / 100)
+        + Math.round((splitMpNum * pctDigital) / 100);
+    }
+    if (!paymentMethod) return 0;
+    return Math.round((total * pctSimple) / 100);
+  }, [splitMode, splitEfectivoNum, splitMpNum, pctEfectivo, pctDigital, total, pctSimple, paymentMethod]);
+
+  const totalACobrar = total + recargoTotal;
+
+  const recargoLabel = useMemo(() => {
+    if (recargoTotal <= 0) return '';
+    if (splitMode) {
+      const partsActive = [pctEfectivo > 0, pctDigital > 0].filter(Boolean).length;
+      if (partsActive > 1) return 'Recargo (mixto)';
+      if (pctEfectivo > 0) return `Recargo (Efectivo ${pctEfectivo}%)`;
+      if (pctDigital > 0 && selectedDigitalMethod) return `Recargo (${getMethodLabel(selectedDigitalMethod)} ${pctDigital}%)`;
+      return 'Recargo';
+    }
+    if (paymentMethod) return `Recargo (${getMethodLabel(paymentMethod)} ${pctSimple}%)`;
+    return 'Recargo';
+  }, [recargoTotal, splitMode, pctEfectivo, pctDigital, selectedDigitalMethod, paymentMethod, pctSimple]);
+
+  // Inicializar / sincronizar selectedDigitalMethod con la lista activa
+  useEffect(() => {
+    if (electronicMethods.length === 0) {
+      if (selectedDigitalMethod !== '') setSelectedDigitalMethod('');
+      return;
+    }
+    const stillActive = selectedDigitalMethod
+      && electronicMethods.some(m => m.method === selectedDigitalMethod);
+    if (!stillActive) {
+      const mp = electronicMethods.find(m => m.method === 'mercado_pago');
+      setSelectedDigitalMethod(mp ? mp.method : electronicMethods[0].method);
+    }
+  }, [electronicMethods, selectedDigitalMethod]);
+
+  // Self-healing: si el método elegido se desactivó en otra pestaña
+  useEffect(() => {
+    if (methodsLoading) return;
+    const activeSet = new Set(activeMethods.map(m => m.method));
+    if (!splitMode && paymentMethod && !activeSet.has(paymentMethod)) {
+      setPaymentMethod('');
+    }
+    if (splitMode && !activeSet.has('efectivo')) {
+      setSplitMode(false);
+      setEfectivoAmount('');
+      setMpAmount('');
+      setPaymentMethod('');
+    }
+  }, [methodsLoading, activeMethods, paymentMethod, splitMode]);
+
   const resetForm = useCallback(() => {
     setSelectedBarber('');
     setSelectedService('');
@@ -248,15 +319,31 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setIsSubmitting(true);
 
     try {
-      const payments = splitMode
-        ? [
-            { method: 'efectivo' as PaymentMethod, amount: splitEfectivoNum },
-            { method: 'mercado_pago' as PaymentMethod, amount: splitMpNum },
-          ]
-        : [{ method: paymentMethod, amount: total }];
-      const primaryMethod = splitMode
-        ? (splitEfectivoNum >= splitMpNum ? 'efectivo' : 'mercado_pago')
-        : paymentMethod;
+      let payments: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
+      let primaryMethod: PaymentMethod;
+
+      if (splitMode) {
+        if (!selectedDigitalMethod) {
+          toast({
+            title: 'Falta método electrónico',
+            description: 'Seleccioná el método electrónico para el split.',
+            variant: 'destructive',
+          });
+          setIsSubmitting(false);
+          return;
+        }
+        const recE = Math.round((splitEfectivoNum * pctEfectivo) / 100);
+        const recD = Math.round((splitMpNum * pctDigital) / 100);
+        payments = [
+          { method: 'efectivo', basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
+          { method: selectedDigitalMethod, basePago: splitMpNum, recargoPct: pctDigital, recargoMonto: recD, amount: splitMpNum + recD },
+        ];
+        primaryMethod = splitEfectivoNum >= splitMpNum ? 'efectivo' : selectedDigitalMethod;
+      } else {
+        const recargoMonto = Math.round((total * pctSimple) / 100);
+        payments = [{ method: paymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
+        primaryMethod = paymentMethod;
+      }
 
       const result = await onSubmit({
         barberId: barber!.id,
@@ -276,7 +363,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       if (result) {
         toast({
           title: "✅ Cobro guardado correctamente",
-          description: `$${total.toLocaleString()} - ${service!.name}`,
+          description: recargoTotal > 0
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${service!.name}`
+            : `$${total.toLocaleString()} - ${service!.name}`,
         });
         resetForm();
       } else {
@@ -295,7 +384,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -312,9 +401,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           handleToggleExtra(extras[index].id);
         } else if (currentStep === 'discount' && discounts[index]) {
           handleSelectDiscount(discounts[index].id);
-        } else if (currentStep === 'payment') {
-          if (index === 0) handleSelectPayment('efectivo');
-          if (index === 1) handleSelectPayment('mercado_pago');
+        } else if (currentStep === 'payment' && activeMethods[index]) {
+          handleSelectPayment(activeMethods[index].method);
         }
       }
 
@@ -346,7 +434,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
@@ -544,8 +632,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 : rounding === 'cliente' ? Math.floor(rawCalc) : Math.ceil(rawCalc);
               
               const paymentRestriction = discount.paymentMethod !== 'todos' && discount.id !== 'none';
-              const paymentLabel = discount.paymentMethod === 'efectivo' ? 'Efectivo' : 
-                                   discount.paymentMethod === 'mercado_pago' ? 'MP' : '';
+              const paymentLabel = paymentRestriction ? getMethodLabel(discount.paymentMethod as PaymentMethod) : '';
               
               return (
                 <button
@@ -589,39 +676,56 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Payment Step */}
         {currentStep === 'payment' && (
           <div className="space-y-6">
-            {!splitMode ? (
+            {methodsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : activeMethods.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
+                <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  No hay métodos de pago activos. Activá al menos uno en Mi Negocio.
+                </p>
+              </div>
+            ) : !splitMode ? (
               <>
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={() => handleSelectPayment('efectivo')}
-                    className={`relative p-8 rounded-lg border transition-colors hover:border-success ${
-                      paymentMethod === 'efectivo'
-                        ? 'border-success bg-success/5'
-                        : 'border-border bg-card hover:bg-muted/50'
-                    }`}
-                  >
-                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">1</span>
-                    <Banknote className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'efectivo' ? 'text-success' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-center text-foreground">Efectivo</p>
-                  </button>
-                  <button
-                    onClick={() => handleSelectPayment('mercado_pago')}
-                    className={`relative p-8 rounded-lg border transition-colors hover:border-secondary ${
-                      paymentMethod === 'mercado_pago'
-                        ? 'border-secondary bg-secondary/5'
-                        : 'border-border bg-card hover:bg-muted/50'
-                    }`}
-                  >
-                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">2</span>
-                    <CreditCard className={`h-10 w-10 mx-auto mb-3 ${paymentMethod === 'mercado_pago' ? 'text-secondary' : 'text-muted-foreground'}`} />
-                    <p className="font-medium text-center text-foreground">Mercado Pago</p>
-                  </button>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {activeMethods.map((m, idx) => {
+                    const isEfectivo = m.method === 'efectivo';
+                    const isSelected = paymentMethod === m.method;
+                    const Icon = isEfectivo ? Banknote : CreditCard;
+                    const selectedClass = isEfectivo
+                      ? 'border-success bg-success/5'
+                      : 'border-secondary bg-secondary/5';
+                    const hoverClass = isEfectivo ? 'hover:border-success' : 'hover:border-secondary';
+                    const iconColor = isSelected
+                      ? (isEfectivo ? 'text-success' : 'text-secondary')
+                      : 'text-muted-foreground';
+                    return (
+                      <button
+                        key={m.method}
+                        onClick={() => handleSelectPayment(m.method)}
+                        className={`relative p-6 rounded-lg border transition-colors ${hoverClass} ${
+                          isSelected ? selectedClass : 'border-border bg-card hover:bg-muted/50'
+                        }`}
+                      >
+                        <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">{idx + 1}</span>
+                        <Icon className={`h-9 w-9 mx-auto mb-2 ${iconColor}`} />
+                        <p className="font-medium text-center text-foreground">{m.label}</p>
+                        {m.recargoPct > 0 && (
+                          <p className="text-[11px] text-center text-muted-foreground mt-1">+{m.recargoPct}%</p>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button
                   type="button"
                   onClick={enableSplitMode}
-                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+                  disabled={!isEfectivoActive || electronicMethods.length === 0}
+                  title={!isEfectivoActive || electronicMethods.length === 0 ? 'Activá efectivo y al menos un método electrónico en Mi Negocio' : undefined}
+                  className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
                 >
                   <Split className="h-4 w-4" />
                   Combinar métodos de pago
@@ -639,10 +743,34 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </Button>
                 </div>
 
+                {electronicMethods.length > 1 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">Método electrónico</label>
+                    <div className="flex flex-wrap gap-2">
+                      {electronicMethods.map(m => (
+                        <button
+                          key={m.method}
+                          type="button"
+                          onClick={() => setSelectedDigitalMethod(m.method)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                            selectedDigitalMethod === m.method
+                              ? 'border-secondary bg-secondary/10 text-foreground'
+                              : 'border-border text-muted-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          {getMethodLabel(m.method)}
+                          {m.recargoPct > 0 && <span className="ml-1 opacity-70">+{m.recargoPct}%</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <Banknote className="h-4 w-4 text-success" /> Efectivo
+                      {pctEfectivo > 0 && <span className="text-[11px] text-muted-foreground">+{pctEfectivo}%</span>}
                     </label>
                     <CurrencyInput
                       value={efectivoAmount}
@@ -650,10 +778,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       placeholder="0"
                       className="h-12 text-lg"
                     />
+                    {pctEfectivo > 0 && splitEfectivoNum > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        → ${(splitEfectivoNum + Math.round(splitEfectivoNum * pctEfectivo / 100)).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-secondary" /> Mercado Pago
+                      <CreditCard className="h-4 w-4 text-secondary" />
+                      {selectedDigitalMethod ? getMethodLabel(selectedDigitalMethod) : 'Electrónico'}
+                      {pctDigital > 0 && <span className="text-[11px] text-muted-foreground">+{pctDigital}%</span>}
                     </label>
                     <CurrencyInput
                       value={mpAmount}
@@ -661,6 +796,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       placeholder="0"
                       className="h-12 text-lg"
                     />
+                    {pctDigital > 0 && splitMpNum > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        → ${(splitMpNum + Math.round(splitMpNum * pctDigital / 100)).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -714,11 +854,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     </div>
                   )
                 )}
+                {recargoTotal > 0 && (
+                  <div className="flex justify-between text-foreground">
+                    <span className="text-muted-foreground">{recargoLabel}</span>
+                    <span className="font-medium">+${recargoTotal.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
-                <span className="text-lg font-medium">Total</span>
-                <span className="text-3xl font-bold text-foreground">${total.toLocaleString()}</span>
+                <span className="text-lg font-medium">Total a cobrar</span>
+                <span className="text-3xl font-bold text-foreground">${totalACobrar.toLocaleString()}</span>
               </div>
 
               <Button

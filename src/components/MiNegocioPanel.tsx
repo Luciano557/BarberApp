@@ -35,7 +35,11 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
   };
 }
 
-export function MiNegocioPanel() {
+interface MiNegocioPanelProps {
+  onGoToGeneralConfig?: () => void;
+}
+
+export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}) {
   const { organization } = useOrganization();
   const { currentSucursal, refreshSucursales } = useSucursal();
   const { isOwner, isGeneralManager, isManager, user } = useAuth();
@@ -253,6 +257,7 @@ export function MiNegocioPanel() {
                 onAddLine={addLine}
                 onUpdateLine={updateLine}
                 onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
+                onGoToGeneralConfig={onGoToGeneralConfig}
               />
             </TabsContent>
           ))}
