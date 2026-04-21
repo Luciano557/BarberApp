@@ -30,6 +30,12 @@ const Index = () => {
   };
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
+  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas'>('menu');
+
+  const goToGeneralConfig = () => {
+    setConfigInitialSection('payments');
+    setActiveTab('config');
+  };
 
   useEffect(() => {
     if (!rolesLoaded) {
@@ -170,13 +176,16 @@ const Index = () => {
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
             <PinProtectedSection sectionName="Mi Negocio">
-              <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? () => setActiveTab('config') : undefined} />
+              <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
             </PinProtectedSection>
           )}
 
           {activeTab === 'config' && canManageConfig && (
             <PinProtectedSection sectionName="Configuración">
-              <ConfigurationPanel />
+              <ConfigurationPanel
+                initialSection={configInitialSection}
+                onSectionChange={setConfigInitialSection}
+              />
             </PinProtectedSection>
           )}
         </div>

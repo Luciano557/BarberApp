@@ -1,213 +1,56 @@
 
 
-## Diagnóstico breve
+## Plan: agrupar todo lo no-efectivo como "Digital" en Caja
 
-**Archivos a tocar (4):**
-1. `src/components/config/PaymentMethodsConfig.tsx` — UX confusa cuando sucursal hereda general; agregar acceso directo a la config general.
-2. `src/components/PaymentRegistration.tsx` — UI hardcodeada Efectivo/MP, sin recargos, sin lista dinámica, submit en formato viejo, label "Mercado Pago" en split.
-3. `src/components/SucursalTabContent.tsx` y `src/components/MiNegocioPanel.tsx` — pasar prop `onGoToGeneral` hacia `PaymentMethodsConfig`.
-4. `src/pages/Index.tsx` — exponer un callback que abra `Configuración → Mi Negocio` cuando se invoca desde el panel de sucursal.
-5. `src/components/config/DiscountsConfig.tsx` — unificar label "Solo Mercado Pago" → "Solo QR".
-6. `src/components/PaymentRegistration.tsx` (paso descuentos) — `paymentLabel` para `mercado_pago` debe usar `getMethodLabel` (= "QR"), no "MP".
+### Diagnóstico — dónde está el bug
 
-**Lo que ya estaba bien (no se toca):**
-- DB, RLS, seeds, triggers de onboarding.
-- `usePaymentMethodsConfig`: resuelve methods, recargos y default sano por ausencia de fila.
-- `useTransactions.addTransaction` y `loadTransactionsByDate`: ya aceptan/persisten `basePago`/`recargoPct`/`recargoMonto`/`amount`, y mantienen `total_final` como BASE.
-- `useCashClosing`, `getDailySummary`, `SueldosPanel`: intactos. Los dejamos así.
-- Tipos `PaymentMethod`, `getMethodLabel` (devuelve "QR" para `mercado_pago`), `TransactionPayment`.
-- Historial: las ventas viejas siguen guardando su `metodo_pago` original; al desactivar un método solo se filtra para nuevos cobros, no se altera nada existente.
+`useTransactions.ts` ya agrega correctamente: la variable `totalMercadoPago` que devuelve el summary suma `mercado_pago + transferencia + debito + credito` (line 397-398). El bug es 100% de presentación dentro de `DailySummary.tsx`, que:
 
-**Lo viejo / desconectado:**
-- `PaymentRegistration`: 2 botones hardcodeados, atajo Ctrl+1/2 fijo, split fijo a `efectivo + mercado_pago`, no calcula recargo, fila "Total" no incluye recargo, `onSubmit.payments` manda solo `{method, amount}`.
-- `PaymentRegistration` paso "discount": etiqueta "MP" hardcodeada en chip "Solo MP".
-- `PaymentMethodsConfig`: cuando sucursal hereda general muestra grilla gris confusa.
-- `DiscountsConfig`: `<SelectItem>` dice "Solo Mercado Pago".
+1. **Filtra por método exacto `'mercado_pago'`** en la agregación por barbero (`barberSummaries`, lines 192-195) → cobros con débito/crédito/transferencia no entran al total digital del barbero (queda en $0).
+2. **Filtra por método exacto `'mercado_pago'`** para construir `barberTransactions.mercadoPago` (lines 93-102) → en el modal "Cerrar Caja" esos cobros no aparecen en ninguna lista.
+3. **Suma solo `'mercado_pago'`** en `mpAmt` para el desglose por fila (line 620) y en la sección de transacciones del modal de cierre (lines 782, 818).
+4. **Muestra el label "Mercado Pago"** en 3 lugares: card general (435), card por barbero (509), card del modal de cierre (760), título de la sección de transacciones (811).
+5. **Detecta "mixto" comparando solo a `efectivo`/`mercado_pago`** → un cobro split efectivo + débito no se reconoce como mixto.
 
----
+### Cambios a aplicar — solo `src/components/DailySummary.tsx`
 
-## Cambio 1 — `PaymentMethodsConfig.tsx`
+**Helpers:** definir un único criterio:
 
-Sin cambios de lógica de DB. Solo claridad y CTA.
-
-**Nueva prop opcional:** `onGoToGeneral?: () => void`.
-
-**Header:**
-- Título: `Métodos de pago y recargos`.
-- Subtítulo dinámico:
-  - `editingGeneral` → "Configuración general del negocio".
-  - sucursal + hereda → "Esta sucursal usa la configuración general".
-  - sucursal + override → "Esta sucursal tiene configuración propia".
-- Switch a la derecha solo si `sucursalId !== null`. Label clarificador: "Usar configuración general" (sigue igual) + tooltip/hint debajo: "Activado: hereda de Mi Negocio. Desactivado: configuración propia."
-
-**Body:**
-
-A. `sucursalId !== null && usarGeneral === true` (HEREDA):
-- **No renderizar la grilla**.
-- Estado vacío con `Building2` + texto:
-  - Título: "Esta sucursal usa la configuración general"
-  - Detalle: "Los métodos de pago activos y los recargos se administran desde Mi Negocio. Cualquier cambio se aplica acá automáticamente."
-- Dos botones lado a lado:
-  - Primario `Button` "Ir a configuración general" → llama `onGoToGeneral?.()`. Solo se renderiza si la prop está provista.
-  - Secundario `outline` "Personalizar esta sucursal" → `handleToggleUsarGeneral(false)`.
-
-B. `editingGeneral` o `editingOverride`:
-- Si `editingOverride`: banner sutil arriba de la grilla con `Info` icono: "Esta sucursal tiene configuración propia. Los cambios acá NO afectan a las demás sucursales." + acción inline "Volver a usar la configuración general" → `handleToggleUsarGeneral(true)`.
-- Renderizar la grilla actual de 5 métodos con switch + recargo % + Guardar (sin cambios).
-
----
-
-## Cambio 2 — Conectar el CTA "Ir a configuración general"
-
-`MiNegocioPanel` y `SucursalTabContent` no manejan tabs globales. La config general vive en `Configuración → Mi Negocio (OrganizationSettings)` (panel `config`).
-
-**Estrategia simple:**
-- `Index.tsx`: agregar callback `goToGeneralConfig = () => setActiveTab('config')` y pasarlo como prop al panel actual de Mi Negocio (a través de `MiNegocioPanel`).
-- `MiNegocioPanel`: aceptar `onGoToGeneralConfig?: () => void` y propagarla a `SucursalTabContent`.
-- `SucursalTabContent`: aceptar `onGoToGeneralConfig?` y pasarla a `<PaymentMethodsConfig onGoToGeneral={onGoToGeneralConfig} />`.
-- En `OrganizationSettings`, `<PaymentMethodsConfig sucursalId={null} />` no recibe la prop (no aplica).
-
-Resultado: al tocar "Ir a configuración general" desde un tab de sucursal, el usuario aterriza en `Configuración → Mi Negocio`, donde edita la fila general y vuelve.
-
-(El detalle de scroll a la sección de métodos de pago se omite para no inflar el alcance; quedará visible debajo del card de organización.)
-
----
-
-## Cambio 3 — `PaymentRegistration.tsx` (selector dinámico + recargos)
-
-### 3.1 Hook + estado
-- Importar `usePaymentMethodsConfig`, `getMethodLabel`.
-- `const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();` (sin args → sucursal activa, default sano).
-- `const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);`
-- `const electronicMethods = useMemo(() => activeMethods.filter(m => m.method !== 'efectivo'), [activeMethods]);`
-- Nuevo estado: `const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('')` para el split.
-- Inicializarlo cuando cambia `electronicMethods`: si `mercado_pago` está activo usalo; si no, `electronicMethods[0]?.method`; si no hay, `''`.
-
-### 3.2 Render de selector simple (no split)
-- Reemplazar los 2 botones hardcodeados por `activeMethods.map((m, idx) => …)` en `grid grid-cols-2 md:grid-cols-3 gap-3`.
-- Cada botón: ícono `Banknote` si `m.method === 'efectivo'`, sino `CreditCard`. Label `m.label`. Atajo `idx+1` arriba-izquierda. Si `m.recargoPct > 0`: chip sutil "+{m.recargoPct}%" abajo del label.
-- Estilos: efectivo usa `border-success`/`bg-success/5` cuando seleccionado; resto `border-secondary`/`bg-secondary/5`.
-- Botón "Combinar métodos de pago": deshabilitado si no hay efectivo activo o no hay `electronicMethods`. Tooltip si está deshabilitado: "Activá efectivo y al menos un método electrónico en Mi Negocio".
-
-### 3.3 Render del split
-- Mantener layout 2 columnas. Columna izquierda fija = Efectivo (`Banknote`). Columna derecha = el método electrónico seleccionado (`CreditCard`), con label `getMethodLabel(selectedDigitalMethod)`.
-- Si `electronicMethods.length > 1`: arriba del input derecho, chips selector horizontal con cada electrónico activo (label vía `getMethodLabel`, click → `setSelectedDigitalMethod(m)`).
-- Junto a cada `CurrencyInput`, si su método tiene recargo > 0: texto pequeño `→ ${cobrado.toLocaleString()}` debajo (donde `cobrado = Math.round(monto * pct/100) + monto`).
-- `splitValid` sigue comparando suma de **bases** vs `total`.
-
-### 3.4 Cálculo de recargo
-```
-const pctSimple = paymentMethod ? getRecargoPct(paymentMethod) : 0;
-const pctEfectivo = getRecargoPct('efectivo');
-const pctDigital = selectedDigitalMethod ? getRecargoPct(selectedDigitalMethod) : 0;
-
-const recargoTotal = useMemo(() => {
-  if (splitMode) {
-    return Math.round(splitEfectivoNum * pctEfectivo / 100)
-         + Math.round(splitMpNum     * pctDigital / 100);
-  }
-  return Math.round(total * pctSimple / 100);
-}, [...]);
-
-const totalACobrar = total + recargoTotal;
-```
-
-### 3.5 Resumen visible (Card)
-Después del bloque de descuento:
-```
-Recargo (QR 10%)        +$X.XXX     ← solo si recargoTotal > 0
-─────────────────────────────────
-Total a cobrar           $totalACobrar
-```
-- Reemplazar `<span>Total</span>$total` por `<span>Total a cobrar</span>$totalACobrar`.
-- Si `recargoTotal === 0`, `totalACobrar === total` y la fila Recargo no se renderiza → comportamiento visual idéntico al actual.
-- En modo simple, etiqueta del recargo: `"Recargo (${getMethodLabel(paymentMethod)} ${pctSimple}%)"`.
-- En split: si ambos pcts > 0 → "Recargo (mixto)"; si uno → mostrar el específico.
-- No agregar fila "Base".
-
-### 3.6 `onSubmit` — formato extendido
-
-Ampliar tipo en `PaymentRegistrationProps.onSubmit.payments`:
 ```ts
-payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
+const isDigital = (m: PaymentMethod) => m !== 'efectivo';
 ```
 
-En `handleSubmit`:
-- Modo simple:
-  ```ts
-  const recargoMonto = Math.round(total * pctSimple / 100);
-  payments = [{ method: paymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
-  ```
-- Modo split:
-  ```ts
-  const recE = Math.round(splitEfectivoNum * pctEfectivo / 100);
-  const recD = Math.round(splitMpNum     * pctDigital / 100);
-  payments = [
-    { method: 'efectivo',             basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
-    { method: selectedDigitalMethod,  basePago: splitMpNum,       recargoPct: pctDigital,  recargoMonto: recD, amount: splitMpNum + recD },
-  ];
-  ```
-- `primaryMethod`: el de mayor `basePago`.
-- `total` que se manda al `onSubmit` sigue siendo la BASE (intacto). `useTransactions` ya lo respeta.
+(usando el helper `isDigitalMethod` ya existente en `src/types/barbershop.ts`).
 
-### 3.7 Atajos de teclado
-Reemplazar el `if index===0/===1` por:
-```ts
-} else if (currentStep === 'payment' && activeMethods[index]) {
-  handleSelectPayment(activeMethods[index].method);
-}
-```
+**Agregaciones a corregir:**
 
-### 3.8 Self-healing al cambiar config (Cambio 4 del usuario)
-`useEffect` que observa `activeMethods`:
-- Si `paymentMethod` ya no está en `activeMethods.map(m => m.method)` (y no estamos en split): `setPaymentMethod('')` (silencioso, no toast).
-- Si `splitMode === true` y `selectedDigitalMethod` ya no está en `electronicMethods`: si hay otro electrónico activo, seleccionarlo; si no, `cancelSplitMode()`.
-- Si `splitMode === true` y `efectivo` se desactiva: `cancelSplitMode()`.
+- `barberTransactions` (lines 87-103): renombrar `mercadoPago` → `digital`; filtrar con `isDigital(p.method)`.
+- `barberSummaries` (lines 192-195): sumar `else existing.totalMercadoPago += p.amount` para cualquier método que cumpla `isDigital`. (Mantengo el nombre del campo `totalMercadoPago` en la interfaz interna `BarberSummary` para no propagar el rename a `useCashClosing` y otros lugares; solo cambia el label visible).
+- En la lista de transacciones (lines 619-620): `digitalAmt = txPayments.filter(p => isDigital(p.method)).reduce(...)`.
+- Sección "Mercado Pago Transactions" del modal de cierre (lines 806-840): renombrar lista a `digital`, sumar todos los digitales.
 
-Esto no altera ventas anteriores; solo limpia la selección del formulario abierto.
+**Labels visibles a actualizar a "Digital":**
 
-### 3.9 Loading / fallback
-- Si `methodsLoading`: en el paso de pago, mostrar `Loader2` chico arriba del grid.
-- Si `activeMethods.length === 0`: mensaje en el grid: "No hay métodos de pago activos. Activá al menos uno en Mi Negocio."
+- Line 435 — card general superior.
+- Line 509 — card por barbero.
+- Line 676 — desglose mixto inline (`Dig. $X` en lugar de `MP $X`).
+- Line 760 — card del modal "Cerrar Caja".
+- Line 811 — header de la sección de transacciones digitales del modal.
 
-### 3.10 Toast y label histórico
-- Toast: si `recargoTotal > 0`, description = `"$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()})"`. Si no, comportamiento actual.
-- En el chip de descuentos restringido (`paymentLabel`), reemplazar el ternario hardcodeado:
-  ```ts
-  const paymentLabel = discount.paymentMethod === 'todos' ? '' : getMethodLabel(discount.paymentMethod as PaymentMethod);
-  ```
-  → muestra "QR" en vez de "MP".
+**Iconos:** mantener `CreditCard` (genérico para digital) — ya es apropiado.
 
----
+### Lo que NO se toca
 
-## Cambio 4 — `DiscountsConfig.tsx`
+- `useTransactions`, `useCashClosing`, `useBackfillClosing`, `useBarbershopStore` (este último es legacy local, sin uso real de DB).
+- Persistencia: campos `efectivo` y `mp` en `ingresos` siguen guardando lo mismo (BASE efectivo / BASE digital agregado).
+- Comisiones, sueldos, `total_final`, `recargo_total`, `total_cobrado`, historial.
+- Nombre del campo interno `totalMercadoPago` en `BarberSummary` y en el resumen de `useTransactions` (refactor cosmético costoso, sin valor funcional). Solo cambia lo visible y la lógica de filtrado.
 
-Cambio cosmético en el `<Select>`:
-- `<SelectItem value="mercado_pago">Solo Mercado Pago</SelectItem>` → `<SelectItem value="mercado_pago">Solo QR</SelectItem>`.
+### Verificación
 
-(El valor interno sigue siendo `mercado_pago` por compatibilidad histórica; solo cambia el label visible.)
-
----
-
-## Lo que NO se toca
-
-- `useTransactions.ts`, `useCashClosing.ts`, `getDailySummary`: 0 cambios.
-- `SueldosPanel`, comisiones, bono fijo, `MultiDayClosingSummary`: 0 cambios.
-- DB, migraciones, RLS, seeds: 0 cambios.
-- Ventas históricas: ningún update; quedan tal cual.
-- `DailySummary.tsx` (etiquetas "Mercado Pago" en cierres) y otros lugares de historial: fuera de alcance del pedido. Se atacan en una pasada cosmética separada si el usuario lo pide.
-
----
-
-## Verificación post-cambio
-
-1. **Configuración por sucursal heredando**: aparece estado vacío con "Esta sucursal usa la configuración general" + botones "Ir a configuración general" (lleva a `config → Mi Negocio`) y "Personalizar esta sucursal".
-2. **Toggle a personalizado**: aparece banner "Configuración propia" con acción para volver a heredar + grilla editable.
-3. **Cobrar → paso Método de pago**: 5 tarjetas (Efectivo, QR, Transferencia, Débito, Crédito) cuando todas están activas. Si una se desactiva, deja de aparecer.
-4. **Recargo en QR (10%)**: al elegir QR aparece fila "Recargo (QR 10%) +$X" y "Total a cobrar" mayor que "Total".
-5. **Split Efectivo + QR con recargo**: chip selector de método electrónico si hay más de uno; texto "→ $cobrado" debajo del input QR; total a cobrar correcto.
-6. **Submit**: `venta.total_final` = BASE; `venta.recargo_total`/`total_cobrado` con valores correctos; `venta_pagos` con `base_pago`/`recargo_pct`/`recargo_monto`; `ingresos.sueldo` igual que antes.
-7. **Atajos Ctrl+1..N**: seleccionan según el orden visible.
-8. **Auto-limpieza**: si en otra pestaña se desactiva el método elegido, el formulario abierto limpia la selección sin tocar historial.
-9. **Etiquetas**: en descuentos (chip "Solo QR" y selector "Solo QR") y en cobro: nunca aparece "MP" ni "Mercado Pago".
+1. Cobro con débito → en card general "Digital" suma; en card del barbero "Digital" suma; en el modal "Cerrar Caja" aparece bajo la sección "Digital".
+2. Cobro mixto efectivo + crédito → badge "Mixto" aparece, desglose dice "Ef. $X / Dig. $Y", y aparece en ambas listas del modal.
+3. Cobro QR (`mercado_pago`) → sigue contando en "Digital" como antes.
+4. En toda la pantalla de Caja no aparece más el texto "Mercado Pago" ni "MP".
+5. Sueldos, comisiones y cierres ya guardados siguen idénticos.
 

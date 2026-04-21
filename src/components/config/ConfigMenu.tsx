@@ -1,6 +1,6 @@
-import { Shield, ChevronRight, ClipboardList, Crown } from 'lucide-react';
+import { Shield, ChevronRight, ClipboardList, Crown, Wallet } from 'lucide-react';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments';
 
 interface ConfigMenuItem {
   id: ConfigSection;
@@ -20,6 +20,12 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
       icon: <Crown className="h-5 w-5" />,
       title: 'Plan y Suscripción',
       description: 'Ver plan actual, límites e información del negocio',
+    },
+    {
+      id: 'payments',
+      icon: <Wallet className="h-5 w-5" />,
+      title: 'Métodos de pago y recargos',
+      description: 'Configuración general del negocio',
     },
     {
       id: 'pin',
