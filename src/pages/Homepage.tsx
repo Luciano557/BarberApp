@@ -317,9 +317,24 @@ export default function Homepage() {
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             {['Funcionalidades', 'Planes'].map(l => (
-              <a key={l} href={`#${l.toLowerCase()}`} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">{l}</a>
+              <a 
+                key={l} 
+                href={`#${l.toLowerCase()}`} 
+                className="text-sm text-slate-500 hover:text-slate-900 transition-colors animate-fadeIn"
+              >
+                {l}
+              </a>
             ))}
           </nav>
+          <style>{`
+            @keyframes fadeIn {
+              from { opacity: 0; transform: translateY(-10px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-fadeIn {
+              animation: fadeIn 0.5s ease forwards;
+            }
+          `}</style>
           <div className="flex items-center gap-2">
             <Link to="/login">
               <button className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-all">
