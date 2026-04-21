@@ -854,11 +854,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     </div>
                   )
                 )}
+                {recargoTotal > 0 && (
+                  <div className="flex justify-between text-foreground">
+                    <span className="text-muted-foreground">{recargoLabel}</span>
+                    <span className="font-medium">+${recargoTotal.toLocaleString()}</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
-                <span className="text-lg font-medium">Total</span>
-                <span className="text-3xl font-bold text-foreground">${total.toLocaleString()}</span>
+                <span className="text-lg font-medium">Total a cobrar</span>
+                <span className="text-3xl font-bold text-foreground">${totalACobrar.toLocaleString()}</span>
               </div>
 
               <Button
