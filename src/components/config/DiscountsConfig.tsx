@@ -52,7 +52,7 @@ export function DiscountsConfig({ discounts, onAdd, onUpdate, onDelete }: Discou
   };
 
   const getPaymentMethodLabel = (method: string) => {
-    switch (method) { case 'efectivo': return 'Solo Efectivo'; case 'mercado_pago': return 'Solo MP'; default: return 'Todos'; }
+    switch (method) { case 'efectivo': return 'Solo Efectivo'; case 'mercado_pago': return 'Solo QR'; default: return 'Todos'; }
   };
 
   const getRoundingLabel = (rounding: string, unit?: number) => {
