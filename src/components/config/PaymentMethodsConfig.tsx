@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Loader2, Wallet } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Wallet, Building2, Info, ArrowRight, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
@@ -16,6 +17,11 @@ interface PaymentMethodsConfigProps {
    * `string` ⇒ configuración override por sucursal.
    */
   sucursalId: string | null;
+  /**
+   * Callback opcional para navegar a la configuración general
+   * (Configuración → Mi Negocio). Solo aplica cuando `sucursalId !== null`.
+   */
+  onGoToGeneral?: () => void;
 }
 
 interface MethodState {
@@ -23,7 +29,7 @@ interface MethodState {
   recargoPct: string; // string en UI para edición libre
 }
 
-export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) {
+export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMethodsConfigProps) {
   const { organization } = useOrganization();
   const { methods, usarConfigGeneral, loading, reload } =
     usePaymentMethodsConfig({ sucursalId });
@@ -51,9 +57,9 @@ export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) 
     setState(next);
   }, [loading, usarConfigGeneral, methods]);
 
-  // Sucursal usa override sólo si hay sucursalId y usarGeneral === false
-  const editingOverride = sucursalId !== null && !usarGeneral;
   const editingGeneral = sucursalId === null;
+  const editingOverride = sucursalId !== null && !usarGeneral;
+  const inheritsFromGeneral = sucursalId !== null && usarGeneral;
   const canEdit = editingGeneral || editingOverride;
 
   const handleToggleUsarGeneral = async (next: boolean) => {
@@ -76,7 +82,7 @@ export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) 
     }
     setUsarGeneral(next);
     toast.success(
-      next ? 'Usando configuración general' : 'Override por sucursal habilitado',
+      next ? 'Usando configuración general' : 'Configuración propia de sucursal habilitada',
     );
     await reload();
     setSaving(false);
@@ -94,7 +100,6 @@ export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) 
     setSaving(true);
     const targetSucursalId = editingOverride ? sucursalId : null;
 
-    // Buscar fila existente
     let q = supabase
       .from('payment_methods_config')
       .select('id')
@@ -134,34 +139,42 @@ export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) 
     setSaving(false);
   };
 
+  const subtitle = editingGeneral
+    ? 'Configuración general del negocio'
+    : inheritsFromGeneral
+      ? 'Esta sucursal usa la configuración general'
+      : 'Esta sucursal tiene configuración propia';
+
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <Wallet className="w-5 h-5 text-primary" />
             </div>
             <div>
               <CardTitle className="text-base">Métodos de pago y recargos</CardTitle>
-              <CardDescription>
-                {editingGeneral
-                  ? 'Configuración general del negocio'
-                  : 'Configuración específica de esta sucursal'}
-              </CardDescription>
+              <CardDescription>{subtitle}</CardDescription>
             </div>
           </div>
           {sucursalId !== null && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="use-general" className="text-sm">
-                Usar configuración general
-              </Label>
-              <Switch
-                id="use-general"
-                checked={usarGeneral}
-                onCheckedChange={handleToggleUsarGeneral}
-                disabled={saving || loading}
-              />
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="use-general" className="text-sm">
+                  Usar configuración general
+                </Label>
+                <Switch
+                  id="use-general"
+                  checked={usarGeneral}
+                  onCheckedChange={handleToggleUsarGeneral}
+                  disabled={saving || loading}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground text-right max-w-[220px]">
+                Activado: hereda de Mi Negocio.<br />
+                Desactivado: configuración propia.
+              </p>
             </div>
           )}
         </div>
@@ -171,13 +184,56 @@ export function PaymentMethodsConfig({ sucursalId }: PaymentMethodsConfigProps) 
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
+        ) : inheritsFromGeneral ? (
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 flex flex-col items-center text-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="space-y-1 max-w-md">
+              <h4 className="font-medium text-foreground">
+                Esta sucursal usa la configuración general
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Los métodos de pago activos y los recargos se administran desde Mi Negocio.
+                Cualquier cambio se aplica acá automáticamente.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {onGoToGeneral && (
+                <Button onClick={onGoToGeneral} className="gap-2">
+                  <Settings className="h-4 w-4" />
+                  Ir a configuración general
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => handleToggleUsarGeneral(false)}
+                disabled={saving}
+              >
+                Personalizar esta sucursal
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-2">
-            {!canEdit && sucursalId !== null && (
-              <p className="text-xs text-muted-foreground mb-3">
-                Esta sucursal está usando la configuración general. Desactivá el
-                switch para personalizar.
-              </p>
+            {editingOverride && (
+              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3 mb-3">
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                <div className="flex-1 text-sm">
+                  <p className="text-foreground">
+                    Esta sucursal tiene configuración propia. Los cambios acá NO afectan a las demás sucursales.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleUsarGeneral(true)}
+                    disabled={saving}
+                    className="mt-1 text-xs font-medium text-primary hover:underline"
+                  >
+                    Volver a usar la configuración general
+                  </button>
+                </div>
+              </div>
             )}
             {PAYMENT_METHODS.map((m) => {
               const s = state[m];
