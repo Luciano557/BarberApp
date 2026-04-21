@@ -1,213 +1,68 @@
 
 
-## Diagnóstico breve
+## Plan: Separar configuración general de métodos de pago en su propia sección
 
-**Archivos a tocar (4):**
-1. `src/components/config/PaymentMethodsConfig.tsx` — UX confusa cuando sucursal hereda general; agregar acceso directo a la config general.
-2. `src/components/PaymentRegistration.tsx` — UI hardcodeada Efectivo/MP, sin recargos, sin lista dinámica, submit en formato viejo, label "Mercado Pago" en split.
-3. `src/components/SucursalTabContent.tsx` y `src/components/MiNegocioPanel.tsx` — pasar prop `onGoToGeneral` hacia `PaymentMethodsConfig`.
-4. `src/pages/Index.tsx` — exponer un callback que abra `Configuración → Mi Negocio` cuando se invoca desde el panel de sucursal.
-5. `src/components/config/DiscountsConfig.tsx` — unificar label "Solo Mercado Pago" → "Solo QR".
-6. `src/components/PaymentRegistration.tsx` (paso descuentos) — `paymentLabel` para `mercado_pago` debe usar `getMethodLabel` (= "QR"), no "MP".
+### Diagnóstico
 
-**Lo que ya estaba bien (no se toca):**
-- DB, RLS, seeds, triggers de onboarding.
-- `usePaymentMethodsConfig`: resuelve methods, recargos y default sano por ausencia de fila.
-- `useTransactions.addTransaction` y `loadTransactionsByDate`: ya aceptan/persisten `basePago`/`recargoPct`/`recargoMonto`/`amount`, y mantienen `total_final` como BASE.
-- `useCashClosing`, `getDailySummary`, `SueldosPanel`: intactos. Los dejamos así.
-- Tipos `PaymentMethod`, `getMethodLabel` (devuelve "QR" para `mercado_pago`), `TransactionPayment`.
-- Historial: las ventas viejas siguen guardando su `metodo_pago` original; al desactivar un método solo se filtra para nuevos cobros, no se altera nada existente.
+Hoy la configuración general de métodos de pago vive **embebida dentro de `OrganizationSettings`** (panel "Plan y Suscripción"). El botón "Ir a configuración general" desde una sucursal manda al **menú raíz de Configuración**, no a un lugar concreto. Resultado: navegación ambigua y UX confusa.
 
-**Lo viejo / desconectado:**
-- `PaymentRegistration`: 2 botones hardcodeados, atajo Ctrl+1/2 fijo, split fijo a `efectivo + mercado_pago`, no calcula recargo, fila "Total" no incluye recargo, `onSubmit.payments` manda solo `{method, amount}`.
-- `PaymentRegistration` paso "discount": etiqueta "MP" hardcodeada en chip "Solo MP".
-- `PaymentMethodsConfig`: cuando sucursal hereda general muestra grilla gris confusa.
-- `DiscountsConfig`: `<SelectItem>` dice "Solo Mercado Pago".
+### Archivos a tocar
 
----
+1. **`src/components/config/ConfigMenu.tsx`** — agregar nueva entrada "Métodos de pago y recargos".
+2. **`src/components/ConfigurationPanel.tsx`** — agregar sección `'payments'` que renderiza `PaymentMethodsConfig` con `sucursalId={null}`. Aceptar prop opcional `initialSection` para deep-link.
+3. **`src/components/OrganizationSettings.tsx`** — **quitar** `<PaymentMethodsConfig sucursalId={null} />` (deja de vivir acá). Plan y Suscripción queda solo con datos del negocio + plan.
+4. **`src/pages/Index.tsx`** — exponer estado `configInitialSection`. El callback `onGoToGeneralConfig` que se pasa a Mi Negocio ahora hace `setConfigInitialSection('payments'); setActiveTab('config')`. `ConfigurationPanel` recibe `initialSection`.
+5. **`src/components/config/PaymentMethodsConfig.tsx`** — pequeños retoques de copy en estado heredado:
+   - Botón primario pasa a llamarse **"Editar configuración general"** (el usuario lo pidió textual).
+   - Sin cambios de lógica.
 
-## Cambio 1 — `PaymentMethodsConfig.tsx`
+### Cómo queda la navegación
 
-Sin cambios de lógica de DB. Solo claridad y CTA.
+- **Configuración → Métodos de pago y recargos** — nueva entrada del menú principal de Configuración. Subtítulo: "Configuración general del negocio". Renderiza `<PaymentMethodsConfig sucursalId={null} />`.
+- **Mi Negocio → sucursal X**, botón "Editar configuración general" → abre directo `Configuración → Métodos de pago y recargos` (no el menú raíz).
+- **Configuración → Plan y Suscripción** — vuelve a contener solo los datos del negocio y del plan. Limpio.
 
-**Nueva prop opcional:** `onGoToGeneral?: () => void`.
+### Ficha de sucursal — estado HEREDA general
 
-**Header:**
-- Título: `Métodos de pago y recargos`.
-- Subtítulo dinámico:
-  - `editingGeneral` → "Configuración general del negocio".
-  - sucursal + hereda → "Esta sucursal usa la configuración general".
-  - sucursal + override → "Esta sucursal tiene configuración propia".
-- Switch a la derecha solo si `sucursalId !== null`. Label clarificador: "Usar configuración general" (sigue igual) + tooltip/hint debajo: "Activado: hereda de Mi Negocio. Desactivado: configuración propia."
+Sin cambios estructurales (ya está bien implementado). Solo:
+- Texto: "Esta sucursal usa la configuración general del negocio. Los métodos activos y los recargos se administran en un solo lugar."
+- Botón primario: **"Editar configuración general"** (icon `Settings` + flecha).
+- Botón secundario: **"Personalizar esta sucursal"** (outline). Al click → toggle off + aparece la grilla.
+- Sin grilla gris.
 
-**Body:**
+### Ficha de sucursal — estado OVERRIDE propio
 
-A. `sucursalId !== null && usarGeneral === true` (HEREDA):
-- **No renderizar la grilla**.
-- Estado vacío con `Building2` + texto:
-  - Título: "Esta sucursal usa la configuración general"
-  - Detalle: "Los métodos de pago activos y los recargos se administran desde Mi Negocio. Cualquier cambio se aplica acá automáticamente."
-- Dos botones lado a lado:
-  - Primario `Button` "Ir a configuración general" → llama `onGoToGeneral?.()`. Solo se renderiza si la prop está provista.
-  - Secundario `outline` "Personalizar esta sucursal" → `handleToggleUsarGeneral(false)`.
+Sin cambios. Banner sutil arriba: "Esta sucursal tiene configuración propia. Los cambios acá no afectan a las demás." + acción inline "Volver a usar la configuración general". Debajo, la grilla editable de los 5 métodos.
 
-B. `editingGeneral` o `editingOverride`:
-- Si `editingOverride`: banner sutil arriba de la grilla con `Info` icono: "Esta sucursal tiene configuración propia. Los cambios acá NO afectan a las demás sucursales." + acción inline "Volver a usar la configuración general" → `handleToggleUsarGeneral(true)`.
-- Renderizar la grilla actual de 5 métodos con switch + recargo % + Guardar (sin cambios).
+### Navegación directa: cómo se resuelve
 
----
-
-## Cambio 2 — Conectar el CTA "Ir a configuración general"
-
-`MiNegocioPanel` y `SucursalTabContent` no manejan tabs globales. La config general vive en `Configuración → Mi Negocio (OrganizationSettings)` (panel `config`).
-
-**Estrategia simple:**
-- `Index.tsx`: agregar callback `goToGeneralConfig = () => setActiveTab('config')` y pasarlo como prop al panel actual de Mi Negocio (a través de `MiNegocioPanel`).
-- `MiNegocioPanel`: aceptar `onGoToGeneralConfig?: () => void` y propagarla a `SucursalTabContent`.
-- `SucursalTabContent`: aceptar `onGoToGeneralConfig?` y pasarla a `<PaymentMethodsConfig onGoToGeneral={onGoToGeneralConfig} />`.
-- En `OrganizationSettings`, `<PaymentMethodsConfig sucursalId={null} />` no recibe la prop (no aplica).
-
-Resultado: al tocar "Ir a configuración general" desde un tab de sucursal, el usuario aterriza en `Configuración → Mi Negocio`, donde edita la fila general y vuelve.
-
-(El detalle de scroll a la sección de métodos de pago se omite para no inflar el alcance; quedará visible debajo del card de organización.)
-
----
-
-## Cambio 3 — `PaymentRegistration.tsx` (selector dinámico + recargos)
-
-### 3.1 Hook + estado
-- Importar `usePaymentMethodsConfig`, `getMethodLabel`.
-- `const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();` (sin args → sucursal activa, default sano).
-- `const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);`
-- `const electronicMethods = useMemo(() => activeMethods.filter(m => m.method !== 'efectivo'), [activeMethods]);`
-- Nuevo estado: `const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('')` para el split.
-- Inicializarlo cuando cambia `electronicMethods`: si `mercado_pago` está activo usalo; si no, `electronicMethods[0]?.method`; si no hay, `''`.
-
-### 3.2 Render de selector simple (no split)
-- Reemplazar los 2 botones hardcodeados por `activeMethods.map((m, idx) => …)` en `grid grid-cols-2 md:grid-cols-3 gap-3`.
-- Cada botón: ícono `Banknote` si `m.method === 'efectivo'`, sino `CreditCard`. Label `m.label`. Atajo `idx+1` arriba-izquierda. Si `m.recargoPct > 0`: chip sutil "+{m.recargoPct}%" abajo del label.
-- Estilos: efectivo usa `border-success`/`bg-success/5` cuando seleccionado; resto `border-secondary`/`bg-secondary/5`.
-- Botón "Combinar métodos de pago": deshabilitado si no hay efectivo activo o no hay `electronicMethods`. Tooltip si está deshabilitado: "Activá efectivo y al menos un método electrónico en Mi Negocio".
-
-### 3.3 Render del split
-- Mantener layout 2 columnas. Columna izquierda fija = Efectivo (`Banknote`). Columna derecha = el método electrónico seleccionado (`CreditCard`), con label `getMethodLabel(selectedDigitalMethod)`.
-- Si `electronicMethods.length > 1`: arriba del input derecho, chips selector horizontal con cada electrónico activo (label vía `getMethodLabel`, click → `setSelectedDigitalMethod(m)`).
-- Junto a cada `CurrencyInput`, si su método tiene recargo > 0: texto pequeño `→ ${cobrado.toLocaleString()}` debajo (donde `cobrado = Math.round(monto * pct/100) + monto`).
-- `splitValid` sigue comparando suma de **bases** vs `total`.
-
-### 3.4 Cálculo de recargo
-```
-const pctSimple = paymentMethod ? getRecargoPct(paymentMethod) : 0;
-const pctEfectivo = getRecargoPct('efectivo');
-const pctDigital = selectedDigitalMethod ? getRecargoPct(selectedDigitalMethod) : 0;
-
-const recargoTotal = useMemo(() => {
-  if (splitMode) {
-    return Math.round(splitEfectivoNum * pctEfectivo / 100)
-         + Math.round(splitMpNum     * pctDigital / 100);
-  }
-  return Math.round(total * pctSimple / 100);
-}, [...]);
-
-const totalACobrar = total + recargoTotal;
+`Index.tsx` mantiene un estado adicional:
+```text
+configInitialSection: 'menu' | 'payments' | …
 ```
 
-### 3.5 Resumen visible (Card)
-Después del bloque de descuento:
-```
-Recargo (QR 10%)        +$X.XXX     ← solo si recargoTotal > 0
-─────────────────────────────────
-Total a cobrar           $totalACobrar
-```
-- Reemplazar `<span>Total</span>$total` por `<span>Total a cobrar</span>$totalACobrar`.
-- Si `recargoTotal === 0`, `totalACobrar === total` y la fila Recargo no se renderiza → comportamiento visual idéntico al actual.
-- En modo simple, etiqueta del recargo: `"Recargo (${getMethodLabel(paymentMethod)} ${pctSimple}%)"`.
-- En split: si ambos pcts > 0 → "Recargo (mixto)"; si uno → mostrar el específico.
-- No agregar fila "Base".
+Al pulsar "Editar configuración general" desde una sucursal:
+1. `setConfigInitialSection('payments')`
+2. `setActiveTab('config')`
 
-### 3.6 `onSubmit` — formato extendido
+`ConfigurationPanel` lee `initialSection` como prop y arranca en esa sección directa, no en el menú. Si el usuario abre Configuración por el sidebar, `initialSection` es `undefined` y arranca en `menu` como hoy.
 
-Ampliar tipo en `PaymentRegistrationProps.onSubmit.payments`:
-```ts
-payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
-```
+### Lo que NO se toca
 
-En `handleSubmit`:
-- Modo simple:
-  ```ts
-  const recargoMonto = Math.round(total * pctSimple / 100);
-  payments = [{ method: paymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
-  ```
-- Modo split:
-  ```ts
-  const recE = Math.round(splitEfectivoNum * pctEfectivo / 100);
-  const recD = Math.round(splitMpNum     * pctDigital / 100);
-  payments = [
-    { method: 'efectivo',             basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
-    { method: selectedDigitalMethod,  basePago: splitMpNum,       recargoPct: pctDigital,  recargoMonto: recD, amount: splitMpNum + recD },
-  ];
-  ```
-- `primaryMethod`: el de mayor `basePago`.
-- `total` que se manda al `onSubmit` sigue siendo la BASE (intacto). `useTransactions` ya lo respeta.
+- DB, RLS, hooks (`usePaymentMethodsConfig`, `useTransactions`, `useCashClosing`).
+- `SueldosPanel`, cierres, historial, comisiones.
+- `venta.total_final` sigue siendo BASE; `recargo_total` y `total_cobrado` intactos.
+- `PaymentRegistration` (ya migrado en pasos previos).
+- Modelo de 5 métodos. Métodos desactivados siguen apareciendo en historial/cierres.
+- Etiqueta "QR" (ya está aplicada).
 
-### 3.7 Atajos de teclado
-Reemplazar el `if index===0/===1` por:
-```ts
-} else if (currentStep === 'payment' && activeMethods[index]) {
-  handleSelectPayment(activeMethods[index].method);
-}
-```
+### Verificación
 
-### 3.8 Self-healing al cambiar config (Cambio 4 del usuario)
-`useEffect` que observa `activeMethods`:
-- Si `paymentMethod` ya no está en `activeMethods.map(m => m.method)` (y no estamos en split): `setPaymentMethod('')` (silencioso, no toast).
-- Si `splitMode === true` y `selectedDigitalMethod` ya no está en `electronicMethods`: si hay otro electrónico activo, seleccionarlo; si no, `cancelSplitMode()`.
-- Si `splitMode === true` y `efectivo` se desactiva: `cancelSplitMode()`.
-
-Esto no altera ventas anteriores; solo limpia la selección del formulario abierto.
-
-### 3.9 Loading / fallback
-- Si `methodsLoading`: en el paso de pago, mostrar `Loader2` chico arriba del grid.
-- Si `activeMethods.length === 0`: mensaje en el grid: "No hay métodos de pago activos. Activá al menos uno en Mi Negocio."
-
-### 3.10 Toast y label histórico
-- Toast: si `recargoTotal > 0`, description = `"$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()})"`. Si no, comportamiento actual.
-- En el chip de descuentos restringido (`paymentLabel`), reemplazar el ternario hardcodeado:
-  ```ts
-  const paymentLabel = discount.paymentMethod === 'todos' ? '' : getMethodLabel(discount.paymentMethod as PaymentMethod);
-  ```
-  → muestra "QR" en vez de "MP".
-
----
-
-## Cambio 4 — `DiscountsConfig.tsx`
-
-Cambio cosmético en el `<Select>`:
-- `<SelectItem value="mercado_pago">Solo Mercado Pago</SelectItem>` → `<SelectItem value="mercado_pago">Solo QR</SelectItem>`.
-
-(El valor interno sigue siendo `mercado_pago` por compatibilidad histórica; solo cambia el label visible.)
-
----
-
-## Lo que NO se toca
-
-- `useTransactions.ts`, `useCashClosing.ts`, `getDailySummary`: 0 cambios.
-- `SueldosPanel`, comisiones, bono fijo, `MultiDayClosingSummary`: 0 cambios.
-- DB, migraciones, RLS, seeds: 0 cambios.
-- Ventas históricas: ningún update; quedan tal cual.
-- `DailySummary.tsx` (etiquetas "Mercado Pago" en cierres) y otros lugares de historial: fuera de alcance del pedido. Se atacan en una pasada cosmética separada si el usuario lo pide.
-
----
-
-## Verificación post-cambio
-
-1. **Configuración por sucursal heredando**: aparece estado vacío con "Esta sucursal usa la configuración general" + botones "Ir a configuración general" (lleva a `config → Mi Negocio`) y "Personalizar esta sucursal".
-2. **Toggle a personalizado**: aparece banner "Configuración propia" con acción para volver a heredar + grilla editable.
-3. **Cobrar → paso Método de pago**: 5 tarjetas (Efectivo, QR, Transferencia, Débito, Crédito) cuando todas están activas. Si una se desactiva, deja de aparecer.
-4. **Recargo en QR (10%)**: al elegir QR aparece fila "Recargo (QR 10%) +$X" y "Total a cobrar" mayor que "Total".
-5. **Split Efectivo + QR con recargo**: chip selector de método electrónico si hay más de uno; texto "→ $cobrado" debajo del input QR; total a cobrar correcto.
-6. **Submit**: `venta.total_final` = BASE; `venta.recargo_total`/`total_cobrado` con valores correctos; `venta_pagos` con `base_pago`/`recargo_pct`/`recargo_monto`; `ingresos.sueldo` igual que antes.
-7. **Atajos Ctrl+1..N**: seleccionan según el orden visible.
-8. **Auto-limpieza**: si en otra pestaña se desactiva el método elegido, el formulario abierto limpia la selección sin tocar historial.
-9. **Etiquetas**: en descuentos (chip "Solo QR" y selector "Solo QR") y en cobro: nunca aparece "MP" ni "Mercado Pago".
+1. **Sidebar → Configuración**: aparece nueva tarjeta "Métodos de pago y recargos" entre Plan y PIN.
+2. **Configuración → Métodos de pago y recargos**: muestra `PaymentMethodsConfig` con la grilla general editable (5 métodos, recargos, switches).
+3. **Configuración → Plan y Suscripción**: ya NO muestra métodos de pago. Solo datos del negocio + plan.
+4. **Mi Negocio → sucursal heredando**: bloque sin grilla, con botón "Editar configuración general" + "Personalizar esta sucursal".
+5. **Click en "Editar configuración general"**: aterriza directo en `Configuración → Métodos de pago y recargos`. No se ve el menú intermedio.
+6. **Mi Negocio → sucursal con override**: banner + grilla editable de la sucursal.
+7. **Etiquetas**: en toda la UI sigue diciendo "QR", nunca "Mercado Pago" / "MP".
 
