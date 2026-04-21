@@ -61,6 +61,35 @@ export interface Discount {
   sucursalId?: string; // Reference to sucursales table
 }
 
+export type PaymentMethod = 'efectivo' | 'mercado_pago' | 'transferencia' | 'debito' | 'credito';
+export type DiscountType = 'fixed' | 'percentage';
+
+// Métodos de pago: lista cerrada e identidad visual
+export const PAYMENT_METHODS: PaymentMethod[] = ['efectivo', 'mercado_pago', 'transferencia', 'debito', 'credito'];
+
+export function getMethodLabel(m: PaymentMethod): string {
+  switch (m) {
+    case 'efectivo': return 'Efectivo';
+    case 'mercado_pago': return 'QR';
+    case 'transferencia': return 'Transferencia';
+    case 'debito': return 'Débito';
+    case 'credito': return 'Crédito';
+  }
+}
+
+// Métodos electrónicos (todo lo que no es efectivo)
+export function isDigitalMethod(m: PaymentMethod): boolean {
+  return m !== 'efectivo';
+}
+
+export interface TransactionPayment {
+  method: PaymentMethod;
+  amount: number;          // base + recargo (lo que entra a caja)
+  recargoPct?: number;     // % aplicado a la base de este pago
+  recargoMonto?: number;   // recargo en pesos de este pago
+  basePago?: number;       // porción de BASE asignada a este pago
+}
+
 export interface Transaction {
   id: string;
   barberId: string;
@@ -71,10 +100,12 @@ export interface Transaction {
   extras: { uid: string; name: string; price: number }[];
   discount: number;
   discountType: 'fixed' | 'percentage';
-  paymentMethod: 'efectivo' | 'mercado_pago';
-  payments?: { method: 'efectivo' | 'mercado_pago'; amount: number }[];
+  paymentMethod: PaymentMethod;
+  payments?: TransactionPayment[];
   subtotal: number;
-  total: number;
+  total: number;            // BASE comisionable (servicio + extras − descuento)
+  recargoTotal?: number;    // Suma de recargos cobrados
+  totalCobrado?: number;    // total + recargoTotal (lo que entró a caja)
   createdAt: Date;
   // Soft delete fields
   estado?: 'activo' | 'anulado';
@@ -82,6 +113,3 @@ export interface Transaction {
   anuladoPor?: string;
   anuladoPorId?: string;
 }
-
-export type PaymentMethod = 'efectivo' | 'mercado_pago';
-export type DiscountType = 'fixed' | 'percentage';
