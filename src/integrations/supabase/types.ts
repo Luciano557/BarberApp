@@ -882,7 +882,9 @@ export type Database = {
           created_at: string
           deluxe: number | null
           dia: string | null
+          digital_cobrado: number | null
           efectivo: number | null
+          efectivo_cobrado: number | null
           entry_mode: string
           essencial: number | null
           estado: string | null
@@ -892,11 +894,13 @@ export type Database = {
           mp: number | null
           organization_id: string | null
           perdida: number | null
+          recargos_total: number
           servicios_con_descuento: number | null
           servicios_por_linea: Json | null
           servicios_sin_descuento: number | null
           sucursal_id: string | null
           sueldo: number | null
+          total_cobrado: number | null
           total_facturado: number | null
           total_sin_descuento: number | null
           Usuario: string | null
@@ -915,7 +919,9 @@ export type Database = {
           created_at: string
           deluxe?: number | null
           dia?: string | null
+          digital_cobrado?: number | null
           efectivo?: number | null
+          efectivo_cobrado?: number | null
           entry_mode?: string
           essencial?: number | null
           estado?: string | null
@@ -925,11 +931,13 @@ export type Database = {
           mp?: number | null
           organization_id?: string | null
           perdida?: number | null
+          recargos_total?: number
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
           sucursal_id?: string | null
           sueldo?: number | null
+          total_cobrado?: number | null
           total_facturado?: number | null
           total_sin_descuento?: number | null
           Usuario?: string | null
@@ -948,7 +956,9 @@ export type Database = {
           created_at?: string
           deluxe?: number | null
           dia?: string | null
+          digital_cobrado?: number | null
           efectivo?: number | null
+          efectivo_cobrado?: number | null
           entry_mode?: string
           essencial?: number | null
           estado?: string | null
@@ -958,11 +968,13 @@ export type Database = {
           mp?: number | null
           organization_id?: string | null
           perdida?: number | null
+          recargos_total?: number
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
           servicios_sin_descuento?: number | null
           sucursal_id?: string | null
           sueldo?: number | null
+          total_cobrado?: number | null
           total_facturado?: number | null
           total_sin_descuento?: number | null
           Usuario?: string | null
@@ -1286,6 +1298,54 @@ export type Database = {
           },
         ]
       }
+      payment_methods_config: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          metodo_pago: string
+          organization_id: string
+          recargo_pct: number
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          metodo_pago: string
+          organization_id: string
+          recargo_pct?: number
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          metodo_pago?: string
+          organization_id?: string
+          recargo_pct?: number
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_config_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plan_features: {
         Row: {
           can_export_reports: boolean | null
@@ -1536,6 +1596,45 @@ export type Database = {
             foreignKeyName: "servicios_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sucursal_payment_settings: {
+        Row: {
+          created_at: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+          usar_config_general: boolean
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+          usar_config_general?: boolean
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+          usar_config_general?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sucursal_payment_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_payment_settings_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
@@ -1950,9 +2049,11 @@ export type Database = {
           metodo_pago: string
           organization_id: string | null
           precio_servicio: number
+          recargo_total: number
           servicio_id: string
           servicio_nombre: string
           sucursal_id: string | null
+          total_cobrado: number | null
           total_final: number
         }
         Insert: {
@@ -1969,9 +2070,11 @@ export type Database = {
           metodo_pago: string
           organization_id?: string | null
           precio_servicio?: number
+          recargo_total?: number
           servicio_id: string
           servicio_nombre: string
           sucursal_id?: string | null
+          total_cobrado?: number | null
           total_final?: number
         }
         Update: {
@@ -1988,9 +2091,11 @@ export type Database = {
           metodo_pago?: string
           organization_id?: string | null
           precio_servicio?: number
+          recargo_total?: number
           servicio_id?: string
           servicio_nombre?: string
           sucursal_id?: string | null
+          total_cobrado?: number | null
           total_final?: number
         }
         Relationships: [
@@ -2075,32 +2180,41 @@ export type Database = {
       }
       venta_pagos: {
         Row: {
+          base_pago: number | null
           created_at: string
           id: string
           metodo_pago: string
           monto: number
           orden: number
           organization_id: string
+          recargo_monto: number
+          recargo_pct: number
           sucursal_id: string | null
           venta_id: string
         }
         Insert: {
+          base_pago?: number | null
           created_at?: string
           id?: string
           metodo_pago: string
           monto?: number
           orden?: number
           organization_id: string
+          recargo_monto?: number
+          recargo_pct?: number
           sucursal_id?: string | null
           venta_id: string
         }
         Update: {
+          base_pago?: number | null
           created_at?: string
           id?: string
           metodo_pago?: string
           monto?: number
           orden?: number
           organization_id?: string
+          recargo_monto?: number
+          recargo_pct?: number
           sucursal_id?: string | null
           venta_id?: string
         }
@@ -2173,6 +2287,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      seed_payment_methods_for_org: {
+        Args: { _org_id: string }
+        Returns: undefined
       }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
