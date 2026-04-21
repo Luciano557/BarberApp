@@ -116,7 +116,7 @@ export function DiscountsConfig({ discounts, onAdd, onUpdate, onDelete }: Discou
             <SelectContent>
               <SelectItem value="todos">Todos los métodos</SelectItem>
               <SelectItem value="efectivo">Solo Efectivo</SelectItem>
-              <SelectItem value="mercado_pago">Solo Mercado Pago</SelectItem>
+              <SelectItem value="mercado_pago">Solo QR</SelectItem>
             </SelectContent>
           </Select>
         </div>
