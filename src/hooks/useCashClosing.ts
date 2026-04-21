@@ -185,8 +185,10 @@ export function useCashClosing() {
       efectivo_cobrado: efectivoCobrado,
       digital_cobrado: digitalCobrado,
     };
+
+    const { error } = await supabase
       .from('ingresos')
-      .insert(insertData);
+      .insert(insertData as any);
     
     if (error) {
       console.error('Error saving cash closing:', error);
