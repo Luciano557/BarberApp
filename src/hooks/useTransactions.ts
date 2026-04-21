@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Transaction } from '@/types/barbershop';
+import { Transaction, PaymentMethod } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -14,8 +14,10 @@ interface VentaInsert {
   servicio_nombre: string;
   precio_servicio: number;
   descuento_pct: number;
-  metodo_pago: 'efectivo' | 'mercado_pago';
+  metodo_pago: PaymentMethod;
   total_final: number;
+  recargo_total: number;
+  total_cobrado: number;
   organization_id: string;
   sucursal_id?: string | null;
 }
