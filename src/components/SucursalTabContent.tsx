@@ -40,6 +40,7 @@ interface SucursalTabContentProps {
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onSucursalUpdated: () => void;
+  onGoToGeneralConfig?: () => void;
 }
 
 export function SucursalTabContent({
@@ -51,6 +52,7 @@ export function SucursalTabContent({
   onAddDiscount, onUpdateDiscount, onDeleteDiscount,
   onAddLine, onUpdateLine,
   onSucursalUpdated,
+  onGoToGeneralConfig,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
 
@@ -248,7 +250,7 @@ export function SucursalTabContent({
 
         {/* Métodos de pago y recargos (override por sucursal) */}
         <div className="mt-6">
-          <PaymentMethodsConfig sucursalId={sucursal.id} />
+          <PaymentMethodsConfig sucursalId={sucursal.id} onGoToGeneral={onGoToGeneralConfig} />
         </div>
 
       </div>

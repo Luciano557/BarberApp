@@ -170,7 +170,7 @@ const Index = () => {
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
             <PinProtectedSection sectionName="Mi Negocio">
-              <MiNegocioPanel />
+              <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? () => setActiveTab('config') : undefined} />
             </PinProtectedSection>
           )}
 
