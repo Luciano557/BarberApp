@@ -1,56 +1,55 @@
 
 
-## Plan: agrupar todo lo no-efectivo como "Digital" en Caja
+## Plan: Confirmar email manualmente — `sebastian.tello20001@gmail.com`
 
-### Diagnóstico — dónde está el bug
+### Diagnóstico
 
-`useTransactions.ts` ya agrega correctamente: la variable `totalMercadoPago` que devuelve el summary suma `mercado_pago + transferencia + debito + credito` (line 397-398). El bug es 100% de presentación dentro de `DailySummary.tsx`, que:
+La cuenta existe en `auth.users` pero tiene `email_confirmed_at = NULL`, por lo que Supabase Auth bloquea el inicio de sesión hasta que se confirme el email.
 
-1. **Filtra por método exacto `'mercado_pago'`** en la agregación por barbero (`barberSummaries`, lines 192-195) → cobros con débito/crédito/transferencia no entran al total digital del barbero (queda en $0).
-2. **Filtra por método exacto `'mercado_pago'`** para construir `barberTransactions.mercadoPago` (lines 93-102) → en el modal "Cerrar Caja" esos cobros no aparecen en ninguna lista.
-3. **Suma solo `'mercado_pago'`** en `mpAmt` para el desglose por fila (line 620) y en la sección de transacciones del modal de cierre (lines 782, 818).
-4. **Muestra el label "Mercado Pago"** en 3 lugares: card general (435), card por barbero (509), card del modal de cierre (760), título de la sección de transacciones (811).
-5. **Detecta "mixto" comparando solo a `efectivo`/`mercado_pago`** → un cobro split efectivo + débito no se reconoce como mixto.
+| Campo | Valor |
+|---|---|
+| user_id | `d3111779-a809-4fe4-b250-3649d73cd44b` |
+| email | sebastian.tello20001@gmail.com |
+| created_at | 2026-04-22 13:34 UTC |
+| email_confirmed_at | **NULL** ← bloquea login |
+| last_sign_in_at | nunca |
+| business_name (signup) | perri barbershop |
+| full_name | Sebastian Tello |
 
-### Cambios a aplicar — solo `src/components/DailySummary.tsx`
+Como el flujo de registro propio (`handle_new_user`) ya creó la organización "perri barbershop", la sucursal "Casa Central", el `profile`, el rol `owner` y el `user_sucursales` correspondientes — solo falta marcar el email como confirmado.
 
-**Helpers:** definir un único criterio:
+### Acción única
 
-```ts
-const isDigital = (m: PaymentMethod) => m !== 'efectivo';
+Una migración puntual sobre `auth.users` para setear `email_confirmed_at = now()` exclusivamente en este `user_id`:
+
+```sql
+UPDATE auth.users
+SET email_confirmed_at = now(),
+    confirmed_at       = COALESCE(confirmed_at, now())
+WHERE id = 'd3111779-a809-4fe4-b250-3649d73cd44b'
+  AND email = 'sebastian.tello20001@gmail.com'
+  AND email_confirmed_at IS NULL;
 ```
 
-(usando el helper `isDigitalMethod` ya existente en `src/types/barbershop.ts`).
+- Filtro doble por `id` + `email` para evitar cualquier riesgo de afectar otra fila.
+- Idempotente: si ya estuviera confirmado, no hace nada.
+- No toca `profiles`, `organizations`, `sucursales`, `user_roles` ni `user_sucursales` — todo eso ya está creado por el trigger de signup.
+- No cambia password. El usuario inicia con la contraseña que eligió al registrarse.
 
-**Agregaciones a corregir:**
+### Lo que NO se hace
 
-- `barberTransactions` (lines 87-103): renombrar `mercadoPago` → `digital`; filtrar con `isDigital(p.method)`.
-- `barberSummaries` (lines 192-195): sumar `else existing.totalMercadoPago += p.amount` para cualquier método que cumpla `isDigital`. (Mantengo el nombre del campo `totalMercadoPago` en la interfaz interna `BarberSummary` para no propagar el rename a `useCashClosing` y otros lugares; solo cambia el label visible).
-- En la lista de transacciones (lines 619-620): `digitalAmt = txPayments.filter(p => isDigital(p.method)).reduce(...)`.
-- Sección "Mercado Pago Transactions" del modal de cierre (lines 806-840): renombrar lista a `digital`, sumar todos los digitales.
+- No se reenvía email de confirmación (la idea es justamente saltearlo).
+- No se modifica ninguna tabla de aplicación.
+- No se altera el flujo de auth ni `handle_new_user`.
+- No se toca ningún otro usuario.
 
-**Labels visibles a actualizar a "Digital":**
+### Verificación post-cambio
 
-- Line 435 — card general superior.
-- Line 509 — card por barbero.
-- Line 676 — desglose mixto inline (`Dig. $X` en lugar de `MP $X`).
-- Line 760 — card del modal "Cerrar Caja".
-- Line 811 — header de la sección de transacciones digitales del modal.
+1. Re-consultar `auth.users` filtrando por ese email → `email_confirmed_at` debe estar seteado.
+2. Pedirle al usuario que ingrese desde `/login` con su email y la contraseña que usó al registrarse.
+3. Confirmar que entra a `/app/perri-barbershop-<hash>` como `owner` de su organización.
 
-**Iconos:** mantener `CreditCard` (genérico para digital) — ya es apropiado.
+### Nota operativa
 
-### Lo que NO se toca
-
-- `useTransactions`, `useCashClosing`, `useBackfillClosing`, `useBarbershopStore` (este último es legacy local, sin uso real de DB).
-- Persistencia: campos `efectivo` y `mp` en `ingresos` siguen guardando lo mismo (BASE efectivo / BASE digital agregado).
-- Comisiones, sueldos, `total_final`, `recargo_total`, `total_cobrado`, historial.
-- Nombre del campo interno `totalMercadoPago` en `BarberSummary` y en el resumen de `useTransactions` (refactor cosmético costoso, sin valor funcional). Solo cambia lo visible y la lógica de filtrado.
-
-### Verificación
-
-1. Cobro con débito → en card general "Digital" suma; en card del barbero "Digital" suma; en el modal "Cerrar Caja" aparece bajo la sección "Digital".
-2. Cobro mixto efectivo + crédito → badge "Mixto" aparece, desglose dice "Ef. $X / Dig. $Y", y aparece en ambas listas del modal.
-3. Cobro QR (`mercado_pago`) → sigue contando en "Digital" como antes.
-4. En toda la pantalla de Caja no aparece más el texto "Mercado Pago" ni "MP".
-5. Sueldos, comisiones y cierres ya guardados siguen idénticos.
+Si en el futuro hay que repetir esto seguido para otros usuarios, conviene desactivar "Confirm email" en Supabase Auth → Providers → Email, o bien implementar un panel admin. Para este caso puntual, la migración directa es lo más rápido y seguro.
 
