@@ -30,6 +30,12 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     return <Navigate to="/login" replace />;
   }
 
+  // Bloquear acceso si el email no está verificado (excepto invitados)
+  const isInvited = user.user_metadata?.invited_by != null;
+  if (!user.email_confirmed_at && !isInvited) {
+    return <Navigate to="/verify-email" replace />;
+  }
+
   // Check if user needs to change password (invited users)
   const mustChangePassword = user.user_metadata?.must_change_password === true;
   

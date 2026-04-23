@@ -8,9 +8,9 @@ import { toast } from 'sonner';
 import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 const PLANS = [
-  { id: 'basico',      label: 'Básico',      price: '$30.000'  },
-  { id: 'profesional', label: 'Profesional', price: '$50.000'  },
-  { id: 'premium',     label: 'Premium',     price: '$100.000' },
+  { id: 'free',    label: 'Básico',      price: '$30.000'  },
+  { id: 'basic',   label: 'Profesional', price: '$50.000'  },
+  { id: 'premium', label: 'Premium',     price: '$100.000' },
 ] as const;
 type PlanId = typeof PLANS[number]['id'];
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +34,7 @@ export default function Login() {
   const [registerName, setRegisterName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [country, setCountry] = useState('AR');
-  const [plan, setPlan] = useState<PlanId>('basico');
+  const [plan, setPlan] = useState<PlanId>('free');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,13 +87,22 @@ export default function Login() {
       setIsLoading(false);
       return;
     }
-    const { error } = await signUp(registerEmail, registerPassword, registerName, businessName, country);
+    // Guardar email para la pantalla de verificación (limpiado tras éxito)
+    localStorage.setItem('pending_verification_email', registerEmail);
+
+    const { error } = await signUp(registerEmail, registerPassword, registerName, businessName, country, plan);
     if (error) {
       toast.error('Error al registrarse', { description: error.message });
+      setIsLoading(false);
+      return;
+    }
+
+    // Si Supabase devolvió sesión inmediata (verificación deshabilitada), pasar por el callback
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      navigate('/auth/callback', { replace: true });
     } else {
-      toast.success('Cuenta creada', {
-        description: 'Revisá tu email para confirmar tu cuenta',
-      });
+      navigate('/verify-email', { replace: true });
     }
     setIsLoading(false);
   };
@@ -348,7 +357,7 @@ export default function Login() {
                 </Select>
               </div>
 
-              {/* TODO: Persistir el plan elegido al crear la organización (requiere ajustar AuthContext.signUp) */}
+              {/* Plan persistido en organizations.plan vía business_plan en raw_user_meta_data */}
               <div>
                 <Label htmlFor="plan" className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1">
                   <Sparkles size={12} /> Plan

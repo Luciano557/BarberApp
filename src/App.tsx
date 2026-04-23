@@ -11,6 +11,8 @@ import Homepage from "./pages/Homepage";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
+import VerifyEmail from "./pages/VerifyEmail";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import Reservar from "./pages/Reservar";
 
@@ -29,6 +31,8 @@ const App = () => (
                 <Route path="/" element={<Homepage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/:orgSlug/reservar" element={<Reservar />} />
                 <Route
                   path="/app/:orgSlug"
