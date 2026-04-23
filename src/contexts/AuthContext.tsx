@@ -33,7 +33,7 @@ interface AuthContextType {
   canViewFinanzas: boolean;
   canViewTurnosAgenda: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, businessName?: string, country?: string, plan?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -83,6 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
+        // Limpieza de localStorage cuando el usuario queda verificado
+        if (session?.user?.email_confirmed_at) {
+          localStorage.removeItem('pending_verification_email');
+        }
+
         if (session?.user) {
           // Use setTimeout to avoid potential race conditions with Supabase
           setTimeout(async () => {
@@ -123,16 +128,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName: string, businessName?: string, country?: string) => {
+  const signUp = async (email: string, password: string, fullName: string, businessName?: string, country?: string, plan?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
-        data: { 
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
           full_name: fullName,
           business_name: businessName || 'Mi Barbería',
-          country: country || 'AR'
+          country: country || 'AR',
+          business_plan: (plan || 'free').toLowerCase(),
         }
       }
     });
