@@ -7,6 +7,7 @@ import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
 import { MiNegocioPanel } from '@/components/MiNegocioPanel';
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
+import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PinProtectedSection } from '@/components/PinProtectedSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -17,7 +18,7 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
@@ -73,7 +74,10 @@ const Index = () => {
     if (activeTab === 'turnos-agenda' && !canViewTurnosAgenda) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, hasNoAccess, rolesLoaded]);
+    if (activeTab === 'clientes' && !canViewClientes) {
+      setActiveTab(canViewResumen ? 'resumen' : 'no-access');
+    }
+  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
 
   const {
     isLoading,
