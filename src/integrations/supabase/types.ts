@@ -381,6 +381,83 @@ export type Database = {
         }
         Relationships: []
       }
+      clientes: {
+        Row: {
+          apellido: string
+          created_at: string
+          email: string | null
+          id: string
+          nombre: string
+          nota_interna: string | null
+          organization_id: string
+          origen: string
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          apellido: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nombre: string
+          nota_interna?: string | null
+          organization_id: string
+          origen?: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apellido?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          nombre?: string
+          nota_interna?: string | null
+          organization_id?: string
+          origen?: string
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      clientes_sucursales: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          id: string
+          organization_id: string
+          origen_relacion: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          origen_relacion?: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          origen_relacion?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_sucursales_cliente_fk"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comision_equipo_config: {
         Row: {
           activa: boolean
@@ -1851,6 +1928,7 @@ export type Database = {
           cancelado_at: string | null
           cancelado_motivo: string | null
           cliente_email: string | null
+          cliente_id: string | null
           cliente_nombre: string | null
           cliente_telefono: string | null
           created_at: string
@@ -1873,6 +1951,7 @@ export type Database = {
           cancelado_at?: string | null
           cancelado_motivo?: string | null
           cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
@@ -1895,6 +1974,7 @@ export type Database = {
           cancelado_at?: string | null
           cancelado_motivo?: string | null
           cliente_email?: string | null
+          cliente_id?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
@@ -2276,6 +2356,16 @@ export type Database = {
       check_org_limit: {
         Args: { _org_id: string; _resource: string }
         Returns: boolean
+      }
+      create_cliente_with_sucursal: {
+        Args: {
+          _apellido: string
+          _email: string
+          _nombre: string
+          _sucursal_id: string
+          _telefono: string
+        }
+        Returns: string
       }
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
