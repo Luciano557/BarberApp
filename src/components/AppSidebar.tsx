@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ interface AppSidebarProps {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
-  const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, signOut } = useAuth();
+  const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, signOut } = useAuth();
   const { organization } = useOrganization();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
@@ -31,6 +31,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
     ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos y Agenda', icon: CalendarClock }] : []),
+    ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
     ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
