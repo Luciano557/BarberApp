@@ -178,6 +178,10 @@ const Index = () => {
             </PinProtectedSection>
           )}
 
+          {activeTab === 'clientes' && canViewClientes && (
+            <ClientesPanel />
+          )}
+
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
             <PinProtectedSection sectionName="Mi Negocio">
               <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
