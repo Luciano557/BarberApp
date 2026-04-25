@@ -388,6 +388,9 @@ export type Database = {
           apellido: string
           bloqueado: boolean
           created_at: string
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           email: string | null
           fecha_nacimiento: string | null
           id: string
@@ -408,6 +411,9 @@ export type Database = {
           apellido: string
           bloqueado?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           email?: string | null
           fecha_nacimiento?: string | null
           id?: string
@@ -428,6 +434,9 @@ export type Database = {
           apellido?: string
           bloqueado?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           email?: string | null
           fecha_nacimiento?: string | null
           id?: string
@@ -2412,6 +2421,7 @@ export type Database = {
         Args: { _org_id: string }
         Returns: undefined
       }
+      soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
