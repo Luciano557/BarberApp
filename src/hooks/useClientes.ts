@@ -20,6 +20,9 @@ export interface Cliente {
   motivo_bloqueo: string | null;
   origen: 'manual' | 'importado' | 'reserva';
   nota_interna: string | null;
+  eliminado: boolean;
+  eliminado_at: string | null;
+  eliminado_por: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -60,8 +63,6 @@ export type ClienteUpdate = Partial<Pick<Cliente,
   | 'fecha_nacimiento'
   | 'alergias'
   | 'acepta_marketing'
-  | 'bloqueado'
-  | 'motivo_bloqueo'
   | 'nota_interna'
 >>;
 
@@ -97,6 +98,7 @@ export function useClientes() {
             .from('clientes')
             .select('*')
             .in('id', ids)
+            .eq('eliminado', false)
             .order('apellido', { ascending: true });
           if (cliErr) throw cliErr;
           setClientes((data || []) as Cliente[]);
@@ -106,6 +108,7 @@ export function useClientes() {
           .from('clientes')
           .select('*')
           .eq('organization_id', organization.id)
+          .eq('eliminado', false)
           .order('apellido', { ascending: true });
         if (cliErr) throw cliErr;
         setClientes((data || []) as Cliente[]);
@@ -164,6 +167,47 @@ export function useClientes() {
     }
   }, [fetchClientes]);
 
+  const blockCliente = useCallback(async (id: string, motivo: string): Promise<{ error: string | null }> => {
+    const m = motivo.trim();
+    if (!m) return { error: 'El motivo es obligatorio' };
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ bloqueado: true, motivo_bloqueo: m } as any)
+        .eq('id', id);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al bloquear cliente' };
+    }
+  }, [fetchClientes]);
+
+  const unblockCliente = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ bloqueado: false, motivo_bloqueo: null } as any)
+        .eq('id', id);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al desbloquear cliente' };
+    }
+  }, [fetchClientes]);
+
+  const deleteCliente = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.rpc('soft_delete_cliente', { _cliente_id: id } as any);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al eliminar cliente' };
+    }
+  }, [fetchClientes]);
+
   const getClienteById = useCallback(async (id: string): Promise<Cliente | null> => {
     const { data, error } = await supabase
       .from('clientes')
@@ -212,6 +256,9 @@ export function useClientes() {
     refresh: fetchClientes,
     createCliente,
     updateCliente,
+    blockCliente,
+    unblockCliente,
+    deleteCliente,
     getClienteById,
     getSucursalesByCliente,
     getReservasByCliente,

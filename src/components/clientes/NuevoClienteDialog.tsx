@@ -31,14 +31,14 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [fechaNac, setFechaNac] = useState<string | null>(null);
   const [sucursalId, setSucursalId] = useState<string>('');
 
-  // Opcionales
+  // Más datos
   const [showMore, setShowMore] = useState(false);
   const [instagram, setInstagram] = useState('');
   const [tiktok, setTiktok] = useState('');
   const [otraRed, setOtraRed] = useState('');
-  const [fechaNac, setFechaNac] = useState<string | null>(null);
   const [alergias, setAlergias] = useState('');
   const [aceptaMarketing, setAceptaMarketing] = useState(true);
 
@@ -51,12 +51,12 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setApellido('');
       setTelefono('');
       setEmail('');
+      setFechaNac(null);
       setSucursalId(currentSucursal?.id ?? '');
       setShowMore(false);
       setInstagram('');
       setTiktok('');
       setOtraRed('');
-      setFechaNac(null);
       setAlergias('');
       setAceptaMarketing(true);
     }
@@ -90,10 +90,10 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       sucursalId: targetSucursalId,
       telefono: t || null,
       email: e || null,
+      fecha_nacimiento: fechaNac,
       instagram: instagram.trim() || null,
       tiktok: tiktok.trim() || null,
       otra_red_social: otraRed.trim() || null,
-      fecha_nacimiento: fechaNac,
       alergias: alergias.trim() || null,
       acepta_marketing: aceptaMarketing,
     });
@@ -141,6 +141,60 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
             <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@email.com" />
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Fecha de nacimiento</Label>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("w-full justify-start text-left font-normal", !fechaNac && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  {fechaNac ? format(parseISO(fechaNac), "d 'de' MMMM yyyy", { locale: es }) : 'Seleccionar fecha'}
+                  {fechaNac && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(ev) => { ev.stopPropagation(); setFechaNac(null); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setFechaNac(null); } }}
+                      className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                      aria-label="Limpiar fecha"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={fechaNac ? parseISO(fechaNac) : undefined}
+                  onSelect={(d) => {
+                    setFechaNac(d ? format(d, 'yyyy-MM-dd') : null);
+                    setDatePickerOpen(false);
+                  }}
+                  disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                  captionLayout="dropdown-buttons"
+                  fromYear={1900}
+                  toYear={new Date().getFullYear()}
+                />
+                <div className="border-t p-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setFechaNac(null); setDatePickerOpen(false); }}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
           {needsSucursalPicker && (
             <div className="space-y-1.5">
               <Label htmlFor="sucursal">Sucursal *</Label>
@@ -163,11 +217,11 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
             </div>
           )}
 
-          {/* Más datos (opcional) */}
+          {/* Más datos */}
           <Collapsible open={showMore} onOpenChange={setShowMore}>
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" className="w-full justify-between px-2 -mx-2 text-sm font-medium">
-                Más datos (opcional)
+                Más datos
                 <ChevronDown className={cn("h-4 w-4 transition-transform", showMore && "rotate-180")} />
               </Button>
             </CollapsibleTrigger>
@@ -183,60 +237,6 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
               <div className="space-y-1.5">
                 <Label htmlFor="otra_red">Otra red social</Label>
                 <Input id="otra_red" value={otraRed} onChange={(e) => setOtraRed(e.target.value)} placeholder="Ej: Twitter @usuario" />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Fecha de nacimiento</Label>
-                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className={cn("w-full justify-start text-left font-normal", !fechaNac && "text-muted-foreground")}
-                    >
-                      <CalendarIcon className="h-4 w-4" />
-                      {fechaNac ? format(parseISO(fechaNac), "d 'de' MMMM yyyy", { locale: es }) : 'Seleccionar fecha'}
-                      {fechaNac && (
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(ev) => { ev.stopPropagation(); setFechaNac(null); }}
-                          onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setFechaNac(null); } }}
-                          className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
-                          aria-label="Limpiar fecha"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={fechaNac ? parseISO(fechaNac) : undefined}
-                      onSelect={(d) => {
-                        setFechaNac(d ? format(d, 'yyyy-MM-dd') : null);
-                        setDatePickerOpen(false);
-                      }}
-                      disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                      initialFocus
-                      className={cn('p-3 pointer-events-auto')}
-                      captionLayout="dropdown-buttons"
-                      fromYear={1900}
-                      toYear={new Date().getFullYear()}
-                    />
-                    <div className="border-t p-2 flex justify-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setFechaNac(null); setDatePickerOpen(false); }}
-                      >
-                        Limpiar
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
               </div>
 
               <div className="space-y-1.5">
