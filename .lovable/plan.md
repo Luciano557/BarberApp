@@ -1,131 +1,100 @@
-# Extender módulo Clientes — implementación final
+# Ajustes finales al módulo Clientes
 
-Sin clientes existentes, se agregan los 8 campos nuevos a `clientes` y se reescribe la RPC para aceptar todos los campos opcionales en una sola operación atómica. Frontend alineado con esos campos.
+## 1. Base de datos: soft delete
 
----
+Migración sobre `public.clientes`:
 
-## 1. Migración SQL
+- Agregar columnas:
+  - `eliminado boolean NOT NULL DEFAULT false`
+  - `eliminado_at timestamptz NULL`
+  - `eliminado_por uuid NULL` (sin FK a `auth.users`)
+- Índice parcial: `CREATE INDEX clientes_no_eliminados_idx ON clientes (organization_id) WHERE eliminado = false`.
 
-**ALTER TABLE clientes** — agregar columnas:
+Nueva función RPC `soft_delete_cliente(_cliente_id uuid)`:
 
-| Columna | Tipo | Default | Nullable |
-|---|---|---|---|
-| `instagram` | text | null | sí |
-| `tiktok` | text | null | sí |
-| `otra_red_social` | text | null | sí |
-| `fecha_nacimiento` | date | null | sí |
-| `alergias` | text | null | sí |
-| `acepta_marketing` | boolean | `true` | no |
-| `bloqueado` | boolean | `false` | no |
-| `motivo_bloqueo` | text | null | sí |
+- `SECURITY DEFINER`, `search_path = public`.
+- Validar `auth.uid()` y que el cliente pertenezca a la misma `organization_id` del usuario.
+- Permitir solo a `owner`, `general_manager`, `manager` (no a `barber`).
+- Hacer `UPDATE clientes SET eliminado = true, eliminado_at = now(), eliminado_por = auth.uid() WHERE id = _cliente_id AND eliminado = false`.
+- No tocar `turnos`, `clientes_sucursales` ni historial.
 
-**RPC `create_cliente_with_sucursal`** — `DROP` y recrear con nueva firma:
+No se implementa restauración (fuera de alcance).
 
-```text
-(_nombre text, _apellido text, _sucursal_id uuid,
- _telefono text DEFAULT NULL, _email text DEFAULT NULL,
- _instagram text DEFAULT NULL, _tiktok text DEFAULT NULL,
- _otra_red_social text DEFAULT NULL, _fecha_nacimiento date DEFAULT NULL,
- _alergias text DEFAULT NULL, _acepta_marketing boolean DEFAULT true)
-```
+## 2. Filtrado en el frontend
 
-- Reordenamos `_sucursal_id` antes de los opcionales para que los demás puedan tener `DEFAULT NULL`.
-- Mantiene `SECURITY DEFINER`, validaciones de organización y sucursal, y la inserción atómica en `clientes` + `clientes_sucursales`.
-- Strings vacíos se normalizan a `NULL` con `NULLIF(btrim(...), '')`.
-- `bloqueado`, `motivo_bloqueo`, `nota_interna` no se aceptan en creación: quedan en sus defaults (`false`, `null`, `null`).
+`useClientes.ts`:
 
-No se tocan policies RLS (las existentes cubren todos los campos del row), ni tablas `clientes_sucursales` ni `turnos`.
+- Agregar campos `eliminado`, `eliminado_at`, `eliminado_por` a la interfaz `Cliente`.
+- En `fetchClientes`, agregar `.eq('eliminado', false)` a las dos queries (modo sucursal y modo all).
+- En la consulta por sucursal, después de obtener los `cliente_id` desde `clientes_sucursales`, filtrar también con `.eq('eliminado', false)`.
+- Nuevo método `deleteCliente(id)` que llama a la RPC `soft_delete_cliente` y refresca la lista.
+- Quitar `bloqueado` y `motivo_bloqueo` del tipo `ClienteUpdate` (el bloqueo deja de pasar por update genérico).
+- Nuevos métodos:
+  - `blockCliente(id, motivo)` — `update` directo con `bloqueado: true, motivo_bloqueo: motivo.trim()`.
+  - `unblockCliente(id)` — `update` con `bloqueado: false, motivo_bloqueo: null`.
 
----
+## 3. Formulario "Nuevo cliente" (`NuevoClienteDialog.tsx`)
 
-## 2. Hook `src/hooks/useClientes.ts`
+Datos principales (en este orden):
 
-- Extender la interfaz `Cliente` con los 8 campos.
-- Tipo `CreateClienteParams` que acepta los nuevos campos opcionales (`acepta_marketing` con default `true`).
-- Tipo `ClienteUpdate` que permite actualizar todo lo editable desde el perfil: contacto + redes + `fecha_nacimiento` + `alergias` + `acepta_marketing` + `bloqueado` + `motivo_bloqueo` + `nota_interna`.
-- `createCliente`: pasa todos los campos al RPC con la nueva firma de parámetros.
-- `updateCliente`: sin cambios estructurales, sólo se amplía el tipo del `patch`.
-
----
-
-## 3. Formulario `NuevoClienteDialog.tsx`
-
-**Sección principal** (siempre visible):
 - Nombre *
 - Apellido *
 - Teléfono
 - Email
+- Fecha de nacimiento (DatePicker con botón Limpiar → `null`)
 
-**"Más datos (opcional)"** — `Collapsible` cerrado por defecto:
-- Instagram (text)
-- TikTok (text)
-- Otra red social (text libre)
-- Fecha de nacimiento (DatePicker shadcn — `Popover` + `Calendar` con `className="p-3 pointer-events-auto"`, botón "Limpiar" para volver a `null`)
-- Alergias (Textarea)
-- Acepta marketing (Switch, **default `true`**)
+Sección "Más datos" (cambiar el label, ya no decir "(opcional)"):
 
-**Selector de sucursal**: igual al actual (sólo si `isAllMode` o no hay `currentSucursal`).
+- Instagram
+- TikTok
+- Otra red social
+- Alergias
+- Acepta marketing (Switch, default `true`)
 
-Al enviar: trim y conversión de strings vacíos a `null` antes de pasar al hook. `acepta_marketing` se envía siempre.
+`fecha_nacimiento` se quita del bloque colapsable y se mueve arriba. La RPC `create_cliente_with_sucursal` ya soporta `_fecha_nacimiento` opcional, no requiere cambios en backend.
 
-No se piden: nota interna, origen, fuente, bloqueado, motivo de bloqueo, fecha de creación, fecha de importación.
+## 4. Perfil del cliente (`ClienteDetailDialog.tsx`)
 
----
+### Reorganizar secciones editables
 
-## 4. Perfil `ClienteDetailDialog.tsx`
+Eliminar la sección "Estado" del bloque editable. La sección "Información personal" mantiene: Fecha de nacimiento, Alergias, Acepta marketing.
 
-Reorganizar el cuerpo del modal en secciones editables. Cada sección con su propio botón "Editar / Guardar / Cancelar":
+### Bloque "Acciones" al final del perfil
 
-**Datos de contacto**
-- Nombre, Apellido, Teléfono, Email
+Renderizado al final, antes de "Nota interna" (o como zona de acciones sensibles):
 
-**Redes sociales**
-- Instagram, TikTok, Otra red social
+- **Si `cliente.bloqueado === false`**:
+  - Botón destructivo discreto "Bloquear cliente".
+  - Al click: abre `AlertDialog`/`Dialog` con campo `Textarea` "Motivo del bloqueo" obligatorio.
+  - Validar que `motivo.trim().length > 0` antes de confirmar.
+  - Confirmar → `blockCliente(id, motivo)` → toast éxito → cerrar modal y refrescar.
 
-**Información personal**
-- Fecha de nacimiento (DatePicker con limpiar → `null`)
-- Alergias (Textarea)
-- Acepta marketing (Switch)
+- **Si `cliente.bloqueado === true`**:
+  - Banner de aviso destacado con `ShieldAlert`: "Cliente bloqueado".
+  - Mostrar `cliente.motivo_bloqueo` debajo si existe.
+  - Botón "Desbloquear cliente" → `AlertDialog` de confirmación → `unblockCliente(id)`.
 
-**Estado**
-- Bloqueado (Switch)
-- Motivo de bloqueo (Textarea — visible cuando `bloqueado === true` o cuando ya hay un valor previo)
+El badge "Bloqueado" en el título del diálogo se mantiene como indicador visual.
 
-**Nota interna** (sección existente, sin cambios)
+### Botón "Eliminar cliente"
 
-Se elimina del perfil el bloque "Origen" y "Fecha de creación" para no exponer la detección de origen (punto 8).
+En el mismo bloque de acciones, separado visualmente:
 
-Se conserva: badges de sucursales asociadas, estadísticas de reservas, botón WhatsApp como placeholder.
+- Botón destructivo "Eliminar cliente".
+- Confirmación con `AlertDialog`: "¿Eliminar a {nombre}? Esta acción ocultará el cliente de la lista. El historial de turnos se conserva."
+- Confirmar → `deleteCliente(id)` → toast éxito → cerrar el diálogo de detalle.
 
----
+Los campos `eliminado`, `eliminado_at`, `eliminado_por` no se muestran ni se editan en ningún formulario.
 
-## 5. Panel `ClientesPanel.tsx`
+## 5. Fuera de alcance (no se implementa)
 
-Sin cambios funcionales. Sigue:
-- Botón "Importar clientes" → toast "Próximamente".
-- Botón WhatsApp en cada fila → toast "Próximamente".
-- Búsqueda por nombre, apellido, teléfono, email.
-- Vista por sucursal activa o consolidada según rol.
+- Restaurar clientes eliminados.
+- Bloqueo automático de reservas cuando `bloqueado = true` (sigue siendo solo marca administrativa).
+- Importación real, WhatsApp funcional, deduplicación, fusión, fuente de procedencia.
 
----
+## Archivos afectados
 
-## 6. Lo que se conserva
-
-- Tab Clientes sin PIN.
-- Cliente a nivel organización.
-- Relación N:M con sucursales.
-- Creación atómica vía RPC.
-- Vista por sucursal activa.
-- Vista consolidada solo para owner/general_manager.
-- Manager y barber limitados por sucursal vía RLS.
-- `turnos.cliente_id` nullable.
-- Sin importación real, sin WhatsApp funcional, sin deduplicación, sin fusión, sin bloqueo automático de reservas, sin fuente de procedencia.
-
----
-
-## Detalles técnicos
-
-- **DatePicker con limpiar**: dentro del `PopoverContent`, agregar un `Button variant="ghost" size="sm"` "Limpiar" que llama a `onChange(null)` y cierra el popover. La fecha se persiste en formato ISO `YYYY-MM-DD` (date column).
-- **Switch para acepta_marketing**: estado inicial `true` en el form de creación; en edición refleja el valor actual.
-- **Switch bloqueado**: al activarse muestra inline el textarea de motivo; al desactivarse se mantiene el motivo guardado salvo que el usuario lo borre manualmente.
-- **Tipos Supabase** (`src/integrations/supabase/types.ts`): se regeneran automáticamente al aplicar la migración; el hook usa `as any` puntual sólo en la llamada al RPC mientras se regeneran los tipos del cliente.
+- `supabase/migrations/<nueva>.sql` — columnas soft delete + RPC `soft_delete_cliente` + índice.
+- `src/hooks/useClientes.ts` — filtro `eliminado=false`, nuevos métodos `deleteCliente`, `blockCliente`, `unblockCliente`, tipos actualizados.
+- `src/components/clientes/NuevoClienteDialog.tsx` — reordenar campos, mover fecha de nacimiento arriba, renombrar sección.
+- `src/components/clientes/ClienteDetailDialog.tsx` — quitar sección "Estado" editable, agregar bloque de acciones (bloquear/desbloquear con modal de motivo, eliminar con confirmación).
