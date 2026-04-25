@@ -1,181 +1,131 @@
-## Plan final: Módulo "Clientes"
+# Extender módulo Clientes — implementación final
 
-### Resumen
-Nueva tab "Clientes" en la navegación principal entre "Turnos y Agenda" y "Mi Negocio". Base de clientes a nivel organización con relación N:M a sucursales. Acceso por **rol + RLS** (sin PIN). Botón "Importar clientes" y botón WhatsApp solo visuales. Creación atómica vía RPC para evitar clientes huérfanos.
-
----
-
-### Parte 1 — Base de datos (migración SQL aditiva)
-
-**1.1 Tabla `clientes`** (a nivel organización):
-```text
-id              uuid pk default gen_random_uuid()
-organization_id uuid not null
-nombre          text not null
-apellido        text not null
-telefono        text null
-email           text null
-origen          text not null default 'manual'
-nota_interna    text null
-created_at      timestamptz default now()
-updated_at      timestamptz default now()
-CHECK (origen IN ('manual','importado','reserva'))
-```
-- Índice por `organization_id`.
-- Trigger `update_updated_at_column` para `updated_at`.
-- En esta etapa solo se usa activamente `manual`. Los otros valores quedan preparados.
-
-**1.2 Tabla `clientes_sucursales`** (N:M):
-```text
-id               uuid pk default gen_random_uuid()
-organization_id  uuid not null
-cliente_id       uuid not null
-sucursal_id      uuid not null
-origen_relacion  text not null default 'manual'
-created_at       timestamptz default now()
-updated_at       timestamptz default now()
-UNIQUE (organization_id, cliente_id, sucursal_id)
-CHECK (origen_relacion IN ('manual','importado','reserva'))
-```
-- Índices: `(cliente_id)`, `(sucursal_id)`, `(organization_id)`.
-- La constraint única solo evita asociar el mismo cliente dos veces a la misma sucursal. **No** garantiza unicidad de identidad en `clientes` (deduplicación queda para más adelante).
-- El `CHECK` sobre `origen_relacion` es consistente con los valores permitidos en `clientes.origen`.
-
-**1.3 RPC `create_cliente_with_sucursal` (creación atómica)**
-
-Función `SECURITY DEFINER` que inserta cliente + relación en una sola transacción para evitar clientes huérfanos:
-
-```text
-create_cliente_with_sucursal(
-  _nombre text,
-  _apellido text,
-  _telefono text,
-  _email text,
-  _sucursal_id uuid
-) RETURNS uuid
-```
-
-Lógica:
-- Resuelve `_org_id := get_user_organization_id(auth.uid())`.
-- Valida: `auth.uid()` no nulo; usuario con rol válido (owner/general_manager/manager/barber); si manager o barber → `_sucursal_id IN get_user_sucursal_ids(auth.uid())`; sucursal pertenece a la misma org.
-- Inserta en `clientes` (`origen='manual'`) e inmediatamente en `clientes_sucursales` (`origen_relacion='manual'`) dentro de la misma transacción. Si cualquier paso falla, todo se revierte por la transacción implícita de la función.
-- Devuelve el `id` del cliente creado.
-- Errores: `RAISE EXCEPTION` con mensajes claros (`'No autorizado'`, `'Sucursal no válida'`).
-
-`search_path = public`. Permisos: `GRANT EXECUTE ... TO authenticated`.
-
-**1.4 Turnos — vínculo opcional**
-- `ALTER TABLE turnos ADD COLUMN cliente_id uuid NULL`.
-- Índice `(cliente_id)`.
-- Estrictamente nullable. Sin backfill, sin validaciones nuevas, sin tocar edge functions de reserva.
-- Crear turnos sin `cliente_id` sigue siendo válido.
-
-**1.5 RLS**
-
-Helpers reutilizados: `get_user_organization_id`, `get_user_sucursal_ids`, `has_role`.
-
-`clientes`:
-- **SELECT**: owner / general_manager → todos los de su org. manager / barber → solo clientes con al menos una fila en `clientes_sucursales` cuya `sucursal_id IN get_user_sucursal_ids(auth.uid())`.
-- **INSERT**: owner / general_manager / manager / barber dentro de su org (la validación fina por sucursal vive en la RPC y en la RLS de `clientes_sucursales`).
-- **UPDATE**: owner / general_manager → cualquier cliente de su org. manager / barber → solo clientes asociados a sus sucursales.
-- **DELETE**: bloqueado.
-
-`clientes_sucursales`:
-- **SELECT**: owner / general_manager → toda la org. manager / barber → solo filas con `sucursal_id IN get_user_sucursal_ids`.
-- **INSERT / UPDATE / DELETE**: owner / general_manager → toda la org. manager / barber → solo si `sucursal_id IN get_user_sucursal_ids`.
+Sin clientes existentes, se agregan los 8 campos nuevos a `clientes` y se reescribe la RPC para aceptar todos los campos opcionales en una sola operación atómica. Frontend alineado con esos campos.
 
 ---
 
-### Parte 2 — Frontend
+## 1. Migración SQL
 
-**2.1 Permisos (`src/contexts/AuthContext.tsx`)**
-- `canViewClientes = (isOwner || isGeneralManager || isManager || isBarber) && !hasNoAccess`.
+**ALTER TABLE clientes** — agregar columnas:
 
-**2.2 Navegación (`src/components/AppSidebar.tsx`)**
-- Item con icono `Users`, id `clientes`, label "Clientes", insertado **después** de "Turnos y Agenda" y **antes** de "Mi Negocio".
-- Visibilidad condicionada a `canViewClientes`.
+| Columna | Tipo | Default | Nullable |
+|---|---|---|---|
+| `instagram` | text | null | sí |
+| `tiktok` | text | null | sí |
+| `otra_red_social` | text | null | sí |
+| `fecha_nacimiento` | date | null | sí |
+| `alergias` | text | null | sí |
+| `acepta_marketing` | boolean | `true` | no |
+| `bloqueado` | boolean | `false` | no |
+| `motivo_bloqueo` | text | null | sí |
 
-**2.3 Routing en `src/pages/Index.tsx`**
-- Nueva tab `clientes` que renderiza `<ClientesPanel />` **directamente, sin `PinProtectedSection`**.
-- Guard de redirección si la tab activa es `clientes` y `!canViewClientes`.
+**RPC `create_cliente_with_sucursal`** — `DROP` y recrear con nueva firma:
 
-**2.4 Hook `src/hooks/useClientes.ts`**
-- Lista filtrada según contexto:
-  - `currentSucursal` definido → join contra `clientes_sucursales` filtrado por esa `sucursal_id`.
-  - `isAllMode` (owner/GM) → todos los clientes de la org.
-- Funciones: `createCliente({nombre, apellido, telefono, email, sucursalId})`, `updateCliente(id, patch)`, `getClienteById(id)`, `getSucursalesByCliente(id)`, `getReservasByCliente(id)`.
-- **`createCliente`**: invoca la RPC `create_cliente_with_sucursal`. Toda la atomicidad la garantiza la función SQL. El frontend solo maneja el resultado: éxito → toast OK + refresh; error → toast con el mensaje de la RPC.
-- **Fallback defensivo** (si la RPC no estuviese disponible por cualquier razón): el hook detecta que la respuesta de la RPC falló y, si por alguna razón quedara un `cliente_id` huérfano (no debería suceder porque la RPC es transaccional), elimina el cliente recién creado y muestra error claro al usuario. La ruta principal es siempre la RPC.
+```text
+(_nombre text, _apellido text, _sucursal_id uuid,
+ _telefono text DEFAULT NULL, _email text DEFAULT NULL,
+ _instagram text DEFAULT NULL, _tiktok text DEFAULT NULL,
+ _otra_red_social text DEFAULT NULL, _fecha_nacimiento date DEFAULT NULL,
+ _alergias text DEFAULT NULL, _acepta_marketing boolean DEFAULT true)
+```
 
-**2.5 `src/components/ClientesPanel.tsx`** (pantalla principal)
+- Reordenamos `_sucursal_id` antes de los opcionales para que los demás puedan tener `DEFAULT NULL`.
+- Mantiene `SECURITY DEFINER`, validaciones de organización y sucursal, y la inserción atómica en `clientes` + `clientes_sucursales`.
+- Strings vacíos se normalizan a `NULL` con `NULLIF(btrim(...), '')`.
+- `bloqueado`, `motivo_bloqueo`, `nota_interna` no se aceptan en creación: quedan en sus defaults (`false`, `null`, `null`).
 
-Coherencia visual con `MiNegocioPanel`, `DailySummary`, `PaymentRegistration`:
-- Header:
-  - Título "Clientes".
-  - Subtítulo dinámico: sucursal activa → "Gestioná la lista de clientes de esta sucursal."; vista consolidada → "Gestioná la lista de clientes de todas las sucursales."
-  - Botón primario "Nuevo cliente" (icono `Plus`).
-  - Botón secundario `outline` "Importar clientes" → toast: "La importación de clientes estará disponible próximamente."
-- Buscador: filtra por nombre / apellido / teléfono / email sobre la lista cargada.
-- Lista limpia (cards/filas, no tabla densa):
-  - Nombre + apellido como texto principal.
-  - Teléfono en `text-xs text-muted-foreground` (o "Sin teléfono" en italic muted).
-  - Botón ícono WhatsApp a la derecha → toast "Próximamente". Sin abrir WA.
-  - Click en card → abre `ClienteDetailDialog`.
-  - Sin aviso de datos incompletos en la lista.
-- Estado vacío con icono `Users` y CTA "Crear cliente".
-- Loading skeleton + manejo de errores con toast.
-
-**2.6 `src/components/clientes/NuevoClienteDialog.tsx`**
-
-Solo cuatro campos: **Nombre***, **Apellido***, **Teléfono**, **Email**.
-
-No se piden: nota interna, fecha de creación, fecha de importación, origen.
-
-Selector de sucursal:
-- `currentSucursal` definido → se usa automáticamente, sin selector.
-- `isAllMode` (owner/GM) → selector obligatorio con sucursales de la org.
-- Caso defensivo (sin sucursal activa ni permiso global) → bloquear creación con mensaje claro.
-
-Validaciones cliente: nombre y apellido requeridos (trim); email con regex básica si presente.
-
-Submit: invoca `useClientes.createCliente` → RPC. Atomicidad garantizada por SQL.
-
-**2.7 `src/components/clientes/ClienteDetailDialog.tsx`** (Sheet/Dialog grande)
-
-- **Datos** (lectura → "Editar" → edición inline):
-  - Editables: nombre, apellido, teléfono, email, **nota interna**.
-  - Solo lectura: origen (badge), fecha de creación.
-- **Aviso sutil** si falta teléfono o email: texto pequeño muted "Datos de contacto incompletos." Solo dentro del perfil.
-- **Sucursales asociadas**: chips/badges desde `clientes_sucursales` (filtradas por RLS).
-- **Resumen de reservas** (si `cliente_id` poblado en algún turno): última, próxima, total. Si no hay datos → "Sin reservas registradas."
-- **Historial de reservas**: lista compacta (fecha, hora, estado, barbero, servicio, sucursal) joineando `turnos`, `barberos`, `servicios`, `sucursales` por `cliente_id`.
-- **Botón visual de WhatsApp**: ícono + label, sin integración → toast "Próximamente".
-
-Una sola `nota_interna` libre por cliente. Sin historial de notas.
-
-**2.8 No implementado en esta etapa**
-- Importación real (carga de archivos, plantillas CSV/Excel, importación desde apps, deduplicación por importación).
-- Exportación, eliminación, fusión, detección de duplicados.
-- WhatsApp funcional, mensajes prearmados, campañas.
-- Sucursal principal por cliente, métricas avanzadas, automatizaciones.
-- PIN sobre la tab Clientes.
+No se tocan policies RLS (las existentes cubren todos los campos del row), ni tablas `clientes_sucursales` ni `turnos`.
 
 ---
 
-### Parte 3 — Verificaciones finales
-- Tab Clientes **no** pide PIN.
-- **Atomicidad**: la creación cliente + relación se hace vía RPC `create_cliente_with_sucursal` en una sola transacción. No quedan clientes huérfanos.
-- `clientes.origen` y `clientes_sucursales.origen_relacion` con CHECK constraint para los mismos tres valores: `manual`, `importado`, `reserva`.
-- La constraint única solo evita asociaciones repetidas, no duplicados de identidad.
-- Vista consolidada solo para owner / general_manager.
-- Manager y barber nunca acceden a clientes de sucursales no asignadas.
-- Crear desde sucursal activa → asocia automáticamente.
-- Crear desde consolidada (owner/GM) → exige selector de sucursal.
-- No se piden nota interna, fecha de creación ni origen al crear.
-- `turnos.cliente_id` es nullable, no rompe el flujo actual de reservas, no fuerza backfill, no se modifican edge functions.
-- Coherencia visual con Cobrar, Caja y Mi Negocio.
+## 2. Hook `src/hooks/useClientes.ts`
 
-### Detalles técnicos
-- Una sola migración aditiva: `CREATE TABLE clientes` y `clientes_sucursales` (con CHECK en ambos `origen` / `origen_relacion`), `ALTER TABLE turnos ADD COLUMN cliente_id`, índices, triggers `updated_at`, función RPC `create_cliente_with_sucursal` (SECURITY DEFINER), políticas RLS.
-- Tipos TS regenerados automáticamente tras la migración.
-- No se tocan: AuthCallback, VerifyEmail, ProtectedRoute, edge functions, useTransactions, agenda, hooks de turnos.
+- Extender la interfaz `Cliente` con los 8 campos.
+- Tipo `CreateClienteParams` que acepta los nuevos campos opcionales (`acepta_marketing` con default `true`).
+- Tipo `ClienteUpdate` que permite actualizar todo lo editable desde el perfil: contacto + redes + `fecha_nacimiento` + `alergias` + `acepta_marketing` + `bloqueado` + `motivo_bloqueo` + `nota_interna`.
+- `createCliente`: pasa todos los campos al RPC con la nueva firma de parámetros.
+- `updateCliente`: sin cambios estructurales, sólo se amplía el tipo del `patch`.
+
+---
+
+## 3. Formulario `NuevoClienteDialog.tsx`
+
+**Sección principal** (siempre visible):
+- Nombre *
+- Apellido *
+- Teléfono
+- Email
+
+**"Más datos (opcional)"** — `Collapsible` cerrado por defecto:
+- Instagram (text)
+- TikTok (text)
+- Otra red social (text libre)
+- Fecha de nacimiento (DatePicker shadcn — `Popover` + `Calendar` con `className="p-3 pointer-events-auto"`, botón "Limpiar" para volver a `null`)
+- Alergias (Textarea)
+- Acepta marketing (Switch, **default `true`**)
+
+**Selector de sucursal**: igual al actual (sólo si `isAllMode` o no hay `currentSucursal`).
+
+Al enviar: trim y conversión de strings vacíos a `null` antes de pasar al hook. `acepta_marketing` se envía siempre.
+
+No se piden: nota interna, origen, fuente, bloqueado, motivo de bloqueo, fecha de creación, fecha de importación.
+
+---
+
+## 4. Perfil `ClienteDetailDialog.tsx`
+
+Reorganizar el cuerpo del modal en secciones editables. Cada sección con su propio botón "Editar / Guardar / Cancelar":
+
+**Datos de contacto**
+- Nombre, Apellido, Teléfono, Email
+
+**Redes sociales**
+- Instagram, TikTok, Otra red social
+
+**Información personal**
+- Fecha de nacimiento (DatePicker con limpiar → `null`)
+- Alergias (Textarea)
+- Acepta marketing (Switch)
+
+**Estado**
+- Bloqueado (Switch)
+- Motivo de bloqueo (Textarea — visible cuando `bloqueado === true` o cuando ya hay un valor previo)
+
+**Nota interna** (sección existente, sin cambios)
+
+Se elimina del perfil el bloque "Origen" y "Fecha de creación" para no exponer la detección de origen (punto 8).
+
+Se conserva: badges de sucursales asociadas, estadísticas de reservas, botón WhatsApp como placeholder.
+
+---
+
+## 5. Panel `ClientesPanel.tsx`
+
+Sin cambios funcionales. Sigue:
+- Botón "Importar clientes" → toast "Próximamente".
+- Botón WhatsApp en cada fila → toast "Próximamente".
+- Búsqueda por nombre, apellido, teléfono, email.
+- Vista por sucursal activa o consolidada según rol.
+
+---
+
+## 6. Lo que se conserva
+
+- Tab Clientes sin PIN.
+- Cliente a nivel organización.
+- Relación N:M con sucursales.
+- Creación atómica vía RPC.
+- Vista por sucursal activa.
+- Vista consolidada solo para owner/general_manager.
+- Manager y barber limitados por sucursal vía RLS.
+- `turnos.cliente_id` nullable.
+- Sin importación real, sin WhatsApp funcional, sin deduplicación, sin fusión, sin bloqueo automático de reservas, sin fuente de procedencia.
+
+---
+
+## Detalles técnicos
+
+- **DatePicker con limpiar**: dentro del `PopoverContent`, agregar un `Button variant="ghost" size="sm"` "Limpiar" que llama a `onChange(null)` y cierra el popover. La fecha se persiste en formato ISO `YYYY-MM-DD` (date column).
+- **Switch para acepta_marketing**: estado inicial `true` en el form de creación; en edición refleja el valor actual.
+- **Switch bloqueado**: al activarse muestra inline el textarea de motivo; al desactivarse se mantiene el motivo guardado salvo que el usuario lo borre manualmente.
+- **Tipos Supabase** (`src/integrations/supabase/types.ts`): se regeneran automáticamente al aplicar la migración; el hook usa `as any` puntual sólo en la llamada al RPC mientras se regeneran los tipos del cliente.
