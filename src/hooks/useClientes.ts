@@ -10,18 +10,21 @@ export interface Cliente {
   apellido: string;
   telefono: string | null;
   email: string | null;
+  instagram: string | null;
+  tiktok: string | null;
+  otra_red_social: string | null;
+  fecha_nacimiento: string | null;
+  alergias: string | null;
+  acepta_marketing: boolean;
+  bloqueado: boolean;
+  motivo_bloqueo: string | null;
   origen: 'manual' | 'importado' | 'reserva';
   nota_interna: string | null;
+  eliminado: boolean;
+  eliminado_at: string | null;
+  eliminado_por: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface ClienteSucursalLink {
-  id: string;
-  cliente_id: string;
-  sucursal_id: string;
-  origen_relacion: string;
-  created_at: string;
 }
 
 export interface ReservaCliente {
@@ -34,6 +37,34 @@ export interface ReservaCliente {
   servicio_id: string;
   sucursal_id: string;
 }
+
+export interface CreateClienteParams {
+  nombre: string;
+  apellido: string;
+  sucursalId: string;
+  telefono?: string | null;
+  email?: string | null;
+  instagram?: string | null;
+  tiktok?: string | null;
+  otra_red_social?: string | null;
+  fecha_nacimiento?: string | null;
+  alergias?: string | null;
+  acepta_marketing?: boolean;
+}
+
+export type ClienteUpdate = Partial<Pick<Cliente,
+  | 'nombre'
+  | 'apellido'
+  | 'telefono'
+  | 'email'
+  | 'instagram'
+  | 'tiktok'
+  | 'otra_red_social'
+  | 'fecha_nacimiento'
+  | 'alergias'
+  | 'acepta_marketing'
+  | 'nota_interna'
+>>;
 
 export function useClientes() {
   const { organization } = useOrganization();
@@ -52,7 +83,6 @@ export function useClientes() {
     setError(null);
     try {
       if (currentSucursal) {
-        // Filter by sucursal via the join table
         const { data: links, error: linkErr } = await supabase
           .from('clientes_sucursales')
           .select('cliente_id')
@@ -68,6 +98,7 @@ export function useClientes() {
             .from('clientes')
             .select('*')
             .in('id', ids)
+            .eq('eliminado', false)
             .order('apellido', { ascending: true });
           if (cliErr) throw cliErr;
           setClientes((data || []) as Cliente[]);
@@ -77,6 +108,7 @@ export function useClientes() {
           .from('clientes')
           .select('*')
           .eq('organization_id', organization.id)
+          .eq('eliminado', false)
           .order('apellido', { ascending: true });
         if (cliErr) throw cliErr;
         setClientes((data || []) as Cliente[]);
@@ -95,21 +127,21 @@ export function useClientes() {
     fetchClientes();
   }, [fetchClientes]);
 
-  const createCliente = useCallback(async (params: {
-    nombre: string;
-    apellido: string;
-    telefono?: string;
-    email?: string;
-    sucursalId: string;
-  }): Promise<{ id: string | null; error: string | null }> => {
+  const createCliente = useCallback(async (params: CreateClienteParams): Promise<{ id: string | null; error: string | null }> => {
     try {
       const { data, error } = await supabase.rpc('create_cliente_with_sucursal', {
         _nombre: params.nombre,
         _apellido: params.apellido,
+        _sucursal_id: params.sucursalId,
         _telefono: params.telefono ?? null,
         _email: params.email ?? null,
-        _sucursal_id: params.sucursalId,
-      });
+        _instagram: params.instagram ?? null,
+        _tiktok: params.tiktok ?? null,
+        _otra_red_social: params.otra_red_social ?? null,
+        _fecha_nacimiento: params.fecha_nacimiento ?? null,
+        _alergias: params.alergias ?? null,
+        _acepta_marketing: params.acepta_marketing ?? true,
+      } as any);
       if (error) return { id: null, error: error.message };
       await fetchClientes();
       return { id: (data as string) ?? null, error: null };
@@ -120,18 +152,59 @@ export function useClientes() {
 
   const updateCliente = useCallback(async (
     id: string,
-    patch: Partial<Pick<Cliente, 'nombre' | 'apellido' | 'telefono' | 'email' | 'nota_interna'>>
+    patch: ClienteUpdate
   ): Promise<{ error: string | null }> => {
     try {
       const { error } = await supabase
         .from('clientes')
-        .update(patch)
+        .update(patch as any)
         .eq('id', id);
       if (error) return { error: error.message };
       await fetchClientes();
       return { error: null };
     } catch (e: any) {
       return { error: e?.message || 'Error al actualizar cliente' };
+    }
+  }, [fetchClientes]);
+
+  const blockCliente = useCallback(async (id: string, motivo: string): Promise<{ error: string | null }> => {
+    const m = motivo.trim();
+    if (!m) return { error: 'El motivo es obligatorio' };
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ bloqueado: true, motivo_bloqueo: m } as any)
+        .eq('id', id);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al bloquear cliente' };
+    }
+  }, [fetchClientes]);
+
+  const unblockCliente = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase
+        .from('clientes')
+        .update({ bloqueado: false, motivo_bloqueo: null } as any)
+        .eq('id', id);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al desbloquear cliente' };
+    }
+  }, [fetchClientes]);
+
+  const deleteCliente = useCallback(async (id: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.rpc('soft_delete_cliente', { _cliente_id: id } as any);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al eliminar cliente' };
     }
   }, [fetchClientes]);
 
@@ -183,6 +256,9 @@ export function useClientes() {
     refresh: fetchClientes,
     createCliente,
     updateCliente,
+    blockCliente,
+    unblockCliente,
+    deleteCliente,
     getClienteById,
     getSucursalesByCliente,
     getReservasByCliente,

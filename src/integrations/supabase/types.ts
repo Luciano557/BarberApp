@@ -383,39 +383,72 @@ export type Database = {
       }
       clientes: {
         Row: {
+          acepta_marketing: boolean
+          alergias: string | null
           apellido: string
+          bloqueado: boolean
           created_at: string
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           email: string | null
+          fecha_nacimiento: string | null
           id: string
+          instagram: string | null
+          motivo_bloqueo: string | null
           nombre: string
           nota_interna: string | null
           organization_id: string
           origen: string
+          otra_red_social: string | null
           telefono: string | null
+          tiktok: string | null
           updated_at: string
         }
         Insert: {
+          acepta_marketing?: boolean
+          alergias?: string | null
           apellido: string
+          bloqueado?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           email?: string | null
+          fecha_nacimiento?: string | null
           id?: string
+          instagram?: string | null
+          motivo_bloqueo?: string | null
           nombre: string
           nota_interna?: string | null
           organization_id: string
           origen?: string
+          otra_red_social?: string | null
           telefono?: string | null
+          tiktok?: string | null
           updated_at?: string
         }
         Update: {
+          acepta_marketing?: boolean
+          alergias?: string | null
           apellido?: string
+          bloqueado?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           email?: string | null
+          fecha_nacimiento?: string | null
           id?: string
+          instagram?: string | null
+          motivo_bloqueo?: string | null
           nombre?: string
           nota_interna?: string | null
           organization_id?: string
           origen?: string
+          otra_red_social?: string | null
           telefono?: string | null
+          tiktok?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -2359,11 +2392,17 @@ export type Database = {
       }
       create_cliente_with_sucursal: {
         Args: {
+          _acepta_marketing?: boolean
+          _alergias?: string
           _apellido: string
-          _email: string
+          _email?: string
+          _fecha_nacimiento?: string
+          _instagram?: string
           _nombre: string
+          _otra_red_social?: string
           _sucursal_id: string
-          _telefono: string
+          _telefono?: string
+          _tiktok?: string
         }
         Returns: string
       }
@@ -2382,6 +2421,7 @@ export type Database = {
         Args: { _org_id: string }
         Returns: undefined
       }
+      soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean

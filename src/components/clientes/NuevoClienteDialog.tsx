@@ -3,11 +3,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useClientes } from '@/hooks/useClientes';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, CalendarIcon, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface NuevoClienteDialogProps {
   open: boolean;
@@ -23,8 +31,19 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [fechaNac, setFechaNac] = useState<string | null>(null);
   const [sucursalId, setSucursalId] = useState<string>('');
+
+  // Más datos
+  const [showMore, setShowMore] = useState(false);
+  const [instagram, setInstagram] = useState('');
+  const [tiktok, setTiktok] = useState('');
+  const [otraRed, setOtraRed] = useState('');
+  const [alergias, setAlergias] = useState('');
+  const [aceptaMarketing, setAceptaMarketing] = useState(true);
+
   const [saving, setSaving] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -32,7 +51,14 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setApellido('');
       setTelefono('');
       setEmail('');
+      setFechaNac(null);
       setSucursalId(currentSucursal?.id ?? '');
+      setShowMore(false);
+      setInstagram('');
+      setTiktok('');
+      setOtraRed('');
+      setAlergias('');
+      setAceptaMarketing(true);
     }
   }, [open, currentSucursal?.id]);
 
@@ -45,14 +71,8 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     const t = telefono.trim();
     const e = email.trim();
 
-    if (!n) {
-      toast.error('El nombre es obligatorio');
-      return;
-    }
-    if (!a) {
-      toast.error('El apellido es obligatorio');
-      return;
-    }
+    if (!n) { toast.error('El nombre es obligatorio'); return; }
+    if (!a) { toast.error('El apellido es obligatorio'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       toast.error('Email inválido');
       return;
@@ -67,9 +87,15 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     const { id, error } = await createCliente({
       nombre: n,
       apellido: a,
-      telefono: t || undefined,
-      email: e || undefined,
       sucursalId: targetSucursalId,
+      telefono: t || null,
+      email: e || null,
+      fecha_nacimiento: fechaNac,
+      instagram: instagram.trim() || null,
+      tiktok: tiktok.trim() || null,
+      otra_red_social: otraRed.trim() || null,
+      alergias: alergias.trim() || null,
+      acepta_marketing: aceptaMarketing,
     });
     setSaving(false);
 
@@ -84,7 +110,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nuevo cliente</DialogTitle>
           <DialogDescription>
@@ -93,50 +119,80 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
         </DialogHeader>
 
         <div className="space-y-4 py-2">
+          {/* Datos principales */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="nombre">Nombre *</Label>
-              <Input
-                id="nombre"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Juan"
-                autoFocus
-              />
+              <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Juan" autoFocus />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="apellido">Apellido *</Label>
-              <Input
-                id="apellido"
-                value={apellido}
-                onChange={(e) => setApellido(e.target.value)}
-                placeholder="Pérez"
-              />
+              <Input id="apellido" value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Pérez" />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="telefono">Teléfono</Label>
-            <Input
-              id="telefono"
-              type="tel"
-              inputMode="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              placeholder="11 5555 5555"
-            />
+            <Input id="telefono" type="tel" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="11 5555 5555" />
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              inputMode="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="cliente@email.com"
-            />
+            <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@email.com" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Fecha de nacimiento</Label>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn("w-full justify-start text-left font-normal", !fechaNac && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  {fechaNac ? format(parseISO(fechaNac), "d 'de' MMMM yyyy", { locale: es }) : 'Seleccionar fecha'}
+                  {fechaNac && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(ev) => { ev.stopPropagation(); setFechaNac(null); }}
+                      onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setFechaNac(null); } }}
+                      className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                      aria-label="Limpiar fecha"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={fechaNac ? parseISO(fechaNac) : undefined}
+                  onSelect={(d) => {
+                    setFechaNac(d ? format(d, 'yyyy-MM-dd') : null);
+                    setDatePickerOpen(false);
+                  }}
+                  disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                  initialFocus
+                  className={cn('p-3 pointer-events-auto')}
+                  captionLayout="dropdown-buttons"
+                  fromYear={1900}
+                  toYear={new Date().getFullYear()}
+                />
+                <div className="border-t p-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setFechaNac(null); setDatePickerOpen(false); }}
+                  >
+                    Limpiar
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           {needsSucursalPicker && (
@@ -160,6 +216,49 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
               )}
             </div>
           )}
+
+          {/* Más datos */}
+          <Collapsible open={showMore} onOpenChange={setShowMore}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" className="w-full justify-between px-2 -mx-2 text-sm font-medium">
+                Más datos
+                <ChevronDown className={cn("h-4 w-4 transition-transform", showMore && "rotate-180")} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="instagram">Instagram</Label>
+                <Input id="instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tiktok">TikTok</Label>
+                <Input id="tiktok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} placeholder="@usuario" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="otra_red">Otra red social</Label>
+                <Input id="otra_red" value={otraRed} onChange={(e) => setOtraRed(e.target.value)} placeholder="Ej: Twitter @usuario" />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="alergias">Alergias</Label>
+                <Textarea
+                  id="alergias"
+                  value={alergias}
+                  onChange={(e) => setAlergias(e.target.value)}
+                  placeholder="Ej: alergia a tintes, productos con amoníaco..."
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="acepta_marketing" className="text-sm">Acepta marketing</Label>
+                  <p className="text-xs text-muted-foreground">Promociones y novedades por mensajes.</p>
+                </div>
+                <Switch id="acepta_marketing" checked={aceptaMarketing} onCheckedChange={setAceptaMarketing} />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <DialogFooter>
