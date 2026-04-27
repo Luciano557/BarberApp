@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { ImportMethodStep } from './ImportMethodStep';
 import { ImportPreviewStep } from './ImportPreviewStep';
 import { ImportSummaryStep } from './ImportSummaryStep';
@@ -33,7 +33,7 @@ interface AccessibleSucursal { id: string; nombre: string; }
 export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) {
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
-  const { role } = useUserRole();
+  const { isOwner, isGeneralManager } = useAuth();
 
   const [step, setStep] = useState<Step>('method');
   const [parsing, setParsing] = useState(false);
@@ -61,8 +61,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
   // Compute accessible sucursales
   useEffect(() => {
     if (!open || !organization?.id) return;
-    const isOwnerOrGM = role === 'owner' || role === 'general_manager';
-    if (isOwnerOrGM) {
+    if (isOwner || isGeneralManager) {
       setAccessible(sucursales.map(s => ({ id: s.id, nombre: s.nombre })));
       return;
     }
@@ -78,7 +77,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
       const ids = new Set((data ?? []).map((r: any) => r.sucursal_id));
       setAccessible(sucursales.filter(s => ids.has(s.id)).map(s => ({ id: s.id, nombre: s.nombre })));
     })();
-  }, [open, organization?.id, role, sucursales]);
+  }, [open, organization?.id, isOwner, isGeneralManager, sucursales]);
 
   const handleFile = async (file: File) => {
     setParsing(true);
