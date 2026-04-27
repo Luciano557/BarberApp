@@ -90,7 +90,7 @@ export function normalizeDate(input: unknown): string | null {
   }
 
   // DD/MM/YYYY or DD-MM-YYYY (also DD.MM.YYYY)
-  m = raw.match(/^(\d{1,2})[/\\-.](\d{1,2})[/\\-.](\d{2,4})$/);
+  m = raw.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
   if (m) {
     const d = +m[1], mo = +m[2], y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
     return validDate(y, mo, d);
