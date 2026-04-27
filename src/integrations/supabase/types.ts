@@ -392,6 +392,8 @@ export type Database = {
           eliminado_at: string | null
           eliminado_por: string | null
           email: string | null
+          fecha_cliente_desde: string | null
+          fecha_importacion: string | null
           fecha_nacimiento: string | null
           id: string
           instagram: string | null
@@ -415,6 +417,8 @@ export type Database = {
           eliminado_at?: string | null
           eliminado_por?: string | null
           email?: string | null
+          fecha_cliente_desde?: string | null
+          fecha_importacion?: string | null
           fecha_nacimiento?: string | null
           id?: string
           instagram?: string | null
@@ -438,6 +442,8 @@ export type Database = {
           eliminado_at?: string | null
           eliminado_por?: string | null
           email?: string | null
+          fecha_cliente_desde?: string | null
+          fecha_importacion?: string | null
           fecha_nacimiento?: string | null
           id?: string
           instagram?: string | null
@@ -2416,6 +2422,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_clientes_with_sucursal: {
+        Args: { _clientes: Json; _sucursal_id: string }
+        Returns: Json
       }
       seed_payment_methods_for_org: {
         Args: { _org_id: string }
