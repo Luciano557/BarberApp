@@ -57,6 +57,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
     setTruncated(false);
     setTotalParsed(0);
     setSummary(null);
+    setPreviewFilter('all');
     setSucursalId(currentSucursal?.id ?? '');
   }, [open, currentSucursal?.id]);
 
