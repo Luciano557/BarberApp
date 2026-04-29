@@ -239,6 +239,7 @@ export function SucursalTabContent({
         <div className="space-y-4 mt-6">
           <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
           <CobrarConfig
+            sucursalId={sucursal.id}
             services={services} extras={extras} discounts={discounts} lines={lines}
             onAddService={onAddService} onUpdateService={onUpdateService}
             onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}

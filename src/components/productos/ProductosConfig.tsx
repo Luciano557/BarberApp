@@ -1,0 +1,229 @@
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Plus, Tag, History, Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Marca, Producto, ProductoSucursal, ProductoConSucursal } from './types';
+import { ProductoListItem } from './ProductoListItem';
+import { ProductoDialog } from './ProductoDialog';
+import { MarcasManagerDialog } from './MarcasManagerDialog';
+import { StockMovementDialog } from './StockMovementDialog';
+import { StockHistoryDialog } from './StockHistoryDialog';
+
+interface ProductosConfigProps {
+  sucursalId: string;
+}
+
+export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
+  const { organization } = useOrganization();
+  const orgId = organization?.id;
+
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [productosSucursal, setProductosSucursal] = useState<ProductoSucursal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  const [search, setSearch] = useState('');
+
+  const [productoDialog, setProductoDialog] = useState<{ open: boolean; producto: ProductoConSucursal | null }>({ open: false, producto: null });
+  const [marcasDialog, setMarcasDialog] = useState(false);
+  const [stockDialog, setStockDialog] = useState<{
+    open: boolean;
+    producto: ProductoConSucursal | null;
+    tipo: 'stock_inicial' | 'reposicion' | 'ajuste_manual';
+  }>({ open: false, producto: null, tipo: 'reposicion' });
+  const [historyDialog, setHistoryDialog] = useState<{ open: boolean; producto: ProductoConSucursal | null }>({ open: false, producto: null });
+
+  const fetchAll = useCallback(async () => {
+    if (!orgId) return;
+    setLoading(true);
+    const [m, p, ps] = await Promise.all([
+      supabase.from('marcas_producto').select('*').eq('organization_id', orgId).order('nombre'),
+      supabase.from('productos').select('*').eq('organization_id', orgId).order('nombre'),
+      supabase.from('productos_sucursal').select('*').eq('organization_id', orgId).eq('sucursal_id', sucursalId),
+    ]);
+    if (m.error || p.error || ps.error) {
+      toast.error('Error al cargar productos');
+    } else {
+      setMarcas((m.data || []) as Marca[]);
+      setProductos((p.data || []) as Producto[]);
+      setProductosSucursal((ps.data || []) as ProductoSucursal[]);
+    }
+    setLoading(false);
+  }, [orgId, sucursalId]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Combinar productos globales con su config de sucursal
+  const items: ProductoConSucursal[] = useMemo(() => {
+    const psMap = new Map(productosSucursal.map(x => [x.producto_id, x]));
+    const marcasMap = new Map(marcas.map(x => [x.id, x]));
+    return productos
+      .filter(p => p.activo)
+      .map(p => ({
+        producto: p,
+        marca: p.marca_id ? marcasMap.get(p.marca_id) || null : null,
+        sucursal: psMap.get(p.id) || null,
+      }));
+  }, [productos, productosSucursal, marcas]);
+
+  const filteredItems = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return items.filter(it => {
+      const isActiveInSucursal = it.sucursal?.activo === true;
+      if (activeSubTab === 'active' && !isActiveInSucursal) return false;
+      if (activeSubTab === 'inactive' && isActiveInSucursal) return false;
+      if (!s) return true;
+      return (
+        it.producto.nombre.toLowerCase().includes(s) ||
+        (it.marca?.nombre.toLowerCase().includes(s) ?? false)
+      );
+    });
+  }, [items, activeSubTab, search]);
+
+  const activeCount = items.filter(it => it.sucursal?.activo === true).length;
+  const inactiveCount = items.length - activeCount;
+
+  const handleToggleActiveSucursal = async (item: ProductoConSucursal, nextActive: boolean) => {
+    if (!orgId) return;
+    if (item.sucursal) {
+      const { error } = await supabase
+        .from('productos_sucursal')
+        .update({ activo: nextActive })
+        .eq('id', item.sucursal.id);
+      if (error) { toast.error('No se pudo actualizar'); return; }
+      toast.success(nextActive ? 'Producto activado en sucursal' : 'Producto desactivado en sucursal');
+      await fetchAll();
+    } else {
+      // Crear vínculo con valores por defecto
+      const { error } = await supabase
+        .from('productos_sucursal')
+        .insert({
+          organization_id: orgId,
+          sucursal_id: sucursalId,
+          producto_id: item.producto.id,
+          activo: nextActive,
+          precio_venta: 0,
+          stock_actual: 0,
+        });
+      if (error) { toast.error('No se pudo activar'); return; }
+      toast.success('Producto activado en sucursal. Configurá precios y stock.');
+      await fetchAll();
+    }
+  };
+
+  return (
+    <>
+      <Card className="border border-border bg-card">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="text-base font-medium">Productos</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Gestioná tu catálogo de productos, precios y stock por sucursal.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMarcasDialog(true)}>
+              <Tag className="h-4 w-4 mr-1" /> Marcas
+            </Button>
+            <Button size="sm" onClick={() => setProductoDialog({ open: true, producto: null })}>
+              <Plus className="h-4 w-4 mr-1" /> Nuevo producto
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o marca"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+              maxLength={80}
+            />
+          </div>
+
+          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
+                Activos en sucursal ({activeCount})
+              </TabsTrigger>
+              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
+                Inactivos / no configurados ({inactiveCount})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value={activeSubTab} className="mt-4 space-y-2">
+              {loading ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Cargando...</p>
+              ) : filteredItems.length === 0 ? (
+                <div className="text-center py-8 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    {productos.length === 0
+                      ? 'Todavía no hay productos. Creá el primero para empezar.'
+                      : activeSubTab === 'active'
+                        ? 'No hay productos activos en esta sucursal.'
+                        : 'No hay productos inactivos.'}
+                  </p>
+                </div>
+              ) : (
+                filteredItems.map(item => (
+                  <ProductoListItem
+                    key={item.producto.id}
+                    item={item}
+                    onEdit={() => setProductoDialog({ open: true, producto: item })}
+                    onToggleActive={(next) => handleToggleActiveSucursal(item, next)}
+                    onStockInicial={() => setStockDialog({ open: true, producto: item, tipo: 'stock_inicial' })}
+                    onAgregarStock={() => setStockDialog({ open: true, producto: item, tipo: 'reposicion' })}
+                    onAjustarStock={() => setStockDialog({ open: true, producto: item, tipo: 'ajuste_manual' })}
+                    onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
+                  />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <ProductoDialog
+        open={productoDialog.open}
+        producto={productoDialog.producto}
+        marcas={marcas}
+        sucursalId={sucursalId}
+        onClose={() => setProductoDialog({ open: false, producto: null })}
+        onSaved={fetchAll}
+        onManageMarcas={() => setMarcasDialog(true)}
+      />
+
+      <MarcasManagerDialog
+        open={marcasDialog}
+        marcas={marcas}
+        onClose={() => setMarcasDialog(false)}
+        onChanged={fetchAll}
+      />
+
+      {stockDialog.producto && (
+        <StockMovementDialog
+          open={stockDialog.open}
+          item={stockDialog.producto}
+          tipo={stockDialog.tipo}
+          onClose={() => setStockDialog({ open: false, producto: null, tipo: 'reposicion' })}
+          onSaved={fetchAll}
+        />
+      )}
+
+      {historyDialog.producto && (
+        <StockHistoryDialog
+          open={historyDialog.open}
+          item={historyDialog.producto}
+          onClose={() => setHistoryDialog({ open: false, producto: null })}
+        />
+      )}
+    </>
+  );
+}
