@@ -57,6 +57,10 @@ export interface PreviewRow {
   // when true, this row is excluded from internal duplicate detection
   // for the rest of the import session (until a new file is uploaded)
   keepSeparate?: boolean;
+  // sticky flag: true once the row had blocking errors at any point in the session.
+  // never goes back to false within the same session, so corrected rows remain visible
+  // inside the "Con errores" filter as "Corregido".
+  wasErrored?: boolean;
 }
 
 export const TEMPLATE_HEADERS = [
