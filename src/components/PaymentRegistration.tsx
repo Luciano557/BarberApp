@@ -1120,17 +1120,28 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </div>
 
       {/* Navigation */}
-      {currentStepIndex > 0 && (
-        <div className="flex justify-start pt-4 border-t border-border">
-          <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </Button>
+      {(currentStepIndex > 0 || cart.length > 0 || !!selectedBarber || !!selectedService) && (
+        <div className="flex items-center justify-between gap-2 pt-4 border-t border-border">
+          {currentStepIndex > 0 ? (
+            <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Volver
+            </Button>
+          ) : <span />}
+          {(cart.length > 0 || !!selectedBarber || !!selectedService || selectedExtras.length > 0 || selectedDiscount !== 'none') && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCancelOpen(true)}
+              className="gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <X className="h-4 w-4" /> Cancelar venta
+            </Button>
+          )}
         </div>
       )}
 
-      {/* Pending Tasks Bubble - fixed bottom */}
-      {/* Daily Turnos Viewer */}
-      <DailyTurnosViewer />
+      {/* Daily Turnos Viewer — solo en el paso inicial */}
+      {currentStep === 'barber' && <DailyTurnosViewer />}
 
       {sucursalId && (
         <ProductoPickerDialog
@@ -1138,10 +1149,39 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           sucursalId={sucursalId}
           canEditPrice={canEditProductPrice}
           initialCart={cart}
+          barbers={barbers.map(b => ({ id: b.uid, name: `${b.firstName} ${b.lastName}` }))}
+          initialBarberId={cartBarberId}
+          initialBarberName={cartBarberName}
           onClose={() => setPickerOpen(false)}
-          onConfirm={(items) => setCart(items)}
+          onConfirm={(items, barberId, barberName) => {
+            setCart(items);
+            setCartBarberId(barberId);
+            setCartBarberName(barberName);
+            // Si la asignación cambió y ya había un servicio elegido para otro barbero, no tocamos.
+          }}
         />
       )}
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar venta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se va a limpiar el barbero, servicio, extras, descuento, pagos y los productos del carrito. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { resetForm(); setCancelOpen(false); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sí, cancelar venta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {showTasksBubble && pendingTasks.length > 0 && (
         <div
