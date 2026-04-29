@@ -604,25 +604,52 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {currentStep === 'barber' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {barbers.map((barber, index) => (
+              {barbers.map((barber, index) => {
+                const isSelected =
+                  selectedBarber === barber.uid ||
+                  (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
+                return (
+                  <button
+                    key={barber.uid}
+                    onClick={() => handleSelectBarber(barber.uid)}
+                    className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                      isSelected
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                      <User className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                  </button>
+                );
+              })}
+
+              {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
+              {cart.length > 0 && (
                 <button
-                  key={barber.uid}
-                  onClick={() => handleSelectBarber(barber.uid)}
+                  type="button"
+                  onClick={handleSelectNoBarber}
                   className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
-                    selectedBarber === barber.uid
+                    productSaleAssignment === 'no_barber'
                       ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
+                      : 'border-dashed border-border bg-card hover:bg-muted/50'
                   }`}
                 >
                   <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                    {index + 1}
+                    {barbers.length + 1}
                   </span>
                   <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                    <User className="h-6 w-6 text-muted-foreground" />
+                    <Package className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                  <p className="font-medium text-center text-foreground">Sin barbero</p>
+                  <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
                 </button>
-              ))}
+              )}
             </div>
 
             {/* Bloque productos: solo en paso inicial */}
@@ -633,7 +660,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   <span className="text-sm font-medium text-foreground">Productos</span>
                   {cart.length > 0 && (
                     <span className="text-xs text-muted-foreground">
-                      · {cartBarberId ? `Asignados a ${cartBarberName}` : 'Sin barbero'}
+                      {productSaleAssignment === 'barber' && cartBarberName
+                        ? `· Asignados a ${cartBarberName}`
+                        : productSaleAssignment === 'no_barber'
+                        ? '· Sin barbero'
+                        : '· Elegí barbero o tocá Sin barbero para continuar'}
                     </span>
                   )}
                 </div>
@@ -647,7 +678,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               {cart.length === 0 ? (
                 <div className="px-4 py-5 text-center space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Sumá productos a la venta. Pueden ir sin barbero o asignados a uno.
+                    Sumá productos a la venta. Después elegí un barbero o tocá "Sin barbero".
                   </p>
                   <Button
                     type="button"
@@ -684,7 +715,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setCart(prev => prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id))}
+                        onClick={() => {
+                          setCart(prev => {
+                            const next = prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id);
+                            if (next.length === 0) {
+                              setProductSaleAssignment('pending');
+                              setCartBarberId(null);
+                              setCartBarberName(null);
+                            }
+                            return next;
+                          });
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -697,23 +738,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     className="w-full"
                     onClick={() => setPickerOpen(true)}
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos o cambiar asignación
+                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Ir a pago: solo si hay productos */}
-            {cart.length > 0 && (
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => setCurrentStep('payment')}
-                className="w-full h-12"
-              >
-                Ir a pago <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
           </div>
         )}
 
