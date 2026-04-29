@@ -14,7 +14,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ImportMethodStep } from './ImportMethodStep';
-import { ImportPreviewStep } from './ImportPreviewStep';
+import { ImportPreviewStep, PreviewFilter } from './ImportPreviewStep';
 import { ImportSummaryStep } from './ImportSummaryStep';
 import {
   PreviewRow, parseImportFile, rowToPayload,
