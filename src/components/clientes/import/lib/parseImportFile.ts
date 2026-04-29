@@ -252,7 +252,8 @@ export function validateRow(row: PreviewRow, originalGet?: (f: string) => unknow
   row.warnings = [];
   if (!row.nombre.trim()) row.errors.push('Nombre requerido');
   if (row.nombre.length > 80) row.errors.push('Nombre supera 80 caracteres');
-  if (row.apellido.length > 80) row.errors.push('Apellido supera 80 caracteres');
+  if (row.apellido.length > 80) row.warnings.push('Apellido supera 80 caracteres');
+  if (!row.apellido.trim()) row.warnings.push('Apellido faltante');
 
   if (row.email) {
     if (!isValidEmail(row.email)) row.errors.push('Email inválido');
@@ -272,13 +273,16 @@ export function validateRow(row: PreviewRow, originalGet?: (f: string) => unknow
     row.errors.push('"Cliente desde" no reconocida');
   }
 
-  if (!row.telefono && !row.email) {
-    row.warnings.push('Sin teléfono ni email');
+  if (!row.telefono.trim() && !row.email.trim()) {
+    row.errors.push('Falta teléfono o email');
   }
 
   // Recompute duplicate keys after edits
   row.phoneKey = normalizePhone(row.telefono);
   row.emailKey = normalizeEmail(row.email);
+
+  // Sticky: once a row had errors, mark it for the session.
+  if (row.errors.length > 0) row.wasErrored = true;
 }
 
 export interface DuplicateGroup {
