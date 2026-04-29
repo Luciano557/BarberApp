@@ -47,15 +47,14 @@ interface PaymentRegistrationProps {
   }) => Promise<any | null>;
 }
 
-type Step = 'barber' | 'service' | 'extras' | 'productos' | 'discount' | 'payment';
+type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
 
-const STEPS: Step[] = ['barber', 'service', 'extras', 'productos', 'discount', 'payment'];
+const STEPS: Step[] = ['barber', 'service', 'extras', 'discount', 'payment'];
 
 const STEP_INFO = {
-  barber: { title: 'Barbero', subtitle: 'Selecciona quién atendió', icon: User },
+  barber: { title: 'Barbero', subtitle: 'Elegí quién atendió o sumá productos', icon: User },
   service: { title: 'Servicio', subtitle: 'Selecciona el servicio principal', icon: Scissors },
   extras: { title: 'Extras', subtitle: 'Agrega extras opcionales', icon: Sparkles },
-  productos: { title: 'Productos', subtitle: 'Sumá productos a la venta (opcional)', icon: Package },
   discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde (solo servicios)', icon: Tag },
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
