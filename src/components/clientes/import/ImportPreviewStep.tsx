@@ -289,8 +289,9 @@ export function ImportPreviewStep({
                       ) : (
                         <div className="flex flex-col gap-0.5">
                           <p className="text-sm font-medium truncate">
-                            {r.nombre || <span className="italic text-muted-foreground">Sin nombre</span>}{' '}
-                            {r.apellido}
+                            {r.nombre
+                              ? [r.nombre, r.apellido].filter(Boolean).join(' ')
+                              : <span className="italic text-muted-foreground">Sin nombre</span>}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             {[r.telefono, r.email].filter(Boolean).join(' · ') || (
@@ -306,6 +307,10 @@ export function ImportPreviewStep({
                         ) : status === 'listo' ? (
                           <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Listo
+                          </Badge>
+                        ) : status === 'corregido' ? (
+                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Corregido
                           </Badge>
                         ) : status === 'error' ? (
                           <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">
