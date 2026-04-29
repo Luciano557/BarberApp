@@ -585,7 +585,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       <div className="min-h-[320px]">
         {/* Barber Step */}
         {currentStep === 'barber' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {barbers.map((barber, index) => (
                 <button
@@ -607,24 +607,96 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSalesOnlyProducts(true);
-                setSelectedBarber('');
-                setSelectedService('');
-                setSelectedExtras([]);
-                setSelectedDiscount('none');
-                setCurrentStep('productos');
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
-            >
-              <Package className="h-4 w-4" />
-              Venta solo de productos (sin barbero)
-            </button>
-            <p className="text-xs text-muted-foreground text-center">
-              Las ventas solo de productos se registran a la sucursal y no generan comisión.
-            </p>
+
+            {/* Bloque productos: solo en paso inicial */}
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Productos</span>
+                  {cart.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      · {cartBarberId ? `Asignados a ${cartBarberName}` : 'Sin barbero'}
+                    </span>
+                  )}
+                </div>
+                {cart.length > 0 && (
+                  <span className="text-sm font-semibold text-foreground">
+                    ${subtotalProductos.toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
+
+              {cart.length === 0 ? (
+                <div className="px-4 py-5 text-center space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Sumá productos a la venta. Pueden ir sin barbero o asignados a uno.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={!sucursalId}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Añadir producto
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-3 space-y-2">
+                  {cart.map((it) => (
+                    <div
+                      key={it.producto_sucursal_id}
+                      className="flex items-center gap-3 p-2.5 rounded-md border border-border bg-background"
+                    >
+                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{it.nombre}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {it.marca_nombre ? `${it.marca_nombre} · ` : ''}
+                          {it.cantidad} × ${it.precio_unitario.toLocaleString('es-AR')}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">
+                        ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => setCart(prev => prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setPickerOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos o cambiar asignación
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Ir a pago: solo si hay productos */}
+            {cart.length > 0 && (
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => setCurrentStep('payment')}
+                className="w-full h-12"
+              >
+                Ir a pago <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
 
