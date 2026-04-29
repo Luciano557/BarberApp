@@ -1219,15 +1219,15 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           sucursalId={sucursalId}
           canEditPrice={canEditProductPrice}
           initialCart={cart}
-          barbers={barbers.map(b => ({ id: b.uid, name: `${b.firstName} ${b.lastName}` }))}
-          initialBarberId={cartBarberId}
-          initialBarberName={cartBarberName}
           onClose={() => setPickerOpen(false)}
-          onConfirm={(items, barberId, barberName) => {
+          onConfirm={(items) => {
             setCart(items);
-            setCartBarberId(barberId);
-            setCartBarberName(barberName);
-            // Si la asignación cambió y ya había un servicio elegido para otro barbero, no tocamos.
+            // Si el carrito quedó vacío tras editar, resetear asignación.
+            if (items.length === 0) {
+              setProductSaleAssignment('pending');
+              setCartBarberId(null);
+              setCartBarberName(null);
+            }
           }}
         />
       )}
