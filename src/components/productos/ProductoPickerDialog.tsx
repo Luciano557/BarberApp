@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Search, Plus, Minus, Package, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Minus, Package, AlertTriangle, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -27,8 +28,11 @@ interface ProductoPickerDialogProps {
   sucursalId: string;
   canEditPrice: boolean;
   initialCart: CartItem[];
+  barbers?: { id: string; name: string }[];
+  initialBarberId?: string | null;
+  initialBarberName?: string | null;
   onClose: () => void;
-  onConfirm: (cart: CartItem[]) => void;
+  onConfirm: (cart: CartItem[], barberId: string | null, barberName: string | null) => void;
 }
 
 interface RowData {
@@ -42,6 +46,9 @@ export function ProductoPickerDialog({
   sucursalId,
   canEditPrice,
   initialCart,
+  barbers = [],
+  initialBarberId = null,
+  initialBarberName = null,
   onClose,
   onConfirm,
 }: ProductoPickerDialogProps) {
@@ -52,6 +59,7 @@ export function ProductoPickerDialog({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
+  const [barberId, setBarberId] = useState<string | null>(initialBarberId);
 
   const fetchRows = useCallback(async () => {
     if (!orgId || !sucursalId) return;
@@ -91,8 +99,10 @@ export function ProductoPickerDialog({
       initialCart.forEach(it => initialMap.set(it.producto_sucursal_id, { ...it }));
       setCart(initialMap);
       setSearch('');
+      setBarberId(initialBarberId);
     }
-  }, [open, fetchRows, initialCart]);
+  }, [open, fetchRows, initialCart, initialBarberId]);
+
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -148,7 +158,12 @@ export function ProductoPickerDialog({
   }, [cart]);
 
   const handleConfirm = () => {
-    onConfirm(Array.from(cart.values()));
+    const selected = barberId ? barbers.find(b => b.id === barberId) : null;
+    onConfirm(
+      Array.from(cart.values()),
+      barberId,
+      selected ? selected.name : null,
+    );
     onClose();
   };
 
@@ -160,6 +175,33 @@ export function ProductoPickerDialog({
             <Package className="h-5 w-5" /> Agregar productos
           </DialogTitle>
         </DialogHeader>
+
+        {barbers.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Asignar venta a
+            </label>
+            <Select
+              value={barberId ?? '__none__'}
+              onValueChange={(v) => setBarberId(v === '__none__' ? null : v)}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin barbero</SelectItem>
+                {barbers.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {barberId
+                ? 'Los productos quedan asociados a este barbero. Podés sumar un servicio con el mismo barbero.'
+                : 'Los productos se registran a la sucursal. No vas a poder sumar un servicio.'}
+            </p>
+          </div>
+        )}
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
