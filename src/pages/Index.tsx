@@ -91,6 +91,7 @@ const Index = () => {
   } = useSupabaseData();
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
+  const { currentSucursal } = useSucursal();
 
   const summary = getDailySummary();
 
