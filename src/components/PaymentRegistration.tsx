@@ -18,6 +18,7 @@ interface PaymentRegistrationProps {
   barbers: Barber[];
   discounts: Discount[];
   lines?: Line[];
+  sucursalId?: string | null;
   onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
@@ -32,18 +33,20 @@ interface PaymentRegistrationProps {
     payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     subtotal: number;
     total: number;
+    productos?: ProductoCartInput[];
   }) => Promise<any | null>;
 }
 
-type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
+type Step = 'barber' | 'service' | 'extras' | 'productos' | 'discount' | 'payment';
 
-const STEPS: Step[] = ['barber', 'service', 'extras', 'discount', 'payment'];
+const STEPS: Step[] = ['barber', 'service', 'extras', 'productos', 'discount', 'payment'];
 
 const STEP_INFO = {
   barber: { title: 'Barbero', subtitle: 'Selecciona quién atendió', icon: User },
   service: { title: 'Servicio', subtitle: 'Selecciona el servicio principal', icon: Scissors },
   extras: { title: 'Extras', subtitle: 'Agrega extras opcionales', icon: Sparkles },
-  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde', icon: Tag },
+  productos: { title: 'Productos', subtitle: 'Sumá productos a la venta (opcional)', icon: Package },
+  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde (solo servicios)', icon: Tag },
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
