@@ -1,148 +1,102 @@
-# Mejoras UX en preview de importación de clientes (v2)
+## Objetivo
 
-Objetivo: hacer manejable la resolución de errores y duplicados. Solo UI. No se toca RPC, parser de Fresha, parser de plantilla, normalización, agenda ni turnos.
-
-## Archivos afectados
-
-- `src/components/clientes/import/ImportPreviewStep.tsx` — refactor de UI (filtros, vista de duplicados, acciones masivas).
-- `src/components/clientes/import/ImportClientesDialog.tsx` — footer accionable + estado `filter` elevado.
-- `src/components/clientes/import/ImportMethodStep.tsx` — segunda card pasa a "Importar desde otra aplicación" con `Select`.
-- `src/components/clientes/import/MergeDuplicatesDialog.tsx` — sumar callback `onKeepSeparate`.
-- Nuevo: `src/components/clientes/import/lib/mergeDuplicates.ts` — helper puro de fusión por criterios Vittro.
-- Nuevo: `src/components/clientes/import/DuplicatesGroupView.tsx` — render de grupos duplicados.
-- `src/components/clientes/import/lib/parseImportFile.ts` — agregado mínimo aditivo: campo opcional `keepSeparate?: boolean` en `PreviewRow` y `detectInternalDuplicates` lo respeta.
+Hacer el apellido opcional en todo el módulo Clientes (DB, formularios, RPCs, importación) y aplicar los fixes de UX en la preview de importación: scroll en duplicados, filas corregidas sticky en "Con errores", buscador, y limpieza del título de grupos.
 
 ---
 
-## 1. Filtros accionables
+## 1. Migración de base de datos
 
-Reemplazar las 4 tarjetas Stat por una barra de chips:
+Una sola migración con tres cambios:
 
-- Todas · Listas · Con errores · Duplicados · Descartadas
+1. `ALTER TABLE public.clientes ALTER COLUMN apellido DROP NOT NULL;` — no borrar datos.
+2. Reemplazar `create_cliente_with_sucursal`:
+   - Hacer `_apellido` `DEFAULT NULL`.
+   - Quitar el chequeo `IF _apellido IS NULL OR length(btrim(_apellido)) = 0 THEN RAISE 'Apellido obligatorio'`.
+   - Agregar validación: `IF (_telefono IS NULL OR btrim(_telefono)='') AND (_email IS NULL OR btrim(_email)='') THEN RAISE 'Teléfono o email obligatorio'`.
+   - Insert: `apellido = NULLIF(btrim(COALESCE(_apellido,'')), '')`.
+3. Reemplazar `import_clientes_with_sucursal`:
+   - Sacar `IF _apellido = '' THEN _apellido := '-'` y guardar `NULL` cuando esté vacío.
+   - Agregar tras el chequeo de nombre: `IF _telefono IS NULL AND _email IS NULL THEN _errors := _errors || jsonb_build_object('index', _idx, 'error', 'Teléfono o email requerido'); CONTINUE;`.
 
-Cada chip muestra contador. Chip activo destacado (sobrio, sin emojis). Estado local `filter` elevado a `ImportClientesDialog` para que el footer pueda cambiarlo.
+Las firmas de las funciones se mantienen (no se rompe el contrato con el frontend).
 
-Empty state corto cuando un filtro no devuelve filas ("No hay filas con errores", etc.).
+## 2. Frontend — Nuevo cliente y edición
 
-## 2. Acciones rápidas para errores
+`src/components/clientes/NuevoClienteDialog.tsx`:
+- Quitar la validación bloqueante de apellido.
+- Cambiar label `Apellido *` → `Apellido` (sin asterisco).
+- Agregar validación: si `!telefono && !email` → toast "Ingresá teléfono o email" y abortar.
+- Permitir enviar `apellido` vacío (RPC ya lo aceptará tras la migración).
 
-Si hay errores, banda superior breve:
+`src/components/clientes/ClienteDetailDialog.tsx`:
+- Línea 178-179: cambiar a "Nombre obligatorio" y validar contacto (teléfono o email). Permitir guardar con `apellido` vacío.
+- En las cabeceras `${cliente.nombre} ${cliente.apellido}` usar `[nombre, apellido].filter(Boolean).join(' ')` para evitar el espacio sobrante.
 
-- Texto: "N filas con errores."
-- "Ver errores" → activa filtro.
-- "Descartar todos los errores" → AlertDialog:
+## 3. Importación — `parseImportFile.ts`
 
-  > "Se descartarán N filas con errores. No se importarán. ¿Continuar?"
+- En `PreviewRow` agregar `wasErrored?: boolean`.
+- En `validateRow`:
+  - Mantener: nombre requerido.
+  - Quitar: `if (row.apellido.length > 80) row.errors.push('Apellido supera 80 caracteres');` → pasarlo a `warnings`.
+  - Si falta apellido → `warnings.push('Apellido faltante')` (no error).
+  - Si no hay teléfono ni email → `errors.push('Falta teléfono o email')`. Quitar el warning duplicado "Sin teléfono ni email".
+  - Mantener validaciones de email y fechas como están.
+  - Al final: si `errors.length > 0`, setear `row.wasErrored = true` (sticky; no se baja a false).
 
-Las filas con error siguen siendo editables inline.
+`parseFreshaFile.ts` (línea 124): si fuerza apellido como error, ajustar a la misma regla (warning "Apellido faltante", no error). Cambio mínimo y aislado, justificado por la nueva validación.
 
-## 3. Vista agrupada de duplicados
+## 4. Importación — `ImportPreviewStep.tsx`
 
-Cuando `filter === 'duplicates'`, render de `DuplicatesGroupView` en lugar de la lista plana.
+**Filtro "Con errores" sticky**:
+- `filteredRows` para `filter === 'errors'`: incluir filas con `errors.length > 0` **o** `wasErrored === true`, en ambos casos `!discarded`.
 
-Por cada grupo (Card sobria):
+**Contador**:
+- `counts.errores` sigue contando solo `errors.length > 0` (errores reales bloqueantes). Las "corregidas" no inflan el contador.
 
-- Título: "Grupo #N — {nombre principal}"
-- Subtítulo breve: "M filas · coincide por {teléfono|email|teléfono y email}"
-- Acción principal: **Ver comparación** (abre `MergeDuplicatesDialog` actual).
-- Acción secundaria: **Fusionar con criterios de Vittro**.
-- Acción secundaria: **Mantener separados**.
-- Acción destructiva (al final, estilo `text-muted-foreground hover:text-destructive`): **Descartar**.
+**Estado visual "Corregido"**:
+- Para una fila con `wasErrored && errors.length === 0 && !duplicateGroupId && !discarded`, mostrar badge "Corregido" (verde sutil con `CheckCircle2`) en lugar de "Listo".
 
-### Confirmaciones (cortas)
+**Buscador**:
+- Agregar `<Input>` arriba del listado, placeholder "Buscar por nombre, teléfono o email…", `maxLength={80}`. Estado local `query`.
+- Filtrar `filteredRows` adicionalmente por match case-insensitive en `nombre`, `apellido`, `telefono`, `email`.
+- Pasar `query` también a `<DuplicatesGroupView>`.
 
-- Fusionar grupo:
+**Acción "Conservar con contacto"**:
+- Botón en el banner de errores, junto a "Ver errores" / "Descartar errores".
+- Al click: para cada fila con `errors.length > 0 && !discarded && nombre && (telefono || email)`:
+  - Llamar a `updateRow` (la nueva regla de `validateRow` la dejará sin errores y con warning "Apellido faltante" si corresponde). `wasErrored` ya está marcado.
 
-  > "¿Fusionar este grupo usando criterios de Vittro? Se conservará la fila más reciente y se completarán campos vacíos con datos disponibles."
+**Scroll en vista de duplicados**:
+- Envolver `<DuplicatesGroupView>` en `<div className="h-[420px] overflow-y-auto rounded-md border p-2">…</div>`. Igual altura que la lista normal.
+- En `DuplicatesGroupView`, asegurar que la barra de acciones masivas no use `sticky` interno conflictivo (queda como Card normal dentro del scroll del padre).
 
-- Descartar grupo:
+## 5. `DuplicatesGroupView.tsx`
 
-  > "Se descartarán X clientes de este grupo. No se importarán."
+- Quitar `Grupo #{i + 1} —` del título. Mostrar solo `principalName`.
+- Aceptar prop opcional `query?: string`. Filtrar grupos: incluir solo aquellos donde alguna fila matchea el query en nombre/apellido/teléfono/email.
 
-- Mantener separados grupo: sin confirmación (acción reversible y de bajo riesgo).
+## 6. `ImportClientesDialog.tsx`
 
-## 4. Acciones masivas para duplicados
-
-Barra superior dentro de la vista de duplicados:
-
-- **Fusionar todos con criterios de Vittro** — AlertDialog:
-
-  > "Se fusionarán N grupos. Se conserva la fila más reciente y se completan campos vacíos con datos disponibles. ¿Continuar?"
-
-- **Mantener separados todos** — AlertDialog:
-
-  > "Se mantendrán separados N grupos. Se importarán como clientes distintos."
-
-- **Descartar duplicados** (destructivo, al final) — AlertDialog:
-
-  > "Se descartarán X clientes duplicados. No se importarán. Se conserva una fila por grupo."
-
-## 5. Lógica de fusión (helper puro)
-
-`mergeGroupByVittroCriteria(group: PreviewRow[]): { merged: PreviewRow; discardedIds: string[] }`:
-
-1. Filtrar `!discarded`.
-2. Elegir base:
-   - Mayor `fecha_cliente_desde` (string `YYYY-MM-DD` comparable).
-   - Empate o sin fecha válida → fila con más campos no-vacíos entre los `FIELDS` ya definidos.
-3. `merged = { ...base }`.
-4. Por campo: si está vacío en `merged`, completar con la primera no-vacía del resto. Si hay conflicto, gana la base.
-5. `acepta_marketing`: OR del grupo.
-6. Resetear `duplicateGroupId = null`, `discarded = false`, `errors = []`, `warnings = []`. Setear `keepSeparate = true` para que no vuelva a marcarse como duplicado tras la edición. Llamar `validateRow(merged)`.
-7. Devolver `merged` y los `rowIds` del resto del grupo (van a `discarded`).
-
-## 6. "Descartar duplicados" masivo
-
-Por cada grupo: elegir ganadora con la misma regla (mayor `fecha_cliente_desde`, desempate por más campos completos). El resto pasa a `discarded`. La ganadora obtiene `duplicateGroupId = null` y `keepSeparate = true`. Se ejecuta `validateRow` por si quedó válida.
-
-## 7. "Mantener separados" (individual y masivo)
-
-Setear `keepSeparate = true` en todas las filas del grupo y limpiar `duplicateGroupId`. Estas filas quedan excluidas para siempre dentro de la sesión actual.
-
-Para que sobreviva a re-detecciones automáticas:
-
-- Agregar al type `PreviewRow` el campo opcional `keepSeparate?: boolean`.
-- En `detectInternalDuplicates`: `if (r.discarded || r.keepSeparate) continue`.
-- En el `useEffect` de `ImportPreviewStep` que recomputa duplicados al editar, las filas marcadas no se re-evalúan.
-- `keepSeparate` no se persiste ni va al payload (`rowToPayload` no lo usa).
-- Solo se limpia si el usuario vuelve al paso de método y sube un archivo nuevo (el estado `rows` se reinicia).
-
-## 8. `MergeDuplicatesDialog` (cambios mínimos)
-
-- Sumar botón secundario en el footer: **Mantener separados** → llama nuevo prop `onKeepSeparate(group)`.
-- Sin cambios en la lógica interna de elección campo a campo.
-
-## 9. Footer accionable de importación
-
-En `ImportClientesDialog`, cuando hay bloqueos:
-
-- Texto corto: "Hay {N} {error|errores} y {M} duplicado{s} pendientes."
-- Botones link/ghost: **Ver errores**, **Ver duplicados** (cambian el `filter` del preview).
-
-`canImport` no cambia: requiere 0 errores activos y 0 duplicados pendientes.
-
-## 10. "Importar desde otra aplicación"
-
-Segunda card de `ImportMethodStep`:
-
-- Título: "Importar desde otra aplicación"
-- Subtítulo: "Elegí la app de origen y subí el archivo."
-- `Select` "Aplicación de origen" → opciones: Fresha (única por ahora).
-- Botón "Subir archivo" (habilitado solo con app elegida).
-- Si app === 'fresha' → `onPickFreshaFile(file)` (parser actual, intacto).
-
-## 11. Fuera de alcance
-
-- RPC `import_clientes_with_sucursal`.
-- `parseFreshaFile.ts`, `normalize.ts`.
-- `parseImportFile.ts` salvo el agregado aditivo de `keepSeparate`.
-- Agenda, turnos, WhatsApp, dedupe contra clientes existentes.
+- `<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">`.
+- Envolver el contenido del paso preview en `<div className="flex-1 min-h-0 overflow-y-auto">`.
+- `DialogFooter` queda fuera del scroll (sticky por flex), por lo que los botones no se tapan.
+- `validRows` y `blockingCount` ya usan `errors.length === 0`, así que las filas corregidas dejan de bloquear automáticamente. Sin cambios funcionales aquí.
 
 ---
 
-## Notas de estilo
+## 7. Fuera de alcance
 
-- Sin emojis. Iconos `lucide-react` ya en uso.
-- Tokens semánticos (`muted`, `destructive`, `accent`).
-- Confirmaciones con `AlertDialog`, copy directo y corto en castellano rioplatense.
-- Acciones destructivas siempre al final del bloque y con confirmación.
+No tocar: agenda, turnos, WhatsApp, deduplicación contra clientes existentes, importación final, lógica de fechas, lógica de booleanos, parsers (excepto el cambio mínimo en `parseFreshaFile` y `parseImportFile/validateRow` requerido por la nueva regla de apellido).
+
+---
+
+## Resumen técnico de cambios por archivo
+
+- `supabase/migrations/<nuevo>.sql` — DROP NOT NULL apellido + recrear ambas RPCs.
+- `src/components/clientes/NuevoClienteDialog.tsx` — apellido opcional, validar contacto.
+- `src/components/clientes/ClienteDetailDialog.tsx` — misma validación, render de nombre completo seguro.
+- `src/components/clientes/import/lib/parseImportFile.ts` — `wasErrored`, nuevas reglas en `validateRow`.
+- `src/components/clientes/import/lib/parseFreshaFile.ts` — apellido como warning, no error.
+- `src/components/clientes/import/ImportPreviewStep.tsx` — filtro sticky, contador, badge "Corregido", buscador, "Conservar con contacto", contenedor con scroll para duplicados.
+- `src/components/clientes/import/DuplicatesGroupView.tsx` — sin "Grupo #N", soporte de `query`.
+- `src/components/clientes/import/ImportClientesDialog.tsx` — layout flex con scroll interno.
