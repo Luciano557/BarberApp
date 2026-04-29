@@ -98,18 +98,46 @@ export function ImportPreviewStep({
     setConfirmDiscardErrors(false);
   };
 
-  const filteredRows = useMemo(() => {
-    return rows.filter(r => {
-      if (filter === 'all') return true;
-      if (filter === 'discarded') return r.discarded;
-      if (r.discarded) return false;
-      const s = getStatus(r);
-      if (filter === 'ready') return s === 'listo';
-      if (filter === 'errors') return s === 'error';
-      if (filter === 'duplicates') return s === 'duplicado';
-      return true;
+  const handleKeepWithContact = () => {
+    const next = rows.map(r => {
+      if (r.discarded || r.errors.length === 0) return r;
+      const hasName = r.nombre.trim().length > 0;
+      const hasContact = r.telefono.trim().length > 0 || r.email.trim().length > 0;
+      if (!hasName || !hasContact) return r;
+      const merged = { ...r };
+      validateRow(merged);
+      // wasErrored is sticky and stays true; errors should be empty now.
+      return merged;
     });
-  }, [rows, filter]);
+    onChange(next);
+  };
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter(r => {
+      // base filter
+      let pass = false;
+      if (filter === 'all') pass = true;
+      else if (filter === 'discarded') pass = r.discarded;
+      else if (r.discarded) pass = false;
+      else if (filter === 'errors') {
+        // sticky: include rows that had errors at any point in the session
+        pass = r.errors.length > 0 || r.wasErrored === true;
+      } else if (filter === 'ready') {
+        pass = r.errors.length === 0 && !r.duplicateGroupId;
+      } else if (filter === 'duplicates') {
+        pass = !!r.duplicateGroupId;
+      } else {
+        pass = true;
+      }
+      if (!pass) return false;
+      if (!q) return true;
+      const hay = [r.nombre, r.apellido, r.telefono, r.email]
+        .filter(Boolean)
+        .some(v => v.toLowerCase().includes(q));
+      return hay;
+    });
+  }, [rows, filter, query]);
 
   const groupRows = useMemo(() => {
     if (!resolveGroupId) return [];
