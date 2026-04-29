@@ -42,9 +42,6 @@ export function ProductoPickerDialog({
   sucursalId,
   canEditPrice,
   initialCart,
-  barbers = [],
-  initialBarberId = null,
-  initialBarberName = null,
   onClose,
   onConfirm,
 }: ProductoPickerDialogProps) {
@@ -55,7 +52,6 @@ export function ProductoPickerDialog({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
-  const [barberId, setBarberId] = useState<string | null>(initialBarberId);
 
   const fetchRows = useCallback(async () => {
     if (!orgId || !sucursalId) return;
