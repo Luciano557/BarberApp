@@ -1084,9 +1084,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
                 {(() => {
-                  const displayBarberName = barber
-                    ? `${barber.firstName} ${barber.lastName}`
-                    : (cart.length > 0 ? cartBarberName : null);
+                  let displayBarberName: string | null = null;
+                  if (barber) {
+                    displayBarberName = `${barber.firstName} ${barber.lastName}`;
+                  } else if (cart.length > 0) {
+                    if (productSaleAssignment === 'barber' && cartBarberName) {
+                      displayBarberName = cartBarberName;
+                    } else if (productSaleAssignment === 'no_barber') {
+                      displayBarberName = 'Sin barbero';
+                    }
+                  }
                   if (!displayBarberName) return null;
                   return (
                     <div className="flex justify-between">
