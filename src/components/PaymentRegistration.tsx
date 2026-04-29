@@ -466,7 +466,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       }
 
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-        if (currentStep === 'extras') {
+        if (currentStep === 'extras' || currentStep === 'productos') {
           e.preventDefault();
           goToNextStep();
         } else if (currentStep === 'payment' && paymentMethod) {
