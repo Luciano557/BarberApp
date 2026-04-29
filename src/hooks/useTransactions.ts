@@ -8,11 +8,11 @@ import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
 
 interface VentaInsert {
-  barbero_id: string;
-  barbero_nombre: string;
-  servicio_id: string;
-  servicio_nombre: string;
-  precio_servicio: number;
+  barbero_id: string | null;
+  barbero_nombre: string | null;
+  servicio_id: string | null;
+  servicio_nombre: string | null;
+  precio_servicio: number | null;
   descuento_pct: number;
   metodo_pago: PaymentMethod;
   total_final: number;
@@ -20,6 +20,17 @@ interface VentaInsert {
   total_cobrado: number;
   organization_id: string;
   sucursal_id?: string | null;
+  tipo_venta: 'servicio' | 'productos' | 'mixta';
+}
+
+export interface ProductoCartInput {
+  producto_id: string;
+  producto_sucursal_id: string;
+  producto_nombre: string;
+  marca_id: string | null;
+  marca_nombre: string | null;
+  precio_unitario: number;
+  cantidad: number;
 }
 
 interface VentaExtraInsert {
