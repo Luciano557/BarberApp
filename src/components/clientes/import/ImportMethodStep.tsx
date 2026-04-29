@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { FileSpreadsheet, Download, FileUp } from 'lucide-react';
 import { generateTemplate } from './lib/parseImportFile';
 import { toast } from 'sonner';
@@ -10,7 +15,11 @@ interface Props {
   onPickFreshaFile: (file: File) => void;
 }
 
+type SourceApp = '' | 'fresha';
+
 export function ImportMethodStep({ onPickFile, onPickFreshaFile }: Props) {
+  const [sourceApp, setSourceApp] = useState<SourceApp>('');
+
   const handleDownload = () => {
     try {
       const blob = generateTemplate();
@@ -35,6 +44,15 @@ export function ImportMethodStep({ onPickFile, onPickFreshaFile }: Props) {
       e.target.value = '';
     };
 
+  const handleExternalFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (sourceApp === 'fresha') {
+      onPickFreshaFile(file);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="p-5">
@@ -45,8 +63,7 @@ export function ImportMethodStep({ onPickFile, onPickFreshaFile }: Props) {
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-medium">Usar plantilla de Vittro</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Descargá una plantilla en Excel, completala con tus clientes y subila acá.
-              Es la forma más segura de importar sin perder datos.
+              Descargá la plantilla, completala y subila.
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               <Button variant="outline" size="sm" onClick={handleDownload}>
@@ -75,21 +92,32 @@ export function ImportMethodStep({ onPickFile, onPickFreshaFile }: Props) {
             <FileUp className="h-5 w-5 text-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium">Importar archivo de Fresha</h3>
+            <h3 className="text-sm font-medium">Importar desde otra aplicación</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Subí el archivo de clientes exportado desde Fresha y Vittro mapeará las columnas
-              automáticamente. No necesitás conectar tu cuenta.
+              Elegí la app de origen y subí el archivo.
             </p>
+            <div className="space-y-2 mt-3 max-w-sm">
+              <Label className="text-xs">Aplicación de origen</Label>
+              <Select value={sourceApp} onValueChange={(v) => setSourceApp(v as SourceApp)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Elegí una aplicación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fresha">Fresha</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex flex-wrap gap-2 mt-3">
               <label>
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                   className="hidden"
-                  onChange={handleFileInput(onPickFreshaFile)}
+                  onChange={handleExternalFile}
+                  disabled={!sourceApp}
                 />
-                <Button size="sm" variant="outline" asChild>
-                  <span>Subir archivo de Fresha</span>
+                <Button size="sm" variant="outline" asChild disabled={!sourceApp}>
+                  <span>Subir archivo</span>
                 </Button>
               </label>
             </div>
