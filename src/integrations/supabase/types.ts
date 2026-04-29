@@ -385,7 +385,7 @@ export type Database = {
         Row: {
           acepta_marketing: boolean
           alergias: string | null
-          apellido: string
+          apellido: string | null
           bloqueado: boolean
           created_at: string
           eliminado: boolean
@@ -412,7 +412,7 @@ export type Database = {
         Insert: {
           acepta_marketing?: boolean
           alergias?: string | null
-          apellido: string
+          apellido?: string | null
           bloqueado?: boolean
           created_at?: string
           eliminado?: boolean
@@ -439,7 +439,7 @@ export type Database = {
         Update: {
           acepta_marketing?: boolean
           alergias?: string | null
-          apellido?: string
+          apellido?: string | null
           bloqueado?: boolean
           created_at?: string
           eliminado?: boolean
@@ -2406,13 +2406,13 @@ export type Database = {
         Args: {
           _acepta_marketing?: boolean
           _alergias?: string
-          _apellido: string
+          _apellido?: string
           _email?: string
           _fecha_nacimiento?: string
           _instagram?: string
           _nombre: string
           _otra_red_social?: string
-          _sucursal_id: string
+          _sucursal_id?: string
           _telefono?: string
           _tiktok?: string
         }

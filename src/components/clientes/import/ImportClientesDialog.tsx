@@ -191,7 +191,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!importing) onOpenChange(o); }}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-2">
             {(step === 'preview' || step === 'sucursal') && (
@@ -210,6 +210,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
           <DialogDescription>{descByStep[step]}</DialogDescription>
         </DialogHeader>
 
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
         {parsing ? (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
@@ -263,6 +264,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
             errors={summary?.errors ?? []}
           />
         )}
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
           {step === 'method' && (

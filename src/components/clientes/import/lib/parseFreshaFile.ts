@@ -112,20 +112,20 @@ export async function parseFreshaFile(file: File): Promise<ParseResult> {
       discarded: false,
     };
 
-    // Custom validation: name + lastname required, and phone OR email required.
+    // Custom validation: name required + phone OR email required.
     validateRow(row);
     // For Fresha, "no contact" must be a blocking error, not just a warning.
     if (!row.telefono.trim() && !row.email.trim()) {
-      if (!row.errors.includes('Sin teléfono ni email')) {
-        row.errors.push('Sin teléfono ni email');
+      if (!row.errors.includes('Falta teléfono o email')) {
+        row.errors.push('Falta teléfono o email');
       }
       row.warnings = row.warnings.filter(w => w !== 'Sin teléfono ni email');
     }
-    if (!row.apellido.trim()) {
-      if (!row.errors.includes('Apellido requerido')) {
-        row.errors.push('Apellido requerido');
-      }
+    // Apellido faltante = warning, no bloqueante
+    if (!row.apellido.trim() && !row.warnings.includes('Apellido faltante')) {
+      row.warnings.push('Apellido faltante');
     }
+    if (row.errors.length > 0) row.wasErrored = true;
 
     return row;
   });

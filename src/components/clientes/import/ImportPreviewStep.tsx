@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, CheckCircle2, Trash2, Users2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash2, Users2, Search, Sparkles } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -27,11 +27,12 @@ interface Props {
   onFilterChange: (f: PreviewFilter) => void;
 }
 
-type RowStatus = 'listo' | 'error' | 'duplicado';
+type RowStatus = 'listo' | 'error' | 'duplicado' | 'corregido';
 
 function getStatus(r: PreviewRow): RowStatus {
   if (r.errors.length > 0) return 'error';
   if (r.duplicateGroupId) return 'duplicado';
+  if (r.wasErrored) return 'corregido';
   return 'listo';
 }
 
@@ -41,6 +42,7 @@ export function ImportPreviewStep({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resolveGroupId, setResolveGroupId] = useState<string | null>(null);
   const [confirmDiscardErrors, setConfirmDiscardErrors] = useState(false);
+  const [query, setQuery] = useState('');
 
   // Run duplicate detection whenever rows content changes
   useEffect(() => {
@@ -59,8 +61,8 @@ export function ImportPreviewStep({
     return {
       total: rows.length,
       activos: active.length,
-      listos: active.filter(r => getStatus(r) === 'listo').length,
-      errores: active.filter(r => getStatus(r) === 'error').length,
+      listos: active.filter(r => getStatus(r) === 'listo' || getStatus(r) === 'corregido').length,
+      errores: active.filter(r => r.errors.length > 0).length,
       duplicados: active.filter(r => getStatus(r) === 'duplicado').length,
       descartados: rows.filter(r => r.discarded).length,
     };
@@ -96,18 +98,46 @@ export function ImportPreviewStep({
     setConfirmDiscardErrors(false);
   };
 
-  const filteredRows = useMemo(() => {
-    return rows.filter(r => {
-      if (filter === 'all') return true;
-      if (filter === 'discarded') return r.discarded;
-      if (r.discarded) return false;
-      const s = getStatus(r);
-      if (filter === 'ready') return s === 'listo';
-      if (filter === 'errors') return s === 'error';
-      if (filter === 'duplicates') return s === 'duplicado';
-      return true;
+  const handleKeepWithContact = () => {
+    const next = rows.map(r => {
+      if (r.discarded || r.errors.length === 0) return r;
+      const hasName = r.nombre.trim().length > 0;
+      const hasContact = r.telefono.trim().length > 0 || r.email.trim().length > 0;
+      if (!hasName || !hasContact) return r;
+      const merged = { ...r };
+      validateRow(merged);
+      // wasErrored is sticky and stays true; errors should be empty now.
+      return merged;
     });
-  }, [rows, filter]);
+    onChange(next);
+  };
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return rows.filter(r => {
+      // base filter
+      let pass = false;
+      if (filter === 'all') pass = true;
+      else if (filter === 'discarded') pass = r.discarded;
+      else if (r.discarded) pass = false;
+      else if (filter === 'errors') {
+        // sticky: include rows that had errors at any point in the session
+        pass = r.errors.length > 0 || r.wasErrored === true;
+      } else if (filter === 'ready') {
+        pass = r.errors.length === 0 && !r.duplicateGroupId;
+      } else if (filter === 'duplicates') {
+        pass = !!r.duplicateGroupId;
+      } else {
+        pass = true;
+      }
+      if (!pass) return false;
+      if (!q) return true;
+      const hay = [r.nombre, r.apellido, r.telefono, r.email]
+        .filter(Boolean)
+        .some(v => v.toLowerCase().includes(q));
+      return hay;
+    });
+  }, [rows, filter, query]);
 
   const groupRows = useMemo(() => {
     if (!resolveGroupId) return [];
@@ -178,7 +208,7 @@ export function ImportPreviewStep({
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {chips.map(c => (
           <Button
             key={c.id}
@@ -193,6 +223,16 @@ export function ImportPreviewStep({
             </span>
           </Button>
         ))}
+        <div className="relative ml-auto w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre, teléfono o email…"
+            maxLength={80}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
       </div>
 
       {counts.errores > 0 && (
@@ -202,6 +242,10 @@ export function ImportPreviewStep({
           </p>
           <Button size="sm" variant="outline" onClick={() => onFilterChange('errors')}>
             Ver errores
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleKeepWithContact}>
+            <Sparkles className="h-3.5 w-3.5" />
+            Conservar con contacto
           </Button>
           <Button
             size="sm" variant="ghost"
@@ -214,11 +258,14 @@ export function ImportPreviewStep({
       )}
 
       {filter === 'duplicates' ? (
-        <DuplicatesGroupView
-          rows={rows}
-          onChange={onChange}
-          onOpenCompare={(groupId) => setResolveGroupId(groupId)}
-        />
+        <div className="h-[420px] overflow-y-auto rounded-md border p-2">
+          <DuplicatesGroupView
+            rows={rows}
+            onChange={onChange}
+            onOpenCompare={(groupId) => setResolveGroupId(groupId)}
+            query={query}
+          />
+        </div>
       ) : (
         <ScrollArea className="h-[420px] rounded-md border">
           <div className="divide-y">
@@ -242,8 +289,9 @@ export function ImportPreviewStep({
                       ) : (
                         <div className="flex flex-col gap-0.5">
                           <p className="text-sm font-medium truncate">
-                            {r.nombre || <span className="italic text-muted-foreground">Sin nombre</span>}{' '}
-                            {r.apellido}
+                            {r.nombre
+                              ? [r.nombre, r.apellido].filter(Boolean).join(' ')
+                              : <span className="italic text-muted-foreground">Sin nombre</span>}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
                             {[r.telefono, r.email].filter(Boolean).join(' · ') || (
@@ -259,6 +307,10 @@ export function ImportPreviewStep({
                         ) : status === 'listo' ? (
                           <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Listo
+                          </Badge>
+                        ) : status === 'corregido' ? (
+                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Corregido
                           </Badge>
                         ) : status === 'error' ? (
                           <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">
