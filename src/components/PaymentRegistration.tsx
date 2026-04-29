@@ -81,6 +81,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [pickerOpen, setPickerOpen] = useState(false);
   const [cartBarberId, setCartBarberId] = useState<string | null>(null);
   const [cartBarberName, setCartBarberName] = useState<string | null>(null);
+  // Asignación explícita de la venta de productos: pending | no_barber | barber
+  type ProductSaleAssignment = 'pending' | 'no_barber' | 'barber';
+  const [productSaleAssignment, setProductSaleAssignment] = useState<ProductSaleAssignment>('pending');
   // Cancelar venta
   const [cancelOpen, setCancelOpen] = useState(false);
 
@@ -180,27 +183,40 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   }, [currentStepIndex]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
-    // Si hay carrito sin barbero asignado: bloquear paso a servicio.
-    if (cart.length > 0 && !cartBarberId) {
-      toast({
-        title: 'Asigná la venta a un barbero',
-        description: 'Para agregar un servicio, asigná primero la venta a un barbero.',
-        variant: 'destructive',
-      });
-      return;
+    const b = barbers.find(x => x.uid === barberId);
+    const fullName = b ? `${b.firstName} ${b.lastName}` : '';
+
+    if (cart.length > 0) {
+      // Carrito asignado a otro barbero: bloquear.
+      if (productSaleAssignment === 'barber' && cartBarberId && cartBarberId !== barberId) {
+        toast({
+          title: 'Productos asignados a otro barbero',
+          description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación tocando ese barbero u otra opción, o cancelá la venta para empezar de nuevo.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      // pending | no_barber | mismo barber → asignar/reasignar al barbero tocado.
+      setProductSaleAssignment('barber');
+      setCartBarberId(barberId);
+      setCartBarberName(fullName);
     }
-    // Si hay carrito asignado a otro barbero: bloquear.
-    if (cart.length > 0 && cartBarberId && cartBarberId !== barberId) {
-      toast({
-        title: 'Productos asignados a otro barbero',
-        description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación del carrito o eliminá los productos para continuar con otro barbero.`,
-        variant: 'destructive',
-      });
-      return;
-    }
+
     setSelectedBarber(barberId);
     setTimeout(() => goToNextStep(), 100);
-  }, [cart.length, cartBarberId, cartBarberName, goToNextStep, toast]);
+  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast]);
+
+  const handleSelectNoBarber = useCallback(() => {
+    setProductSaleAssignment('no_barber');
+    setCartBarberId(null);
+    setCartBarberName(null);
+    setSelectedBarber('');
+    setSelectedService('');
+    setSelectedExtras([]);
+    setSelectedDiscount('none');
+    // Helper: hoy va directo a payment. Encapsulado para que en el futuro pueda enrutar a un step de descuento de productos.
+    setCurrentStep('payment');
+  }, []);
 
   const handleSelectService = useCallback((serviceId: string) => {
     if (!selectedBarber) {
@@ -352,6 +368,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setCart([]);
     setCartBarberId(null);
     setCartBarberName(null);
+    setProductSaleAssignment('pending');
     setCurrentStep('barber');
   }, []);
 
@@ -432,13 +449,13 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         cantidad: it.cantidad,
       }));
 
-      // Si hay servicio: barbero del servicio. Si solo productos: barbero asignado al carrito (puede ser '' = sin barbero).
+      // Si hay servicio: barbero del servicio. Si solo productos: depende de la asignación.
       const finalBarberId = hasService
         ? (barber?.id || '')
-        : (cartBarberId || '');
+        : (productSaleAssignment === 'barber' ? (cartBarberId || '') : '');
       const finalBarberName = hasService
         ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
-        : (cartBarberName || '');
+        : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
 
       const result = await onSubmit({
         barberId: finalBarberId,
@@ -481,7 +498,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart, cartBarberId, cartBarberName]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart, cartBarberId, cartBarberName, productSaleAssignment]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -492,6 +509,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
         if (currentStep === 'barber' && barbers[index]) {
           handleSelectBarber(barbers[index].uid);
+        } else if (currentStep === 'barber' && cart.length > 0 && index === barbers.length) {
+          handleSelectNoBarber();
         } else if (currentStep === 'service' && services[index]) {
           handleSelectService(services[index].id);
         } else if (currentStep === 'extras' && extras[index]) {
@@ -531,7 +550,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
@@ -587,25 +606,52 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {currentStep === 'barber' && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {barbers.map((barber, index) => (
+              {barbers.map((barber, index) => {
+                const isSelected =
+                  selectedBarber === barber.uid ||
+                  (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
+                return (
+                  <button
+                    key={barber.uid}
+                    onClick={() => handleSelectBarber(barber.uid)}
+                    className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                      isSelected
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                      <User className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                  </button>
+                );
+              })}
+
+              {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
+              {cart.length > 0 && (
                 <button
-                  key={barber.uid}
-                  onClick={() => handleSelectBarber(barber.uid)}
+                  type="button"
+                  onClick={handleSelectNoBarber}
                   className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
-                    selectedBarber === barber.uid
+                    productSaleAssignment === 'no_barber'
                       ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
+                      : 'border-dashed border-border bg-card hover:bg-muted/50'
                   }`}
                 >
                   <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                    {index + 1}
+                    {barbers.length + 1}
                   </span>
                   <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                    <User className="h-6 w-6 text-muted-foreground" />
+                    <Package className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                  <p className="font-medium text-center text-foreground">Sin barbero</p>
+                  <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
                 </button>
-              ))}
+              )}
             </div>
 
             {/* Bloque productos: solo en paso inicial */}
@@ -616,7 +662,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   <span className="text-sm font-medium text-foreground">Productos</span>
                   {cart.length > 0 && (
                     <span className="text-xs text-muted-foreground">
-                      · {cartBarberId ? `Asignados a ${cartBarberName}` : 'Sin barbero'}
+                      {productSaleAssignment === 'barber' && cartBarberName
+                        ? `· Asignados a ${cartBarberName}`
+                        : productSaleAssignment === 'no_barber'
+                        ? '· Sin barbero'
+                        : '· Elegí barbero o tocá Sin barbero para continuar'}
                     </span>
                   )}
                 </div>
@@ -630,7 +680,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               {cart.length === 0 ? (
                 <div className="px-4 py-5 text-center space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Sumá productos a la venta. Pueden ir sin barbero o asignados a uno.
+                    Sumá productos a la venta. Después elegí un barbero o tocá "Sin barbero".
                   </p>
                   <Button
                     type="button"
@@ -667,7 +717,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setCart(prev => prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id))}
+                        onClick={() => {
+                          setCart(prev => {
+                            const next = prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id);
+                            if (next.length === 0) {
+                              setProductSaleAssignment('pending');
+                              setCartBarberId(null);
+                              setCartBarberName(null);
+                            }
+                            return next;
+                          });
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -680,23 +740,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     className="w-full"
                     onClick={() => setPickerOpen(true)}
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos o cambiar asignación
+                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Ir a pago: solo si hay productos */}
-            {cart.length > 0 && (
-              <Button
-                type="button"
-                variant="default"
-                onClick={() => setCurrentStep('payment')}
-                className="w-full h-12"
-              >
-                Ir a pago <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
           </div>
         )}
 
@@ -768,6 +816,23 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </div>
                 </div>
               ))}
+
+              {/* Ir a pago sin servicio: solo si hay productos asignados a este barbero y no se eligió servicio */}
+              {cart.length > 0 && selectedBarber && !selectedService && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={() => {
+                    setSelectedService('');
+                    setSelectedExtras([]);
+                    setSelectedDiscount('none');
+                    setCurrentStep('payment');
+                  }}
+                >
+                  Ir a pago sin servicio <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           );
         })()}
@@ -814,7 +879,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <div className="flex items-center gap-2 min-w-0">
               <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span className="text-muted-foreground truncate">
-                {cart.length} producto{cart.length > 1 ? 's' : ''} · {cartBarberId ? `Asignados a ${cartBarberName}` : 'Sin barbero'}
+                {cart.length} producto{cart.length > 1 ? 's' : ''} · {productSaleAssignment === 'barber' && cartBarberName ? `Asignados a ${cartBarberName}` : productSaleAssignment === 'no_barber' ? 'Sin barbero' : 'Sin asignar'}
               </span>
             </div>
             <span className="font-semibold text-foreground flex-shrink-0">
@@ -1021,9 +1086,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
                 {(() => {
-                  const displayBarberName = barber
-                    ? `${barber.firstName} ${barber.lastName}`
-                    : (cart.length > 0 ? cartBarberName : null);
+                  let displayBarberName: string | null = null;
+                  if (barber) {
+                    displayBarberName = `${barber.firstName} ${barber.lastName}`;
+                  } else if (cart.length > 0) {
+                    if (productSaleAssignment === 'barber' && cartBarberName) {
+                      displayBarberName = cartBarberName;
+                    } else if (productSaleAssignment === 'no_barber') {
+                      displayBarberName = 'Sin barbero';
+                    }
+                  }
                   if (!displayBarberName) return null;
                   return (
                     <div className="flex justify-between">
@@ -1149,15 +1221,15 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           sucursalId={sucursalId}
           canEditPrice={canEditProductPrice}
           initialCart={cart}
-          barbers={barbers.map(b => ({ id: b.uid, name: `${b.firstName} ${b.lastName}` }))}
-          initialBarberId={cartBarberId}
-          initialBarberName={cartBarberName}
           onClose={() => setPickerOpen(false)}
-          onConfirm={(items, barberId, barberName) => {
+          onConfirm={(items) => {
             setCart(items);
-            setCartBarberId(barberId);
-            setCartBarberName(barberName);
-            // Si la asignación cambió y ya había un servicio elegido para otro barbero, no tocamos.
+            // Si el carrito quedó vacío tras editar, resetear asignación.
+            if (items.length === 0) {
+              setProductSaleAssignment('pending');
+              setCartBarberId(null);
+              setCartBarberName(null);
+            }
           }}
         />
       )}
