@@ -320,15 +320,36 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setSplitMode(false);
     setEfectivoAmount('');
     setMpAmount('');
+    setCart([]);
+    setSalesOnlyProducts(false);
     setCurrentStep('barber');
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedBarber || !selectedService || !paymentMethod) {
+    const hasService = !!selectedService;
+    const hasProducts = cart.length > 0;
+
+    if (!hasService && !hasProducts) {
       toast({
-        title: "Campos requeridos",
-        description: "Por favor completa todos los pasos.",
-        variant: "destructive",
+        title: 'Venta vacía',
+        description: 'Agregá al menos un servicio o un producto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (hasService && !selectedBarber) {
+      toast({
+        title: 'Falta barbero',
+        description: 'Seleccioná el barbero que atendió el servicio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!paymentMethod) {
+      toast({
+        title: 'Falta método de pago',
+        description: 'Seleccioná cómo paga el cliente.',
+        variant: 'destructive',
       });
       return;
     }
@@ -371,12 +392,22 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         primaryMethod = paymentMethod;
       }
 
+      const productosPayload: ProductoCartInput[] = cart.map(it => ({
+        producto_id: it.producto_id,
+        producto_sucursal_id: it.producto_sucursal_id,
+        producto_nombre: it.nombre,
+        marca_id: it.marca_id,
+        marca_nombre: it.marca_nombre,
+        precio_unitario: it.precio_unitario,
+        cantidad: it.cantidad,
+      }));
+
       const result = await onSubmit({
-        barberId: barber!.id,
-        barberName: `${barber!.firstName} ${barber!.lastName}`,
-        serviceId: service!.id,
-        serviceName: service!.name,
-        servicePrice: service!.price,
+        barberId: barber?.id || '',
+        barberName: barber ? `${barber.firstName} ${barber.lastName}` : '',
+        serviceId: service?.id || '',
+        serviceName: service?.name || '',
+        servicePrice: service?.price || 0,
         extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
         discount: selectedDiscountData?.value || 0,
         discountType: selectedDiscountData?.type || 'percentage',
@@ -384,14 +415,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         payments,
         subtotal,
         total,
+        productos: productosPayload,
       });
 
       if (result) {
+        const summaryLabel = hasService ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
         toast({
           title: "✅ Cobro guardado correctamente",
           description: recargoTotal > 0
-            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${service!.name}`
-            : `$${total.toLocaleString()} - ${service!.name}`,
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
+            : `$${total.toLocaleString()} - ${summaryLabel}`,
         });
         resetForm();
       } else {
