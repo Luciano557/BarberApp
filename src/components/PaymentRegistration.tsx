@@ -547,26 +547,46 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       <div className="min-h-[320px]">
         {/* Barber Step */}
         {currentStep === 'barber' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {barbers.map((barber, index) => (
-              <button
-                key={barber.uid}
-                onClick={() => handleSelectBarber(barber.uid)}
-                className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
-                  selectedBarber === barber.uid
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                  {index + 1}
-                </span>
-                <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                  <User className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
-              </button>
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {barbers.map((barber, index) => (
+                <button
+                  key={barber.uid}
+                  onClick={() => handleSelectBarber(barber.uid)}
+                  className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                    selectedBarber === barber.uid
+                      ? 'border-secondary bg-secondary/5'
+                      : 'border-border bg-card hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                    <User className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSalesOnlyProducts(true);
+                setSelectedBarber('');
+                setSelectedService('');
+                setSelectedExtras([]);
+                setSelectedDiscount('none');
+                setCurrentStep('productos');
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Package className="h-4 w-4" />
+              Venta solo de productos (sin barbero)
+            </button>
+            <p className="text-xs text-muted-foreground text-center">
+              Las ventas solo de productos se registran a la sucursal y no generan comisión.
+            </p>
           </div>
         )}
 
