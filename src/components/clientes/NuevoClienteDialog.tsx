@@ -72,7 +72,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     const e = email.trim();
 
     if (!n) { toast.error('El nombre es obligatorio'); return; }
-    if (!a) { toast.error('El apellido es obligatorio'); return; }
+    if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       toast.error('Email inválido');
       return;
@@ -86,7 +86,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     setSaving(true);
     const { id, error } = await createCliente({
       nombre: n,
-      apellido: a,
+      apellido: a || '',
       sucursalId: targetSucursalId,
       telefono: t || null,
       email: e || null,
@@ -126,7 +126,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
               <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Juan" autoFocus />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="apellido">Apellido *</Label>
+              <Label htmlFor="apellido">Apellido</Label>
               <Input id="apellido" value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Pérez" />
             </div>
           </div>
