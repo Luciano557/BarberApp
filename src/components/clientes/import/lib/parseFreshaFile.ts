@@ -124,6 +124,7 @@ export async function parseFreshaFile(file: File): Promise<ParseResult> {
     // Apellido faltante = warning, no bloqueante
     if (!row.apellido.trim() && !row.warnings.includes('Apellido faltante')) {
       row.warnings.push('Apellido faltante');
+    }
     if (row.errors.length > 0) row.wasErrored = true;
 
     return row;
