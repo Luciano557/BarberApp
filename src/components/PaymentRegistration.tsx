@@ -971,23 +971,54 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Barbero</span>
-                  <span className="font-medium">{barber ? `${barber.firstName} ${barber.lastName}` : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Servicio</span>
-                  <span className="font-medium">{service?.name}</span>
-                </div>
+                {barber ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Barbero</span>
+                    <span className="font-medium">{`${barber.firstName} ${barber.lastName}`}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tipo</span>
+                    <span className="font-medium">Venta general de sucursal</span>
+                  </div>
+                )}
+                {service && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Servicio</span>
+                    <span className="font-medium">{service.name}</span>
+                  </div>
+                )}
                 {selectedExtrasData.length > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Extras</span>
                     <span className="font-medium">{selectedExtrasData.map(e => e.name).join(', ')}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-3 border-t border-border">
+                {cart.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Productos</span>
+                      <span className="font-medium">${subtotalProductos.toLocaleString('es-AR')}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground pl-2 space-y-0.5">
+                      {cart.map(it => (
+                        <div key={it.producto_sucursal_id} className="flex justify-between">
+                          <span className="truncate pr-2">{it.cantidad}× {it.nombre}</span>
+                          <span>${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {subtotalServicios > 0 && (
+                  <div className="flex justify-between pt-3 border-t border-border">
+                    <span className="text-muted-foreground">Subtotal servicios</span>
+                    <span className="font-medium">${subtotalServicios.toLocaleString('es-AR')}</span>
+                  </div>
+                )}
+                <div className={`flex justify-between ${subtotalServicios > 0 ? '' : 'pt-3 border-t border-border'}`}>
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${subtotal.toLocaleString()}</span>
+                  <span className="font-medium">${subtotal.toLocaleString('es-AR')}</span>
                 </div>
                 {selectedDiscountData && selectedDiscountData.value > 0 && (
                   isDiscountValidForPayment ? (
