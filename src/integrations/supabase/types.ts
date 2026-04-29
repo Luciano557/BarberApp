@@ -632,6 +632,7 @@ export type Database = {
       descuentos: {
         Row: {
           activo: boolean
+          aplica_a: string
           created_at: string
           id: string
           metodo_pago: string | null
@@ -646,6 +647,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          aplica_a?: string
           created_at?: string
           id?: string
           metodo_pago?: string | null
@@ -660,6 +662,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          aplica_a?: string
           created_at?: string
           id?: string
           metodo_pago?: string | null
@@ -1016,6 +1019,10 @@ export type Database = {
           mp: number | null
           organization_id: string | null
           perdida: number | null
+          productos_cantidad: number
+          productos_digital: number
+          productos_efectivo: number
+          productos_total: number
           recargos_total: number
           servicios_con_descuento: number | null
           servicios_por_linea: Json | null
@@ -1053,6 +1060,10 @@ export type Database = {
           mp?: number | null
           organization_id?: string | null
           perdida?: number | null
+          productos_cantidad?: number
+          productos_digital?: number
+          productos_efectivo?: number
+          productos_total?: number
           recargos_total?: number
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
@@ -1090,6 +1101,10 @@ export type Database = {
           mp?: number | null
           organization_id?: string | null
           perdida?: number | null
+          productos_cantidad?: number
+          productos_digital?: number
+          productos_efectivo?: number
+          productos_total?: number
           recargos_total?: number
           servicios_con_descuento?: number | null
           servicios_por_linea?: Json | null
@@ -1230,6 +1245,57 @@ export type Database = {
           },
         ]
       }
+      ingresos_items_productos: {
+        Row: {
+          barbero_id: string | null
+          created_at: string
+          id: string
+          ingreso_id: number
+          marca_id: string | null
+          marca_nombre: string | null
+          organization_id: string
+          payment_method: string
+          producto_id: string
+          producto_nombre: string
+          qty: number
+          subtotal: number
+          sucursal_id: string | null
+          unit_price: number
+        }
+        Insert: {
+          barbero_id?: string | null
+          created_at?: string
+          id?: string
+          ingreso_id: number
+          marca_id?: string | null
+          marca_nombre?: string | null
+          organization_id: string
+          payment_method?: string
+          producto_id: string
+          producto_nombre: string
+          qty?: number
+          subtotal?: number
+          sucursal_id?: string | null
+          unit_price?: number
+        }
+        Update: {
+          barbero_id?: string | null
+          created_at?: string
+          id?: string
+          ingreso_id?: number
+          marca_id?: string | null
+          marca_nombre?: string | null
+          organization_id?: string
+          payment_method?: string
+          producto_id?: string
+          producto_nombre?: string
+          qty?: number
+          subtotal?: number
+          sucursal_id?: string | null
+          unit_price?: number
+        }
+        Relationships: []
+      }
       inversiones: {
         Row: {
           activa: boolean
@@ -1321,6 +1387,99 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marcas_producto: {
+        Row: {
+          activo: boolean
+          color: string
+          created_at: string
+          id: string
+          nombre: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          color: string
+          created_at?: string
+          id?: string
+          nombre: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          color?: string
+          created_at?: string
+          id?: string
+          nombre?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      movimientos_stock: {
+        Row: {
+          cantidad: number
+          created_at: string
+          created_by: string | null
+          id: string
+          motivo: string | null
+          organization_id: string
+          producto_id: string
+          producto_sucursal_id: string
+          stock_previo: number
+          stock_resultante: number
+          sucursal_id: string
+          tipo: string
+          venta_id: string | null
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo?: string | null
+          organization_id: string
+          producto_id: string
+          producto_sucursal_id: string
+          stock_previo: number
+          stock_resultante: number
+          sucursal_id: string
+          tipo: string
+          venta_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          motivo?: string | null
+          organization_id?: string
+          producto_id?: string
+          producto_sucursal_id?: string
+          stock_previo?: number
+          stock_resultante?: number
+          sucursal_id?: string
+          tipo?: string
+          venta_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_stock_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_stock_producto_sucursal_id_fkey"
+            columns: ["producto_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "productos_sucursal"
             referencedColumns: ["id"]
           },
         ]
@@ -1500,6 +1659,100 @@ export type Database = {
           price_monthly?: number | null
         }
         Relationships: []
+      }
+      productos: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descripcion: string | null
+          id: string
+          marca_id: string | null
+          nombre: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          marca_id?: string | null
+          nombre: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          marca_id?: string | null
+          nombre?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_marca_id_fkey"
+            columns: ["marca_id"]
+            isOneToOne: false
+            referencedRelation: "marcas_producto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      productos_sucursal: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          margen_pct: number | null
+          organization_id: string
+          precio_costo: number | null
+          precio_venta: number
+          producto_id: string
+          stock_actual: number
+          stock_minimo: number
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          margen_pct?: number | null
+          organization_id: string
+          precio_costo?: number | null
+          precio_venta?: number
+          producto_id: string
+          stock_actual?: number
+          stock_minimo?: number
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          margen_pct?: number | null
+          organization_id?: string
+          precio_costo?: number | null
+          precio_venta?: number
+          producto_id?: string
+          stock_actual?: number
+          stock_minimo?: number
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_sucursal_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -2164,8 +2417,8 @@ export type Database = {
           anulado_at: string | null
           anulado_por: string | null
           anulado_por_id: string | null
-          barbero_id: string
-          barbero_nombre: string
+          barbero_id: string | null
+          barbero_nombre: string | null
           created_at: string
           descuento_pct: number | null
           estado: string | null
@@ -2173,11 +2426,12 @@ export type Database = {
           id: string
           metodo_pago: string
           organization_id: string | null
-          precio_servicio: number
+          precio_servicio: number | null
           recargo_total: number
-          servicio_id: string
-          servicio_nombre: string
+          servicio_id: string | null
+          servicio_nombre: string | null
           sucursal_id: string | null
+          tipo_venta: string
           total_cobrado: number | null
           total_final: number
         }
@@ -2185,8 +2439,8 @@ export type Database = {
           anulado_at?: string | null
           anulado_por?: string | null
           anulado_por_id?: string | null
-          barbero_id: string
-          barbero_nombre: string
+          barbero_id?: string | null
+          barbero_nombre?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -2194,11 +2448,12 @@ export type Database = {
           id?: string
           metodo_pago: string
           organization_id?: string | null
-          precio_servicio?: number
+          precio_servicio?: number | null
           recargo_total?: number
-          servicio_id: string
-          servicio_nombre: string
+          servicio_id?: string | null
+          servicio_nombre?: string | null
           sucursal_id?: string | null
+          tipo_venta?: string
           total_cobrado?: number | null
           total_final?: number
         }
@@ -2206,8 +2461,8 @@ export type Database = {
           anulado_at?: string | null
           anulado_por?: string | null
           anulado_por_id?: string | null
-          barbero_id?: string
-          barbero_nombre?: string
+          barbero_id?: string | null
+          barbero_nombre?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -2215,11 +2470,12 @@ export type Database = {
           id?: string
           metodo_pago?: string
           organization_id?: string | null
-          precio_servicio?: number
+          precio_servicio?: number | null
           recargo_total?: number
-          servicio_id?: string
-          servicio_nombre?: string
+          servicio_id?: string | null
+          servicio_nombre?: string | null
           sucursal_id?: string | null
+          tipo_venta?: string
           total_cobrado?: number | null
           total_final?: number
         }
@@ -2353,6 +2609,79 @@ export type Database = {
           },
         ]
       }
+      venta_producto: {
+        Row: {
+          barbero_id: string | null
+          cantidad: number
+          created_at: string
+          id: string
+          marca_id: string | null
+          marca_nombre: string | null
+          organization_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_nombre: string
+          producto_sucursal_id: string
+          subtotal: number
+          sucursal_id: string
+          venta_id: string
+        }
+        Insert: {
+          barbero_id?: string | null
+          cantidad?: number
+          created_at?: string
+          id?: string
+          marca_id?: string | null
+          marca_nombre?: string | null
+          organization_id: string
+          precio_unitario: number
+          producto_id: string
+          producto_nombre: string
+          producto_sucursal_id: string
+          subtotal: number
+          sucursal_id: string
+          venta_id: string
+        }
+        Update: {
+          barbero_id?: string | null
+          cantidad?: number
+          created_at?: string
+          id?: string
+          marca_id?: string | null
+          marca_nombre?: string | null
+          organization_id?: string
+          precio_unitario?: number
+          producto_id?: string
+          producto_nombre?: string
+          producto_sucursal_id?: string
+          subtotal?: number
+          sucursal_id?: string
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_producto_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_producto_producto_sucursal_id_fkey"
+            columns: ["producto_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "productos_sucursal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_producto_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "venta"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       barberos_safe: {
@@ -2398,6 +2727,10 @@ export type Database = {
       }
     }
     Functions: {
+      cerrar_ventas_generales_sucursal: {
+        Args: { _fecha: string; _sucursal_id: string }
+        Returns: number
+      }
       check_org_limit: {
         Args: { _org_id: string; _resource: string }
         Returns: boolean
@@ -2432,6 +2765,16 @@ export type Database = {
       import_clientes_with_sucursal: {
         Args: { _clientes: Json; _sucursal_id: string }
         Returns: Json
+      }
+      registrar_movimiento_stock: {
+        Args: {
+          _cantidad: number
+          _motivo?: string
+          _producto_sucursal_id: string
+          _tipo: string
+          _venta_id?: string
+        }
+        Returns: string
       }
       seed_payment_methods_for_org: {
         Args: { _org_id: string }
