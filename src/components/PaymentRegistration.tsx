@@ -167,37 +167,54 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
-  // Steps a omitir cuando es venta solo de productos
-  const skipStep = useCallback((step: Step): boolean => {
-    if (!salesOnlyProducts) return false;
-    return step === 'service' || step === 'extras' || step === 'discount';
-  }, [salesOnlyProducts]);
-
   const goToNextStep = useCallback(() => {
-    let nextIndex = currentStepIndex + 1;
-    while (nextIndex < STEPS.length && skipStep(STEPS[nextIndex])) nextIndex++;
-    if (nextIndex < STEPS.length) {
-      setCurrentStep(STEPS[nextIndex]);
+    if (currentStepIndex < STEPS.length - 1) {
+      setCurrentStep(STEPS[currentStepIndex + 1]);
     }
-  }, [currentStepIndex, skipStep]);
+  }, [currentStepIndex]);
 
   const goToPrevStep = useCallback(() => {
-    let prevIndex = currentStepIndex - 1;
-    while (prevIndex >= 0 && skipStep(STEPS[prevIndex])) prevIndex--;
-    if (prevIndex >= 0) {
-      setCurrentStep(STEPS[prevIndex]);
+    if (currentStepIndex > 0) {
+      setCurrentStep(STEPS[currentStepIndex - 1]);
     }
-  }, [currentStepIndex, skipStep]);
+  }, [currentStepIndex]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
+    // Si hay carrito sin barbero asignado: bloquear paso a servicio.
+    if (cart.length > 0 && !cartBarberId) {
+      toast({
+        title: 'Asigná la venta a un barbero',
+        description: 'Para agregar un servicio, asigná primero la venta a un barbero.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    // Si hay carrito asignado a otro barbero: bloquear.
+    if (cart.length > 0 && cartBarberId && cartBarberId !== barberId) {
+      toast({
+        title: 'Productos asignados a otro barbero',
+        description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación del carrito o eliminá los productos para continuar con otro barbero.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedBarber(barberId);
     setTimeout(() => goToNextStep(), 100);
-  }, [goToNextStep]);
+  }, [cart.length, cartBarberId, cartBarberName, goToNextStep, toast]);
 
   const handleSelectService = useCallback((serviceId: string) => {
+    if (!selectedBarber) {
+      toast({
+        title: 'Falta barbero',
+        description: 'Para agregar un servicio, primero seleccioná un barbero.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedService(serviceId);
     setTimeout(() => goToNextStep(), 100);
-  }, [goToNextStep]);
+  }, [selectedBarber, goToNextStep, toast]);
+
 
   const handleToggleExtra = useCallback((extraId: string) => {
     setSelectedExtras(prev =>
