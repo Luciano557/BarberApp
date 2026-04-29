@@ -200,7 +200,7 @@ export function DuplicatesGroupView({ rows, onChange, onOpenCompare, query }: Pr
       </Card>
 
       <div className="space-y-2">
-        {groups.map((g, i) => {
+        {groups.map((g) => {
           const winner = pickWinner(g.rows);
           const principalName = [winner.nombre, winner.apellido].filter(Boolean).join(' ').trim()
             || winner.email || winner.telefono || 'Sin nombre';
