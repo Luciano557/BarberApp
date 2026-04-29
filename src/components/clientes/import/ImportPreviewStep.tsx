@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertTriangle, CheckCircle2, Trash2, Users2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash2, Users2, Search, Sparkles } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -27,11 +27,12 @@ interface Props {
   onFilterChange: (f: PreviewFilter) => void;
 }
 
-type RowStatus = 'listo' | 'error' | 'duplicado';
+type RowStatus = 'listo' | 'error' | 'duplicado' | 'corregido';
 
 function getStatus(r: PreviewRow): RowStatus {
   if (r.errors.length > 0) return 'error';
   if (r.duplicateGroupId) return 'duplicado';
+  if (r.wasErrored) return 'corregido';
   return 'listo';
 }
 
@@ -41,6 +42,7 @@ export function ImportPreviewStep({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resolveGroupId, setResolveGroupId] = useState<string | null>(null);
   const [confirmDiscardErrors, setConfirmDiscardErrors] = useState(false);
+  const [query, setQuery] = useState('');
 
   // Run duplicate detection whenever rows content changes
   useEffect(() => {
