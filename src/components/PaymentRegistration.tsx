@@ -1020,17 +1020,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
-                {barber ? (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Barbero</span>
-                    <span className="font-medium">{`${barber.firstName} ${barber.lastName}`}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tipo</span>
-                    <span className="font-medium">Venta general de sucursal</span>
-                  </div>
-                )}
+                {(() => {
+                  const displayBarberName = barber
+                    ? `${barber.firstName} ${barber.lastName}`
+                    : (cart.length > 0 ? cartBarberName : null);
+                  if (!displayBarberName) return null;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Barbero</span>
+                      <span className="font-medium">{displayBarberName}</span>
+                    </div>
+                  );
+                })()}
                 {service && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Servicio</span>
