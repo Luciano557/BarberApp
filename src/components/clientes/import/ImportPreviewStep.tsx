@@ -208,7 +208,7 @@ export function ImportPreviewStep({
         </Card>
       )}
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {chips.map(c => (
           <Button
             key={c.id}
@@ -223,6 +223,16 @@ export function ImportPreviewStep({
             </span>
           </Button>
         ))}
+        <div className="relative ml-auto w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre, teléfono o email…"
+            maxLength={80}
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
       </div>
 
       {counts.errores > 0 && (
@@ -232,6 +242,10 @@ export function ImportPreviewStep({
           </p>
           <Button size="sm" variant="outline" onClick={() => onFilterChange('errors')}>
             Ver errores
+          </Button>
+          <Button size="sm" variant="outline" onClick={handleKeepWithContact}>
+            <Sparkles className="h-3.5 w-3.5" />
+            Conservar con contacto
           </Button>
           <Button
             size="sm" variant="ghost"
@@ -244,11 +258,14 @@ export function ImportPreviewStep({
       )}
 
       {filter === 'duplicates' ? (
-        <DuplicatesGroupView
-          rows={rows}
-          onChange={onChange}
-          onOpenCompare={(groupId) => setResolveGroupId(groupId)}
-        />
+        <div className="h-[420px] overflow-y-auto rounded-md border p-2">
+          <DuplicatesGroupView
+            rows={rows}
+            onChange={onChange}
+            onOpenCompare={(groupId) => setResolveGroupId(groupId)}
+            query={query}
+          />
+        </div>
       ) : (
         <ScrollArea className="h-[420px] rounded-md border">
           <div className="divide-y">
