@@ -167,7 +167,7 @@ export function useTransactions() {
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (
-    transaction: Omit<Transaction, 'id' | 'createdAt'>
+    transaction: Omit<Transaction, 'id' | 'createdAt'> & { productos?: ProductoCartInput[] }
   ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
@@ -184,9 +184,26 @@ export function useTransactions() {
       return null;
     }
 
+    const productos = transaction.productos || [];
+    const hasService = !!transaction.serviceId;
+    const hasProducts = productos.length > 0;
+
+    if (!hasService && !hasProducts) {
+      toast.error('Agregá al menos un servicio o producto');
+      return null;
+    }
+
+    const tipoVenta: 'servicio' | 'productos' | 'mixta' =
+      hasService && hasProducts ? 'mixta' : hasService ? 'servicio' : 'productos';
+
+    if (tipoVenta !== 'productos' && !transaction.barberId) {
+      toast.error('Seleccioná un barbero para registrar el servicio');
+      return null;
+    }
+
     // Normalize names to avoid spacing issues
-    const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
-    const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
+    const normalizedBarberName = transaction.barberName ? transaction.barberName.replace(/\s+/g, ' ').trim() : null;
+    const normalizedServiceName = transaction.serviceName ? transaction.serviceName.replace(/\s+/g, ' ').trim() : null;
 
     // BASE = transaction.total. Cada pago trae basePago + recargo (o sólo amount = base si legacy).
     // Normalizar: garantizar basePago, recargoMonto, recargoPct y amount = basePago + recargoMonto.
@@ -199,7 +216,6 @@ export function useTransactions() {
       let basePago = p.basePago;
       let recargoMonto = p.recargoMonto;
       if (basePago == null) {
-        // Pago legacy: amount es base, sin recargo
         basePago = Number(p.amount) || 0;
         recargoMonto = recargoMonto ?? 0;
       }
@@ -224,23 +240,23 @@ export function useTransactions() {
     const recargoTotal = sumRecargo;
     const totalCobrado = sumCobrado || baseTotal;
 
-    // Legacy field: usar el método con mayor monto cobrado como primary
     const primaryMethod = [...normalizedPayments].sort((a, b) => b.amount - a.amount)[0].method;
 
     // Insertar venta principal
     const ventaData: VentaInsert = {
-      barbero_id: transaction.barberId,
+      barbero_id: transaction.barberId || null,
       barbero_nombre: normalizedBarberName,
-      servicio_id: transaction.serviceId,
+      servicio_id: transaction.serviceId || null,
       servicio_nombre: normalizedServiceName,
-      precio_servicio: transaction.servicePrice,
+      precio_servicio: hasService ? transaction.servicePrice : null,
       descuento_pct: transaction.discount,
       metodo_pago: primaryMethod,
-      total_final: baseTotal,           // BASE comisionable (intacto)
-      recargo_total: recargoTotal,      // NUEVO
-      total_cobrado: totalCobrado,      // NUEVO
+      total_final: baseTotal,
+      recargo_total: recargoTotal,
+      total_cobrado: totalCobrado,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
+      tipo_venta: tipoVenta,
     };
 
     const { data: venta, error: ventaError } = await supabase
@@ -251,6 +267,7 @@ export function useTransactions() {
 
     if (ventaError) {
       console.error('Error inserting venta:', ventaError);
+      toast.error('Error al guardar la venta');
       return null;
     }
 
@@ -260,7 +277,7 @@ export function useTransactions() {
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       metodo_pago: p.method,
-      monto: p.amount,                  // base + recargo (lo que entra a caja)
+      monto: p.amount,
       base_pago: p.basePago,
       recargo_pct: p.recargoPct,
       recargo_monto: p.recargoMonto,
@@ -291,6 +308,47 @@ export function useTransactions() {
 
       if (extrasError) {
         console.error('Error inserting extras:', extrasError);
+      }
+    }
+
+    // Insertar productos y descontar stock
+    if (hasProducts) {
+      const productosData = productos.map(p => ({
+        venta_id: venta.id,
+        organization_id: organization.id,
+        sucursal_id: currentSucursal.id,
+        producto_id: p.producto_id,
+        producto_sucursal_id: p.producto_sucursal_id,
+        producto_nombre: p.producto_nombre,
+        marca_id: p.marca_id,
+        marca_nombre: p.marca_nombre,
+        precio_unitario: p.precio_unitario,
+        cantidad: p.cantidad,
+        subtotal: p.precio_unitario * p.cantidad,
+        barbero_id: transaction.barberId || null,
+      }));
+
+      const { error: vpError } = await supabase
+        .from('venta_producto')
+        .insert(productosData as any);
+
+      if (vpError) {
+        console.error('Error inserting venta_producto:', vpError);
+        toast.error('Error al guardar productos en la venta');
+      }
+
+      // Descontar stock con RPC (atomic + audit)
+      for (const p of productos) {
+        const { error: stockErr } = await supabase.rpc('registrar_movimiento_stock', {
+          _producto_sucursal_id: p.producto_sucursal_id,
+          _tipo: 'venta',
+          _cantidad: -p.cantidad,
+          _motivo: null,
+          _venta_id: venta.id,
+        });
+        if (stockErr) {
+          console.error('Error registering stock movement:', stockErr);
+        }
       }
     }
 
