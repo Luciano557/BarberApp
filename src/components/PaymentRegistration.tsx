@@ -1,8 +1,18 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2, SkipForward } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
