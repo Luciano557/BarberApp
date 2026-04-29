@@ -81,6 +81,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [pickerOpen, setPickerOpen] = useState(false);
   const [cartBarberId, setCartBarberId] = useState<string | null>(null);
   const [cartBarberName, setCartBarberName] = useState<string | null>(null);
+  // Asignación explícita de la venta de productos: pending | no_barber | barber
+  type ProductSaleAssignment = 'pending' | 'no_barber' | 'barber';
+  const [productSaleAssignment, setProductSaleAssignment] = useState<ProductSaleAssignment>('pending');
   // Cancelar venta
   const [cancelOpen, setCancelOpen] = useState(false);
 
