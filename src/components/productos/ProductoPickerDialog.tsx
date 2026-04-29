@@ -158,7 +158,12 @@ export function ProductoPickerDialog({
   }, [cart]);
 
   const handleConfirm = () => {
-    onConfirm(Array.from(cart.values()));
+    const selected = barberId ? barbers.find(b => b.id === barberId) : null;
+    onConfirm(
+      Array.from(cart.values()),
+      barberId,
+      selected ? selected.name : null,
+    );
     onClose();
   };
 
@@ -170,6 +175,33 @@ export function ProductoPickerDialog({
             <Package className="h-5 w-5" /> Agregar productos
           </DialogTitle>
         </DialogHeader>
+
+        {barbers.length > 0 && (
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Asignar venta a
+            </label>
+            <Select
+              value={barberId ?? '__none__'}
+              onValueChange={(v) => setBarberId(v === '__none__' ? null : v)}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin barbero</SelectItem>
+                {barbers.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {barberId
+                ? 'Los productos quedan asociados a este barbero. Podés sumar un servicio con el mismo barbero.'
+                : 'Los productos se registran a la sucursal. No vas a poder sumar un servicio.'}
+            </p>
+          </div>
+        )}
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
