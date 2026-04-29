@@ -509,6 +509,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
         if (currentStep === 'barber' && barbers[index]) {
           handleSelectBarber(barbers[index].uid);
+        } else if (currentStep === 'barber' && cart.length > 0 && index === barbers.length) {
+          handleSelectNoBarber();
         } else if (currentStep === 'service' && services[index]) {
           handleSelectService(services[index].id);
         } else if (currentStep === 'extras' && extras[index]) {
