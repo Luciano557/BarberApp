@@ -79,7 +79,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   // Productos
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [salesOnlyProducts, setSalesOnlyProducts] = useState(false);
+  const [cartBarberId, setCartBarberId] = useState<string | null>(null);
+  const [cartBarberName, setCartBarberName] = useState<string | null>(null);
+  // Cancelar venta
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
   const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
