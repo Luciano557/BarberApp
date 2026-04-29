@@ -1,15 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { FileSpreadsheet, Download, AppWindow } from 'lucide-react';
+import { FileSpreadsheet, Download, FileUp } from 'lucide-react';
 import { generateTemplate } from './lib/parseImportFile';
 import { toast } from 'sonner';
 
 interface Props {
   onPickVittroTemplate: () => void;
   onPickFile: (file: File) => void;
+  onPickFreshaFile: (file: File) => void;
 }
 
-export function ImportMethodStep({ onPickVittroTemplate, onPickFile }: Props) {
+export function ImportMethodStep({ onPickFile, onPickFreshaFile }: Props) {
   const handleDownload = () => {
     try {
       const blob = generateTemplate();
@@ -26,11 +27,13 @@ export function ImportMethodStep({ onPickVittroTemplate, onPickFile }: Props) {
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onPickFile(file);
-    e.target.value = '';
-  };
+  const handleFileInput =
+    (cb: (f: File) => void) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) cb(file);
+      e.target.value = '';
+    };
 
   return (
     <div className="space-y-4">
@@ -55,7 +58,7 @@ export function ImportMethodStep({ onPickVittroTemplate, onPickFile }: Props) {
                   type="file"
                   accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                   className="hidden"
-                  onChange={handleFileInput}
+                  onChange={handleFileInput(onPickFile)}
                 />
                 <Button size="sm" asChild>
                   <span>Subir archivo</span>
@@ -66,22 +69,30 @@ export function ImportMethodStep({ onPickVittroTemplate, onPickFile }: Props) {
         </div>
       </Card>
 
-      <Card className="p-5 opacity-70">
+      <Card className="p-5">
         <div className="flex items-start gap-4">
           <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center shrink-0">
-            <AppWindow className="h-5 w-5 text-muted-foreground" />
+            <FileUp className="h-5 w-5 text-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-medium">Importar desde otra aplicación</h3>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                Próximamente
-              </span>
-            </div>
+            <h3 className="text-sm font-medium">Importar archivo de Fresha</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Pronto vas a poder importar directamente desde otras aplicaciones de gestión.
-              Por ahora, usá la plantilla de Vittro.
+              Subí el archivo de clientes exportado desde Fresha y Vittro mapeará las columnas
+              automáticamente. No necesitás conectar tu cuenta.
             </p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                  className="hidden"
+                  onChange={handleFileInput(onPickFreshaFile)}
+                />
+                <Button size="sm" variant="outline" asChild>
+                  <span>Subir archivo de Fresha</span>
+                </Button>
+              </label>
+            </div>
           </div>
         </div>
       </Card>

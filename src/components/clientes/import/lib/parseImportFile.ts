@@ -39,6 +39,11 @@ export interface PreviewRow {
   alergias: string;
   nota_interna: string;
   acepta_marketing: boolean;
+  // optional metadata (used for Fresha and future external sources)
+  bloqueado?: boolean;
+  motivo_bloqueo?: string;
+  external_source?: string | null;
+  external_customer_id?: string | null;
   // computed
   errors: string[];
   warnings: string[];
@@ -350,5 +355,9 @@ export function rowToPayload(r: PreviewRow) {
     alergias: r.alergias.trim() || null,
     nota_interna: r.nota_interna.trim() || null,
     acepta_marketing: r.acepta_marketing,
+    bloqueado: r.bloqueado ?? false,
+    motivo_bloqueo: (r.motivo_bloqueo ?? '').trim() || null,
+    external_source: r.external_source ?? null,
+    external_customer_id: (r.external_customer_id ?? '') ? r.external_customer_id : null,
   };
 }

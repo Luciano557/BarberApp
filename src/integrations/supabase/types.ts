@@ -392,6 +392,8 @@ export type Database = {
           eliminado_at: string | null
           eliminado_por: string | null
           email: string | null
+          external_customer_id: string | null
+          external_source: string | null
           fecha_cliente_desde: string | null
           fecha_importacion: string | null
           fecha_nacimiento: string | null
@@ -417,6 +419,8 @@ export type Database = {
           eliminado_at?: string | null
           eliminado_por?: string | null
           email?: string | null
+          external_customer_id?: string | null
+          external_source?: string | null
           fecha_cliente_desde?: string | null
           fecha_importacion?: string | null
           fecha_nacimiento?: string | null
@@ -442,6 +446,8 @@ export type Database = {
           eliminado_at?: string | null
           eliminado_por?: string | null
           email?: string | null
+          external_customer_id?: string | null
+          external_source?: string | null
           fecha_cliente_desde?: string | null
           fecha_importacion?: string | null
           fecha_nacimiento?: string | null
