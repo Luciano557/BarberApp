@@ -481,7 +481,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart, cartBarberId, cartBarberName]);
 
   // Keyboard shortcuts
   useEffect(() => {
