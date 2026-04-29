@@ -183,27 +183,40 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   }, [currentStepIndex]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
-    // Si hay carrito sin barbero asignado: bloquear paso a servicio.
-    if (cart.length > 0 && !cartBarberId) {
-      toast({
-        title: 'Asigná la venta a un barbero',
-        description: 'Para agregar un servicio, asigná primero la venta a un barbero.',
-        variant: 'destructive',
-      });
-      return;
+    const b = barbers.find(x => x.uid === barberId);
+    const fullName = b ? `${b.firstName} ${b.lastName}` : '';
+
+    if (cart.length > 0) {
+      // Carrito asignado a otro barbero: bloquear.
+      if (productSaleAssignment === 'barber' && cartBarberId && cartBarberId !== barberId) {
+        toast({
+          title: 'Productos asignados a otro barbero',
+          description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación tocando ese barbero u otra opción, o cancelá la venta para empezar de nuevo.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      // pending | no_barber | mismo barber → asignar/reasignar al barbero tocado.
+      setProductSaleAssignment('barber');
+      setCartBarberId(barberId);
+      setCartBarberName(fullName);
     }
-    // Si hay carrito asignado a otro barbero: bloquear.
-    if (cart.length > 0 && cartBarberId && cartBarberId !== barberId) {
-      toast({
-        title: 'Productos asignados a otro barbero',
-        description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación del carrito o eliminá los productos para continuar con otro barbero.`,
-        variant: 'destructive',
-      });
-      return;
-    }
+
     setSelectedBarber(barberId);
     setTimeout(() => goToNextStep(), 100);
-  }, [cart.length, cartBarberId, cartBarberName, goToNextStep, toast]);
+  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast]);
+
+  const handleSelectNoBarber = useCallback(() => {
+    setProductSaleAssignment('no_barber');
+    setCartBarberId(null);
+    setCartBarberName(null);
+    setSelectedBarber('');
+    setSelectedService('');
+    setSelectedExtras([]);
+    setSelectedDiscount('none');
+    // Helper: hoy va directo a payment. Encapsulado para que en el futuro pueda enrutar a un step de descuento de productos.
+    setCurrentStep('payment');
+  }, []);
 
   const handleSelectService = useCallback((serviceId: string) => {
     if (!selectedBarber) {
