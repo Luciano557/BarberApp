@@ -350,7 +350,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setEfectivoAmount('');
     setMpAmount('');
     setCart([]);
-    setSalesOnlyProducts(false);
+    setCartBarberId(null);
+    setCartBarberName(null);
     setCurrentStep('barber');
   }, []);
 
