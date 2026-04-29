@@ -61,8 +61,8 @@ export function ImportPreviewStep({
     return {
       total: rows.length,
       activos: active.length,
-      listos: active.filter(r => getStatus(r) === 'listo').length,
-      errores: active.filter(r => getStatus(r) === 'error').length,
+      listos: active.filter(r => getStatus(r) === 'listo' || getStatus(r) === 'corregido').length,
+      errores: active.filter(r => r.errors.length > 0).length,
       duplicados: active.filter(r => getStatus(r) === 'duplicado').length,
       descartados: rows.filter(r => r.discarded).length,
     };
