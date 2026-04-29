@@ -814,6 +814,23 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </div>
                 </div>
               ))}
+
+              {/* Ir a pago sin servicio: solo si hay productos asignados a este barbero y no se eligió servicio */}
+              {cart.length > 0 && selectedBarber && !selectedService && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={() => {
+                    setSelectedService('');
+                    setSelectedExtras([]);
+                    setSelectedDiscount('none');
+                    setCurrentStep('payment');
+                  }}
+                >
+                  Ir a pago sin servicio <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           );
         })()}
