@@ -50,9 +50,11 @@ const STEP_INFO = {
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], sucursalId, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const canEditProductPrice = isOwner || isGeneralManager || isManager;
   const [currentStep, setCurrentStep] = useState<Step>('barber');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -65,6 +67,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Productos
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [salesOnlyProducts, setSalesOnlyProducts] = useState(false);
 
   const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
   const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
