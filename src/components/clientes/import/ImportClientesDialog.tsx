@@ -19,6 +19,7 @@ import { ImportSummaryStep } from './ImportSummaryStep';
 import {
   PreviewRow, parseImportFile, rowToPayload,
 } from './lib/parseImportFile';
+import { parseFreshaFile, FreshaFormatError } from './lib/parseFreshaFile';
 
 interface Props {
   open: boolean;
@@ -95,6 +96,31 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
     } catch (e: any) {
       console.error(e);
       toast.error('No se pudo leer el archivo. Verificá el formato.');
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const handleFreshaFile = async (file: File) => {
+    setParsing(true);
+    try {
+      const result = await parseFreshaFile(file);
+      if (result.rows.length === 0) {
+        toast.error('El archivo no contiene filas válidas.');
+        return;
+      }
+      setRows(result.rows);
+      setUnknownHeaders(result.unknownHeaders);
+      setTruncated(result.truncated);
+      setTotalParsed(result.totalParsed);
+      setStep(sucursalId ? 'preview' : 'sucursal');
+    } catch (e: any) {
+      console.error(e);
+      if (e instanceof FreshaFormatError) {
+        toast.error(e.message);
+      } else {
+        toast.error('No se pudo leer el archivo. Verificá el formato.');
+      }
     } finally {
       setParsing(false);
     }
@@ -191,6 +217,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
           <ImportMethodStep
             onPickVittroTemplate={() => { /* download handled inside */ }}
             onPickFile={handleFile}
+            onPickFreshaFile={handleFreshaFile}
           />
         ) : step === 'sucursal' ? (
           <div className="space-y-4">
