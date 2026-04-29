@@ -432,9 +432,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         cantidad: it.cantidad,
       }));
 
+      // Si hay servicio: barbero del servicio. Si solo productos: barbero asignado al carrito (puede ser '' = sin barbero).
+      const finalBarberId = hasService
+        ? (barber?.id || '')
+        : (cartBarberId || '');
+      const finalBarberName = hasService
+        ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
+        : (cartBarberName || '');
+
       const result = await onSubmit({
-        barberId: barber?.id || '',
-        barberName: barber ? `${barber.firstName} ${barber.lastName}` : '',
+        barberId: finalBarberId,
+        barberName: finalBarberName,
         serviceId: service?.id || '',
         serviceName: service?.name || '',
         servicePrice: service?.price || 0,
