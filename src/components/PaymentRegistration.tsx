@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
@@ -8,6 +8,9 @@ import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
+import { ProductoCartInput } from '@/hooks/useTransactions';
 
 interface PaymentRegistrationProps {
   services: Service[];
