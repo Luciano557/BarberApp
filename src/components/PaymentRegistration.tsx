@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
@@ -8,6 +8,9 @@ import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
+import { ProductoCartInput } from '@/hooks/useTransactions';
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -15,6 +18,7 @@ interface PaymentRegistrationProps {
   barbers: Barber[];
   discounts: Discount[];
   lines?: Line[];
+  sucursalId?: string | null;
   onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
@@ -29,24 +33,28 @@ interface PaymentRegistrationProps {
     payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     subtotal: number;
     total: number;
+    productos?: ProductoCartInput[];
   }) => Promise<any | null>;
 }
 
-type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
+type Step = 'barber' | 'service' | 'extras' | 'productos' | 'discount' | 'payment';
 
-const STEPS: Step[] = ['barber', 'service', 'extras', 'discount', 'payment'];
+const STEPS: Step[] = ['barber', 'service', 'extras', 'productos', 'discount', 'payment'];
 
 const STEP_INFO = {
   barber: { title: 'Barbero', subtitle: 'Selecciona quién atendió', icon: User },
   service: { title: 'Servicio', subtitle: 'Selecciona el servicio principal', icon: Scissors },
   extras: { title: 'Extras', subtitle: 'Agrega extras opcionales', icon: Sparkles },
-  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde', icon: Tag },
+  productos: { title: 'Productos', subtitle: 'Sumá productos a la venta (opcional)', icon: Package },
+  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde (solo servicios)', icon: Tag },
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], sucursalId, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const canEditProductPrice = isOwner || isGeneralManager || isManager;
   const [currentStep, setCurrentStep] = useState<Step>('barber');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -59,6 +67,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Productos
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [salesOnlyProducts, setSalesOnlyProducts] = useState(false);
 
   const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
   const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
@@ -84,11 +96,21 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     [extras, selectedExtras]
   );
 
-  const subtotal = useMemo(() => {
+  // Subtotal de servicios (servicio + extras). NO incluye productos.
+  const subtotalServicios = useMemo(() => {
     const servicePrice = service?.price || 0;
     const extrasTotal = selectedExtrasData.reduce((sum, e) => sum + e.price, 0);
     return servicePrice + extrasTotal;
   }, [service, selectedExtrasData]);
+
+  // Subtotal de productos (precio_unitario * cantidad). No se le aplican descuentos.
+  const subtotalProductos = useMemo(
+    () => cart.reduce((sum, it) => sum + it.precio_unitario * it.cantidad, 0),
+    [cart]
+  );
+
+  // Subtotal total (servicios + productos)
+  const subtotal = subtotalServicios + subtotalProductos;
 
   const selectedDiscountData = useMemo(() => {
     return discounts.find(d => d.id === selectedDiscount);
@@ -101,55 +123,59 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     return selectedDiscountData.paymentMethod === paymentMethod;
   }, [selectedDiscountData, paymentMethod]);
 
+  // Descuento se aplica SOLO sobre el subtotal de servicios
   const discountAmount = useMemo(() => {
     if (!selectedDiscountData || selectedDiscountData.value === 0) return 0;
-    // If discount doesn't apply to selected payment method, no discount
     if (!isDiscountValidForPayment) return 0;
-    
+    if (subtotalServicios === 0) return 0;
+
     if (selectedDiscountData.type === 'fixed') {
-      return selectedDiscountData.value;
+      return Math.min(selectedDiscountData.value, subtotalServicios);
     }
-    // percentage with rounding
-    const rawDiscount = subtotal * (selectedDiscountData.value / 100);
+    const rawDiscount = subtotalServicios * (selectedDiscountData.value / 100);
     const rounding = selectedDiscountData.rounding || 'cliente';
     const unit = selectedDiscountData.roundingUnit || 1;
-    
-    // Apply rounding based on type and unit
+
     let roundedDiscount: number;
     if (unit === 1) {
-      // No unit rounding, just apply direction
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount); break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount); break;
         default: roundedDiscount = Math.floor(rawDiscount); break;
       }
     } else {
-      // Apply unit-based rounding
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount / unit) * unit; break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount / unit) * unit; break;
         default: roundedDiscount = Math.floor(rawDiscount / unit) * unit; break;
       }
     }
-    
     return roundedDiscount;
-  }, [subtotal, selectedDiscountData, isDiscountValidForPayment]);
+  }, [subtotalServicios, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
+  // Steps a omitir cuando es venta solo de productos
+  const skipStep = useCallback((step: Step): boolean => {
+    if (!salesOnlyProducts) return false;
+    return step === 'service' || step === 'extras' || step === 'discount';
+  }, [salesOnlyProducts]);
+
   const goToNextStep = useCallback(() => {
-    const nextIndex = currentStepIndex + 1;
+    let nextIndex = currentStepIndex + 1;
+    while (nextIndex < STEPS.length && skipStep(STEPS[nextIndex])) nextIndex++;
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, skipStep]);
 
   const goToPrevStep = useCallback(() => {
-    const prevIndex = currentStepIndex - 1;
+    let prevIndex = currentStepIndex - 1;
+    while (prevIndex >= 0 && skipStep(STEPS[prevIndex])) prevIndex--;
     if (prevIndex >= 0) {
       setCurrentStep(STEPS[prevIndex]);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, skipStep]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
     setSelectedBarber(barberId);
@@ -294,15 +320,36 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setSplitMode(false);
     setEfectivoAmount('');
     setMpAmount('');
+    setCart([]);
+    setSalesOnlyProducts(false);
     setCurrentStep('barber');
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedBarber || !selectedService || !paymentMethod) {
+    const hasService = !!selectedService;
+    const hasProducts = cart.length > 0;
+
+    if (!hasService && !hasProducts) {
       toast({
-        title: "Campos requeridos",
-        description: "Por favor completa todos los pasos.",
-        variant: "destructive",
+        title: 'Venta vacía',
+        description: 'Agregá al menos un servicio o un producto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (hasService && !selectedBarber) {
+      toast({
+        title: 'Falta barbero',
+        description: 'Seleccioná el barbero que atendió el servicio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!paymentMethod) {
+      toast({
+        title: 'Falta método de pago',
+        description: 'Seleccioná cómo paga el cliente.',
+        variant: 'destructive',
       });
       return;
     }
@@ -345,12 +392,22 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         primaryMethod = paymentMethod;
       }
 
+      const productosPayload: ProductoCartInput[] = cart.map(it => ({
+        producto_id: it.producto_id,
+        producto_sucursal_id: it.producto_sucursal_id,
+        producto_nombre: it.nombre,
+        marca_id: it.marca_id,
+        marca_nombre: it.marca_nombre,
+        precio_unitario: it.precio_unitario,
+        cantidad: it.cantidad,
+      }));
+
       const result = await onSubmit({
-        barberId: barber!.id,
-        barberName: `${barber!.firstName} ${barber!.lastName}`,
-        serviceId: service!.id,
-        serviceName: service!.name,
-        servicePrice: service!.price,
+        barberId: barber?.id || '',
+        barberName: barber ? `${barber.firstName} ${barber.lastName}` : '',
+        serviceId: service?.id || '',
+        serviceName: service?.name || '',
+        servicePrice: service?.price || 0,
         extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
         discount: selectedDiscountData?.value || 0,
         discountType: selectedDiscountData?.type || 'percentage',
@@ -358,14 +415,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         payments,
         subtotal,
         total,
+        productos: productosPayload,
       });
 
       if (result) {
+        const summaryLabel = hasService ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
         toast({
           title: "✅ Cobro guardado correctamente",
           description: recargoTotal > 0
-            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${service!.name}`
-            : `$${total.toLocaleString()} - ${service!.name}`,
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
+            : `$${total.toLocaleString()} - ${summaryLabel}`,
         });
         resetForm();
       } else {
@@ -384,7 +443,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -407,7 +466,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       }
 
       if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-        if (currentStep === 'extras') {
+        if (currentStep === 'extras' || currentStep === 'productos') {
           e.preventDefault();
           goToNextStep();
         } else if (currentStep === 'payment' && paymentMethod) {
@@ -488,26 +547,46 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       <div className="min-h-[320px]">
         {/* Barber Step */}
         {currentStep === 'barber' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {barbers.map((barber, index) => (
-              <button
-                key={barber.uid}
-                onClick={() => handleSelectBarber(barber.uid)}
-                className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
-                  selectedBarber === barber.uid
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                  {index + 1}
-                </span>
-                <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                  <User className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
-              </button>
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {barbers.map((barber, index) => (
+                <button
+                  key={barber.uid}
+                  onClick={() => handleSelectBarber(barber.uid)}
+                  className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                    selectedBarber === barber.uid
+                      ? 'border-secondary bg-secondary/5'
+                      : 'border-border bg-card hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                    <User className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSalesOnlyProducts(true);
+                setSelectedBarber('');
+                setSelectedService('');
+                setSelectedExtras([]);
+                setSelectedDiscount('none');
+                setCurrentStep('productos');
+              }}
+              className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground hover:text-foreground border border-dashed border-border rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Package className="h-4 w-4" />
+              Venta solo de productos (sin barbero)
+            </button>
+            <p className="text-xs text-muted-foreground text-center">
+              Las ventas solo de productos se registran a la sucursal y no generan comisión.
+            </p>
           </div>
         )}
 
@@ -615,6 +694,82 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
             <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
               Continuar <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Productos Step */}
+        {currentStep === 'productos' && (
+          <div className="space-y-4">
+            {cart.length === 0 ? (
+              <div className="text-center py-10 rounded-lg border border-dashed border-border bg-muted/30 space-y-3">
+                <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Sumá productos a la venta</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Opcional. Los productos se cobran aparte y no generan comisión.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={!sucursalId}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Agregar producto
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cart.map((it) => (
+                  <div
+                    key={it.producto_sucursal_id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card"
+                  >
+                    <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{it.nombre}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {it.marca_nombre ? `${it.marca_nombre} · ` : ''}
+                        {it.cantidad} × ${it.precio_unitario.toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => setCart(prev => prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Agregar más productos
+                </Button>
+                <div className="flex justify-between items-center px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Subtotal productos</span>
+                  <span className="font-semibold text-foreground">
+                    ${subtotalProductos.toLocaleString('es-AR')}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
+              {salesOnlyProducts && cart.length === 0 ? 'Continuar sin productos' : 'Continuar'}
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         )}
@@ -816,23 +971,54 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Barbero</span>
-                  <span className="font-medium">{barber ? `${barber.firstName} ${barber.lastName}` : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Servicio</span>
-                  <span className="font-medium">{service?.name}</span>
-                </div>
+                {barber ? (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Barbero</span>
+                    <span className="font-medium">{`${barber.firstName} ${barber.lastName}`}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tipo</span>
+                    <span className="font-medium">Venta general de sucursal</span>
+                  </div>
+                )}
+                {service && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Servicio</span>
+                    <span className="font-medium">{service.name}</span>
+                  </div>
+                )}
                 {selectedExtrasData.length > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Extras</span>
                     <span className="font-medium">{selectedExtrasData.map(e => e.name).join(', ')}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-3 border-t border-border">
+                {cart.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Productos</span>
+                      <span className="font-medium">${subtotalProductos.toLocaleString('es-AR')}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground pl-2 space-y-0.5">
+                      {cart.map(it => (
+                        <div key={it.producto_sucursal_id} className="flex justify-between">
+                          <span className="truncate pr-2">{it.cantidad}× {it.nombre}</span>
+                          <span>${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {subtotalServicios > 0 && (
+                  <div className="flex justify-between pt-3 border-t border-border">
+                    <span className="text-muted-foreground">Subtotal servicios</span>
+                    <span className="font-medium">${subtotalServicios.toLocaleString('es-AR')}</span>
+                  </div>
+                )}
+                <div className={`flex justify-between ${subtotalServicios > 0 ? '' : 'pt-3 border-t border-border'}`}>
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${subtotal.toLocaleString()}</span>
+                  <span className="font-medium">${subtotal.toLocaleString('es-AR')}</span>
                 </div>
                 {selectedDiscountData && selectedDiscountData.value > 0 && (
                   isDiscountValidForPayment ? (
@@ -895,6 +1081,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       {/* Pending Tasks Bubble - fixed bottom */}
       {/* Daily Turnos Viewer */}
       <DailyTurnosViewer />
+
+      {sucursalId && (
+        <ProductoPickerDialog
+          open={pickerOpen}
+          sucursalId={sucursalId}
+          canEditPrice={canEditProductPrice}
+          initialCart={cart}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={(items) => setCart(items)}
+        />
+      )}
 
       {showTasksBubble && pendingTasks.length > 0 && (
         <div

@@ -15,6 +15,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -90,6 +91,7 @@ const Index = () => {
   } = useSupabaseData();
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
+  const { currentSucursal } = useSucursal();
 
   const summary = getDailySummary();
 
@@ -117,6 +119,7 @@ const Index = () => {
               barbers={barbers.filter(b => b.teamRole !== 'otros')}
               discounts={discounts}
               lines={lines}
+              sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
             />
