@@ -155,19 +155,27 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
+  // Steps a omitir cuando es venta solo de productos
+  const skipStep = useCallback((step: Step): boolean => {
+    if (!salesOnlyProducts) return false;
+    return step === 'service' || step === 'extras' || step === 'discount';
+  }, [salesOnlyProducts]);
+
   const goToNextStep = useCallback(() => {
-    const nextIndex = currentStepIndex + 1;
+    let nextIndex = currentStepIndex + 1;
+    while (nextIndex < STEPS.length && skipStep(STEPS[nextIndex])) nextIndex++;
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, skipStep]);
 
   const goToPrevStep = useCallback(() => {
-    const prevIndex = currentStepIndex - 1;
+    let prevIndex = currentStepIndex - 1;
+    while (prevIndex >= 0 && skipStep(STEPS[prevIndex])) prevIndex--;
     if (prevIndex >= 0) {
       setCurrentStep(STEPS[prevIndex]);
     }
-  }, [currentStepIndex]);
+  }, [currentStepIndex, skipStep]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
     setSelectedBarber(barberId);
