@@ -46,6 +46,9 @@ export function ProductoPickerDialog({
   sucursalId,
   canEditPrice,
   initialCart,
+  barbers = [],
+  initialBarberId = null,
+  initialBarberName = null,
   onClose,
   onConfirm,
 }: ProductoPickerDialogProps) {
@@ -56,6 +59,7 @@ export function ProductoPickerDialog({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
+  const [barberId, setBarberId] = useState<string | null>(initialBarberId);
 
   const fetchRows = useCallback(async () => {
     if (!orgId || !sucursalId) return;
@@ -95,8 +99,10 @@ export function ProductoPickerDialog({
       initialCart.forEach(it => initialMap.set(it.producto_sucursal_id, { ...it }));
       setCart(initialMap);
       setSearch('');
+      setBarberId(initialBarberId);
     }
-  }, [open, fetchRows, initialCart]);
+  }, [open, fetchRows, initialCart, initialBarberId]);
+
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
