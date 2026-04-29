@@ -698,6 +698,82 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           </div>
         )}
 
+        {/* Productos Step */}
+        {currentStep === 'productos' && (
+          <div className="space-y-4">
+            {cart.length === 0 ? (
+              <div className="text-center py-10 rounded-lg border border-dashed border-border bg-muted/30 space-y-3">
+                <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Sumá productos a la venta</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Opcional. Los productos se cobran aparte y no generan comisión.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={!sucursalId}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Agregar producto
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cart.map((it) => (
+                  <div
+                    key={it.producto_sucursal_id}
+                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-card"
+                  >
+                    <div className="w-9 h-9 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{it.nombre}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {it.marca_nombre ? `${it.marca_nombre} · ` : ''}
+                        {it.cantidad} × ${it.precio_unitario.toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">
+                      ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => setCart(prev => prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Agregar más productos
+                </Button>
+                <div className="flex justify-between items-center px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Subtotal productos</span>
+                  <span className="font-semibold text-foreground">
+                    ${subtotalProductos.toLocaleString('es-AR')}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
+              {salesOnlyProducts && cart.length === 0 ? 'Continuar sin productos' : 'Continuar'}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Discount Step */}
         {currentStep === 'discount' && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
