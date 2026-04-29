@@ -877,7 +877,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <div className="flex items-center gap-2 min-w-0">
               <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span className="text-muted-foreground truncate">
-                {cart.length} producto{cart.length > 1 ? 's' : ''} · {cartBarberId ? `Asignados a ${cartBarberName}` : 'Sin barbero'}
+                {cart.length} producto{cart.length > 1 ? 's' : ''} · {productSaleAssignment === 'barber' && cartBarberName ? `Asignados a ${cartBarberName}` : productSaleAssignment === 'no_barber' ? 'Sin barbero' : 'Sin asignar'}
               </span>
             </div>
             <span className="font-semibold text-foreground flex-shrink-0">
