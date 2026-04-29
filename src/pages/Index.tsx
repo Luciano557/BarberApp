@@ -119,6 +119,7 @@ const Index = () => {
               barbers={barbers.filter(b => b.teamRole !== 'otros')}
               discounts={discounts}
               lines={lines}
+              sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
             />
