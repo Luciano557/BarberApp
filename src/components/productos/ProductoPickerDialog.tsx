@@ -91,9 +91,8 @@ export function ProductoPickerDialog({
       initialCart.forEach(it => initialMap.set(it.producto_sucursal_id, { ...it }));
       setCart(initialMap);
       setSearch('');
-      setBarberId(initialBarberId);
     }
-  }, [open, fetchRows, initialCart, initialBarberId]);
+  }, [open, fetchRows, initialCart]);
 
 
   const filtered = useMemo(() => {
