@@ -1,104 +1,148 @@
-## Plan: Importación de archivos exportados desde Fresha
+# Mejoras UX en preview de importación de clientes (v2)
 
-Extender el flujo de importación de clientes ya existente para soportar archivos `.xlsx`/`.csv` exportados desde Fresha. Solo lectura de archivos: no hay API, OAuth ni sincronización. Toda la lógica posterior (preview editable, validaciones, duplicados internos, fusión, RPC) se reutiliza tal cual.
+Objetivo: hacer manejable la resolución de errores y duplicados. Solo UI. No se toca RPC, parser de Fresha, parser de plantilla, normalización, agenda ni turnos.
 
-### 1. Base de datos
+## Archivos afectados
 
-Migración sobre `public.clientes`:
+- `src/components/clientes/import/ImportPreviewStep.tsx` — refactor de UI (filtros, vista de duplicados, acciones masivas).
+- `src/components/clientes/import/ImportClientesDialog.tsx` — footer accionable + estado `filter` elevado.
+- `src/components/clientes/import/ImportMethodStep.tsx` — segunda card pasa a "Importar desde otra aplicación" con `Select`.
+- `src/components/clientes/import/MergeDuplicatesDialog.tsx` — sumar callback `onKeepSeparate`.
+- Nuevo: `src/components/clientes/import/lib/mergeDuplicates.ts` — helper puro de fusión por criterios Vittro.
+- Nuevo: `src/components/clientes/import/DuplicatesGroupView.tsx` — render de grupos duplicados.
+- `src/components/clientes/import/lib/parseImportFile.ts` — agregado mínimo aditivo: campo opcional `keepSeparate?: boolean` en `PreviewRow` y `detectInternalDuplicates` lo respeta.
 
-```sql
-alter table public.clientes
-  add column if not exists external_source text,
-  add column if not exists external_customer_id text;
+---
 
-create index if not exists idx_clientes_external
-  on public.clientes (organization_id, external_source, external_customer_id);
-```
+## 1. Filtros accionables
 
-Actualizar la RPC `import_clientes_with_sucursal` para aceptar y persistir `external_source` y `external_customer_id` por cada item del JSON. Validación, RLS y atomicidad existentes se mantienen.
+Reemplazar las 4 tarjetas Stat por una barra de chips:
 
-### 2. Parser Fresha — `src/components/clientes/import/lib/parseFreshaFile.ts` (nuevo)
+- Todas · Listas · Con errores · Duplicados · Descartadas
 
-- Lee `.xlsx`/`.csv` con XLSX usando `cellDates: true` (igual que el parser actual).
-- **Detección de formato**: requiere encabezados mínimos (case-insensitive, trim): `First Name`, `Last Name`, `Mobile Number`, `Email`, `Added`. Si faltan, lanza error con mensaje:
-  > "No pudimos reconocer este archivo como exportación de Fresha. Revisá que sea el archivo de clientes exportado desde Fresha."
-- **Mapeo Fresha → Vittro** (resultado guardado en el `PreviewRow` interno de Vittro):
-  - `First Name` → `nombre`
-  - `Last Name` → `apellido`
-  - **Teléfono** (regla final): `telefono = Mobile Number` si tiene valor; si `Mobile Number` está vacío y `Telephone` tiene valor, usar `Telephone`; si ambos vacíos, dejar `telefono` vacío (la fila será válida solo si hay `Email`). `Telephone` no se guarda como campo separado, no aparece en la UI ni se crean campos `telefono_alternativo`, `mobile_number` ni `telephone`.
-  - `Email` → `email`
-  - `Accepts Marketing` (Yes/No) → `acepta_marketing`
-  - `Blocked` (Yes/No) → `bloqueado`
-  - `Block Reason` → `motivo_bloqueo`
-  - `Date of Birth` → `fecha_nacimiento`
-  - `Added` → `fecha_cliente_desde`
-  - `Comentario` → `nota_interna`
-  - `Client ID` → `external_customer_id`
-  - Constante: `external_source = 'fresha'`
-- Ignora: `Full Name`, `Gender`, `Accepts SMS Marketing`, `Address`, `Apartement Suite`, `Area`, `City`, `State`, `Post Code`, `Referral Source`.
-- Reutiliza `normalizeName/Text/Phone/Email/Date/Boolean` y `validateRow` ya existentes.
-- Soporta fechas en `YYYY-MM-DD`, `DD/MM/YYYY`, `D/M/YYYY`, `DD-MM-YYYY`, `D-M-YYYY`, `DD.MM.YYYY`, `D.M.YYYY` y serial Excel (ya cubierto por `normalizeDate`). Aplica a `Date of Birth` y `Added`.
+Cada chip muestra contador. Chip activo destacado (sobrio, sin emojis). Estado local `filter` elevado a `ImportClientesDialog` para que el footer pueda cambiarlo.
 
-### 3. Extender `PreviewRow` y normalizadores
+Empty state corto cuando un filtro no devuelve filas ("No hay filas con errores", etc.).
 
-`src/components/clientes/import/lib/parseImportFile.ts`:
-- Agregar a `PreviewRow`: `bloqueado: boolean`, `motivo_bloqueo: string`, `external_source: string | null`, `external_customer_id: string | null`.
-- Defaults para flujo plantilla Vittro: `bloqueado=false`, `motivo_bloqueo=''`, `external_source=null`, `external_customer_id=null` (no rompe nada existente).
-- Actualizar `rowToPayload` para incluir `bloqueado`, `motivo_bloqueo`, `external_source`, `external_customer_id` cuando estén presentes.
+## 2. Acciones rápidas para errores
 
-`src/components/clientes/import/lib/normalize.ts`:
-- Confirmar que `TRUE_TOKENS` incluye `yes`/`y` y `FALSE_TOKENS` incluye `no` (ya está). No requiere otros cambios.
+Si hay errores, banda superior breve:
 
-### 4. Validación por fila (luego del mapeo)
+- Texto: "N filas con errores."
+- "Ver errores" → activa filtro.
+- "Descartar todos los errores" → AlertDialog:
 
-Reutiliza `validateRow` existente, ajustando para el caso Fresha:
-- `nombre` requerido.
-- `apellido` requerido.
-- Al menos un dato de contacto: `telefono` (resultante del mapeo Mobile Number → Telephone) **o** `email`.
-- `email` debe ser válido si viene.
-- Fechas válidas o vacías.
-- Booleanos válidos.
+  > "Se descartarán N filas con errores. No se importarán. ¿Continuar?"
 
-Si falta nombre o apellido → error. Si no hay teléfono ni email → error (no warning), para forzar corrección antes de importar.
+Las filas con error siguen siendo editables inline.
 
-### 5. UI — `ImportMethodStep.tsx`
+## 3. Vista agrupada de duplicados
 
-Reemplazar la tarjeta "Importar desde otra aplicación (Próximamente)" por una tarjeta activa **"Importar archivo de Fresha"**:
-- Icono sobrio (`FileSpreadsheet` o `FileUp`, monocromo).
-- Copy: "Subí el archivo de clientes exportado desde Fresha y Vittro mapeará las columnas automáticamente."
-- Botón "Subir archivo de Fresha" que acepta `.xlsx,.csv`.
-- Nuevo prop `onPickFreshaFile: (file: File) => void`.
+Cuando `filter === 'duplicates'`, render de `DuplicatesGroupView` en lugar de la lista plana.
 
-### 6. UI — `ImportClientesDialog.tsx`
+Por cada grupo (Card sobria):
 
-- Nuevo handler `handleFreshaFile(file)` que llama a `parseFreshaFile`. Si la detección falla, muestra `toast.error` con el mensaje y permanece en el paso `method`.
-- En éxito, sigue el flujo idéntico a `handleFile`: setea filas y avanza a `sucursal` o `preview`.
-- El resto del flujo (selección de sucursal, preview editable, duplicados internos por email/teléfono normalizados, fusión manual, botón deshabilitado mientras haya errores o duplicados sin resolver, RPC final) se reutiliza sin cambios.
+- Título: "Grupo #N — {nombre principal}"
+- Subtítulo breve: "M filas · coincide por {teléfono|email|teléfono y email}"
+- Acción principal: **Ver comparación** (abre `MergeDuplicatesDialog` actual).
+- Acción secundaria: **Fusionar con criterios de Vittro**.
+- Acción secundaria: **Mantener separados**.
+- Acción destructiva (al final, estilo `text-muted-foreground hover:text-destructive`): **Descartar**.
 
-### 7. Importación final
+### Confirmaciones (cortas)
 
-Por cada cliente importado desde Fresha, persistir:
-- `origen = 'importado'`
-- `fecha_importacion = now()`
-- `fecha_cliente_desde = Added`
-- `external_source = 'fresha'`
-- `external_customer_id = Client ID`
-- Resto de campos mapeados.
+- Fusionar grupo:
 
-Sin deduplicación contra clientes existentes, sin modificar clientes existentes, sin tocar agenda ni turnos.
+  > "¿Fusionar este grupo usando criterios de Vittro? Se conservará la fila más reciente y se completarán campos vacíos con datos disponibles."
 
-### 8. Verificación
+- Descartar grupo:
 
-1. Subir archivo Fresha → detección y mapeo correctos.
-2. `Mobile Number` vacío + `Telephone` con valor → `telefono` toma `Telephone`.
-3. Ambos teléfonos vacíos + `Email` con valor → fila válida.
-4. Sin teléfono ni email → fila marcada como error bloqueante.
-5. `Added` con serial Excel (ej. 46139) → convertido a `YYYY-MM-DD`.
-6. `Accepts Marketing`/`Blocked` Yes/No → booleanos.
-7. Preview editable, duplicados internos y fusión funcionan igual.
-8. Tras importar, registros con `external_source='fresha'`, `external_customer_id` y `fecha_cliente_desde` poblados.
-9. Subir archivo no-Fresha por la opción Fresha → mensaje de error claro.
+  > "Se descartarán X clientes de este grupo. No se importarán."
 
-### Fuera de alcance
+- Mantener separados grupo: sin confirmación (acción reversible y de bajo riesgo).
 
-API/OAuth Fresha, sincronización, deduplicación o fusión contra clientes existentes, dirección, género, SMS marketing, Referral Source, agenda, turnos, campos `telefono_alternativo`/`mobile_number`/`telephone`.
+## 4. Acciones masivas para duplicados
+
+Barra superior dentro de la vista de duplicados:
+
+- **Fusionar todos con criterios de Vittro** — AlertDialog:
+
+  > "Se fusionarán N grupos. Se conserva la fila más reciente y se completan campos vacíos con datos disponibles. ¿Continuar?"
+
+- **Mantener separados todos** — AlertDialog:
+
+  > "Se mantendrán separados N grupos. Se importarán como clientes distintos."
+
+- **Descartar duplicados** (destructivo, al final) — AlertDialog:
+
+  > "Se descartarán X clientes duplicados. No se importarán. Se conserva una fila por grupo."
+
+## 5. Lógica de fusión (helper puro)
+
+`mergeGroupByVittroCriteria(group: PreviewRow[]): { merged: PreviewRow; discardedIds: string[] }`:
+
+1. Filtrar `!discarded`.
+2. Elegir base:
+   - Mayor `fecha_cliente_desde` (string `YYYY-MM-DD` comparable).
+   - Empate o sin fecha válida → fila con más campos no-vacíos entre los `FIELDS` ya definidos.
+3. `merged = { ...base }`.
+4. Por campo: si está vacío en `merged`, completar con la primera no-vacía del resto. Si hay conflicto, gana la base.
+5. `acepta_marketing`: OR del grupo.
+6. Resetear `duplicateGroupId = null`, `discarded = false`, `errors = []`, `warnings = []`. Setear `keepSeparate = true` para que no vuelva a marcarse como duplicado tras la edición. Llamar `validateRow(merged)`.
+7. Devolver `merged` y los `rowIds` del resto del grupo (van a `discarded`).
+
+## 6. "Descartar duplicados" masivo
+
+Por cada grupo: elegir ganadora con la misma regla (mayor `fecha_cliente_desde`, desempate por más campos completos). El resto pasa a `discarded`. La ganadora obtiene `duplicateGroupId = null` y `keepSeparate = true`. Se ejecuta `validateRow` por si quedó válida.
+
+## 7. "Mantener separados" (individual y masivo)
+
+Setear `keepSeparate = true` en todas las filas del grupo y limpiar `duplicateGroupId`. Estas filas quedan excluidas para siempre dentro de la sesión actual.
+
+Para que sobreviva a re-detecciones automáticas:
+
+- Agregar al type `PreviewRow` el campo opcional `keepSeparate?: boolean`.
+- En `detectInternalDuplicates`: `if (r.discarded || r.keepSeparate) continue`.
+- En el `useEffect` de `ImportPreviewStep` que recomputa duplicados al editar, las filas marcadas no se re-evalúan.
+- `keepSeparate` no se persiste ni va al payload (`rowToPayload` no lo usa).
+- Solo se limpia si el usuario vuelve al paso de método y sube un archivo nuevo (el estado `rows` se reinicia).
+
+## 8. `MergeDuplicatesDialog` (cambios mínimos)
+
+- Sumar botón secundario en el footer: **Mantener separados** → llama nuevo prop `onKeepSeparate(group)`.
+- Sin cambios en la lógica interna de elección campo a campo.
+
+## 9. Footer accionable de importación
+
+En `ImportClientesDialog`, cuando hay bloqueos:
+
+- Texto corto: "Hay {N} {error|errores} y {M} duplicado{s} pendientes."
+- Botones link/ghost: **Ver errores**, **Ver duplicados** (cambian el `filter` del preview).
+
+`canImport` no cambia: requiere 0 errores activos y 0 duplicados pendientes.
+
+## 10. "Importar desde otra aplicación"
+
+Segunda card de `ImportMethodStep`:
+
+- Título: "Importar desde otra aplicación"
+- Subtítulo: "Elegí la app de origen y subí el archivo."
+- `Select` "Aplicación de origen" → opciones: Fresha (única por ahora).
+- Botón "Subir archivo" (habilitado solo con app elegida).
+- Si app === 'fresha' → `onPickFreshaFile(file)` (parser actual, intacto).
+
+## 11. Fuera de alcance
+
+- RPC `import_clientes_with_sucursal`.
+- `parseFreshaFile.ts`, `normalize.ts`.
+- `parseImportFile.ts` salvo el agregado aditivo de `keepSeparate`.
+- Agenda, turnos, WhatsApp, dedupe contra clientes existentes.
+
+---
+
+## Notas de estilo
+
+- Sin emojis. Iconos `lucide-react` ya en uso.
+- Tokens semánticos (`muted`, `destructive`, `accent`).
+- Confirmaciones con `AlertDialog`, copy directo y corto en castellano rioplatense.
+- Acciones destructivas siempre al final del bloque y con confirmación.

@@ -14,6 +14,7 @@ interface Props {
   group: PreviewRow[];
   onResolve: (mergedRow: PreviewRow, discardedRowIds: string[]) => void;
   onCancelGroup: () => void;
+  onKeepSeparate?: () => void;
 }
 
 const FIELDS: Array<keyof PreviewRow> = [
@@ -23,7 +24,7 @@ const FIELDS: Array<keyof PreviewRow> = [
   'alergias', 'nota_interna',
 ];
 
-export function MergeDuplicatesDialog({ open, onOpenChange, group, onResolve, onCancelGroup }: Props) {
+export function MergeDuplicatesDialog({ open, onOpenChange, group, onResolve, onCancelGroup, onKeepSeparate }: Props) {
   // For each field: which rowId provides the value (or '__empty')
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [marketing, setMarketing] = useState<boolean>(true);
@@ -155,10 +156,15 @@ export function MergeDuplicatesDialog({ open, onOpenChange, group, onResolve, on
 
         <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
           <Button variant="ghost" onClick={onCancelGroup}>
-            Descartar todas las filas
+            Descartar todas
           </Button>
+          {onKeepSeparate && (
+            <Button variant="outline" onClick={onKeepSeparate}>
+              Mantener separados
+            </Button>
+          )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={handleConfirm}>Fusionar y conservar</Button>
+          <Button onClick={handleConfirm}>Fusionar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

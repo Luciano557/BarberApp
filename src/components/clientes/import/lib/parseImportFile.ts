@@ -54,6 +54,9 @@ export interface PreviewRow {
   duplicateGroupId: string | null;
   // user actions
   discarded: boolean;
+  // when true, this row is excluded from internal duplicate detection
+  // for the rest of the import session (until a new file is uploaded)
+  keepSeparate?: boolean;
 }
 
 export const TEMPLATE_HEADERS = [
@@ -284,7 +287,7 @@ export function detectInternalDuplicates(rows: PreviewRow[]): DuplicateGroup[] {
   const phoneMap = new Map<string, string[]>();
   const emailMap = new Map<string, string[]>();
   for (const r of rows) {
-    if (r.discarded) continue;
+    if (r.discarded || r.keepSeparate) continue;
     if (r.phoneKey) {
       const arr = phoneMap.get(r.phoneKey) ?? [];
       arr.push(r.rowId);
@@ -319,7 +322,7 @@ export function detectInternalDuplicates(rows: PreviewRow[]): DuplicateGroup[] {
 
   const groups = new Map<string, string[]>();
   for (const r of rows) {
-    if (r.discarded) continue;
+    if (r.discarded || r.keepSeparate) continue;
     const root = find(r.rowId);
     const arr = groups.get(root) ?? [];
     arr.push(r.rowId);
@@ -336,6 +339,7 @@ export function detectInternalDuplicates(rows: PreviewRow[]): DuplicateGroup[] {
   const idToGroup = new Map<string, string>();
   for (const g of result) for (const id of g.rowIds) idToGroup.set(id, g.groupId);
   for (const r of rows) {
+    if (r.keepSeparate) { r.duplicateGroupId = null; continue; }
     r.duplicateGroupId = idToGroup.get(r.rowId) ?? null;
   }
   return result;

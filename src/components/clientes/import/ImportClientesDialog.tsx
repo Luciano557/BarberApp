@@ -14,7 +14,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ImportMethodStep } from './ImportMethodStep';
-import { ImportPreviewStep } from './ImportPreviewStep';
+import { ImportPreviewStep, PreviewFilter } from './ImportPreviewStep';
 import { ImportSummaryStep } from './ImportSummaryStep';
 import {
   PreviewRow, parseImportFile, rowToPayload,
@@ -46,6 +46,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
   const [accessible, setAccessible] = useState<AccessibleSucursal[]>([]);
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<{ inserted: number; total: number; errors: Array<{ index: number; error: string }> } | null>(null);
+  const [previewFilter, setPreviewFilter] = useState<PreviewFilter>('all');
 
   // Reset on open
   useEffect(() => {
@@ -56,6 +57,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
     setTruncated(false);
     setTotalParsed(0);
     setSummary(null);
+    setPreviewFilter('all');
     setSucursalId(currentSucursal?.id ?? '');
   }, [open, currentSucursal?.id]);
 
@@ -251,6 +253,8 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
             unknownHeaders={unknownHeaders}
             truncated={truncated}
             totalParsed={totalParsed}
+            filter={previewFilter}
+            onFilterChange={setPreviewFilter}
           />
         ) : (
           <ImportSummaryStep
@@ -282,12 +286,26 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
               </Button>
               <div className="flex flex-col items-end gap-1">
                 {(blockingCount.errs > 0 || blockingCount.dups > 0) && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Corregí {blockingCount.errs} {blockingCount.errs === 1 ? 'error' : 'errores'}
-                    {blockingCount.errs > 0 && blockingCount.dups > 0 ? ' y ' : ''}
-                    {blockingCount.dups > 0 ? `resolvé ${blockingCount.dups} duplicado${blockingCount.dups === 1 ? '' : 's'}` : ''}
-                    {' '}para continuar.
-                  </p>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <p className="text-[11px] text-muted-foreground">
+                      Hay {blockingCount.errs} {blockingCount.errs === 1 ? 'error' : 'errores'}
+                      {blockingCount.errs > 0 && blockingCount.dups > 0 ? ' y ' : ''}
+                      {blockingCount.dups > 0 ? `${blockingCount.dups} duplicado${blockingCount.dups === 1 ? '' : 's'}` : ''}
+                      {' '}pendientes.
+                    </p>
+                    {blockingCount.errs > 0 && (
+                      <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
+                        onClick={() => setPreviewFilter('errors')}>
+                        Ver errores
+                      </Button>
+                    )}
+                    {blockingCount.dups > 0 && (
+                      <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
+                        onClick={() => setPreviewFilter('duplicates')}>
+                        Ver duplicados
+                      </Button>
+                    )}
+                  </div>
                 )}
                 <Button onClick={handleImport} disabled={!canImport || importing}>
                   {importing && <Loader2 className="h-4 w-4 animate-spin" />}
