@@ -13,6 +13,7 @@ interface Props {
   rows: PreviewRow[];
   onChange: (rows: PreviewRow[]) => void;
   onOpenCompare: (groupId: string) => void;
+  query?: string;
 }
 
 interface Group {
@@ -52,8 +53,19 @@ type ConfirmKind =
   | { type: 'merge-one'; groupId: string }
   | { type: 'discard-one'; groupId: string; count: number };
 
-export function DuplicatesGroupView({ rows, onChange, onOpenCompare }: Props) {
-  const groups = useMemo(() => buildGroups(rows), [rows]);
+export function DuplicatesGroupView({ rows, onChange, onOpenCompare, query }: Props) {
+  const allGroups = useMemo(() => buildGroups(rows), [rows]);
+  const groups = useMemo(() => {
+    const q = (query ?? '').trim().toLowerCase();
+    if (!q) return allGroups;
+    return allGroups.filter(g =>
+      g.rows.some(r =>
+        [r.nombre, r.apellido, r.telefono, r.email]
+          .filter(Boolean)
+          .some(v => v.toLowerCase().includes(q))
+      )
+    );
+  }, [allGroups, query]);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
 
   const totalDuplicateRows = useMemo(
@@ -200,7 +212,7 @@ export function DuplicatesGroupView({ rows, onChange, onOpenCompare }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    Grupo #{i + 1} — {principalName}
+                    {principalName}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {g.rows.length} filas · coincide por {matchLabel(g.matchBy)}
