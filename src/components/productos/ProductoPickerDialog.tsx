@@ -28,8 +28,11 @@ interface ProductoPickerDialogProps {
   sucursalId: string;
   canEditPrice: boolean;
   initialCart: CartItem[];
+  barbers?: { id: string; name: string }[];
+  initialBarberId?: string | null;
+  initialBarberName?: string | null;
   onClose: () => void;
-  onConfirm: (cart: CartItem[]) => void;
+  onConfirm: (cart: CartItem[], barberId: string | null, barberName: string | null) => void;
 }
 
 interface RowData {
