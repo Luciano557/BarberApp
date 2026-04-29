@@ -368,6 +368,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setCart([]);
     setCartBarberId(null);
     setCartBarberName(null);
+    setProductSaleAssignment('pending');
     setCurrentStep('barber');
   }, []);
 
