@@ -96,11 +96,21 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     [extras, selectedExtras]
   );
 
-  const subtotal = useMemo(() => {
+  // Subtotal de servicios (servicio + extras). NO incluye productos.
+  const subtotalServicios = useMemo(() => {
     const servicePrice = service?.price || 0;
     const extrasTotal = selectedExtrasData.reduce((sum, e) => sum + e.price, 0);
     return servicePrice + extrasTotal;
   }, [service, selectedExtrasData]);
+
+  // Subtotal de productos (precio_unitario * cantidad). No se le aplican descuentos.
+  const subtotalProductos = useMemo(
+    () => cart.reduce((sum, it) => sum + it.precio_unitario * it.cantidad, 0),
+    [cart]
+  );
+
+  // Subtotal total (servicios + productos)
+  const subtotal = subtotalServicios + subtotalProductos;
 
   const selectedDiscountData = useMemo(() => {
     return discounts.find(d => d.id === selectedDiscount);
@@ -113,39 +123,35 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     return selectedDiscountData.paymentMethod === paymentMethod;
   }, [selectedDiscountData, paymentMethod]);
 
+  // Descuento se aplica SOLO sobre el subtotal de servicios
   const discountAmount = useMemo(() => {
     if (!selectedDiscountData || selectedDiscountData.value === 0) return 0;
-    // If discount doesn't apply to selected payment method, no discount
     if (!isDiscountValidForPayment) return 0;
-    
+    if (subtotalServicios === 0) return 0;
+
     if (selectedDiscountData.type === 'fixed') {
-      return selectedDiscountData.value;
+      return Math.min(selectedDiscountData.value, subtotalServicios);
     }
-    // percentage with rounding
-    const rawDiscount = subtotal * (selectedDiscountData.value / 100);
+    const rawDiscount = subtotalServicios * (selectedDiscountData.value / 100);
     const rounding = selectedDiscountData.rounding || 'cliente';
     const unit = selectedDiscountData.roundingUnit || 1;
-    
-    // Apply rounding based on type and unit
+
     let roundedDiscount: number;
     if (unit === 1) {
-      // No unit rounding, just apply direction
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount); break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount); break;
         default: roundedDiscount = Math.floor(rawDiscount); break;
       }
     } else {
-      // Apply unit-based rounding
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount / unit) * unit; break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount / unit) * unit; break;
         default: roundedDiscount = Math.floor(rawDiscount / unit) * unit; break;
       }
     }
-    
     return roundedDiscount;
-  }, [subtotal, selectedDiscountData, isDiscountValidForPayment]);
+  }, [subtotalServicios, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
