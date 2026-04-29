@@ -1082,6 +1082,17 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       {/* Daily Turnos Viewer */}
       <DailyTurnosViewer />
 
+      {sucursalId && (
+        <ProductoPickerDialog
+          open={pickerOpen}
+          sucursalId={sucursalId}
+          canEditPrice={canEditProductPrice}
+          initialCart={cart}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={(items) => setCart(items)}
+        />
+      )}
+
       {showTasksBubble && pendingTasks.length > 0 && (
         <div
           onClick={() => { setShowTasksBubble(false); onNavigateToTareas?.(); }}
