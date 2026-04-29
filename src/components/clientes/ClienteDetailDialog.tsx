@@ -741,7 +741,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar cliente</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Eliminar a <span className="font-medium text-foreground">{cliente?.nombre} {cliente?.apellido}</span>?
+              ¿Eliminar a <span className="font-medium text-foreground">{cliente ? [cliente.nombre, cliente.apellido].filter(Boolean).join(' ') : ''}</span>?
               Esta acción ocultará el cliente de la lista. El historial de turnos se conserva.
             </AlertDialogDescription>
           </AlertDialogHeader>
