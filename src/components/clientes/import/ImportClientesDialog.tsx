@@ -46,6 +46,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
   const [accessible, setAccessible] = useState<AccessibleSucursal[]>([]);
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<{ inserted: number; total: number; errors: Array<{ index: number; error: string }> } | null>(null);
+  const [previewFilter, setPreviewFilter] = useState<PreviewFilter>('all');
 
   // Reset on open
   useEffect(() => {
