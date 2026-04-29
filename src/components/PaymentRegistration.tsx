@@ -550,7 +550,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
