@@ -100,34 +100,22 @@ export function useSupabaseData() {
         barbersQuery = barbersQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      const [servicesRes, extrasRes, barbersRes, discountsRes, descSucRes] = await Promise.all([
+      const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
         barbersQuery,
         supabase.from('descuentos').select('*').order('valor'),
-        supabase.from('descuentos_sucursales').select('descuento_id, sucursal_id, activo'),
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
       if (extrasRes.error) throw extrasRes.error;
       if (barbersRes.error) throw barbersRes.error;
       if (discountsRes.error) throw discountsRes.error;
-      if (descSucRes.error) throw descSucRes.error;
 
       setServices(servicesRes.data.map(row => dbToService(row, fetchedLines)));
       setExtras(extrasRes.data.map(dbToExtra));
       setBarbers(barbersRes.data.map(dbToBarber));
 
-      // Mapa de activación por sucursal
-      const activeMap: Record<string, Set<string>> = {};
-      (descSucRes.data || []).forEach((row: any) => {
-        if (!row.activo) return;
-        if (!activeMap[row.descuento_id]) activeMap[row.descuento_id] = new Set();
-        activeMap[row.descuento_id].add(row.sucursal_id);
-      });
-      setDiscountsActivePerSucursal(activeMap);
-
-      // Map descuentos. La opción "Sin descuento" la inyecta cada vista de Cobrar.
       const dbDiscounts = discountsRes.data.map(dbToDiscount);
       setDiscounts(dbDiscounts);
     } catch (error) {
