@@ -9,21 +9,31 @@ export interface Service {
   id: string;
   uid: string; // Auto-generated, unique, non-editable
   name: string;
-  price: number;
+  price: number; // Operativo: si hay sucursal, viene de servicios_sucursales.precio
   durationMin?: number; // Duration in minutes
   lineId?: string; // Reference to lineas table
   lineName?: string; // Cached line name for display
-  sucursalId?: string; // Reference to sucursales table
-  active: boolean;
+  sucursalId?: string; // Legacy / origen (no decide visibilidad)
+  active: boolean; // Operativo: globalActive && branchActive cuando hay sucursal
+  // Enriquecimiento por sucursal
+  globalActive?: boolean; // servicios.activo
+  branchActive?: boolean; // servicios_sucursales.activo
+  sucursalConfigId?: string; // servicios_sucursales.id (para RPCs)
+  priceConfigured?: boolean; // price > 0
 }
 
 export interface Extra {
   id: string;
   uid: string; // Auto-generated, unique, non-editable
   name: string;
-  price: number;
-  sucursalId?: string; // Reference to sucursales table
-  active: boolean;
+  price: number; // Operativo: si hay sucursal, viene de extras_sucursales.precio
+  sucursalId?: string; // Legacy / origen
+  active: boolean; // Operativo: globalActive && branchActive cuando hay sucursal
+  // Enriquecimiento por sucursal
+  globalActive?: boolean; // extras.activo
+  branchActive?: boolean; // extras_sucursales.activo
+  sucursalConfigId?: string; // extras_sucursales.id (para RPCs)
+  priceConfigured?: boolean; // price > 0
 }
 
 export type CompensationType = 'comision' | 'fijo';
@@ -62,7 +72,11 @@ export interface Discount {
   paymentMethod: 'todos' | 'efectivo' | 'mercado_pago'; // restricción de método de pago
   sucursalId?: string; // Reference to sucursales table (origen, no decide visibilidad)
   appliesTo: DiscountAppliesTo; // 'servicios' | 'productos'
-  active: boolean; // descuentos.activo (estado global)
+  active: boolean; // Operativo: globalActive && branchActive cuando hay sucursal
+  // Enriquecimiento por sucursal
+  globalActive?: boolean; // descuentos.activo
+  branchActive?: boolean; // descuentos_sucursales.activo
+  sucursalConfigId?: string; // descuentos_sucursales.id (para RPC)
 }
 
 // Snapshot de un descuento aplicado a una venta (auditoría)
