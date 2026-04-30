@@ -915,6 +915,54 @@ export type Database = {
           },
         ]
       }
+      extras_sucursales: {
+        Row: {
+          activo: boolean
+          created_at: string
+          extra_id: string
+          id: string
+          organization_id: string
+          precio: number
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          extra_id: string
+          id?: string
+          organization_id: string
+          precio?: number
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          extra_id?: string
+          id?: string
+          organization_id?: string
+          precio?: number
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extras_sucursales_extra_id_fkey"
+            columns: ["extra_id"]
+            isOneToOne: false
+            referencedRelation: "extras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extras_sucursales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gastos_recurrentes: {
         Row: {
           activo: boolean
@@ -2014,6 +2062,54 @@ export type Database = {
           },
           {
             foreignKeyName: "servicios_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      servicios_sucursales: {
+        Row: {
+          activo: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          precio: number
+          servicio_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          organization_id: string
+          precio?: number
+          servicio_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          id?: string
+          organization_id?: string
+          precio?: number
+          servicio_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "servicios_sucursales_servicio_id_fkey"
+            columns: ["servicio_id"]
+            isOneToOne: false
+            referencedRelation: "servicios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "servicios_sucursales_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
