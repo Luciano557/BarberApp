@@ -208,12 +208,13 @@ export function ProductoPickerDialog({
                 const qty = item?.cantidad || 0;
                 const stockAfter = Number(row.sucursal.stock_actual) - qty;
                 const isLowStock = stockAfter < 0;
+                const blocked = isPriceMissing(Number(row.sucursal.precio_venta));
                 return (
                   <div
                     key={row.sucursal.id}
                     className={`flex items-center gap-3 p-3 rounded-lg border bg-card transition-colors ${
                       qty > 0 ? 'border-secondary/50 bg-secondary/5' : 'border-border'
-                    }`}
+                    } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {row.marca && (
                       <div
@@ -235,7 +236,7 @@ export function ProductoPickerDialog({
                           </span>
                         )}
                       </div>
-                      {qty > 0 && canEditPrice && (
+                      {!blocked && qty > 0 && canEditPrice && (
                         <div className="mt-2 flex items-center gap-2">
                           <span className="text-xs text-muted-foreground">Precio:</span>
                           <CurrencyInput
@@ -246,14 +247,16 @@ export function ProductoPickerDialog({
                           />
                         </div>
                       )}
-                      {qty > 0 && !canEditPrice && (
+                      {!blocked && qty > 0 && !canEditPrice && (
                         <p className="text-xs text-muted-foreground mt-1">
                           Precio: ${item!.precio_unitario.toLocaleString('es-AR')}
                         </p>
                       )}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      {qty === 0 ? (
+                      {blocked ? (
+                        <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                      ) : qty === 0 ? (
                         <p className="text-sm font-semibold">${Number(row.sucursal.precio_venta).toLocaleString('es-AR')}</p>
                       ) : (
                         <p className="text-sm font-semibold">
@@ -268,7 +271,7 @@ export function ProductoPickerDialog({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => updateQty(row, -1)}
-                        disabled={qty === 0}
+                        disabled={blocked || qty === 0}
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </Button>
@@ -279,6 +282,7 @@ export function ProductoPickerDialog({
                         size="icon"
                         className="h-8 w-8"
                         onClick={() => updateQty(row, 1)}
+                        disabled={blocked}
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </Button>
