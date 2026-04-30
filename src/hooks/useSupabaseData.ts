@@ -81,8 +81,6 @@ export function useSupabaseData() {
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
-  // Mapa descuento_id → set de sucursal_ids donde está activo
-  const [discountsActivePerSucursal, setDiscountsActivePerSucursal] = useState<Record<string, Set<string>>>({});
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
