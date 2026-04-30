@@ -81,8 +81,6 @@ export function useSupabaseData() {
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
-  // Mapa descuento_id → set de sucursal_ids donde está activo
-  const [discountsActivePerSucursal, setDiscountsActivePerSucursal] = useState<Record<string, Set<string>>>({});
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -102,34 +100,22 @@ export function useSupabaseData() {
         barbersQuery = barbersQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      const [servicesRes, extrasRes, barbersRes, discountsRes, descSucRes] = await Promise.all([
+      const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
         supabase.from('servicios').select('*').order('nombre'),
         supabase.from('extras').select('*').order('nombre'),
         barbersQuery,
         supabase.from('descuentos').select('*').order('valor'),
-        supabase.from('descuentos_sucursales').select('descuento_id, sucursal_id, activo'),
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
       if (extrasRes.error) throw extrasRes.error;
       if (barbersRes.error) throw barbersRes.error;
       if (discountsRes.error) throw discountsRes.error;
-      if (descSucRes.error) throw descSucRes.error;
 
       setServices(servicesRes.data.map(row => dbToService(row, fetchedLines)));
       setExtras(extrasRes.data.map(dbToExtra));
       setBarbers(barbersRes.data.map(dbToBarber));
 
-      // Mapa de activación por sucursal
-      const activeMap: Record<string, Set<string>> = {};
-      (descSucRes.data || []).forEach((row: any) => {
-        if (!row.activo) return;
-        if (!activeMap[row.descuento_id]) activeMap[row.descuento_id] = new Set();
-        activeMap[row.descuento_id].add(row.sucursal_id);
-      });
-      setDiscountsActivePerSucursal(activeMap);
-
-      // Map descuentos. La opción "Sin descuento" la inyecta cada vista de Cobrar.
       const dbDiscounts = discountsRes.data.map(dbToDiscount);
       setDiscounts(dbDiscounts);
     } catch (error) {
@@ -356,39 +342,6 @@ export function useSupabaseData() {
       if (error) throw error;
       const newDiscount = dbToDiscount(data);
 
-      // Crear filas en descuentos_sucursales: una por cada sucursal de la org, todas activas.
-      const { data: sucs, error: sucError } = await supabase
-        .from('sucursales')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('activa', true);
-
-      if (sucError) {
-        console.error('Error fetching sucursales for descuento:', sucError);
-      } else if (sucs && sucs.length > 0) {
-        const rows = sucs.map((s: any) => ({
-          organization_id: organization.id,
-          descuento_id: newDiscount.id,
-          sucursal_id: s.id,
-          activo: true,
-        }));
-        const { error: dsError } = await supabase
-          .from('descuentos_sucursales')
-          .insert(rows);
-        if (dsError) {
-          console.error('Error inserting descuentos_sucursales:', dsError);
-        } else {
-          // Actualizar mapa local
-          setDiscountsActivePerSucursal(prev => {
-            const next = { ...prev };
-            const set = new Set<string>();
-            sucs.forEach((s: any) => set.add(s.id));
-            next[newDiscount.id] = set;
-            return next;
-          });
-        }
-      }
-
       setDiscounts(prev => [...prev, newDiscount]);
       toast.success('Descuento agregado');
       return newDiscount;
@@ -447,59 +400,7 @@ export function useSupabaseData() {
     await setDiscountActive(id, false);
   }, [setDiscountActive]);
 
-  // Activar/desactivar descuento en una sucursal específica
-  const setDiscountSucursalActivo = useCallback(async (
-    descuentoId: string,
-    sucursalId: string,
-    activo: boolean,
-  ) => {
-    if (!organization) {
-      toast.error('No se pudo determinar la organización');
-      return;
-    }
-    if (descuentoId === 'none') return;
-    try {
-      // Upsert: si la fila no existe (sucursal nueva), crearla
-      const { data: existing, error: selError } = await supabase
-        .from('descuentos_sucursales')
-        .select('id')
-        .eq('descuento_id', descuentoId)
-        .eq('sucursal_id', sucursalId)
-        .maybeSingle();
-
-      if (selError) throw selError;
-
-      if (existing) {
-        const { error } = await supabase
-          .from('descuentos_sucursales')
-          .update({ activo })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('descuentos_sucursales')
-          .insert({
-            organization_id: organization.id,
-            descuento_id: descuentoId,
-            sucursal_id: sucursalId,
-            activo,
-          });
-        if (error) throw error;
-      }
-
-      setDiscountsActivePerSucursal(prev => {
-        const next = { ...prev };
-        const set = new Set(next[descuentoId] || []);
-        if (activo) set.add(sucursalId);
-        else set.delete(sucursalId);
-        next[descuentoId] = set;
-        return next;
-      });
-    } catch (error) {
-      console.error('Error toggling descuento sucursal:', error);
-      toast.error('Error al actualizar disponibilidad por sucursal');
-    }
-  }, [organization]);
+  // (Disponibilidad por sucursal queda fuera de alcance en esta etapa.)
 
   // Lines CRUD
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
@@ -557,20 +458,10 @@ export function useSupabaseData() {
     }
   }, []);
 
-  // Filtrar descuentos disponibles para Cobrar:
-  // - global activo
-  // - activo en la sucursal actual
-  const cobrarDiscounts = (() => {
-    if (!currentSucursal?.id) return [] as Discount[];
-    return discounts.filter(d => {
-      if (!d.active) return false;
-      const set = discountsActivePerSucursal[d.id];
-      return !!set && set.has(currentSucursal.id);
-    });
-  })();
-
-  const serviceDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'servicios');
-  const productDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'productos');
+  // Descuentos disponibles para Cobrar: globales activos, filtrados por aplica_a.
+  const activeDiscounts = discounts.filter(d => d.active);
+  const serviceDiscounts = activeDiscounts.filter(d => d.appliesTo === 'servicios');
+  const productDiscounts = activeDiscounts.filter(d => d.appliesTo === 'productos');
 
   return {
     isLoading,
@@ -582,10 +473,9 @@ export function useSupabaseData() {
     allBarbers: barbers,
     // Lista completa (incluye inactivos) para Mi Negocio > Descuentos
     discounts,
-    // Listas ya filtradas por sucursal y aplica_a para Cobrar
+    // Listas ya filtradas por aplica_a para Cobrar
     serviceDiscounts,
     productDiscounts,
-    discountsActivePerSucursal,
     lines: lines.filter(l => l.active),
     allLines: lines,
     addService,
@@ -598,7 +488,6 @@ export function useSupabaseData() {
     updateDiscount,
     deleteDiscount,
     setDiscountActive,
-    setDiscountSucursalActivo,
     addLine,
     updateLine,
     refreshData: fetchData,

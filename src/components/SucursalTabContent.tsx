@@ -37,6 +37,7 @@ interface SucursalTabContentProps {
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
+  onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onSucursalUpdated: () => void;
@@ -49,7 +50,7 @@ export function SucursalTabContent({
   onAddBarber, onUpdateBarber,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
-  onAddDiscount, onUpdateDiscount, onDeleteDiscount,
+  onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onSucursalUpdated,
   onGoToGeneralConfig,
@@ -245,6 +246,7 @@ export function SucursalTabContent({
             onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
             onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
             onDeleteDiscount={onDeleteDiscount}
+            onToggleDiscountActive={onToggleDiscountActive}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
           />
         </div>

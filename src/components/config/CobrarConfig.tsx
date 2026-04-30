@@ -18,6 +18,7 @@ interface CobrarConfigProps {
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
+  onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
 }
@@ -27,7 +28,7 @@ export function CobrarConfig({
   services, extras, discounts, lines,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
-  onAddDiscount, onUpdateDiscount, onDeleteDiscount,
+  onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
 }: CobrarConfigProps) {
   return (
@@ -75,6 +76,7 @@ export function CobrarConfig({
           onAdd={onAddDiscount}
           onUpdate={onUpdateDiscount}
           onDelete={onDeleteDiscount}
+          onToggleActive={onToggleDiscountActive}
         />
       </TabsContent>
     </Tabs>
