@@ -155,7 +155,12 @@ export function ProductoPickerDialog({
   }, [cart]);
 
   const handleConfirm = () => {
-    onConfirm(Array.from(cart.values()));
+    const items = Array.from(cart.values());
+    if (items.some(it => isPriceMissing(it.precio_unitario))) {
+      toast.error('Hay productos sin precio configurado.');
+      return;
+    }
+    onConfirm(items);
     onClose();
   };
 
