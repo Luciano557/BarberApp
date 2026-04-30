@@ -230,9 +230,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
       return;
     }
+    const svc = services.find(s => s.id === serviceId);
+    if (!svc || isPriceMissing(svc.price)) {
+      toast({
+        title: 'Precio pendiente',
+        description: 'Definí un precio para este ítem antes de cobrarlo.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedService(serviceId);
     setTimeout(() => goToNextStep(), 100);
-  }, [selectedBarber, goToNextStep, toast]);
+  }, [selectedBarber, goToNextStep, toast, services]);
 
 
   const handleToggleExtra = useCallback((extraId: string) => {
