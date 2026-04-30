@@ -826,6 +826,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     {group.services.map((service) => {
                       globalIndex++;
                       const idx = globalIndex;
+                      const blocked = isPriceMissing(service.price);
                       return (
                         <button
                           key={service.id}
@@ -834,15 +835,19 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                             selectedService === service.id
                               ? 'border-secondary bg-secondary/5'
                               : 'border-border bg-card hover:bg-muted/50'
-                          }`}
+                          } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                           style={group.lineColor ? { borderLeftWidth: '3px', borderLeftColor: selectedService === service.id ? undefined : group.lineColor } : undefined}
                         >
                           <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                             {idx}
                           </span>
-                          <div className="flex justify-between items-center pl-6">
+                          <div className="flex justify-between items-center pl-6 gap-2">
                             <span className="font-medium text-foreground">{service.name}</span>
-                            <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            {blocked ? (
+                              <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                            ) : (
+                              <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            )}
                           </div>
                         </button>
                       );
