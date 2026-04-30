@@ -69,6 +69,8 @@ function dbToDiscount(row: any): Discount {
     roundingUnit: Number(row.redondeo_unidad) || 100,
     paymentMethod: row.metodo_pago || 'todos',
     sucursalId: row.sucursal_id || undefined,
+    appliesTo: row.aplica_a === 'productos' ? 'productos' : 'servicios',
+    active: row.activo !== false,
   };
 }
 
