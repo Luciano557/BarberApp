@@ -50,7 +50,7 @@ export function SucursalTabContent({
   onAddBarber, onUpdateBarber,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
-  onAddDiscount, onUpdateDiscount, onDeleteDiscount,
+  onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onSucursalUpdated,
   onGoToGeneralConfig,
