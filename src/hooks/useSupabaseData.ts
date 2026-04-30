@@ -458,20 +458,10 @@ export function useSupabaseData() {
     }
   }, []);
 
-  // Filtrar descuentos disponibles para Cobrar:
-  // - global activo
-  // - activo en la sucursal actual
-  const cobrarDiscounts = (() => {
-    if (!currentSucursal?.id) return [] as Discount[];
-    return discounts.filter(d => {
-      if (!d.active) return false;
-      const set = discountsActivePerSucursal[d.id];
-      return !!set && set.has(currentSucursal.id);
-    });
-  })();
-
-  const serviceDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'servicios');
-  const productDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'productos');
+  // Descuentos disponibles para Cobrar: globales activos, filtrados por aplica_a.
+  const activeDiscounts = discounts.filter(d => d.active);
+  const serviceDiscounts = activeDiscounts.filter(d => d.appliesTo === 'servicios');
+  const productDiscounts = activeDiscounts.filter(d => d.appliesTo === 'productos');
 
   return {
     isLoading,
@@ -483,10 +473,9 @@ export function useSupabaseData() {
     allBarbers: barbers,
     // Lista completa (incluye inactivos) para Mi Negocio > Descuentos
     discounts,
-    // Listas ya filtradas por sucursal y aplica_a para Cobrar
+    // Listas ya filtradas por aplica_a para Cobrar
     serviceDiscounts,
     productDiscounts,
-    discountsActivePerSucursal,
     lines: lines.filter(l => l.active),
     allLines: lines,
     addService,
@@ -499,7 +488,6 @@ export function useSupabaseData() {
     updateDiscount,
     deleteDiscount,
     setDiscountActive,
-    setDiscountSucursalActivo,
     addLine,
     updateLine,
     refreshData: fetchData,
