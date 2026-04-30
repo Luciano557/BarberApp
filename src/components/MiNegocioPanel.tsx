@@ -46,7 +46,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const {
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
-    addDiscount, updateDiscount, deleteDiscount, addLine, updateLine,
+    addDiscount, updateDiscount, deleteDiscount, setDiscountActive, addLine, updateLine,
   } = useSupabaseData();
 
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
