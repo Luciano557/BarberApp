@@ -37,6 +37,7 @@ interface SucursalTabContentProps {
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
+  onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onSucursalUpdated: () => void;
