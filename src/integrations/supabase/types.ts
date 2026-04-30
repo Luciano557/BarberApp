@@ -692,6 +692,51 @@ export type Database = {
           },
         ]
       }
+      descuentos_sucursales: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descuento_id: string
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descuento_id: string
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descuento_id?: string
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "descuentos_sucursales_descuento_id_fkey"
+            columns: ["descuento_id"]
+            isOneToOne: false
+            referencedRelation: "descuentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "descuentos_sucursales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deudas: {
         Row: {
           acreedor: string
@@ -2513,6 +2558,66 @@ export type Database = {
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      venta_descuentos_aplicados: {
+        Row: {
+          created_at: string
+          descuento_aplica_a: string
+          descuento_id: string | null
+          descuento_nombre: string
+          descuento_tipo: string
+          descuento_valor: number
+          id: string
+          monto_aplicado: number
+          organization_id: string
+          subtotal_base: number
+          sucursal_id: string | null
+          venta_id: string
+        }
+        Insert: {
+          created_at?: string
+          descuento_aplica_a: string
+          descuento_id?: string | null
+          descuento_nombre: string
+          descuento_tipo: string
+          descuento_valor?: number
+          id?: string
+          monto_aplicado?: number
+          organization_id: string
+          subtotal_base?: number
+          sucursal_id?: string | null
+          venta_id: string
+        }
+        Update: {
+          created_at?: string
+          descuento_aplica_a?: string
+          descuento_id?: string | null
+          descuento_nombre?: string
+          descuento_tipo?: string
+          descuento_valor?: number
+          id?: string
+          monto_aplicado?: number
+          organization_id?: string
+          subtotal_base?: number
+          sucursal_id?: string | null
+          venta_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venta_descuentos_aplicados_descuento_id_fkey"
+            columns: ["descuento_id"]
+            isOneToOne: false
+            referencedRelation: "descuentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_descuentos_aplicados_venta_id_fkey"
+            columns: ["venta_id"]
+            isOneToOne: false
+            referencedRelation: "venta"
             referencedColumns: ["id"]
           },
         ]

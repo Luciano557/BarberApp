@@ -50,6 +50,8 @@ export function getBarberDisplayName(barber: Barber): string {
   return `${barber.firstName} ${barber.lastName}`.trim();
 }
 
+export type DiscountAppliesTo = 'servicios' | 'productos';
+
 export interface Discount {
   id: string;
   label: string;
@@ -58,7 +60,20 @@ export interface Discount {
   rounding: 'cliente' | 'negocio' | 'matematico'; // cliente = floor, negocio = ceil, matematico = round
   roundingUnit: number; // unidad de redondeo (100, 500, 1000, etc.)
   paymentMethod: 'todos' | 'efectivo' | 'mercado_pago'; // restricción de método de pago
-  sucursalId?: string; // Reference to sucursales table
+  sucursalId?: string; // Reference to sucursales table (origen, no decide visibilidad)
+  appliesTo: DiscountAppliesTo; // 'servicios' | 'productos'
+  active: boolean; // descuentos.activo (estado global)
+}
+
+// Snapshot de un descuento aplicado a una venta (auditoría)
+export interface AppliedDiscountSnapshot {
+  descuentoId: string | null;
+  descuentoNombre: string;
+  descuentoTipo: 'porcentaje' | 'monto';
+  descuentoValor: number;
+  descuentoAplicaA: DiscountAppliesTo;
+  subtotalBase: number;
+  montoAplicado: number;
 }
 
 export type PaymentMethod = 'efectivo' | 'mercado_pago' | 'transferencia' | 'debito' | 'credito';
