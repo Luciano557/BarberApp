@@ -246,6 +246,7 @@ export function SucursalTabContent({
             onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
             onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
             onDeleteDiscount={onDeleteDiscount}
+            onToggleDiscountActive={onToggleDiscountActive}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
           />
         </div>
