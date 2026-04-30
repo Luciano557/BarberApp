@@ -334,7 +334,6 @@ export function useSupabaseData() {
           activo: true,
           aplica_a: appliesTo,
           organization_id: organization.id,
-          sucursal_id: discount.sucursalId || null,
         })
         .select()
         .single();
