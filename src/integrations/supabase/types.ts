@@ -2564,6 +2564,7 @@ export type Database = {
       }
       venta_descuentos_aplicados: {
         Row: {
+          barbero_id: string | null
           created_at: string
           descuento_aplica_a: string
           descuento_id: string | null
@@ -2578,6 +2579,7 @@ export type Database = {
           venta_id: string
         }
         Insert: {
+          barbero_id?: string | null
           created_at?: string
           descuento_aplica_a: string
           descuento_id?: string | null
@@ -2592,6 +2594,7 @@ export type Database = {
           venta_id: string
         }
         Update: {
+          barbero_id?: string | null
           created_at?: string
           descuento_aplica_a?: string
           descuento_id?: string | null
