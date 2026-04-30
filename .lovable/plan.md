@@ -1,196 +1,241 @@
 
-# Flujo de Productos en Cobrar — Plan v7 (final)
+# Normalización de Descuentos (servicios + productos) — v2
 
-Corregir el flujo: el modal de productos vuelve a su rol original (solo elegir productos). La asignación de la venta (barbero o "Sin barbero") se decide en el paso inicial tocando una tarjeta. Se introduce un estado explícito de tres valores para evitar ambigüedad entre "todavía no decidió" y "eligió Sin barbero".
+Objetivo: separar descuentos de servicios y productos, dejar la base con activos/inactivos a nivel global y por sucursal, y guardar historial real de cada descuento aplicado en cada venta. Sin descuentos mixtos, sin descuentos por marca/producto, sin múltiples descuentos del mismo tipo en una venta.
 
-Alcance: solo `src/components/PaymentRegistration.tsx` y `src/components/productos/ProductoPickerDialog.tsx`. No se tocan tablas, RPCs, hooks, stock, cierres, descuentos, comisiones, anulación ni Mi Negocio > Productos.
+Cambio clave respecto a la versión anterior: al crear un descuento queda activo por defecto en todas las sucursales de la organización. Si una sucursal no lo quiere usar, lo desactiva manualmente.
 
-## 1. Reglas de negocio
+---
 
-- Producto: sin barbero, con barbero, o con barbero + servicio.
-- Servicio: siempre requiere barbero.
-- Productos solo se agregan desde el paso `barber`.
-- Una sola asignación para toda la venta.
+## 1. Cambios en base de datos
 
-## 2. Estado de asignación
+### 1.1 Tabla `descuentos`
 
-Nuevo estado explícito en `PaymentRegistration`:
+- Mantener `aplica_a text not null default 'servicios'`.
+- Agregar CHECK: `aplica_a IN ('servicios','productos')`.
+- No agregar todavía columnas `eliminado / eliminado_at / eliminado_por`. Por ahora se usa solo `descuentos.activo` para inactivación global.
+- `sucursal_id` queda como dato histórico/origen del descuento, pero ya no decide visibilidad. La visibilidad se resuelve por `descuentos_sucursales`. No se elimina la columna para no romper datos.
 
-```ts
-type ProductSaleAssignment = 'pending' | 'no_barber' | 'barber';
-const [productSaleAssignment, setProductSaleAssignment] = useState<ProductSaleAssignment>('pending');
-```
-
-Se mantienen `cartBarberId` y `cartBarberName`, pero su valor `null` ya no significa "Sin barbero" para la UI: la UI lee `productSaleAssignment`.
-
-Reglas de transición:
-
-- Carrito vacío → `assignment = 'pending'`, `cartBarberId/Name = null`.
-- Confirmar productos en el modal → no toca `assignment`. Si era `pending` sigue en `pending`. Si era `barber` o `no_barber` se mantiene.
-- Si el carrito queda vacío tras editar → resetear a `pending` y limpiar `cartBarberId/Name`.
-- Tocar tarjeta "Sin barbero" → `assignment = 'no_barber'`, `cartBarberId/Name = null`.
-- Tocar tarjeta de barbero con carrito → `assignment = 'barber'`, `cartBarberId/Name = barbero`.
-
-## 3. Cambios en `ProductoPickerDialog.tsx`
-
-Quitar toda lógica de barbero:
-
-- Eliminar props `barbers`, `initialBarberId`, `initialBarberName`.
-- Eliminar bloque UI "Asignar venta a" (Select + texto auxiliar).
-- Eliminar estado `barberId` y el import `Select*`. Quitar `User` si no se usa.
-- Cambiar firma: `onConfirm: (cart: CartItem[]) => void`.
-
-El modal queda con: buscador, lista de productos, cantidad, total, confirmar.
-
-## 4. Cambios en `PaymentRegistration.tsx`
-
-### 4.1 Stepper
-
-`barber → service → extras → discount → payment`. Sin cambios. `DailyTurnosViewer` solo en `barber`.
-
-### 4.2 Paso `barber` — render
-
-Orden:
-
-1. Grilla de barberos.
-2. Si `cart.length > 0`: tarjeta extra **"Sin barbero"** al final de la grilla. Subtítulo "Solo productos". Estilo coherente con tarjetas de barbero, ícono sobrio (`User` o `Package`), sin emojis. Estado seleccionado (borde `primary`) cuando `assignment === 'no_barber'`.
-3. Bloque carrito de productos (si hay items): lista editable con cantidad ±, subtotal por ítem, eliminar, subtotal total, botón "Agregar más productos".
-4. Si carrito vacío: botón "Añadir producto".
-5. `DailyTurnosViewer`.
-
-Eliminar el botón global "Ir a pago" del paso `barber` y el botón "Cambiar asignación" del bloque carrito. La asignación se cambia tocando la tarjeta correspondiente en la grilla.
-
-El chip de asignación dentro del carrito muestra:
-
-- `assignment === 'pending'`: "Elegí barbero o tocá Sin barbero para continuar".
-- `assignment === 'no_barber'`: "Sin barbero".
-- `assignment === 'barber'`: "Asignado a {cartBarberName}".
-
-### 4.3 Interacciones en `barber`
-
-**Tocar tarjeta de barbero:**
-
-- Carrito vacío → `setSelectedBarber(id)`, avanzar a `service`. (No tocar `assignment`, sigue `pending`.)
-- Carrito con `assignment === 'pending'` → setear `assignment = 'barber'`, `cartBarberId/Name`, `selectedBarber`, avanzar a `service`.
-- Carrito con `assignment === 'no_barber'` → setear `assignment = 'barber'`, `cartBarberId/Name`, `selectedBarber`, avanzar a `service`. (Tocar barbero reasigna.)
-- Carrito con `assignment === 'barber'` y mismo barbero → `setSelectedBarber`, avanzar a `service`.
-- Carrito con `assignment === 'barber'` y otro barbero → toast: *"Los productos están asignados a {Nombre}. Cambiá la asignación tocando ese barbero u otra opción, o cancelá la venta para empezar de nuevo."* Bloquear avance. (Permitir reasignar también es válido; mantenemos el bloqueo para evitar cambios accidentales en venta mixta.)
-
-**Tocar tarjeta "Sin barbero"** (visible solo con `cart.length > 0`):
-
-- `setProductSaleAssignment('no_barber')`, `setCartBarberId(null)`, `setCartBarberName(null)`, `setSelectedBarber('')`.
-- Limpiar `selectedService`, `selectedExtras`, `selectedDiscount` (defensivo, no debería haber nada).
-- Avanzar al siguiente paso útil. Helper:
-
-```ts
-const goToProductsOnlyNextStep = () => setCurrentStep('payment');
-```
-
-(Encapsulado para que en el futuro pueda enrutar a un step de descuento de productos.)
-
-### 4.4 Modal — invocación y cierre
-
-`ProductoPickerDialog` se abre desde "Añadir producto" o "Agregar más productos". `onConfirm(cart)`:
-
-- `setCart(cart)`.
-- Si `cart.length === 0` → `setProductSaleAssignment('pending')`, `setCartBarberId(null)`, `setCartBarberName(null)`.
-- Cerrar modal y permanecer en `barber`.
-
-### 4.5 Paso `service`
-
-Defensa: si no hay `selectedBarber` → toast *"Para agregar un servicio, primero seleccioná un barbero."* y abortar selección.
-
-Nuevo botón **"Ir a pago sin servicio"** (variante `outline`, full width, debajo de la lista de servicios), visible cuando:
-
-```ts
-cart.length > 0 && selectedBarber && !selectedService
-```
-
-Al tocar:
-
-- `setSelectedService('')`, `setSelectedExtras([])`, `setSelectedDiscount('none')`.
-- `setCurrentStep('payment')`.
-
-Resultado: venta de productos con barbero, sin servicio.
-
-### 4.6 Pasos `extras`, `discount`, `payment`
-
-Sin botón "Añadir producto". Carrito visible como resumen compacto de solo lectura (ya implementado para los pasos intermedios).
-
-En `payment`:
-
-- Línea de barbero:
-  - Si hay servicio → nombre del barbero del servicio.
-  - Si solo productos y `assignment === 'barber'` → `cartBarberName`.
-  - Si solo productos y `assignment === 'no_barber'` → **"Sin barbero"**.
-- Subtotal servicios + extras (si aplica).
-- Descuento (solo sobre servicios/extras).
-- Subtotal productos (si aplica).
-- Recargo + Total a cobrar.
-- Nunca mostrar "Venta general de sucursal".
-
-### 4.7 Submit
-
-`handleSubmit` ya casi soporta el caso. Ajuste:
-
-```ts
-const hasService = !!selectedService;
-const hasProducts = cart.length > 0;
-
-const finalBarberId = hasService
-  ? (barber?.id || '')
-  : (productSaleAssignment === 'barber' ? (cartBarberId || '') : '');
-const finalBarberName = hasService
-  ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
-  : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
-```
-
-Sin cambios en `useTransactions`.
-
-### 4.8 `resetForm`
-
-Agregar `setProductSaleAssignment('pending')` además del reset existente.
-
-### 4.9 Atajos de teclado
-
-En `barber`, los atajos numéricos cubren la grilla. Si la tarjeta "Sin barbero" está visible, ocupa el índice `barbers.length` y dispara el mismo handler que tocarla.
-
-## 5. Flujos cubiertos
+### 1.2 Nueva tabla `descuentos_sucursales`
 
 ```text
-A — Solo productos sin barbero
-   barber → Añadir producto → confirmar → Sin barbero → payment
-
-B — Solo productos con barbero
-   barber → Añadir producto → confirmar → Barbero 1 → service
-        → Ir a pago sin servicio → payment
-
-C — Solo servicio
-   barber → Barbero 1 → service → extras → discount → payment
-
-D — Producto + servicio (mixta)
-   barber → Añadir producto → confirmar → Barbero 1 → service
-        → elegir servicio → extras → discount → payment
-
-E — Producto asignado a Barbero 1 + intento de tocar Barbero 2
-   bloqueado con toast.
+descuentos_sucursales
+  id uuid pk default gen_random_uuid()
+  organization_id uuid not null
+  descuento_id uuid not null references descuentos(id) on delete cascade
+  sucursal_id uuid not null references sucursales(id) on delete cascade
+  activo boolean not null default true
+  created_at timestamptz default now()
+  updated_at timestamptz default now()
+  unique (organization_id, descuento_id, sucursal_id)
 ```
 
-## 6. Detalles técnicos
+- Default `activo = true`: cuando se crea un descuento, queda habilitado por defecto en todas las sucursales.
+- Trigger `update_updated_at_column` para `updated_at`.
+- RLS (igual que `descuentos`):
+  - SELECT: cualquier usuario de la organización.
+  - INSERT/UPDATE/DELETE: `owner`, `general_manager` o `manager` de la organización. Sin diferenciar por sucursal asignada para la activación/desactivación.
 
-- Archivos: `src/components/PaymentRegistration.tsx`, `src/components/productos/ProductoPickerDialog.tsx`.
-- Sin migraciones ni cambios en hooks/types.
-- Tokens semánticos, dark mode, sin emojis. Iconos `lucide-react`.
-- Componentes shadcn ya presentes.
+### 1.3 Backfill de descuentos existentes
 
-## 7. QA manual
+Para cada descuento ya creado:
 
-- A, B, C, D, E (arriba).
-- Carrito asignado a Barbero 1 → tocar "Sin barbero" → reasigna a `no_barber` → al tocar Barbero 1 nuevamente reasigna a `barber` y avanza a `service`.
-- Volver desde `payment` mantiene cart, asignación y barbero. Calendario reaparece solo en `barber`.
-- "Cancelar venta" limpia todo incluyendo `productSaleAssignment`.
-- En `service`, "Ir a pago sin servicio" solo aparece con cart + barbero + sin servicio.
+- Insertar una fila en `descuentos_sucursales` por cada sucursal de su organización con `activo = true`.
+- Si el descuento tenía `descuentos.activo = false`, mantenerlo así (la fila por sucursal queda en true, pero el global apaga la visibilidad).
 
-## 8. Fuera de alcance
+No se borra ningún descuento existente. No se reconstruye nada de ventas pasadas.
 
-Backend, datos, hooks de transacciones, stock, cierres, descuentos, comisiones, anulación, Mi Negocio > Productos.
+### 1.4 Nueva tabla `venta_descuentos_aplicados` (auditoría / snapshot)
+
+```text
+venta_descuentos_aplicados
+  id uuid pk default gen_random_uuid()
+  organization_id uuid not null
+  sucursal_id uuid null
+  venta_id uuid not null references venta(id) on delete cascade
+  descuento_id uuid null references descuentos(id) on delete set null
+  descuento_nombre text not null
+  descuento_tipo text not null            -- 'porcentaje' | 'fijo'
+  descuento_valor numeric not null default 0
+  descuento_aplica_a text not null        -- 'servicios' | 'productos'
+  subtotal_base numeric not null default 0
+  monto_aplicado numeric not null default 0
+  created_at timestamptz not null default now()
+  check (descuento_aplica_a in ('servicios','productos'))
+```
+
+- Índices: `(venta_id)`, `(organization_id, sucursal_id, created_at)`, `(descuento_id)`.
+- RLS: lectura por miembros de la organización; insert solo desde el flujo de cobro (validar `organization_id` del usuario y pertenencia de la venta).
+- Solo se inserta una fila si efectivamente se aplicó un descuento (no insertar filas con `monto_aplicado = 0` por defecto).
+- El snapshot se guarda al momento de la venta para que cambios futuros en el descuento (nombre, valor, desactivación) no afecten el histórico.
+
+### 1.5 `venta.descuento_pct`
+
+- No se elimina. Mantiene su semántica actual = descuento de servicios (porcentaje), por compatibilidad con cierres y reportes existentes.
+- La fuente nueva de verdad para auditoría detallada es `venta_descuentos_aplicados`.
+
+---
+
+## 2. Lógica de creación de descuentos
+
+Al crear un descuento (servicio o producto):
+
+1. Insert en `descuentos` con `activo = true` y `aplica_a` correspondiente.
+2. En la misma transacción / inmediatamente después, insertar una fila en `descuentos_sucursales` por cada sucursal de la organización, con `activo = true`.
+3. UX esperada: “creo un descuento y ya lo puedo usar en cualquier sucursal”.
+
+Si después se agrega una sucursal nueva a la organización, el plan no obliga aún a crear automáticamente filas para descuentos previos. Queda fuera de alcance esta vez (puede gestionarse desde el panel por sucursal).
+
+---
+
+## 3. Lógica de cálculo en Cobrar
+
+Sin descuentos mixtos:
+
+```text
+subtotal_servicios = precio_servicio + suma(extras)
+subtotal_productos = suma(venta_producto.subtotal)
+
+descuento_servicios → solo sobre subtotal_servicios
+descuento_productos → solo sobre subtotal_productos
+
+subtotal_servicios_neto = subtotal_servicios - monto_desc_servicios
+subtotal_productos_neto = subtotal_productos - monto_desc_productos
+
+total_base = subtotal_servicios_neto + subtotal_productos_neto
+total_cobrado = total_base + recargos_metodo_pago
+```
+
+- Reutilizar redondeo, `redondeo_unidad`, `tipo`, `metodo_pago` igual que hoy para ambos.
+- Solo servicios → solo aparece selector de descuento de servicios.
+- Solo productos → solo aparece selector de descuento de productos.
+- Mixta → ambos bloques separados, cada uno con su propio descuento independiente.
+
+Un descuento aparece en Cobrar si y solo si:
+
+- `descuentos.activo = true`
+- `descuentos_sucursales.activo = true` para la sucursal activa
+- `aplica_a` corresponde al bloque (servicios o productos)
+- `metodo_pago` compatible con el método elegido (igual que hoy)
+
+---
+
+## 4. Persistencia al cobrar
+
+En el flujo de venta:
+
+1. Insert de `venta` con `descuento_pct` = porcentaje del descuento de servicios (si fue porcentaje), igual que hoy. Si fue fijo, queda `descuento_pct = 0` y el detalle queda solo en la tabla nueva.
+2. Insert de `venta_producto` como hoy, con `subtotal` ya neto del descuento de productos para mantener compatibilidad con `productos_total` neto en cierre.
+3. Insert de `venta_pagos` como hoy.
+4. Para cada descuento aplicado (0, 1 o 2 filas), insertar en `venta_descuentos_aplicados` el snapshot:
+   - `descuento_id`, `descuento_nombre`, `descuento_tipo`, `descuento_valor`, `descuento_aplica_a`
+   - `subtotal_base` (servicios o productos antes del descuento)
+   - `monto_aplicado` ya redondeado según las reglas del descuento
+
+Encapsular el insert en un helper para que anulación y cierre no requieran cambios estructurales.
+
+---
+
+## 5. UI — Mi Negocio > Descuentos
+
+`src/components/config/DiscountsConfig.tsx` y `CobrarConfig.tsx`:
+
+- Tabs internas:
+  - **Servicios**
+  - **Productos**
+- Dentro de cada tab, dos secciones: **Activos** e **Inactivos** (basadas en `descuentos.activo`).
+- Al crear un descuento:
+  - Elegir `aplica_a` (Servicios o Productos). Sin opción mixta ni “toda la venta”.
+  - Quedar activo globalmente (`descuentos.activo = true`) y activo en todas las sucursales (`descuentos_sucursales.activo = true`).
+- Acciones por descuento:
+  - Editar.
+  - Desactivar / Reactivar (toggle `descuentos.activo`).
+  - Sin botón de borrar físico.
+- Panel **Disponibilidad por sucursal** (modal o sección expandible al editar el descuento):
+  - Lista las sucursales de la organización con un switch por sucursal.
+  - Cada switch refleja y modifica `descuentos_sucursales.activo` para esa sucursal.
+  - Texto auxiliar: “Cuando creás un descuento se activa automáticamente en todas las sucursales. Apagá el switch para que no esté disponible en una sucursal específica.”
+  - En organizaciones con una sola sucursal, ocultar o deshabilitar el panel.
+- Copy auxiliar bajo el título del módulo: “Los descuentos se crean a nivel del negocio y por defecto quedan activos en todas las sucursales. Cada sucursal puede desactivarlo si no lo quiere usar.”
+- Respetar tokens semánticos, sin emojis, `maxLength` 80 en nombre.
+
+---
+
+## 6. UI — Cobrar (`PaymentRegistration.tsx`)
+
+- Detectar composición de la venta:
+  - Hay servicio o extras → mostrar selector **Descuento servicios**.
+  - Hay productos en el carrito → mostrar selector **Descuento productos**.
+  - Mixta → mostrar ambos bloques separados, cada uno con su propio “Sin descuento”.
+- Cada selector lista solo descuentos que cumplan los filtros descritos en la sección 3.
+- El selector de descuento de productos reemplaza el TODO existente (`enrutar a un step de descuento de productos`).
+- Actualizar copy del paso “discount” actual: pasar de “(solo servicios)” a textos dinámicos según corresponda.
+
+---
+
+## 7. Tipos / hooks
+
+- `src/types/barbershop.ts`:
+  - Agregar `appliesTo: 'servicios' | 'productos'` a `Discount`.
+  - Agregar en `Transaction` un array opcional `appliedDiscounts` con el snapshot insertado en `venta_descuentos_aplicados`.
+- `src/hooks/useSupabaseData.ts`:
+  - Fetch de descuentos: traer `aplica_a` y joinear con `descuentos_sucursales` para la sucursal activa. Exponer dos listas: `serviceDiscounts`, `productDiscounts`, ya filtradas por activo global + activo en sucursal + método de pago.
+  - `addDiscount`: tras insertar en `descuentos`, insertar `descuentos_sucursales` (una fila por cada sucursal de la organización) con `activo = true`.
+  - Reemplazar `deleteDiscount` por `setDiscountActive(id, activo)` (toggle global). Mantener nombre `onDelete` apuntando al toggle por compatibilidad.
+  - Nuevo método `setDiscountSucursalActivo(descuentoId, sucursalId, activo)`.
+- `src/hooks/useTransactions.ts`:
+  - Calcular y persistir snapshots según la nueva lógica.
+
+---
+
+## 8. Compatibilidad con cierre de caja
+
+- `ingresos` y agregados de servicios (`cantidad_de_20_por`, `cantidad_de_50_por`, `servicios_con_descuento`, `servicios_sin_descuento`, `perdida`) se siguen calculando como hoy a partir de `venta.descuento_pct`.
+- Productos en cierre: `productos_total`, `productos_cantidad`, `productos_efectivo`, `productos_digital` ya existen. El descuento de productos queda reflejado porque `venta_producto.subtotal` se guarda neto del descuento de productos (ver sección 4). Así el cierre muestra el ingreso real por productos sin necesidad de cambios estructurales en cierre.
+- Detalle granular de descuentos queda en `venta_descuentos_aplicados` para reportes futuros.
+
+---
+
+## 9. Migración / pasos de despliegue
+
+1. Migración SQL:
+   - Alterar `descuentos`: agregar CHECK en `aplica_a`.
+   - Crear `descuentos_sucursales` con RLS, trigger `updated_at` e índices.
+   - Backfill: insertar relaciones para descuentos existentes con `activo = true` (ver 1.3).
+   - Crear `venta_descuentos_aplicados` con RLS e índices.
+2. Frontend:
+   - Tipos y hooks.
+   - UI Mi Negocio > Descuentos (tabs + panel sucursales).
+   - UI Cobrar (dos selectores y cálculo separado).
+   - Persistencia del snapshot en cada venta.
+
+---
+
+## 10. Fuera de alcance (explícito)
+
+- Descuentos mixtos / “toda la venta”.
+- Descuentos por marca o por producto específico.
+- Múltiples descuentos del mismo tipo en la misma venta.
+- Borrado físico, soft delete con columnas dedicadas (`eliminado / eliminado_at / eliminado_por`).
+- Cambios en comisiones.
+- Reportes/dashboard de descuentos.
+- Auto-creación de filas en `descuentos_sucursales` cuando se crea una sucursal nueva.
+
+---
+
+## 11. Resumen de archivos a crear/editar
+
+Migraciones SQL:
+- Alterar `descuentos` (CHECK).
+- Crear `descuentos_sucursales` + RLS + trigger + backfill.
+- Crear `venta_descuentos_aplicados` + RLS + índices.
+
+Frontend:
+- `src/types/barbershop.ts`
+- `src/hooks/useSupabaseData.ts`
+- `src/hooks/useTransactions.ts`
+- `src/components/config/DiscountsConfig.tsx`
+- `src/components/config/CobrarConfig.tsx`
+- `src/components/PaymentRegistration.tsx`
+
+Resultado: descuentos separados por tipo, activos por defecto en todas las sucursales al crearlos, con desactivación manual por sucursal cuando haga falta, y con historial completo y consultable de cada aplicación en `venta_descuentos_aplicados`.
