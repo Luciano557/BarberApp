@@ -880,30 +880,39 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {currentStep === 'extras' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {extras.map((extra, index) => (
-                <button
-                  key={extra.id}
-                  onClick={() => handleToggleExtra(extra.id)}
-                  className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
-                    selectedExtras.includes(extra.id)
-                      ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  {selectedExtras.includes(extra.id) && (
-                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                      <Check className="h-3 w-3" />
+              {extras.map((extra, index) => {
+                const blocked = isPriceMissing(extra.price);
+                return (
+                  <button
+                    key={extra.id}
+                    onClick={() => handleToggleExtra(extra.id)}
+                    className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
+                      selectedExtras.includes(extra.id)
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    {selectedExtras.includes(extra.id) && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                    <div className="pt-3">
+                      <p className="font-medium text-foreground text-center">{extra.name}</p>
+                      {blocked ? (
+                        <div className="flex justify-center mt-1">
+                          <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
+                      )}
                     </div>
-                  )}
-                  <div className="pt-3">
-                    <p className="font-medium text-foreground text-center">{extra.name}</p>
-                    <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
             <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
