@@ -234,7 +234,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 allSucursales={allSucursales}
                 services={getServicesForSucursal(s.id)}
                 extras={getExtrasForSucursal(s.id)}
-                discounts={getDiscountsForSucursal(s.id)}
+                discounts={discounts}
                 lines={allLines}
                 onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
                 onUpdateBarber={updateBarberFn}
@@ -242,7 +242,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onUpdateService={updateService}
                 onAddExtra={addExtraForSucursal(s.id)}
                 onUpdateExtra={updateExtra}
-                onAddDiscount={addDiscountForSucursal(s.id)}
+                onAddDiscount={addDiscount}
                 onUpdateDiscount={updateDiscount}
                 onDeleteDiscount={deleteDiscount}
                 onToggleDiscountActive={setDiscountActive}
