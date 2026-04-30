@@ -289,7 +289,7 @@ export function useSupabaseData() {
           nombre: normalizedName,
           precio: 0,
           duracion_min: service.durationMin || 30,
-          activo: service.active,
+          activo: true,
           linea_id: service.lineId || null,
           organization_id: organization.id,
           sucursal_id: null,
@@ -457,7 +457,7 @@ export function useSupabaseData() {
         .insert({
           nombre: normalizedName,
           precio: 0,
-          activo: extra.active,
+          activo: true,
           organization_id: organization.id,
           sucursal_id: null,
         })

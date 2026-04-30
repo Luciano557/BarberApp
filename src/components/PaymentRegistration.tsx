@@ -21,6 +21,9 @@ import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
+import { Badge } from '@/components/ui/badge';
+
+const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -227,18 +230,37 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
       return;
     }
+    const svc = services.find(s => s.id === serviceId);
+    if (!svc || isPriceMissing(svc.price)) {
+      toast({
+        title: 'Precio pendiente',
+        description: 'Definí un precio para este ítem antes de cobrarlo.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedService(serviceId);
     setTimeout(() => goToNextStep(), 100);
-  }, [selectedBarber, goToNextStep, toast]);
+  }, [selectedBarber, goToNextStep, toast, services]);
 
 
   const handleToggleExtra = useCallback((extraId: string) => {
-    setSelectedExtras(prev =>
-      prev.includes(extraId)
-        ? prev.filter(id => id !== extraId)
-        : [...prev, extraId]
-    );
-  }, []);
+    setSelectedExtras(prev => {
+      if (prev.includes(extraId)) {
+        return prev.filter(id => id !== extraId);
+      }
+      const ex = extras.find(e => e.id === extraId);
+      if (!ex || isPriceMissing(ex.price)) {
+        toast({
+          title: 'Precio pendiente',
+          description: 'Definí un precio para este ítem antes de cobrarlo.',
+          variant: 'destructive',
+        });
+        return prev;
+      }
+      return [...prev, extraId];
+    });
+  }, [extras, toast]);
 
   const handleSelectDiscount = useCallback((discountId: string) => {
     setSelectedDiscount(discountId);
@@ -380,6 +402,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       toast({
         title: 'Venta vacía',
         description: 'Agregá al menos un servicio o un producto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const invalidService = hasService && isPriceMissing(service?.price);
+    const invalidExtras = selectedExtrasData.some(e => isPriceMissing(e.price));
+    const invalidProducts = cart.some(it => isPriceMissing(it.precio_unitario));
+    if (invalidService || invalidExtras || invalidProducts) {
+      toast({
+        title: 'Ítems sin precio',
+        description: 'Hay ítems sin precio configurado. Definí el precio antes de cobrar.',
         variant: 'destructive',
       });
       return;
@@ -792,6 +826,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     {group.services.map((service) => {
                       globalIndex++;
                       const idx = globalIndex;
+                      const blocked = isPriceMissing(service.price);
                       return (
                         <button
                           key={service.id}
@@ -800,15 +835,19 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                             selectedService === service.id
                               ? 'border-secondary bg-secondary/5'
                               : 'border-border bg-card hover:bg-muted/50'
-                          }`}
+                          } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                           style={group.lineColor ? { borderLeftWidth: '3px', borderLeftColor: selectedService === service.id ? undefined : group.lineColor } : undefined}
                         >
                           <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                             {idx}
                           </span>
-                          <div className="flex justify-between items-center pl-6">
+                          <div className="flex justify-between items-center pl-6 gap-2">
                             <span className="font-medium text-foreground">{service.name}</span>
-                            <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            {blocked ? (
+                              <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                            ) : (
+                              <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            )}
                           </div>
                         </button>
                       );
@@ -841,30 +880,39 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {currentStep === 'extras' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {extras.map((extra, index) => (
-                <button
-                  key={extra.id}
-                  onClick={() => handleToggleExtra(extra.id)}
-                  className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
-                    selectedExtras.includes(extra.id)
-                      ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  {selectedExtras.includes(extra.id) && (
-                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                      <Check className="h-3 w-3" />
+              {extras.map((extra, index) => {
+                const blocked = isPriceMissing(extra.price);
+                return (
+                  <button
+                    key={extra.id}
+                    onClick={() => handleToggleExtra(extra.id)}
+                    className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
+                      selectedExtras.includes(extra.id)
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    {selectedExtras.includes(extra.id) && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                    <div className="pt-3">
+                      <p className="font-medium text-foreground text-center">{extra.name}</p>
+                      {blocked ? (
+                        <div className="flex justify-center mt-1">
+                          <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
+                      )}
                     </div>
-                  )}
-                  <div className="pt-3">
-                    <p className="font-medium text-foreground text-center">{extra.name}</p>
-                    <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
             <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
