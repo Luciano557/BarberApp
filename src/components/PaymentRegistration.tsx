@@ -245,12 +245,22 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
 
   const handleToggleExtra = useCallback((extraId: string) => {
-    setSelectedExtras(prev =>
-      prev.includes(extraId)
-        ? prev.filter(id => id !== extraId)
-        : [...prev, extraId]
-    );
-  }, []);
+    setSelectedExtras(prev => {
+      if (prev.includes(extraId)) {
+        return prev.filter(id => id !== extraId);
+      }
+      const ex = extras.find(e => e.id === extraId);
+      if (!ex || isPriceMissing(ex.price)) {
+        toast({
+          title: 'Precio pendiente',
+          description: 'Definí un precio para este ítem antes de cobrarlo.',
+          variant: 'destructive',
+        });
+        return prev;
+      }
+      return [...prev, extraId];
+    });
+  }, [extras, toast]);
 
   const handleSelectDiscount = useCallback((discountId: string) => {
     setSelectedDiscount(discountId);
