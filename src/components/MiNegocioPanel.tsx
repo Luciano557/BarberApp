@@ -254,6 +254,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onAddDiscount={addDiscountForSucursal(s.id)}
                 onUpdateDiscount={updateDiscount}
                 onDeleteDiscount={deleteDiscount}
+                onToggleDiscountActive={setDiscountActive}
                 onAddLine={addLine}
                 onUpdateLine={updateLine}
                 onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
