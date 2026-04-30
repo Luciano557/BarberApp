@@ -457,7 +457,7 @@ export function useSupabaseData() {
         .insert({
           nombre: normalizedName,
           precio: 0,
-          activo: extra.active,
+          activo: true,
           organization_id: organization.id,
           sucursal_id: null,
         })
