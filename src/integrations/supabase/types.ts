@@ -2931,6 +2931,10 @@ export type Database = {
       }
     }
     Functions: {
+      _assert_can_write_sucursal_catalog: {
+        Args: { _org_id: string; _sucursal_id: string }
+        Returns: undefined
+      }
       cerrar_ventas_generales_sucursal: {
         Args: { _fecha: string; _sucursal_id: string }
         Returns: number
@@ -2983,6 +2987,100 @@ export type Database = {
       seed_payment_methods_for_org: {
         Args: { _org_id: string }
         Returns: undefined
+      }
+      set_descuento_sucursal_activo: {
+        Args: { _activo: boolean; _id: string }
+        Returns: {
+          activo: boolean
+          created_at: string
+          descuento_id: string
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "descuentos_sucursales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_extra_sucursal_activo: {
+        Args: { _activo: boolean; _id: string }
+        Returns: {
+          activo: boolean
+          created_at: string
+          extra_id: string
+          id: string
+          organization_id: string
+          precio: number
+          sucursal_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "extras_sucursales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_extra_sucursal_precio: {
+        Args: { _id: string; _precio: number }
+        Returns: {
+          activo: boolean
+          created_at: string
+          extra_id: string
+          id: string
+          organization_id: string
+          precio: number
+          sucursal_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "extras_sucursales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_servicio_sucursal_activo: {
+        Args: { _activo: boolean; _id: string }
+        Returns: {
+          activo: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          precio: number
+          servicio_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "servicios_sucursales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_servicio_sucursal_precio: {
+        Args: { _id: string; _precio: number }
+        Returns: {
+          activo: boolean
+          created_at: string
+          id: string
+          organization_id: string
+          precio: number
+          servicio_id: string
+          sucursal_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "servicios_sucursales"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
       user_belongs_to_org: {
