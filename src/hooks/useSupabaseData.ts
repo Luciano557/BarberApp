@@ -400,59 +400,7 @@ export function useSupabaseData() {
     await setDiscountActive(id, false);
   }, [setDiscountActive]);
 
-  // Activar/desactivar descuento en una sucursal específica
-  const setDiscountSucursalActivo = useCallback(async (
-    descuentoId: string,
-    sucursalId: string,
-    activo: boolean,
-  ) => {
-    if (!organization) {
-      toast.error('No se pudo determinar la organización');
-      return;
-    }
-    if (descuentoId === 'none') return;
-    try {
-      // Upsert: si la fila no existe (sucursal nueva), crearla
-      const { data: existing, error: selError } = await supabase
-        .from('descuentos_sucursales')
-        .select('id')
-        .eq('descuento_id', descuentoId)
-        .eq('sucursal_id', sucursalId)
-        .maybeSingle();
-
-      if (selError) throw selError;
-
-      if (existing) {
-        const { error } = await supabase
-          .from('descuentos_sucursales')
-          .update({ activo })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('descuentos_sucursales')
-          .insert({
-            organization_id: organization.id,
-            descuento_id: descuentoId,
-            sucursal_id: sucursalId,
-            activo,
-          });
-        if (error) throw error;
-      }
-
-      setDiscountsActivePerSucursal(prev => {
-        const next = { ...prev };
-        const set = new Set(next[descuentoId] || []);
-        if (activo) set.add(sucursalId);
-        else set.delete(sucursalId);
-        next[descuentoId] = set;
-        return next;
-      });
-    } catch (error) {
-      console.error('Error toggling descuento sucursal:', error);
-      toast.error('Error al actualizar disponibilidad por sucursal');
-    }
-  }, [organization]);
+  // (Disponibilidad por sucursal queda fuera de alcance en esta etapa.)
 
   // Lines CRUD
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
