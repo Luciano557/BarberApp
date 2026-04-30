@@ -9,7 +9,9 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto, ProductoSucursal } from './types';
+import { Badge } from '@/components/ui/badge';
 
+const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 export interface CartItem {
   producto_id: string;
   producto_sucursal_id: string;
