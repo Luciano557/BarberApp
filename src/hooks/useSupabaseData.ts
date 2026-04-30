@@ -342,39 +342,6 @@ export function useSupabaseData() {
       if (error) throw error;
       const newDiscount = dbToDiscount(data);
 
-      // Crear filas en descuentos_sucursales: una por cada sucursal de la org, todas activas.
-      const { data: sucs, error: sucError } = await supabase
-        .from('sucursales')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('activa', true);
-
-      if (sucError) {
-        console.error('Error fetching sucursales for descuento:', sucError);
-      } else if (sucs && sucs.length > 0) {
-        const rows = sucs.map((s: any) => ({
-          organization_id: organization.id,
-          descuento_id: newDiscount.id,
-          sucursal_id: s.id,
-          activo: true,
-        }));
-        const { error: dsError } = await supabase
-          .from('descuentos_sucursales')
-          .insert(rows);
-        if (dsError) {
-          console.error('Error inserting descuentos_sucursales:', dsError);
-        } else {
-          // Actualizar mapa local
-          setDiscountsActivePerSucursal(prev => {
-            const next = { ...prev };
-            const set = new Set<string>();
-            sucs.forEach((s: any) => set.add(s.id));
-            next[newDiscount.id] = set;
-            return next;
-          });
-        }
-      }
-
       setDiscounts(prev => [...prev, newDiscount]);
       toast.success('Descuento agregado');
       return newDiscount;
