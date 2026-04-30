@@ -10,11 +10,11 @@ function generateUID(prefix: string): string {
 }
 
 const initialDiscounts: Discount[] = [
-  { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
-  { id: '10', label: '10%', value: 10, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
-  { id: '20', label: '20%', value: 20, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
-  { id: '30', label: '30%', value: 30, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
-  { id: '50', label: '50%', value: 50, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
+  { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos', appliesTo: 'servicios', active: true },
+  { id: '10', label: '10%', value: 10, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos', appliesTo: 'servicios', active: true },
+  { id: '20', label: '20%', value: 20, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos', appliesTo: 'servicios', active: true },
+  { id: '30', label: '30%', value: 30, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos', appliesTo: 'servicios', active: true },
+  { id: '50', label: '50%', value: 50, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos', appliesTo: 'servicios', active: true },
 ];
 
 export function useBarbershopStore() {
