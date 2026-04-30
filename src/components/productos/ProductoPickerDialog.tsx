@@ -107,6 +107,10 @@ export function ProductoPickerDialog({
   }, [rows, search]);
 
   const updateQty = (row: RowData, delta: number) => {
+    if (delta > 0 && isPriceMissing(Number(row.sucursal.precio_venta))) {
+      toast.error('Definí un precio para este ítem antes de cobrarlo.');
+      return;
+    }
     setCart(prev => {
       const next = new Map(prev);
       const key = row.sucursal.id;
