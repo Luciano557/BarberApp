@@ -182,9 +182,6 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const getExtrasForSucursal = (sucursalId: string) =>
     allExtras.filter(e => e.sucursalId === sucursalId);
 
-  const getDiscountsForSucursal = (sucursalId: string) =>
-    discounts.filter(d => d.id === 'none' || d.sucursalId === sucursalId);
-
   // Wrap add functions to inject sucursalId
   const addServiceForSucursal = useCallback((sucursalId: string) => {
     return (service: Parameters<typeof addService>[0]) => {
@@ -197,12 +194,6 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       return addExtra({ ...extra, sucursalId });
     };
   }, [addExtra]);
-
-  const addDiscountForSucursal = useCallback((sucursalId: string) => {
-    return (discount: Parameters<typeof addDiscount>[0]) => {
-      return addDiscount({ ...discount, sucursalId });
-    };
-  }, [addDiscount]);
 
   return (
     <div className="space-y-6 animate-fade-in">
