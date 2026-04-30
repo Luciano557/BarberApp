@@ -21,6 +21,9 @@ import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
+import { Badge } from '@/components/ui/badge';
+
+const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 
 interface PaymentRegistrationProps {
   services: Service[];
