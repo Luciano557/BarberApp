@@ -1,21 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power, Settings2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Edit2, Save, X, Power } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
-import { supabase } from '@/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface DiscountsConfigProps {
   discounts: Discount[];
@@ -23,16 +12,11 @@ interface DiscountsConfigProps {
   onUpdate: (id: string, updates: Partial<Discount>) => void;
   onDelete: (id: string) => void;
   onToggleActive?: (id: string, activo: boolean) => void;
-  onToggleSucursal?: (descuentoId: string, sucursalId: string, activo: boolean) => void;
-  discountsActivePerSucursal?: Record<string, Set<string>>;
-}
-
-interface SucursalOption {
-  id: string;
-  nombre: string;
 }
 
 const ROUNDING_UNITS = [1, 10, 50, 100, 500, 1000];
+
+type TypeFilter = 'todos' | DiscountAppliesTo;
 
 export function DiscountsConfig({
   discounts,
@@ -40,11 +24,8 @@ export function DiscountsConfig({
   onUpdate,
   onDelete,
   onToggleActive,
-  onToggleSucursal,
-  discountsActivePerSucursal,
 }: DiscountsConfigProps) {
-  const { organization } = useOrganization();
-  const [activeTab, setActiveTab] = useState<DiscountAppliesTo>('servicios');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -57,27 +38,6 @@ export function DiscountsConfig({
   const [newPaymentMethod, setNewPaymentMethod] = useState<'todos' | 'efectivo' | 'mercado_pago'>('todos');
   const [newAppliesTo, setNewAppliesTo] = useState<DiscountAppliesTo>('servicios');
 
-  // Sucursales panel
-  const [sucursales, setSucursales] = useState<SucursalOption[]>([]);
-  const [sucursalDialogId, setSucursalDialogId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!organization?.id) return;
-      const { data, error } = await supabase
-        .from('sucursales')
-        .select('id, nombre')
-        .eq('organization_id', organization.id)
-        .eq('activa', true)
-        .order('nombre');
-      if (!cancelled && !error && data) {
-        setSucursales(data as SucursalOption[]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [organization?.id]);
-
   const resetForm = () => {
     setNewLabel('');
     setNewValue('');
@@ -85,12 +45,11 @@ export function DiscountsConfig({
     setNewRounding('cliente');
     setNewRoundingUnit(100);
     setNewPaymentMethod('todos');
-    setNewAppliesTo(activeTab);
+    setNewAppliesTo(typeFilter === 'productos' ? 'productos' : 'servicios');
   };
 
   const startAdd = () => {
     resetForm();
-    setNewAppliesTo(activeTab);
     setIsAdding(true);
   };
 
@@ -154,20 +113,13 @@ export function DiscountsConfig({
     }
   };
 
-  const filteredByType = useMemo(
-    () => discounts.filter(d => (d.appliesTo || 'servicios') === activeTab),
-    [discounts, activeTab],
-  );
-  const activos = filteredByType.filter(d => d.active);
-  const inactivos = filteredByType.filter(d => !d.active);
+  const filtered = useMemo(() => {
+    if (typeFilter === 'todos') return discounts;
+    return discounts.filter(d => (d.appliesTo || 'servicios') === typeFilter);
+  }, [discounts, typeFilter]);
 
-  const dialogDiscount = useMemo(
-    () => discounts.find(d => d.id === sucursalDialogId) || null,
-    [discounts, sucursalDialogId],
-  );
-  const dialogActiveSet = sucursalDialogId
-    ? discountsActivePerSucursal?.[sucursalDialogId] || new Set<string>()
-    : new Set<string>();
+  const activos = filtered.filter(d => d.active);
+  const inactivos = filtered.filter(d => !d.active);
 
   const Form = ({ isEdit = false, id = '' }: { isEdit?: boolean; id?: string }) => (
     <div className="space-y-4 p-4 bg-muted rounded-lg animate-scale-in">
@@ -186,7 +138,7 @@ export function DiscountsConfig({
           <Select value={newAppliesTo} onValueChange={(v) => setNewAppliesTo(v as DiscountAppliesTo)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="servicios">Servicios y extras</SelectItem>
+              <SelectItem value="servicios">Servicios</SelectItem>
               <SelectItem value="productos">Productos</SelectItem>
             </SelectContent>
           </Select>
@@ -280,6 +232,9 @@ export function DiscountsConfig({
               <span className="text-sm px-2 py-0.5 rounded bg-primary/10 text-primary">
                 {d.type === 'fixed' ? `$${d.value.toLocaleString('es-AR')}` : `${d.value}%`}
               </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
+                {(d.appliesTo || 'servicios') === 'productos' ? 'Productos' : 'Servicios'}
+              </span>
               {d.type === 'percentage' && (
                 <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
                   {getRoundingLabel(d.rounding, d.roundingUnit)}
@@ -298,17 +253,6 @@ export function DiscountsConfig({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {sucursales.length > 1 && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setSucursalDialogId(d.id)}
-                title="Disponibilidad por sucursal"
-                className="h-8 w-8"
-              >
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            )}
             <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8">
               <Edit2 className="h-4 w-4" />
             </Button>
@@ -333,7 +277,7 @@ export function DiscountsConfig({
         <div>
           <CardTitle className="text-base font-medium">Descuentos</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
-            Los descuentos se crean a nivel del negocio y por defecto quedan activos en todas las sucursales. Cada sucursal puede desactivarlo si no lo quiere usar.
+            Creá descuentos para servicios o productos. Los inactivos no aparecen en Cobrar.
           </p>
         </div>
         {!isAdding && !editingId && (
@@ -343,84 +287,54 @@ export function DiscountsConfig({
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DiscountAppliesTo)}>
-          <TabsList className="w-full h-9 bg-muted p-1 rounded-lg">
-            <TabsTrigger value="servicios" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
-              Servicios
-            </TabsTrigger>
-            <TabsTrigger value="productos" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
-              Productos
-            </TabsTrigger>
-          </TabsList>
-
-          {(['servicios', 'productos'] as DiscountAppliesTo[]).map(tabKey => (
-            <TabsContent key={tabKey} value={tabKey} className="space-y-3 mt-4">
-              {isAdding && <Form />}
-
-              {activos.length === 0 && inactivos.length === 0 && !isAdding && (
-                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No hay descuentos {tabKey === 'servicios' ? 'de servicios' : 'de productos'}.
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-3" onClick={startAdd}>
-                    <Plus className="h-4 w-4 mr-1" /> Crear el primero
-                  </Button>
-                </div>
-              )}
-
-              {activos.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Activos</p>
-                  {activos.map(renderRow)}
-                </div>
-              )}
-
-              {inactivos.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inactivos</p>
-                  {inactivos.map(renderRow)}
-                </div>
-              )}
-            </TabsContent>
+        {/* Filtro simple por tipo */}
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full sm:w-fit">
+          {([
+            { v: 'todos' as TypeFilter, label: 'Todos' },
+            { v: 'servicios' as TypeFilter, label: 'Servicios' },
+            { v: 'productos' as TypeFilter, label: 'Productos' },
+          ]).map(opt => (
+            <button
+              key={opt.v}
+              onClick={() => setTypeFilter(opt.v)}
+              className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
+                typeFilter === opt.v
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {opt.label}
+            </button>
           ))}
-        </Tabs>
-      </CardContent>
+        </div>
 
-      <Dialog open={!!sucursalDialogId} onOpenChange={(open) => !open && setSucursalDialogId(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Disponibilidad por sucursal</DialogTitle>
-            <DialogDescription>
-              {dialogDiscount ? `Descuento "${dialogDiscount.label}". ` : ''}
-              Cuando creás un descuento se activa automáticamente en todas las sucursales. Apagá el switch para que no esté disponible en una sucursal específica.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 mt-2">
-            {sucursales.map(s => {
-              const checked = dialogActiveSet.has(s.id);
-              return (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
-                >
-                  <span className="text-sm font-medium text-foreground">{s.nombre}</span>
-                  <Switch
-                    checked={checked}
-                    onCheckedChange={(v) => {
-                      if (sucursalDialogId && onToggleSucursal) {
-                        onToggleSucursal(sucursalDialogId, s.id, v);
-                      }
-                    }}
-                  />
-                </div>
-              );
-            })}
-            {sucursales.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No hay sucursales activas.</p>
-            )}
+        {isAdding && <Form />}
+
+        {activos.length === 0 && inactivos.length === 0 && !isAdding && (
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              No hay descuentos para mostrar.
+            </p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={startAdd}>
+              <Plus className="h-4 w-4 mr-1" /> Crear el primero
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+
+        {activos.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Activos</p>
+            {activos.map(renderRow)}
+          </div>
+        )}
+
+        {inactivos.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inactivos</p>
+            {inactivos.map(renderRow)}
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
