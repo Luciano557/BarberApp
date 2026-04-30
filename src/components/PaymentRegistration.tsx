@@ -406,6 +406,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
       return;
     }
+
+    const invalidService = hasService && isPriceMissing(service?.price);
+    const invalidExtras = selectedExtrasData.some(e => isPriceMissing(e.price));
+    const invalidProducts = cart.some(it => isPriceMissing(it.precio_unitario));
+    if (invalidService || invalidExtras || invalidProducts) {
+      toast({
+        title: 'Ítems sin precio',
+        description: 'Hay ítems sin precio configurado. Definí el precio antes de cobrar.',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (hasService && !selectedBarber) {
       toast({
         title: 'Falta barbero',
