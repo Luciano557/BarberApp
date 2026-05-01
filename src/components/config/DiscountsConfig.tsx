@@ -267,9 +267,9 @@ export function DiscountsConfig({
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => (onToggleActive ? onToggleActive(d.id, !d.active) : onDelete(d.id))}
-              className={d.active ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
-              title={d.active ? 'Desactivar' : 'Reactivar'}
+              onClick={() => (onToggleActive ? onToggleActive(d.id, !flagFor(d)) : onDelete(d.id))}
+              className={flagFor(d) ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
+              title={flagFor(d) ? 'Desactivar' : 'Reactivar'}
             >
               <Power className="h-4 w-4" />
             </Button>
