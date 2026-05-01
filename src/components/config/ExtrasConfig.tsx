@@ -65,29 +65,39 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
     setToggleConfirm(null);
   };
 
-  const renderExtraItem = (extra: Extra) => (
+  const isItemActive = (extra: Extra) =>
+    isGlobal ? (extra.globalActive ?? extra.active) : extra.active;
+
+  const renderExtraItem = (extra: Extra) => {
+    const itemActive = isItemActive(extra);
+    return (
     <div key={extra.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === extra.id ? (
         <div className="flex gap-2 w-full">
-          <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-          <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" maxLength={80} />
+          {!isGlobal && (
+            <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
+          )}
           <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
         </div>
       ) : (
         <>
           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-          <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+          {!isGlobal && (
+            <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+          )}
           <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: extra.active ? 'deactivate' : 'activate' })} className="h-8 w-8" title={extra.active ? 'Desactivar' : 'Activar'}>
-            {extra.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
         </>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
