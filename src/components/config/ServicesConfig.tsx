@@ -28,7 +28,8 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: ServicesConfigProps) {
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mode = 'sucursal' }: ServicesConfigProps) {
+  const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
