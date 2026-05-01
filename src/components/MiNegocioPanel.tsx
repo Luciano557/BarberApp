@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
+import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
 
 interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
