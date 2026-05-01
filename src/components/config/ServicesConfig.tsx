@@ -56,32 +56,41 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
     { label: 'Gris', value: '#6B7280' },
   ];
 
-  const activeServices = services.filter(s => s.active);
-  const inactiveServices = services.filter(s => !s.active);
+  const flagFor = (s: Service) => isGlobal ? (s.globalActive ?? s.active) : s.active;
+  const activeServices = services.filter(s => flagFor(s));
+  const inactiveServices = services.filter(s => !flagFor(s));
   const activeLines = lines.filter(l => l.active);
 
   const handleAdd = () => {
     const dur = parseInt(newDuration) || 30;
-    if (newName && newPrice && dur >= 5) {
-      onAdd({
-        name: newName, price: parseFloat(newPrice), durationMin: dur, active: true,
-        lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
-        lineName: activeLines.find(l => l.id === newLineId)?.name,
-      });
-      setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    if (dur < 5) return;
+    onAdd({
+      name: newName,
+      price: isGlobal ? 0 : parseFloat(newPrice),
+      durationMin: dur,
+      active: true,
+      lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
+      lineName: activeLines.find(l => l.id === newLineId)?.name,
+    });
+    setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
     const dur = parseInt(editDuration) || 30;
-    if (newName && newPrice && dur >= 5) {
-      onUpdate(id, {
-        name: newName, price: parseFloat(newPrice), durationMin: dur,
-        lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
-        lineName: activeLines.find(l => l.id === editLineId)?.name,
-      });
-      setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    if (dur < 5) return;
+    const updates: Partial<Service> = {
+      name: newName,
+      durationMin: dur,
+      lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
+      lineName: activeLines.find(l => l.id === editLineId)?.name,
+    };
+    if (!isGlobal) updates.price = parseFloat(newPrice);
+    onUpdate(id, updates);
+    setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
   };
 
   const startEdit = (service: Service) => {
