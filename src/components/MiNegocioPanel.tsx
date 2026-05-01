@@ -42,7 +42,7 @@ interface MiNegocioPanelProps {
 
 export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}) {
   const { organization } = useOrganization();
-  const { currentSucursal, refreshSucursales } = useSucursal();
+  const { currentSucursal, refreshSucursales, setCurrentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, user } = useAuth();
   const {
     allServices, allExtras, discounts, allLines,
@@ -56,9 +56,12 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
+  const showGeneralTab = isOwner || isGeneralManager;
+  const GENERAL_TAB = '__general__';
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
