@@ -119,8 +119,10 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="flex gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-                  <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" maxLength={80} />
+                  {!isGlobal && (
+                    <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  )}
                   <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                 </div>
