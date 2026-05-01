@@ -12,6 +12,11 @@ interface ExtrasConfigProps {
   extras: Extra[];
   onAdd: (extra: Omit<Extra, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Extra>) => void;
+  /**
+   * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico por sucursal.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 interface ToggleConfirm {
@@ -19,7 +24,8 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
+export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: ExtrasConfigProps) {
+  const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -27,21 +33,24 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
 
-  const activeExtras = extras.filter(e => e.active);
-  const inactiveExtras = extras.filter(e => !e.active);
+  const flagFor = (e: Extra) => isGlobal ? (e.globalActive ?? e.active) : e.active;
+  const activeExtras = extras.filter(e => flagFor(e));
+  const inactiveExtras = extras.filter(e => !flagFor(e));
 
   const handleAdd = () => {
-    if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
-      setNewName(''); setNewPrice(''); setIsAdding(false);
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    onAdd({ name: newName, price: isGlobal ? 0 : parseFloat(newPrice), active: true });
+    setNewName(''); setNewPrice(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
-    if (newName && newPrice) {
-      onUpdate(id, { name: newName, price: parseFloat(newPrice) });
-      setEditingId(null); setNewName(''); setNewPrice('');
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    const updates: Partial<Extra> = { name: newName };
+    if (!isGlobal) updates.price = parseFloat(newPrice);
+    onUpdate(id, updates);
+    setEditingId(null); setNewName(''); setNewPrice('');
   };
 
   const startEdit = (extra: Extra) => {
