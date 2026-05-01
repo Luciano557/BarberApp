@@ -60,13 +60,19 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
   const showGeneralTab = isOwner || isGeneralManager;
   const GENERAL_TAB = '__general__';
   const storageKey = organization?.id ? `vittro:miNegocio:activeTab:${organization.id}` : null;
+
+  // activeTab es la única fuente visual. Se inicializa de forma perezosa desde localStorage
+  // para que un remount conserve la tab elegida sin depender de currentSucursal.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined' || !storageKey) return '';
+    try { return localStorage.getItem(storageKey) || ''; } catch { return ''; }
+  });
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
@@ -114,25 +120,32 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
 
-  // Inicializar activeTab una sola vez. Prioridad:
-  //   1) localStorage válido para esta organización
-  //   2) currentSucursal si está en visibleSucursales (Owner/GM)
-  //   3) primera sucursal visible
-  //   4) General (solo fallback si no hay sucursales y el rol lo permite)
-  // NO defaultear a General sólo porque currentSucursal sea null.
+  // Helper: ¿es esta tab válida con el estado actual?
+  const isValidTab = useCallback((tab: string) => {
+    if (!tab) return false;
+    if (tab === GENERAL_TAB) return showGeneralTab;
+    return visibleSucursales.some(s => s.id === tab);
+  }, [showGeneralTab, visibleSucursales]);
+
+  // Inicializa activeTab cuando todavía no hay una tab válida elegida.
+  // No se ejecuta más una vez que activeTab es válida — así, cambiar de sucursal
+  // o que currentSucursal se sincronice no recalcula la tab visual.
   useEffect(() => {
-    if (activeTab) return;
     if (!organization?.id) return;
-    if (allSucursales.length === 0 && !showGeneralTab && !isManagerOnly) return;
+    if (isValidTab(activeTab)) return;
+    // Esperar a saber qué sucursales hay (para manager esperar a tener la lista filtrada)
+    if (isManagerOnly && managerSucursalIds.length === 0 && allSucursales.length > 0) {
+      // Aún sincronizando permisos del manager
+      return;
+    }
+    if (allSucursales.length === 0 && !showGeneralTab) return;
 
-    const stored = storageKey ? localStorage.getItem(storageKey) : null;
-    const isValidStored =
-      stored !== null &&
-      ((stored === GENERAL_TAB && showGeneralTab) ||
-        visibleSucursales.some(s => s.id === stored));
+    const stored = storageKey ? (() => {
+      try { return localStorage.getItem(storageKey); } catch { return null; }
+    })() : null;
 
-    if (isValidStored) {
-      setActiveTab(stored as string);
+    if (stored && isValidTab(stored)) {
+      setActiveTab(stored);
       return;
     }
 
@@ -141,7 +154,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       return;
     }
 
-    // Owner / GM
+    // Owner / GM: priorizar currentSucursal si es visible, luego primera sucursal, y por último General.
     if (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id)) {
       setActiveTab(currentSucursal.id);
     } else if (visibleSucursales[0]) {
@@ -149,7 +162,26 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     } else if (showGeneralTab) {
       setActiveTab(GENERAL_TAB);
     }
-  }, [activeTab, organization?.id, storageKey, showGeneralTab, isManagerOnly, visibleSucursales, currentSucursal, allSucursales.length]);
+  }, [
+    activeTab, isValidTab, organization?.id, storageKey, showGeneralTab,
+    isManagerOnly, managerSucursalIds.length, allSucursales.length,
+    visibleSucursales, currentSucursal,
+  ]);
+
+  // Validación defensiva: si la tab activa dejó de ser válida (sucursal eliminada/desactivada,
+  // cambio de organización o de permisos), elegir un fallback. Nunca degradar a General mientras
+  // exista una sucursal visible.
+  useEffect(() => {
+    if (!activeTab) return;
+    if (isValidTab(activeTab)) return;
+    if (visibleSucursales[0]) {
+      setActiveTab(visibleSucursales[0].id);
+    } else if (showGeneralTab) {
+      setActiveTab(GENERAL_TAB);
+    } else {
+      setActiveTab('');
+    }
+  }, [activeTab, isValidTab, visibleSucursales, showGeneralTab]);
 
   // Handler único: cambia tab + persiste localStorage. NO escribe null en currentSucursal al entrar a General.
   const handleTabChange = useCallback((value: string) => {
