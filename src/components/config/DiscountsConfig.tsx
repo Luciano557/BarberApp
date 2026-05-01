@@ -12,6 +12,11 @@ interface DiscountsConfigProps {
   onUpdate: (id: string, updates: Partial<Discount>) => void;
   onDelete: (id: string) => void;
   onToggleActive?: (id: string, activo: boolean) => void;
+  /**
+   * 'global' = edita catálogo global; usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 const ROUNDING_UNITS = [1, 10, 50, 100, 500, 1000];
@@ -24,7 +29,9 @@ export function DiscountsConfig({
   onUpdate,
   onDelete,
   onToggleActive,
+  mode = 'sucursal',
 }: DiscountsConfigProps) {
+  const isGlobal = mode === 'global';
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
