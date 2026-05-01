@@ -48,6 +48,10 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
     addDiscount, updateDiscount, deleteDiscount, setDiscountActive, addLine, updateLine,
+    addServiceGlobal, updateServiceGlobal,
+    addExtraGlobal, updateExtraGlobal,
+    addDiscountGlobal, updateDiscountGlobal,
+    setDiscountActiveGlobal, deleteDiscountGlobal,
   } = useSupabaseData();
 
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
@@ -62,6 +66,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const canCreateSucursal = isOwner || isGeneralManager;
   const showGeneralTab = isOwner || isGeneralManager;
   const GENERAL_TAB = '__general__';
+  const storageKey = organization?.id ? `vittro:miNegocio:activeTab:${organization.id}` : null;
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
@@ -109,36 +114,56 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
 
-  // Default tab: General (owner/GM) o sucursal actual; fallback primera visible
-  const computedDefault = showGeneralTab
-    ? ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
-        ? currentSucursal.id
-        : GENERAL_TAB)
-    : ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
-        ? currentSucursal.id
-        : visibleSucursales[0]?.id);
-
-  // Inicializar activeTab una vez que tengamos sucursales
+  // Inicializar activeTab una sola vez. Prioridad:
+  //   1) localStorage válido para esta organización
+  //   2) currentSucursal si está en visibleSucursales (Owner/GM)
+  //   3) primera sucursal visible
+  //   4) General (solo fallback si no hay sucursales y el rol lo permite)
+  // NO defaultear a General sólo porque currentSucursal sea null.
   useEffect(() => {
     if (activeTab) return;
-    if (showGeneralTab) {
-      setActiveTab(computedDefault || GENERAL_TAB);
-    } else if (visibleSucursales.length > 0) {
-      setActiveTab(computedDefault || visibleSucursales[0].id);
-    }
-  }, [activeTab, showGeneralTab, computedDefault, visibleSucursales]);
+    if (!organization?.id) return;
+    if (allSucursales.length === 0 && !showGeneralTab && !isManagerOnly) return;
 
-  // Sincronizar currentSucursal según la tab activa
-  useEffect(() => {
-    if (!activeTab) return;
-    if (activeTab === GENERAL_TAB) {
-      if (currentSucursal !== null) setCurrentSucursal(null);
-    } else {
-      if (currentSucursal?.id !== activeTab) setCurrentSucursal(activeTab);
-    }
-  }, [activeTab, currentSucursal, setCurrentSucursal]);
+    const stored = storageKey ? localStorage.getItem(storageKey) : null;
+    const isValidStored =
+      stored !== null &&
+      ((stored === GENERAL_TAB && showGeneralTab) ||
+        visibleSucursales.some(s => s.id === stored));
 
-  const generalIsReady = activeTab === GENERAL_TAB && currentSucursal === null;
+    if (isValidStored) {
+      setActiveTab(stored as string);
+      return;
+    }
+
+    if (isManagerOnly) {
+      if (visibleSucursales[0]) setActiveTab(visibleSucursales[0].id);
+      return;
+    }
+
+    // Owner / GM
+    if (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id)) {
+      setActiveTab(currentSucursal.id);
+    } else if (visibleSucursales[0]) {
+      setActiveTab(visibleSucursales[0].id);
+    } else if (showGeneralTab) {
+      setActiveTab(GENERAL_TAB);
+    }
+  }, [activeTab, organization?.id, storageKey, showGeneralTab, isManagerOnly, visibleSucursales, currentSucursal, allSucursales.length]);
+
+  // Handler único: cambia tab + persiste localStorage. NO escribe null en currentSucursal al entrar a General.
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, value); } catch { /* ignore */ }
+    }
+    if (value === GENERAL_TAB) return;
+    if (currentSucursal?.id !== value) {
+      setCurrentSucursal(value);
+    }
+  }, [storageKey, currentSucursal?.id, setCurrentSucursal]);
+
+  const generalIsReady = activeTab === GENERAL_TAB;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
