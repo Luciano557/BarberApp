@@ -125,8 +125,9 @@ export function DiscountsConfig({
     return discounts.filter(d => (d.appliesTo || 'servicios') === typeFilter);
   }, [discounts, typeFilter]);
 
-  const activos = filtered.filter(d => d.active);
-  const inactivos = filtered.filter(d => !d.active);
+  const flagFor = (d: Discount) => isGlobal ? (d.globalActive ?? d.active) : d.active;
+  const activos = filtered.filter(d => flagFor(d));
+  const inactivos = filtered.filter(d => !flagFor(d));
 
   const Form = ({ isEdit = false, id = '' }: { isEdit?: boolean; id?: string }) => (
     <div className="space-y-4 p-4 bg-muted rounded-lg animate-scale-in">
