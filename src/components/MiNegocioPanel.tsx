@@ -109,10 +109,36 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
 
-  // Default tab: use current sucursal from panel selector if it exists in visible list
-  const defaultTabId = (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
-    ? currentSucursal.id
-    : visibleSucursales[0]?.id;
+  // Default tab: General (owner/GM) o sucursal actual; fallback primera visible
+  const computedDefault = showGeneralTab
+    ? ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+        ? currentSucursal.id
+        : GENERAL_TAB)
+    : ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+        ? currentSucursal.id
+        : visibleSucursales[0]?.id);
+
+  // Inicializar activeTab una vez que tengamos sucursales
+  useEffect(() => {
+    if (activeTab) return;
+    if (showGeneralTab) {
+      setActiveTab(computedDefault || GENERAL_TAB);
+    } else if (visibleSucursales.length > 0) {
+      setActiveTab(computedDefault || visibleSucursales[0].id);
+    }
+  }, [activeTab, showGeneralTab, computedDefault, visibleSucursales]);
+
+  // Sincronizar currentSucursal según la tab activa
+  useEffect(() => {
+    if (!activeTab) return;
+    if (activeTab === GENERAL_TAB) {
+      if (currentSucursal !== null) setCurrentSucursal(null);
+    } else {
+      if (currentSucursal?.id !== activeTab) setCurrentSucursal(activeTab);
+    }
+  }, [activeTab, currentSucursal, setCurrentSucursal]);
+
+  const generalIsReady = activeTab === GENERAL_TAB && currentSucursal === null;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
