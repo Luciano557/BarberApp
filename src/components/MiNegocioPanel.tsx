@@ -60,13 +60,19 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
   const showGeneralTab = isOwner || isGeneralManager;
   const GENERAL_TAB = '__general__';
   const storageKey = organization?.id ? `vittro:miNegocio:activeTab:${organization.id}` : null;
+
+  // activeTab es la única fuente visual. Se inicializa de forma perezosa desde localStorage
+  // para que un remount conserve la tab elegida sin depender de currentSucursal.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined' || !storageKey) return '';
+    try { return localStorage.getItem(storageKey) || ''; } catch { return ''; }
+  });
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
