@@ -243,11 +243,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
         </div>
       </div>
 
-      {/* Tabs por sucursal */}
-      {visibleSucursales.length > 0 && (
-        <Tabs defaultValue={defaultTabId} className="w-full">
-          {visibleSucursales.length > 1 && (
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+      {/* Tabs */}
+      {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {(showGeneralTab || visibleSucursales.length > 1) && (
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
+              {showGeneralTab && (
+                <TabsTrigger value={GENERAL_TAB} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                  General
+                </TabsTrigger>
+              )}
               {visibleSucursales.map(s => (
                 <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
                   {s.nombre}
@@ -255,6 +260,28 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
               ))}
             </TabsList>
           )}
+
+          {showGeneralTab && (
+            <TabsContent value={GENERAL_TAB}>
+              <MiNegocioGeneralTabContent
+                isReady={generalIsReady}
+                services={allServices}
+                extras={allExtras}
+                discounts={discounts}
+                lines={allLines}
+                onAddService={addService}
+                onUpdateService={updateService}
+                onAddExtra={addExtra}
+                onUpdateExtra={updateExtra}
+                onAddDiscount={addDiscount}
+                onUpdateDiscount={updateDiscount}
+                onDeleteDiscount={deleteDiscount}
+                onToggleDiscountActive={setDiscountActive}
+                onAddLine={addLine}
+              />
+            </TabsContent>
+          )}
+
           {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
               <SucursalTabContent
