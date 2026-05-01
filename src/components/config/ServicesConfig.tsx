@@ -16,6 +16,11 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  /**
+   * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico por sucursal.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 interface ToggleConfirm {
