@@ -270,7 +270,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
 
       {/* Tabs */}
       {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           {(showGeneralTab || visibleSucursales.length > 1) && (
             <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
               {showGeneralTab && (
@@ -294,18 +294,19 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 extras={allExtras}
                 discounts={discounts}
                 lines={allLines}
-                onAddService={addService}
-                onUpdateService={updateService}
-                onAddExtra={addExtra}
-                onUpdateExtra={updateExtra}
-                onAddDiscount={addDiscount}
-                onUpdateDiscount={updateDiscount}
-                onDeleteDiscount={deleteDiscount}
-                onToggleDiscountActive={setDiscountActive}
+                onAddService={addServiceGlobal}
+                onUpdateService={updateServiceGlobal}
+                onAddExtra={addExtraGlobal}
+                onUpdateExtra={updateExtraGlobal}
+                onAddDiscount={addDiscountGlobal}
+                onUpdateDiscount={updateDiscountGlobal}
+                onDeleteDiscount={deleteDiscountGlobal}
+                onToggleDiscountActive={setDiscountActiveGlobal}
                 onAddLine={addLine}
               />
             </TabsContent>
           )}
+
 
           {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
