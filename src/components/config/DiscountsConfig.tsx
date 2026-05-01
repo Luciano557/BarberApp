@@ -12,6 +12,11 @@ interface DiscountsConfigProps {
   onUpdate: (id: string, updates: Partial<Discount>) => void;
   onDelete: (id: string) => void;
   onToggleActive?: (id: string, activo: boolean) => void;
+  /**
+   * 'global' = edita catálogo global; usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 const ROUNDING_UNITS = [1, 10, 50, 100, 500, 1000];
@@ -24,7 +29,9 @@ export function DiscountsConfig({
   onUpdate,
   onDelete,
   onToggleActive,
+  mode = 'sucursal',
 }: DiscountsConfigProps) {
+  const isGlobal = mode === 'global';
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -118,8 +125,9 @@ export function DiscountsConfig({
     return discounts.filter(d => (d.appliesTo || 'servicios') === typeFilter);
   }, [discounts, typeFilter]);
 
-  const activos = filtered.filter(d => d.active);
-  const inactivos = filtered.filter(d => !d.active);
+  const flagFor = (d: Discount) => isGlobal ? (d.globalActive ?? d.active) : d.active;
+  const activos = filtered.filter(d => flagFor(d));
+  const inactivos = filtered.filter(d => !flagFor(d));
 
   const Form = ({ isEdit = false, id = '' }: { isEdit?: boolean; id?: string }) => (
     <div className="space-y-4 p-4 bg-muted rounded-lg animate-scale-in">
@@ -259,9 +267,9 @@ export function DiscountsConfig({
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => (onToggleActive ? onToggleActive(d.id, !d.active) : onDelete(d.id))}
-              className={d.active ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
-              title={d.active ? 'Desactivar' : 'Reactivar'}
+              onClick={() => (onToggleActive ? onToggleActive(d.id, !flagFor(d)) : onDelete(d.id))}
+              className={flagFor(d) ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
+              title={flagFor(d) ? 'Desactivar' : 'Reactivar'}
             >
               <Power className="h-4 w-4" />
             </Button>

@@ -16,6 +16,11 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  /**
+   * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico por sucursal.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 interface ToggleConfirm {
@@ -23,7 +28,8 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: ServicesConfigProps) {
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mode = 'sucursal' }: ServicesConfigProps) {
+  const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -50,32 +56,41 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
     { label: 'Gris', value: '#6B7280' },
   ];
 
-  const activeServices = services.filter(s => s.active);
-  const inactiveServices = services.filter(s => !s.active);
+  const flagFor = (s: Service) => isGlobal ? (s.globalActive ?? s.active) : s.active;
+  const activeServices = services.filter(s => flagFor(s));
+  const inactiveServices = services.filter(s => !flagFor(s));
   const activeLines = lines.filter(l => l.active);
 
   const handleAdd = () => {
     const dur = parseInt(newDuration) || 30;
-    if (newName && newPrice && dur >= 5) {
-      onAdd({
-        name: newName, price: parseFloat(newPrice), durationMin: dur, active: true,
-        lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
-        lineName: activeLines.find(l => l.id === newLineId)?.name,
-      });
-      setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    if (dur < 5) return;
+    onAdd({
+      name: newName,
+      price: isGlobal ? 0 : parseFloat(newPrice),
+      durationMin: dur,
+      active: true,
+      lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
+      lineName: activeLines.find(l => l.id === newLineId)?.name,
+    });
+    setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
     const dur = parseInt(editDuration) || 30;
-    if (newName && newPrice && dur >= 5) {
-      onUpdate(id, {
-        name: newName, price: parseFloat(newPrice), durationMin: dur,
-        lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
-        lineName: activeLines.find(l => l.id === editLineId)?.name,
-      });
-      setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    if (dur < 5) return;
+    const updates: Partial<Service> = {
+      name: newName,
+      durationMin: dur,
+      lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
+      lineName: activeLines.find(l => l.id === editLineId)?.name,
+    };
+    if (!isGlobal) updates.price = parseFloat(newPrice);
+    onUpdate(id, updates);
+    setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
   };
 
   const startEdit = (service: Service) => {
@@ -108,13 +123,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
     setToggleConfirm(null);
   };
 
-  const renderServiceItem = (service: Service) => (
+  const isItemActive = (service: Service) =>
+    isGlobal ? (service.globalActive ?? service.active) : service.active;
+
+  const renderServiceItem = (service: Service) => {
+    const itemActive = isItemActive(service);
+    return (
     <div key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === service.id ? (
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-wrap gap-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
-            <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" maxLength={80} />
+            {!isGlobal && (
+              <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
+            )}
             <div className="flex items-center gap-1">
               <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" />
               <span className="text-xs text-muted-foreground">min</span>
@@ -144,17 +166,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />{service.durationMin || 30} min
           </span>
-          <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+          {!isGlobal && (
+            <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+          )}
           <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: service.active ? 'deactivate' : 'activate' })} className="h-8 w-8" title={service.active ? 'Desactivar' : 'Activar'}>
-            {service.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
         </>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -176,8 +201,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine }: 
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" />
-                  <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" maxLength={80} />
+                  {!isGlobal && (
+                    <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  )}
                   <div className="flex items-center gap-1">
                     <Input type="number" min={5} placeholder="Tiempo" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
                     <span className="text-xs text-muted-foreground">min</span>

@@ -12,6 +12,11 @@ interface ExtrasConfigProps {
   extras: Extra[];
   onAdd: (extra: Omit<Extra, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Extra>) => void;
+  /**
+   * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
+   * 'sucursal' (default) = comportamiento histórico por sucursal.
+   */
+  mode?: 'global' | 'sucursal';
 }
 
 interface ToggleConfirm {
@@ -19,7 +24,8 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
+export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: ExtrasConfigProps) {
+  const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -27,21 +33,24 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
 
-  const activeExtras = extras.filter(e => e.active);
-  const inactiveExtras = extras.filter(e => !e.active);
+  const flagFor = (e: Extra) => isGlobal ? (e.globalActive ?? e.active) : e.active;
+  const activeExtras = extras.filter(e => flagFor(e));
+  const inactiveExtras = extras.filter(e => !flagFor(e));
 
   const handleAdd = () => {
-    if (newName && newPrice) {
-      onAdd({ name: newName, price: parseFloat(newPrice), active: true });
-      setNewName(''); setNewPrice(''); setIsAdding(false);
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    onAdd({ name: newName, price: isGlobal ? 0 : parseFloat(newPrice), active: true });
+    setNewName(''); setNewPrice(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
-    if (newName && newPrice) {
-      onUpdate(id, { name: newName, price: parseFloat(newPrice) });
-      setEditingId(null); setNewName(''); setNewPrice('');
-    }
+    if (!newName) return;
+    if (!isGlobal && !newPrice) return;
+    const updates: Partial<Extra> = { name: newName };
+    if (!isGlobal) updates.price = parseFloat(newPrice);
+    onUpdate(id, updates);
+    setEditingId(null); setNewName(''); setNewPrice('');
   };
 
   const startEdit = (extra: Extra) => {
@@ -56,29 +65,39 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
     setToggleConfirm(null);
   };
 
-  const renderExtraItem = (extra: Extra) => (
+  const isItemActive = (extra: Extra) =>
+    isGlobal ? (extra.globalActive ?? extra.active) : extra.active;
+
+  const renderExtraItem = (extra: Extra) => {
+    const itemActive = isItemActive(extra);
+    return (
     <div key={extra.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === extra.id ? (
         <div className="flex gap-2 w-full">
-          <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-          <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" maxLength={80} />
+          {!isGlobal && (
+            <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
+          )}
           <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
           <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
         </div>
       ) : (
         <>
           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
-          <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+          {!isGlobal && (
+            <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+          )}
           <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: extra.active ? 'deactivate' : 'activate' })} className="h-8 w-8" title={extra.active ? 'Desactivar' : 'Activar'}>
-            {extra.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
         </>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -100,8 +119,10 @@ export function ExtrasConfig({ extras, onAdd, onUpdate }: ExtrasConfigProps) {
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="flex gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" />
-                  <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" maxLength={80} />
+                  {!isGlobal && (
+                    <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  )}
                   <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                 </div>

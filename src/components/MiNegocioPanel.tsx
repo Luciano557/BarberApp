@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
+import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
 
 interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
@@ -41,7 +42,7 @@ interface MiNegocioPanelProps {
 
 export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}) {
   const { organization } = useOrganization();
-  const { currentSucursal, refreshSucursales } = useSucursal();
+  const { currentSucursal, refreshSucursales, setCurrentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, user } = useAuth();
   const {
     allServices, allExtras, discounts, allLines,
@@ -55,9 +56,12 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
+  const showGeneralTab = isOwner || isGeneralManager;
+  const GENERAL_TAB = '__general__';
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
@@ -105,10 +109,36 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
 
-  // Default tab: use current sucursal from panel selector if it exists in visible list
-  const defaultTabId = (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
-    ? currentSucursal.id
-    : visibleSucursales[0]?.id;
+  // Default tab: General (owner/GM) o sucursal actual; fallback primera visible
+  const computedDefault = showGeneralTab
+    ? ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+        ? currentSucursal.id
+        : GENERAL_TAB)
+    : ((currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
+        ? currentSucursal.id
+        : visibleSucursales[0]?.id);
+
+  // Inicializar activeTab una vez que tengamos sucursales
+  useEffect(() => {
+    if (activeTab) return;
+    if (showGeneralTab) {
+      setActiveTab(computedDefault || GENERAL_TAB);
+    } else if (visibleSucursales.length > 0) {
+      setActiveTab(computedDefault || visibleSucursales[0].id);
+    }
+  }, [activeTab, showGeneralTab, computedDefault, visibleSucursales]);
+
+  // Sincronizar currentSucursal según la tab activa
+  useEffect(() => {
+    if (!activeTab) return;
+    if (activeTab === GENERAL_TAB) {
+      if (currentSucursal !== null) setCurrentSucursal(null);
+    } else {
+      if (currentSucursal?.id !== activeTab) setCurrentSucursal(activeTab);
+    }
+  }, [activeTab, currentSucursal, setCurrentSucursal]);
+
+  const generalIsReady = activeTab === GENERAL_TAB && currentSucursal === null;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
@@ -213,11 +243,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
         </div>
       </div>
 
-      {/* Tabs por sucursal */}
-      {visibleSucursales.length > 0 && (
-        <Tabs defaultValue={defaultTabId} className="w-full">
-          {visibleSucursales.length > 1 && (
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+      {/* Tabs */}
+      {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {(showGeneralTab || visibleSucursales.length > 1) && (
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
+              {showGeneralTab && (
+                <TabsTrigger value={GENERAL_TAB} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                  General
+                </TabsTrigger>
+              )}
               {visibleSucursales.map(s => (
                 <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
                   {s.nombre}
@@ -225,6 +260,28 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
               ))}
             </TabsList>
           )}
+
+          {showGeneralTab && (
+            <TabsContent value={GENERAL_TAB}>
+              <MiNegocioGeneralTabContent
+                isReady={generalIsReady}
+                services={allServices}
+                extras={allExtras}
+                discounts={discounts}
+                lines={allLines}
+                onAddService={addService}
+                onUpdateService={updateService}
+                onAddExtra={addExtra}
+                onUpdateExtra={updateExtra}
+                onAddDiscount={addDiscount}
+                onUpdateDiscount={updateDiscount}
+                onDeleteDiscount={deleteDiscount}
+                onToggleDiscountActive={setDiscountActive}
+                onAddLine={addLine}
+              />
+            </TabsContent>
+          )}
+
           {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
               <SucursalTabContent
