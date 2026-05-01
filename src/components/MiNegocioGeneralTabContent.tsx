@@ -1,0 +1,141 @@
+import { useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, Settings2 } from 'lucide-react';
+import { Service, Extra, Discount, Line } from '@/types/barbershop';
+import { ServicesConfig } from './config/ServicesConfig';
+import { ExtrasConfig } from './config/ExtrasConfig';
+import { DiscountsConfig } from './config/DiscountsConfig';
+import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
+import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
+import { toast } from 'sonner';
+
+interface MiNegocioGeneralTabContentProps {
+  /** true cuando el SucursalContext ya está sincronizado en modo global (currentSucursal === null) */
+  isReady: boolean;
+  services: Service[];
+  extras: Extra[];
+  discounts: Discount[];
+  lines: Line[];
+  onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
+  onUpdateService: (id: string, updates: Partial<Service>) => void;
+  onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
+  onUpdateExtra: (id: string, updates: Partial<Extra>) => void;
+  onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
+  onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
+  onDeleteDiscount: (id: string) => void;
+  onToggleDiscountActive?: (id: string, activo: boolean) => void;
+  onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+}
+
+/**
+ * Contenido de la tab "General" de Mi Negocio.
+ * Edita configuración global del negocio: catálogo (servicios/extras/productos/descuentos)
+ * y métodos de pago generales. NO incluye equipo ni datos por sucursal.
+ *
+ * Guard: bloquea mutaciones si el SucursalContext aún no está en modo global,
+ * para evitar escribir accidentalmente sobre la sucursal anterior.
+ */
+export function MiNegocioGeneralTabContent({
+  isReady,
+  services, extras, discounts, lines,
+  onAddService, onUpdateService,
+  onAddExtra, onUpdateExtra,
+  onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
+  onAddLine,
+}: MiNegocioGeneralTabContentProps) {
+
+  const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
+    return (...args: TArgs): TReturn | undefined => {
+      if (!isReady) {
+        toast.warning('Sincronizando vista general… probá de nuevo en un instante.');
+        return undefined;
+      }
+      return fn(...args);
+    };
+  }, [isReady]);
+
+  return (
+    <div className="space-y-6 mt-6">
+      {/* Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Settings2 className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Configuración general del negocio</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Datos globales que aplican a todas las sucursales. Cada sucursal puede activar y configurar precios por su cuenta.
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {!isReady && (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Sincronizando vista general…
+        </div>
+      )}
+
+      <div className={!isReady ? 'opacity-60 pointer-events-none select-none' : ''}>
+        {/* Catálogo */}
+        <div className="space-y-4">
+          <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
+          <Tabs defaultValue="services" className="w-full">
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
+              <TabsTrigger value="services" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Servicios</TabsTrigger>
+              <TabsTrigger value="extras" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Extras</TabsTrigger>
+              <TabsTrigger value="productos" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Productos</TabsTrigger>
+              <TabsTrigger value="discounts" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Descuentos</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="services" className="mt-6">
+              <ServicesConfig
+                mode="global"
+                services={services}
+                lines={lines}
+                onAdd={guarded(onAddService)}
+                onUpdate={guarded(onUpdateService)}
+                onAddLine={onAddLine}
+              />
+            </TabsContent>
+
+            <TabsContent value="extras" className="mt-6">
+              <ExtrasConfig
+                mode="global"
+                extras={extras}
+                onAdd={guarded(onAddExtra)}
+                onUpdate={guarded(onUpdateExtra)}
+              />
+            </TabsContent>
+
+            <TabsContent value="productos" className="mt-6">
+              <ProductosGlobalConfig />
+            </TabsContent>
+
+            <TabsContent value="discounts" className="mt-6">
+              <DiscountsConfig
+                mode="global"
+                discounts={discounts}
+                onAdd={guarded(onAddDiscount)}
+                onUpdate={guarded(onUpdateDiscount)}
+                onDelete={guarded(onDeleteDiscount)}
+                onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Métodos de pago generales */}
+        <div className="mt-8 space-y-4">
+          <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
+          <PaymentMethodsConfig sucursalId={null} />
+        </div>
+      </div>
+    </div>
+  );
+}
