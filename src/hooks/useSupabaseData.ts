@@ -865,6 +865,228 @@ export function useSupabaseData() {
     }
   }, []);
 
+  // ============= GLOBAL handlers (tab "General" en Mi Negocio) =============
+  // Estos handlers NO miran currentSucursal y NUNCA tocan tablas *_sucursales ni RPCs de sucursal.
+  // Escriben siempre sobre las tablas globales (servicios / extras / descuentos).
+
+  const addServiceGlobal = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const normalizedName = service.name.replace(/\s+/g, ' ').trim();
+      const { data, error } = await supabase
+        .from('servicios')
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
+          duracion_min: service.durationMin || 30,
+          activo: service.active !== false,
+          linea_id: service.lineId || null,
+          organization_id: organization.id,
+          sucursal_id: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newService = dbToService(data, lines);
+      setServices(prev => [...prev, newService]);
+      toast.success('Servicio agregado');
+      return newService;
+    } catch (error) {
+      console.error('Error adding service (global):', error);
+      toast.error('Error al agregar servicio');
+      return null;
+    }
+  }, [organization, lines]);
+
+  const updateServiceGlobal = useCallback(async (id: string, updates: Partial<Service>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
+      if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
+      if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('servicios').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      const updatedLine = updates.lineId ? lines.find(l => l.id === updates.lineId) : undefined;
+      setServices(prev => prev.map(s => {
+        if (s.id !== id) return s;
+        const merged: Service = { ...s };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre;
+        if (updates.durationMin !== undefined) merged.durationMin = updates.durationMin;
+        if (updates.lineId !== undefined) {
+          merged.lineId = updates.lineId || undefined;
+          merged.lineName = updatedLine?.name;
+        }
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating service (global):', error);
+      toast.error('Error al actualizar servicio');
+    }
+  }, [lines]);
+
+  const addExtraGlobal = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const normalizedName = extra.name.replace(/\s+/g, ' ').trim();
+      const { data, error } = await supabase
+        .from('extras')
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
+          activo: extra.active !== false,
+          organization_id: organization.id,
+          sucursal_id: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newExtra = dbToExtra(data);
+      setExtras(prev => [...prev, newExtra]);
+      toast.success('Extra agregado');
+      return newExtra;
+    } catch (error) {
+      console.error('Error adding extra (global):', error);
+      toast.error('Error al agregar extra');
+      return null;
+    }
+  }, [organization]);
+
+  const updateExtraGlobal = useCallback(async (id: string, updates: Partial<Extra>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('extras').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      setExtras(prev => prev.map(e => {
+        if (e.id !== id) return e;
+        const merged: Extra = { ...e };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre;
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating extra (global):', error);
+      toast.error('Error al actualizar extra');
+    }
+  }, []);
+
+  const addDiscountGlobal = useCallback(async (discount: Omit<Discount, 'id'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const appliesTo = discount.appliesTo || 'servicios';
+      const { data, error } = await supabase
+        .from('descuentos')
+        .insert({
+          nombre: discount.label.replace(/\s+/g, ' ').trim(),
+          valor: discount.value,
+          tipo: discount.type === 'fixed' ? 'monto' : 'porcentaje',
+          redondeo: discount.rounding || 'cliente',
+          redondeo_unidad: discount.roundingUnit || 100,
+          metodo_pago: discount.paymentMethod || 'todos',
+          activo: discount.active !== false,
+          aplica_a: appliesTo,
+          organization_id: organization.id,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newDiscount = dbToDiscount(data);
+      setDiscounts(prev => [...prev, newDiscount]);
+      toast.success('Descuento agregado');
+      return newDiscount;
+    } catch (error) {
+      console.error('Error adding discount (global):', error);
+      toast.error('Error al agregar descuento');
+      return null;
+    }
+  }, [organization]);
+
+  const updateDiscountGlobal = useCallback(async (id: string, updates: Partial<Discount>) => {
+    if (id === 'none') return;
+    try {
+      const dbUpdates: any = {};
+      if (updates.label !== undefined) dbUpdates.nombre = updates.label.replace(/\s+/g, ' ').trim();
+      if (updates.value !== undefined) dbUpdates.valor = updates.value;
+      if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'monto' : 'porcentaje';
+      if (updates.rounding !== undefined) dbUpdates.redondeo = updates.rounding;
+      if (updates.roundingUnit !== undefined) dbUpdates.redondeo_unidad = updates.roundingUnit;
+      if (updates.paymentMethod !== undefined) dbUpdates.metodo_pago = updates.paymentMethod;
+      if (updates.appliesTo !== undefined) dbUpdates.aplica_a = updates.appliesTo;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('descuentos').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      setDiscounts(prev => prev.map(d => {
+        if (d.id !== id) return d;
+        const merged: Discount = { ...d, ...updates };
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating discount (global):', error);
+      toast.error('Error al actualizar descuento');
+    }
+  }, []);
+
+  const setDiscountActiveGlobal = useCallback(async (id: string, activo: boolean) => {
+    if (id === 'none') return;
+    try {
+      const { error } = await supabase.from('descuentos').update({ activo }).eq('id', id);
+      if (error) throw error;
+      setDiscounts(prev => prev.map(d => {
+        if (d.id !== id) return d;
+        const branchActive = d.branchActive;
+        return {
+          ...d,
+          globalActive: activo,
+          active: branchActive === undefined ? activo : (activo && branchActive),
+        };
+      }));
+      toast.success(activo ? 'Descuento reactivado' : 'Descuento desactivado');
+    } catch (error) {
+      console.error('Error toggling discount (global):', error);
+      toast.error('Error al actualizar descuento');
+    }
+  }, []);
+
+  const deleteDiscountGlobal = useCallback(async (id: string) => {
+    await setDiscountActiveGlobal(id, false);
+  }, [setDiscountActiveGlobal]);
+
   // Descuentos disponibles para Cobrar (compat: filtran por active operativo)
   const activeDiscounts = discounts.filter(d => d.active);
   const serviceDiscounts = activeDiscounts.filter(d => d.appliesTo === 'servicios');
@@ -895,6 +1117,15 @@ export function useSupabaseData() {
     setDiscountActive,
     addLine,
     updateLine,
+    // Global handlers (tab General de Mi Negocio)
+    addServiceGlobal,
+    updateServiceGlobal,
+    addExtraGlobal,
+    updateExtraGlobal,
+    addDiscountGlobal,
+    updateDiscountGlobal,
+    setDiscountActiveGlobal,
+    deleteDiscountGlobal,
     refreshData: fetchData,
   };
 }

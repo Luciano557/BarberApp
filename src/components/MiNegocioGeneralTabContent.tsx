@@ -11,7 +11,7 @@ import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { toast } from 'sonner';
 
 interface MiNegocioGeneralTabContentProps {
-  /** true cuando el SucursalContext ya está sincronizado en modo global (currentSucursal === null) */
+  /** true cuando la tab "General" está activa. Los handlers que reciba deben ser globales. */
   isReady: boolean;
   services: Service[];
   extras: Extra[];
