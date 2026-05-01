@@ -123,13 +123,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
     setToggleConfirm(null);
   };
 
-  const renderServiceItem = (service: Service) => (
+  const isItemActive = (service: Service) =>
+    isGlobal ? (service.globalActive ?? service.active) : service.active;
+
+  const renderServiceItem = (service: Service) => {
+    const itemActive = isItemActive(service);
+    return (
     <div key={service.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === service.id ? (
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-wrap gap-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" />
-            <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" maxLength={80} />
+            {!isGlobal && (
+              <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
+            )}
             <div className="flex items-center gap-1">
               <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" />
               <span className="text-xs text-muted-foreground">min</span>
@@ -159,17 +166,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Clock className="h-3 w-3" />{service.durationMin || 30} min
           </span>
-          <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+          {!isGlobal && (
+            <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+          )}
           <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8">
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: service.active ? 'deactivate' : 'activate' })} className="h-8 w-8" title={service.active ? 'Desactivar' : 'Activar'}>
-            {service.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
         </>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <>
