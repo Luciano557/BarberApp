@@ -201,8 +201,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" />
-                  <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" maxLength={80} />
+                  {!isGlobal && (
+                    <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
+                  )}
                   <div className="flex items-center gap-1">
                     <Input type="number" min={5} placeholder="Tiempo" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
                     <span className="text-xs text-muted-foreground">min</span>
