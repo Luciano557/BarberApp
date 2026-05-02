@@ -938,7 +938,22 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
         {/* Discount Step */}
         {currentStep === 'discount' && (
+          <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <button
+              key="none"
+              onClick={() => handleSelectDiscount('none')}
+              className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                selectedDiscount === 'none'
+                  ? 'border-secondary bg-secondary/5'
+                  : 'border-border bg-card hover:bg-muted/50'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
+                <Check className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="font-medium text-center text-foreground">Sin descuento</p>
+            </button>
             {discounts.map((discount, index) => {
               const rounding = discount.rounding || 'cliente';
               const rawCalc = discount.type === 'fixed' 
@@ -987,6 +1002,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 </button>
               );
             })}
+          </div>
+            <Button
+              onClick={() => {
+                const isValid = selectedDiscount === 'none' || discounts.some(d => d.id === selectedDiscount);
+                if (!selectedDiscount || !isValid) {
+                  handleSelectDiscount('none');
+                  return;
+                }
+                goToNextStep();
+              }}
+              className="w-full h-12 bg-foreground hover:bg-foreground/90"
+            >
+              Continuar <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         )}
 
