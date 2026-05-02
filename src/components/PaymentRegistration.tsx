@@ -1003,6 +1003,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               );
             })}
           </div>
+            <Button
+              onClick={() => {
+                const isValid = selectedDiscount === 'none' || discounts.some(d => d.id === selectedDiscount);
+                if (!selectedDiscount || !isValid) {
+                  handleSelectDiscount('none');
+                  return;
+                }
+                goToNextStep();
+              }}
+              className="w-full h-12 bg-foreground hover:bg-foreground/90"
+            >
+              Continuar <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         )}
 
         {/* Payment Step */}
