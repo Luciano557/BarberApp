@@ -151,6 +151,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
   // Check if a transaction can be voided (barber's cash not closed)
   const canVoidTransaction = useCallback((tx: Transaction): boolean => {
+    if (!tx.barberId) return true;
     return !closedBarbers.has(tx.barberId);
   }, [closedBarbers]);
 
@@ -167,48 +168,59 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         totalEfectivo: 0,
         totalMercadoPago: 0,
         total: 0,
+        productosTotal: 0,
+        serviciosBase: 0,
         commissionPct: barber.commission,
         commissionAmount: 0,
       });
     });
 
     // Aggregate only active transactions, splitting amounts by payments array
-    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    const activeTransactions = summary.transactions.filter(
+      tx => tx.estado !== 'anulado' && !!tx.barberId
+    );
     const txPayments = (tx: Transaction) =>
       tx.payments && tx.payments.length > 0
         ? tx.payments
         : [{ method: tx.paymentMethod, amount: tx.total }];
 
     activeTransactions.forEach(tx => {
-      let existing = summaryMap.get(tx.barberId);
+      const barberId = tx.barberId as string;
+      let existing = summaryMap.get(barberId);
       if (!existing) {
-        const barberData = barbers.find(b => b.id === tx.barberId);
+        const barberData = barbers.find(b => b.id === barberId);
         existing = {
-          barberId: tx.barberId,
-          barberName: tx.barberName,
+          barberId,
+          barberName: tx.barberName || '—',
           count: 0,
           totalEfectivo: 0,
           totalMercadoPago: 0,
           total: 0,
+          productosTotal: 0,
+          serviciosBase: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
         };
-        summaryMap.set(tx.barberId, existing);
+        summaryMap.set(barberId, existing);
       }
-      existing.count += 1;
+      const serviceCount = tx.serviceCount ?? (tx.tipoVenta === 'productos' || !tx.serviceId ? 0 : 1);
+      const serviciosBaseTx = tx.serviciosBase ?? (tx.tipoVenta === 'productos' ? 0 : tx.total);
+      existing.count += serviceCount;
       existing.total += tx.total;
+      existing.productosTotal += tx.productosTotal ?? 0;
+      existing.serviciosBase += serviciosBaseTx;
       txPayments(tx).forEach(p => {
         if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
         else if (isDigitalMethod(p.method)) existing!.totalMercadoPago += p.amount;
       });
     });
 
-    // Calculate commission amounts
-    summaryMap.forEach(summary => {
-      summary.commissionAmount = Math.round(summary.total * (summary.commissionPct / 100));
+    // Calculate commission amounts (sólo sobre serviciosBase)
+    summaryMap.forEach(s => {
+      s.commissionAmount = Math.round(s.serviciosBase * (s.commissionPct / 100));
     });
 
-    return Array.from(summaryMap.values()).filter(s => s.count > 0);
+    return Array.from(summaryMap.values()).filter(s => s.count > 0 || s.productosTotal > 0);
   }, [summary.transactions, barbers]);
 
   // Check if selected date is in the past (for backfill CTA)
