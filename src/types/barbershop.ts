@@ -119,12 +119,23 @@ export interface TransactionPayment {
   basePago?: number;       // porción de BASE asignada a este pago
 }
 
+export interface TransactionProducto {
+  producto_id: string;
+  producto_sucursal_id?: string | null;
+  producto_nombre: string;
+  marca_id?: string | null;
+  marca_nombre?: string | null;
+  precio_unitario: number;
+  cantidad: number;
+  subtotal: number;
+}
+
 export interface Transaction {
   id: string;
-  barberId: string;
-  barberName: string;
-  serviceId: string;
-  serviceName: string;
+  barberId: string | null;
+  barberName: string | null;
+  serviceId: string | null;
+  serviceName: string | null;
   servicePrice: number;
   extras: { uid: string; name: string; price: number }[];
   discount: number;
@@ -132,9 +143,15 @@ export interface Transaction {
   paymentMethod: PaymentMethod;
   payments?: TransactionPayment[];
   subtotal: number;
-  total: number;            // BASE comisionable (servicio + extras − descuento)
+  total: number;            // BASE total de la venta (servicios + productos − descuentos)
   recargoTotal?: number;    // Suma de recargos cobrados
   totalCobrado?: number;    // total + recargoTotal (lo que entró a caja)
+  // Separación servicio / producto para comisión
+  tipoVenta?: 'servicio' | 'productos' | 'mixta';
+  productosTotal?: number;  // Suma de subtotales de productos
+  serviciosBase?: number;   // Base comisionable: total − productosTotal (0 si solo productos)
+  serviceCount?: number;    // 1 si la venta tiene servicio, 0 si es solo productos
+  productos?: TransactionProducto[];
   createdAt: Date;
   // Soft delete fields
   estado?: 'activo' | 'anulado';
