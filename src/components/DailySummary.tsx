@@ -680,7 +680,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-medium ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                            {tx.serviceName}
+                            {tx.serviceName || (tx.productos && tx.productos.length > 0 ? 'Venta de productos' : '—')}
                           </span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
