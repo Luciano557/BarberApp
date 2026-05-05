@@ -530,6 +530,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
+                  {barber.productosTotal > 0 && (
+                    <div className="flex items-center justify-between py-2 border-b border-border">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Receipt className="h-4 w-4" />
+                        Productos
+                      </span>
+                      <span className="font-semibold text-foreground">${barber.productosTotal.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm font-medium text-foreground">Total</span>
                     <span className="text-lg font-bold text-foreground">${barber.total.toLocaleString()}</span>
