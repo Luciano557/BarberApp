@@ -813,7 +813,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     return (
                       <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                         <div>
-                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs ml-2 text-muted-foreground">
                               + {tx.extras.map(e => e.name).join(', ')}
@@ -849,7 +849,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     return (
                       <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                         <div>
-                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs ml-2 text-muted-foreground">
                               + {tx.extras.map(e => e.name).join(', ')}
