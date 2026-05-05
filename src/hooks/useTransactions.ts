@@ -83,14 +83,16 @@ export function useTransactions() {
       return;
     }
 
-    // Cargar extras de cada venta
+    // Cargar extras, pagos y productos de cada venta
     const ventaIds = ventas.map(v => v.id);
-    const [extrasRes, pagosRes] = await Promise.all([
+    const [extrasRes, pagosRes, productosRes] = await Promise.all([
       supabase.from('venta_extra').select('*').in('venta_id', ventaIds),
       supabase.from('venta_pagos').select('*').in('venta_id', ventaIds).order('orden', { ascending: true }),
+      supabase.from('venta_producto').select('*').in('venta_id', ventaIds),
     ]);
     const ventaExtras = extrasRes.data;
     const ventaPagos = pagosRes.data;
+    const ventaProductos = productosRes.data;
 
     const extrasMap = new Map<string, { uid: string; name: string; price: number }[]>();
     ventaExtras?.forEach(ve => {
@@ -119,8 +121,23 @@ export function useTransactions() {
       pagosMap.set(p.venta_id, list);
     });
 
+    const productosMap = new Map<string, import('@/types/barbershop').TransactionProducto[]>();
+    ventaProductos?.forEach((vp: any) => {
+      const list = productosMap.get(vp.venta_id) || [];
+      list.push({
+        producto_id: vp.producto_id,
+        producto_sucursal_id: vp.producto_sucursal_id ?? null,
+        producto_nombre: vp.producto_nombre,
+        marca_id: vp.marca_id ?? null,
+        marca_nombre: vp.marca_nombre ?? null,
+        precio_unitario: Number(vp.precio_unitario) || 0,
+        cantidad: Number(vp.cantidad) || 0,
+        subtotal: Number(vp.subtotal) || 0,
+      });
+      productosMap.set(vp.venta_id, list);
+    });
+
     const txs: Transaction[] = ventas.map(v => {
-      // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
       const pagos = pagosMap.get(v.id);
       const baseTotal = Number(v.total_final);
       const recargoTotal = Number((v as any).recargo_total) || 0;
@@ -134,22 +151,38 @@ export function useTransactions() {
             recargoMonto: 0,
             basePago: baseTotal,
           }];
+
+      const tipoVentaRaw = (v as any).tipo_venta as string | null;
+      const productos = productosMap.get(v.id) || [];
+      const productosTotal = productos.reduce((s, p) => s + p.subtotal, 0);
+      const tipoVenta: 'servicio' | 'productos' | 'mixta' =
+        tipoVentaRaw === 'productos' || tipoVentaRaw === 'servicio' || tipoVentaRaw === 'mixta'
+          ? tipoVentaRaw
+          : (v.servicio_id ? (productos.length > 0 ? 'mixta' : 'servicio') : 'productos');
+      const serviciosBase = tipoVenta === 'productos' ? 0 : Math.max(0, baseTotal - productosTotal);
+      const serviceCount = tipoVenta === 'productos' || !v.servicio_id ? 0 : 1;
+
       return {
         id: v.id,
         barberId: v.barbero_id,
         barberName: v.barbero_nombre,
         serviceId: v.servicio_id,
         serviceName: v.servicio_nombre,
-        servicePrice: Number(v.precio_servicio),
+        servicePrice: Number(v.precio_servicio) || 0,
         extras: extrasMap.get(v.id) || [],
         discount: Number(v.descuento_pct) || 0,
         discountType: 'percentage' as const,
         paymentMethod: v.metodo_pago as PaymentMethod,
         payments,
-        subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
+        subtotal: (Number(v.precio_servicio) || 0) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
         total: baseTotal,
         recargoTotal,
         totalCobrado,
+        tipoVenta,
+        productosTotal,
+        serviciosBase,
+        serviceCount,
+        productos,
         createdAt: new Date(v.fecha_hora),
         estado: (v as any).estado || 'activo',
         anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
