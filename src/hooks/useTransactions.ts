@@ -386,13 +386,33 @@ export function useTransactions() {
     }
 
     // Agregar al estado local
+    const productosEnriched = productos.map(p => ({
+      producto_id: p.producto_id,
+      producto_sucursal_id: p.producto_sucursal_id,
+      producto_nombre: p.producto_nombre,
+      marca_id: p.marca_id,
+      marca_nombre: p.marca_nombre,
+      precio_unitario: p.precio_unitario,
+      cantidad: p.cantidad,
+      subtotal: p.precio_unitario * p.cantidad,
+    }));
+    const productosTotal = productosEnriched.reduce((s, p) => s + p.subtotal, 0);
+    const serviciosBase = tipoVenta === 'productos' ? 0 : Math.max(0, baseTotal - productosTotal);
+    const serviceCount = tipoVenta === 'productos' || !transaction.serviceId ? 0 : 1;
+
+    const { productos: _ignored, ...txRest } = transaction;
     const newTransaction: Transaction = {
-      ...transaction,
+      ...txRest,
       payments: normalizedPayments,
       paymentMethod: primaryMethod,
       total: baseTotal,
       recargoTotal,
       totalCobrado,
+      tipoVenta,
+      productosTotal,
+      serviciosBase,
+      serviceCount,
+      productos: productosEnriched,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
