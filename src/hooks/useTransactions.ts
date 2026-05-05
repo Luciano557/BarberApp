@@ -167,7 +167,7 @@ export function useTransactions() {
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (
-    transaction: Omit<Transaction, 'id' | 'createdAt'> & { productos?: ProductoCartInput[] }
+    transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & { productos?: ProductoCartInput[] }
   ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
