@@ -50,6 +50,8 @@ interface BarberSummary {
   totalEfectivo: number;
   totalMercadoPago: number;
   total: number;
+  productosTotal: number;
+  serviciosBase: number;
   commissionPct: number;
   commissionAmount: number;
 }
