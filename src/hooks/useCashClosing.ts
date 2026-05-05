@@ -15,6 +15,8 @@ interface BarberSummary {
   totalEfectivo: number;
   totalMercadoPago: number;
   total: number;
+  productosTotal?: number;
+  serviciosBase?: number;
   commissionPct: number;
   commissionAmount: number;
 }
@@ -116,14 +118,18 @@ export function useCashClosing() {
 
     const perdida = totalSinDescuento - totalFacturado;
 
-    // Count services with/without discount
-    const serviciosConDescuento = barberTxs.filter(tx => tx.discount > 0).length;
-    const serviciosSinDescuento = barberTxs.filter(tx => tx.discount === 0).length;
-    const cantidadDeServicios = barberTxs.length;
+    // Count services with/without discount (solo ventas con servicio)
+    const txsConServicio = barberTxs.filter(tx => (tx.serviceCount ?? (tx.tipoVenta === 'productos' || !tx.serviceId ? 0 : 1)) > 0);
+    const serviciosConDescuento = txsConServicio.filter(tx => tx.discount > 0).length;
+    const serviciosSinDescuento = txsConServicio.filter(tx => tx.discount === 0).length;
+    const cantidadDeServicios = barberTxs.reduce(
+      (s, tx) => s + (tx.serviceCount ?? (tx.tipoVenta === 'productos' || !tx.serviceId ? 0 : 1)),
+      0
+    );
 
     // Count by discount percentage
-    const cantidadDe50Por = barberTxs.filter(tx => tx.discount === 50).length;
-    const cantidadDe20Por = barberTxs.filter(tx => tx.discount === 20).length;
+    const cantidadDe50Por = txsConServicio.filter(tx => tx.discount === 50).length;
+    const cantidadDe20Por = txsConServicio.filter(tx => tx.discount === 20).length;
 
     // Count extras
     const extras = barberTxs.reduce((sum, tx) => sum + tx.extras.length, 0);
@@ -131,18 +137,54 @@ export function useCashClosing() {
     // Day of week in Spanish
     const dia = format(date, 'EEEE', { locale: es });
 
-    // Calculate salary (commission) — sobre BASE (sin cambios)
-    const sueldo = barber.commissionAmount;
+    // Base comisionable (sólo servicios) y agregados de productos
+    const serviciosBase = barberTxs.reduce(
+      (s, tx) => s + (tx.serviciosBase ?? (tx.tipoVenta === 'productos' ? 0 : tx.total)),
+      0
+    );
+    const productosTotal = barberTxs.reduce((s, tx) => s + (tx.productosTotal ?? 0), 0);
+    const productosCantidad = barberTxs.reduce(
+      (s, tx) => s + (tx.productos?.reduce((acc, p) => acc + (p.cantidad || 0), 0) ?? 0),
+      0
+    );
 
-    // Count services by line
+    // Prorratear productos por método (efectivo/digital) según basePago de cada venta
+    let productosEfectivo = 0;
+    let productosDigital = 0;
+    barberTxs.forEach(tx => {
+      const txProdTotal = tx.productosTotal ?? 0;
+      if (txProdTotal <= 0) return;
+      const pagos = txPayments(tx);
+      const sumBase = pagos.reduce((s, p) => s + (p.basePago != null ? p.basePago : p.amount), 0);
+      if (sumBase <= 0) {
+        productosEfectivo += txProdTotal;
+        return;
+      }
+      let efAcc = 0;
+      let digAcc = 0;
+      pagos.forEach(p => {
+        const base = p.basePago != null ? p.basePago : p.amount;
+        const share = (base / sumBase) * txProdTotal;
+        if (p.method === 'efectivo') efAcc += share;
+        else digAcc += share;
+      });
+      productosEfectivo += Math.round(efAcc);
+      productosDigital += Math.round(digAcc);
+    });
+
+    // Recalcular sueldo SIEMPRE desde serviciosBase (no usar barber.commissionAmount)
+    const sueldo = Math.round(serviciosBase * (barber.commissionPct / 100));
+
+    // Count services by line (sólo ventas con servicio)
     const serviciosPorLinea: Record<string, number> = {};
     lines.forEach(line => {
       serviciosPorLinea[line.name] = 0;
     });
 
-    barberTxs.forEach(tx => {
+    txsConServicio.forEach(tx => {
+      const name = tx.serviceName || '';
       const matchedLine = lines.find(line =>
-        tx.serviceName.toLowerCase().includes(line.name.toLowerCase())
+        name.toLowerCase().includes(line.name.toLowerCase())
       );
       if (matchedLine) {
         serviciosPorLinea[matchedLine.name] = (serviciosPorLinea[matchedLine.name] || 0) + 1;
@@ -156,11 +198,11 @@ export function useCashClosing() {
 
     // Prepare the insert data with barbero_id (UUID) as source of truth
     const insertData = {
-      barbero: normalizedBarberName,  // Mantener para display
-      barbero_id: barber.barberId,    // UUID - fuente de verdad para relaciones
-      mp: mpBase,                     // BASE legacy — sin cambios
-      efectivo: efectivoBase,         // BASE legacy — sin cambios
-      total_facturado: totalFacturado, // BASE legacy — sin cambios
+      barbero: normalizedBarberName,
+      barbero_id: barber.barberId,
+      mp: mpBase,
+      efectivo: efectivoBase,
+      total_facturado: totalFacturado,
       total_sin_descuento: totalSinDescuento,
       perdida,
       cantidad_de_servicios: cantidadDeServicios,
@@ -179,23 +221,62 @@ export function useCashClosing() {
       closed_at: new Date().toISOString(),
       organization_id: organization.id,
       sucursal_id: currentSucursal?.id || null,
-      // SNAPSHOT del arqueo real del cierre — NUEVO obligatorio
       recargos_total: recargosTotal,
       total_cobrado: totalCobrado,
       efectivo_cobrado: efectivoCobrado,
       digital_cobrado: digitalCobrado,
+      productos_total: productosTotal,
+      productos_cantidad: productosCantidad,
+      productos_efectivo: productosEfectivo,
+      productos_digital: productosDigital,
     };
 
-    const { error } = await supabase
+    const { data: ingreso, error } = await supabase
       .from('ingresos')
-      .insert(insertData as any);
-    
-    if (error) {
+      .insert(insertData as any)
+      .select('id')
+      .single();
+
+    if (error || !ingreso) {
       console.error('Error saving cash closing:', error);
       toast.error('Error al guardar el cierre de caja');
       return false;
     }
-    
+
+    // Insertar productos vendidos del barbero en ingresos_items_productos
+    const productosRows: any[] = [];
+    barberTxs.forEach(tx => {
+      if (!tx.productos || tx.productos.length === 0) return;
+      const pagos = txPayments(tx);
+      const dominante = [...pagos].sort((a, b) => b.amount - a.amount)[0];
+      const paymentMethod = dominante?.method === 'efectivo' ? 'efectivo' : 'digital';
+      tx.productos.forEach(p => {
+        productosRows.push({
+          ingreso_id: ingreso.id,
+          organization_id: organization.id,
+          sucursal_id: currentSucursal?.id || null,
+          barbero_id: barber.barberId,
+          producto_id: p.producto_id,
+          producto_nombre: p.producto_nombre,
+          marca_id: p.marca_id ?? null,
+          marca_nombre: p.marca_nombre ?? null,
+          qty: p.cantidad,
+          unit_price: p.precio_unitario,
+          subtotal: p.subtotal,
+          payment_method: paymentMethod,
+        });
+      });
+    });
+
+    if (productosRows.length > 0) {
+      const { error: prodErr } = await supabase
+        .from('ingresos_items_productos')
+        .insert(productosRows as any);
+      if (prodErr) {
+        console.error('Error saving ingresos_items_productos:', prodErr);
+      }
+    }
+
     toast.success(`Cierre de caja guardado para ${normalizedBarberName}`);
     return true;
   }, [organization, currentSucursal]);

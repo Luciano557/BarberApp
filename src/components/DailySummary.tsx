@@ -50,6 +50,8 @@ interface BarberSummary {
   totalEfectivo: number;
   totalMercadoPago: number;
   total: number;
+  productosTotal: number;
+  serviciosBase: number;
   commissionPct: number;
   commissionAmount: number;
 }
@@ -149,6 +151,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
   // Check if a transaction can be voided (barber's cash not closed)
   const canVoidTransaction = useCallback((tx: Transaction): boolean => {
+    if (!tx.barberId) return true;
     return !closedBarbers.has(tx.barberId);
   }, [closedBarbers]);
 
@@ -165,48 +168,59 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         totalEfectivo: 0,
         totalMercadoPago: 0,
         total: 0,
+        productosTotal: 0,
+        serviciosBase: 0,
         commissionPct: barber.commission,
         commissionAmount: 0,
       });
     });
 
     // Aggregate only active transactions, splitting amounts by payments array
-    const activeTransactions = summary.transactions.filter(tx => tx.estado !== 'anulado');
+    const activeTransactions = summary.transactions.filter(
+      tx => tx.estado !== 'anulado' && !!tx.barberId
+    );
     const txPayments = (tx: Transaction) =>
       tx.payments && tx.payments.length > 0
         ? tx.payments
         : [{ method: tx.paymentMethod, amount: tx.total }];
 
     activeTransactions.forEach(tx => {
-      let existing = summaryMap.get(tx.barberId);
+      const barberId = tx.barberId as string;
+      let existing = summaryMap.get(barberId);
       if (!existing) {
-        const barberData = barbers.find(b => b.id === tx.barberId);
+        const barberData = barbers.find(b => b.id === barberId);
         existing = {
-          barberId: tx.barberId,
-          barberName: tx.barberName,
+          barberId,
+          barberName: tx.barberName || '—',
           count: 0,
           totalEfectivo: 0,
           totalMercadoPago: 0,
           total: 0,
+          productosTotal: 0,
+          serviciosBase: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
         };
-        summaryMap.set(tx.barberId, existing);
+        summaryMap.set(barberId, existing);
       }
-      existing.count += 1;
+      const serviceCount = tx.serviceCount ?? (tx.tipoVenta === 'productos' || !tx.serviceId ? 0 : 1);
+      const serviciosBaseTx = tx.serviciosBase ?? (tx.tipoVenta === 'productos' ? 0 : tx.total);
+      existing.count += serviceCount;
       existing.total += tx.total;
+      existing.productosTotal += tx.productosTotal ?? 0;
+      existing.serviciosBase += serviciosBaseTx;
       txPayments(tx).forEach(p => {
         if (p.method === 'efectivo') existing!.totalEfectivo += p.amount;
         else if (isDigitalMethod(p.method)) existing!.totalMercadoPago += p.amount;
       });
     });
 
-    // Calculate commission amounts
-    summaryMap.forEach(summary => {
-      summary.commissionAmount = Math.round(summary.total * (summary.commissionPct / 100));
+    // Calculate commission amounts (sólo sobre serviciosBase)
+    summaryMap.forEach(s => {
+      s.commissionAmount = Math.round(s.serviciosBase * (s.commissionPct / 100));
     });
 
-    return Array.from(summaryMap.values()).filter(s => s.count > 0);
+    return Array.from(summaryMap.values()).filter(s => s.count > 0 || s.productosTotal > 0);
   }, [summary.transactions, barbers]);
 
   // Check if selected date is in the past (for backfill CTA)
@@ -516,6 +530,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
+                  {barber.productosTotal > 0 && (
+                    <div className="flex items-center justify-between py-2 border-b border-border">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Receipt className="h-4 w-4" />
+                        Productos
+                      </span>
+                      <span className="font-semibold text-foreground">${barber.productosTotal.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm font-medium text-foreground">Total</span>
                     <span className="text-lg font-bold text-foreground">${barber.total.toLocaleString()}</span>
@@ -657,7 +680,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`font-medium ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                            {tx.serviceName}
+                            {tx.serviceName || (tx.productos && tx.productos.length > 0 ? 'Venta de productos' : '—')}
                           </span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
@@ -676,7 +699,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           )}
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-                          {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
+                          {(tx.barberName || '—')} • {format(new Date(tx.createdAt), 'HH:mm')}
                           {isMixed && !isVoided && (
                             <span className="ml-2">
                               • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">Dig. ${mpAmt.toLocaleString()}</span>
@@ -790,7 +813,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     return (
                       <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                         <div>
-                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs ml-2 text-muted-foreground">
                               + {tx.extras.map(e => e.name).join(', ')}
@@ -826,7 +849,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     return (
                       <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                         <div>
-                          <span className="font-medium text-sm">{tx.serviceName}</span>
+                          <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
                             <span className="text-xs ml-2 text-muted-foreground">
                               + {tx.extras.map(e => e.name).join(', ')}
