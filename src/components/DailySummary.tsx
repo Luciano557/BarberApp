@@ -699,7 +699,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           )}
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-                          {tx.barberName} • {format(new Date(tx.createdAt), 'HH:mm')}
+                          {(tx.barberName || '—')} • {format(new Date(tx.createdAt), 'HH:mm')}
                           {isMixed && !isVoided && (
                             <span className="ml-2">
                               • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">Dig. ${mpAmt.toLocaleString()}</span>
