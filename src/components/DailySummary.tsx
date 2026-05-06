@@ -496,7 +496,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {(() => { return null; })()}
             {barberSummaries.map((barber) => (
               <Card key={barber.barberId} className="border border-border bg-card">
                 <CardHeader className="pb-2">
