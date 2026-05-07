@@ -245,14 +245,23 @@ export function EquipoUnificado({
     }
   };
 
-  // Visual cargo source of truth: prefer barber.teamRole (rol_equipo), fall back to linked user_roles
+  // Visual cargo source of truth (priority):
+  // 1) barberos.roles_equipo (multirol)
+  // 2) barberos.rol_equipo (rol principal)
+  // 3) user_roles del usuario vinculado (fallback)
+  // 4) ['barber'] default
   const getDisplayRoles = (barber: Barber): AppRole[] => {
+    if (barber.rolesEquipo && barber.rolesEquipo.length > 0) return barber.rolesEquipo;
+    const fromTeamRole = rolEquipoToRoles(barber.teamRole);
+    if (fromTeamRole.length > 0 && !(fromTeamRole.length === 1 && fromTeamRole[0] === 'barber' && !barber.teamRole)) {
+      return fromTeamRole;
+    }
     const linkedUser = getLinkedUser(barber.id);
     if (linkedUser) {
       const ur = getUserRoles(linkedUser.id);
       if (ur.length > 0) return ur;
     }
-    return rolEquipoToRoles((barber.teamRole as string) ?? null);
+    return ['barber'];
   };
 
   // Centralized call to edge function
@@ -262,12 +271,13 @@ export function EquipoUnificado({
     roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
+    sucursalId?: string | null;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
     try {
       const body = {
         barberoId: payload.barberoId,
         organizationId,
-        sucursalId,
+        sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
         accessEmail: payload.accessEmail,
         roles: payload.roles,
         rolEquipo: payload.rolEquipo,
@@ -304,7 +314,12 @@ export function EquipoUnificado({
       }
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberoId: barberId, roles: newRoles });
+    const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+    const res = await callAccessFn({
+      barberoId: barberId,
+      roles: newRoles,
+      sucursalId: targetBarber?.sucursalId ?? sucursalId,
+    });
     if (!res.ok) {
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
@@ -343,7 +358,7 @@ export function EquipoUnificado({
 
     // Compute current roles from persisted state to send (function will validate)
     const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRoles(barber?.teamRole as any);
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : (barber ? rolEquipoToRoles(barber.teamRole) : []);
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
@@ -352,6 +367,7 @@ export function EquipoUnificado({
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
       roles: rolesToSend,
       regenerateAccess: true,
+      sucursalId: barber?.sucursalId ?? sucursalId,
     });
     setSavingAccess(null);
     if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
@@ -391,7 +407,12 @@ export function EquipoUnificado({
           return;
         }
       }
-      const res = await callAccessFn({ barberoId: barberId, roles: data.roles });
+      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+      const res = await callAccessFn({
+        barberoId: barberId,
+        roles: data.roles,
+        sucursalId: targetBarber?.sucursalId ?? sucursalId,
+      });
       if (!res.ok) {
         toast.error(res.error || 'No se pudo guardar el cargo');
         return;
@@ -415,7 +436,7 @@ export function EquipoUnificado({
       toast.success('Integrante actualizado');
       setEditingId(null);
     } else {
-      const teamRole: TeamRole = (rolEquipo === 'barbero' || rolEquipo === 'otros' ? rolEquipo : 'barbero') as TeamRole;
+      const teamRole: TeamRole = rolEquipo;
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
@@ -423,6 +444,7 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
+        rolesEquipo: data.roles,
       });
       setIsAdding(false);
     }

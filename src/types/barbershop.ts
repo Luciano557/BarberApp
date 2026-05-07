@@ -36,8 +36,11 @@ export interface Extra {
   priceConfigured?: boolean; // price > 0
 }
 
+import type { AppRole } from '@/contexts/AuthContext';
+
 export type CompensationType = 'comision' | 'fijo';
-export type TeamRole = 'barbero' | 'otros';
+// Rol principal derivado del multirol (barberos.rol_equipo)
+export type TeamRole = 'owner' | 'general_manager' | 'manager' | 'barbero' | 'otros';
 
 export interface Barber {
   id: string;
@@ -46,12 +49,14 @@ export interface Barber {
   lastName: string;
   phone: string;
   commission: number; // 0-100 percentage
-  compensationType: CompensationType; // 'comision' = variable, 'fijo' = fixed salary
-  fixedSalary?: number; // Monthly fixed salary when compensationType = 'fijo'
-  teamRole: TeamRole; // 'barbero' = operational (can receive services), 'otros' = non-operational
-  payDay?: number; // Day of month for fixed salary payment (1-28)
-  address?: string; // Optional
-  dni?: string; // Optional
+  compensationType: CompensationType;
+  fixedSalary?: number;
+  teamRole: TeamRole; // compat: rol principal derivado (barberos.rol_equipo)
+  rolesEquipo?: AppRole[]; // multirol operativo (barberos.roles_equipo)
+  sucursalId?: string | null; // sucursal del integrante (barberos.sucursal_id)
+  payDay?: number;
+  address?: string;
+  dni?: string;
   active: boolean;
 }
 

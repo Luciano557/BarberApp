@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, Line, TeamRole } from '@/types/barbershop';
+import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -64,7 +65,22 @@ function dbToExtra(row: any, branchRow?: ExtraSucursalRow): Extra {
   };
 }
 
+function rolEquipoToRoles(re: string | null | undefined): AppRole[] {
+  switch (re) {
+    case 'owner': return ['owner'];
+    case 'general_manager': return ['general_manager'];
+    case 'manager': return ['manager'];
+    case 'barbero': return ['barber'];
+    case 'otros': return ['otros'];
+    default: return [];
+  }
+}
+
 function dbToBarber(row: any): Barber {
+  const rolesEquipoRaw = Array.isArray(row.roles_equipo) ? (row.roles_equipo as string[]) : [];
+  const rolesEquipo: AppRole[] = rolesEquipoRaw.length > 0
+    ? (rolesEquipoRaw.filter((r): r is AppRole => ['owner','general_manager','manager','barber','otros'].includes(r)))
+    : rolEquipoToRoles(row.rol_equipo);
   return {
     id: row.id,
     uid: row.id,
@@ -74,7 +90,9 @@ function dbToBarber(row: any): Barber {
     commission: Number(row.comision) || 0,
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
-    teamRole: row.rol_equipo || 'barbero',
+    teamRole: (row.rol_equipo as TeamRole) || 'barbero',
+    rolesEquipo,
+    sucursalId: row.sucursal_id ?? null,
     payDay: row.fecha_cobro_dia || 1,
     address: undefined,
     dni: row.dni || undefined,
@@ -613,6 +631,9 @@ export function useSupabaseData() {
           tipo_compensacion: barber.compensationType || 'comision',
           sueldo_fijo: barber.fixedSalary || null,
           rol_equipo: barber.teamRole || 'barbero',
+          roles_equipo: (barber.rolesEquipo && barber.rolesEquipo.length > 0)
+            ? barber.rolesEquipo
+            : (barber.teamRole === 'otros' ? ['otros'] : ['barber']),
           fecha_cobro_dia: barber.payDay || 1,
         })
         .select()
@@ -641,6 +662,7 @@ export function useSupabaseData() {
       if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
       if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
       if (updates.teamRole !== undefined) dbUpdates.rol_equipo = updates.teamRole;
+      if (updates.rolesEquipo !== undefined) dbUpdates.roles_equipo = updates.rolesEquipo;
       if (updates.payDay !== undefined) dbUpdates.fecha_cobro_dia = updates.payDay;
 
       const { error } = await supabase.from('barberos').update(dbUpdates).eq('id', id);

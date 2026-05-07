@@ -218,6 +218,38 @@ serve(async (req: Request): Promise<Response> => {
           error: `La sucursal ya tiene un Encargado activo (${conflict.nombre} ${conflict.apellido}). Cambiá su cargo antes de asignar otro.`,
         });
       }
+
+      // Also validate against user_roles (real auth permissions)
+      const { data: mgrUserRoles } = await admin
+        .from("user_roles")
+        .select("user_id, profiles!inner(organization_id, barbero_id), user_sucursales!inner(sucursal_id)")
+        .eq("role", "manager");
+      // The above complex join may not work via PostgREST auto-embeds; do it in two steps:
+      const { data: managersWithRole } = await admin
+        .from("user_roles").select("user_id").eq("role", "manager");
+      const candidateUserIds = (managersWithRole || []).map((r: any) => r.user_id);
+      if (candidateUserIds.length > 0) {
+        const { data: candidateProfiles } = await admin
+          .from("profiles")
+          .select("id, barbero_id, organization_id")
+          .in("id", candidateUserIds)
+          .eq("organization_id", organizationId);
+        const orgUserIds = (candidateProfiles || [])
+          .filter((p: any) => p.barbero_id !== barberoId)
+          .map((p: any) => p.id);
+        if (orgUserIds.length > 0) {
+          const { data: branchAssign } = await admin
+            .from("user_sucursales")
+            .select("user_id")
+            .in("user_id", orgUserIds)
+            .eq("sucursal_id", finalSucursalId);
+          if (branchAssign && branchAssign.length > 0) {
+            return jsonResponse(409, {
+              error: "La sucursal ya tiene un usuario con cargo Encargado asignado. Cambiá su cargo antes de asignar otro.",
+            });
+          }
+        }
+      }
     }
 
     // Email validation
@@ -261,8 +293,21 @@ serve(async (req: Request): Promise<Response> => {
 
     if (Object.keys(updates).length > 0) {
       const { error: updErr } = await admin
-        .from("barberos").update(updates).eq("id", barberoId);
+        .from("barberos").update(updates)
+        .eq("id", barberoId)
+        .eq("organization_id", organizationId);
       if (updErr) return jsonResponse(400, { error: `No se pudo actualizar miembro: ${updErr.message}` });
+      // Verify post-update integrity
+      const { data: verify, error: vErr } = await admin
+        .from("barberos")
+        .select("id, organization_id, rol_equipo, roles_equipo")
+        .eq("id", barberoId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (vErr || !verify) return jsonResponse(404, { error: "No se pudo verificar el miembro tras actualizar" });
+      if (normalizedRoles && verify.rol_equipo !== finalRolEquipo) {
+        return jsonResponse(500, { error: "El cargo no quedó persistido. Reintentá." });
+      }
     }
 
     let tempPassword: string | null = null;
