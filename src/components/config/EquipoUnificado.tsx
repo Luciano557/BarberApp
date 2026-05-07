@@ -436,7 +436,7 @@ export function EquipoUnificado({
       toast.success('Integrante actualizado');
       setEditingId(null);
     } else {
-      const teamRole: TeamRole = (rolEquipo === 'barbero' || rolEquipo === 'otros' ? rolEquipo : 'barbero') as TeamRole;
+      const teamRole: TeamRole = rolEquipo;
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
@@ -444,6 +444,7 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
+        rolesEquipo: data.roles,
       });
       setIsAdding(false);
     }
