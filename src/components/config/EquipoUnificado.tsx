@@ -407,7 +407,12 @@ export function EquipoUnificado({
           return;
         }
       }
-      const res = await callAccessFn({ barberoId: barberId, roles: data.roles });
+      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+      const res = await callAccessFn({
+        barberoId: barberId,
+        roles: data.roles,
+        sucursalId: targetBarber?.sucursalId ?? sucursalId,
+      });
       if (!res.ok) {
         toast.error(res.error || 'No se pudo guardar el cargo');
         return;
