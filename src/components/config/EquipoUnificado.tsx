@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,6 +148,10 @@ export function EquipoUnificado({
     conflictEmail: string | null;
     onResolved: (res: any) => void;
   } | null>(null);
+  // Refs to prevent double-resolution race when AlertDialogAction confirms
+  // (Radix closes the dialog → onOpenChange fires before the action handler completes).
+  const resolvingReplaceDialogRef = useRef(false);
+  const resolvingStaleDialogRef = useRef(false);
 
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
@@ -944,7 +948,7 @@ export function EquipoUnificado({
 
       {/* Manager replacement confirmation */}
       <AlertDialog open={!!replaceMgrDialog} onOpenChange={(open) => {
-        if (!open && replaceMgrDialog) {
+        if (!open && replaceMgrDialog && !resolvingReplaceDialogRef.current) {
           replaceMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
           setReplaceMgrDialog(null);
         }
@@ -969,21 +973,26 @@ export function EquipoUnificado({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               const target = replaceMgrDialog;
-              setReplaceMgrDialog(null);
               if (!target) return;
-              const retryRes = await callAccessFn({
-                ...target.payload,
-                replaceExistingManager: true,
-                existingManagerBarberoId: target.currentManagerBarberoId,
-              });
-              if (retryRes.ok) {
-                if (onRefreshBarbers) await onRefreshBarbers();
-                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
-                toast.success('Encargado reemplazado');
-              } else {
-                toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+              resolvingReplaceDialogRef.current = true;
+              try {
+                const retryRes = await callAccessFn({
+                  ...target.payload,
+                  replaceExistingManager: true,
+                  existingManagerBarberoId: target.currentManagerBarberoId,
+                });
+                if (retryRes.ok) {
+                  if (onRefreshBarbers) await onRefreshBarbers();
+                  await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                  toast.success('Encargado reemplazado');
+                } else {
+                  toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+                }
+                target.onResolved(retryRes);
+              } finally {
+                setReplaceMgrDialog(null);
+                resolvingReplaceDialogRef.current = false;
               }
-              target.onResolved(retryRes);
             }}>
               Confirmar reemplazo
             </AlertDialogAction>
@@ -993,7 +1002,7 @@ export function EquipoUnificado({
 
       {/* Stale manager role inconsistency */}
       <AlertDialog open={!!staleMgrDialog} onOpenChange={(open) => {
-        if (!open && staleMgrDialog) {
+        if (!open && staleMgrDialog && !resolvingStaleDialogRef.current) {
           staleMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
           setStaleMgrDialog(null);
         }
@@ -1018,20 +1027,25 @@ export function EquipoUnificado({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               const target = staleMgrDialog;
-              setStaleMgrDialog(null);
               if (!target) return;
-              const retryRes = await callAccessFn({
-                ...target.payload,
-                resolveStaleManagerConflict: true,
-              });
-              if (retryRes.ok) {
-                if (onRefreshBarbers) await onRefreshBarbers();
-                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
-                toast.success('Inconsistencia corregida');
-              } else {
-                toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+              resolvingStaleDialogRef.current = true;
+              try {
+                const retryRes = await callAccessFn({
+                  ...target.payload,
+                  resolveStaleManagerConflict: true,
+                });
+                if (retryRes.ok) {
+                  if (onRefreshBarbers) await onRefreshBarbers();
+                  await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                  toast.success('Inconsistencia corregida');
+                } else {
+                  toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+                }
+                target.onResolved(retryRes);
+              } finally {
+                setStaleMgrDialog(null);
+                resolvingStaleDialogRef.current = false;
               }
-              target.onResolved(retryRes);
             }}>
               Corregir y continuar
             </AlertDialogAction>
