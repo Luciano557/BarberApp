@@ -524,10 +524,12 @@ export function EquipoUnificado({
   // --- Render a barber item ---
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
-    const roles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    const assignableRoles = roles.filter(r => r !== 'owner');
-    const isOwner = roles.includes('owner');
-    const hasSystemAccess = roles.some(r => r !== 'otros');
+    const linkedRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
+    // Visual cargos: prioritize barberos.rol_equipo (barber.teamRole). If linked user has roles, use those.
+    const displayRoles = getDisplayRoles(barber);
+    const assignableRoles = displayRoles.filter(r => r !== 'owner');
+    const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
+    const hasSystemAccess = linkedRoles.some(r => r !== 'otros');
 
     return (
       <div key={barber.id}>
@@ -548,14 +550,12 @@ export function EquipoUnificado({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-foreground">{barber.firstName} {barber.lastName}</span>
-                {roles.filter(r => r !== 'owner' || isOwner).length > 0 ? (
-                  roles.filter(r => isOwner ? true : r !== 'owner').sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(role => (
+                {displayRoles.length > 0 ? (
+                  displayRoles.filter(r => isOwner ? true : r !== 'owner').sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(role => (
                     <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
                       {getRoleIcon(role)} {getRoleLabel(role)}
                     </Badge>
                   ))
-                ) : !linkedUser ? (
-                  <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo — Invitalo para asignar</Badge>
                 ) : (
                   <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo asignado</Badge>
                 )}
@@ -595,8 +595,8 @@ export function EquipoUnificado({
               )}
             </div>
 
-            {/* Role multi-select (only for non-owners with linked users) */}
-            {linkedUser && !isOwner && (
+            {/* Role multi-select — available also when there's no linked user (persists rol_equipo) */}
+            {!isOwner && (
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
                 {ASSIGNABLE_ROLES.map(role => (
