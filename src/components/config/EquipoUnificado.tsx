@@ -248,7 +248,62 @@ export function EquipoUnificado({
     await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
   };
 
-  const resetForm = () => {
+  // Save access_email only (no auth touch)
+  const handleSaveAccessEmail = async (barberId: string) => {
+    const draft = (emailDrafts[barberId] ?? '').trim();
+    setSavingAccess(barberId);
+    const res = await callAccessFn({ barberoId: barberId, accessEmail: draft === '' ? null : draft });
+    setSavingAccess(null);
+    if (!res.ok) { toast.error(res.error || 'No se pudo guardar el email'); return; }
+    toast.success('Email de acceso guardado');
+    setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
+    await fetchAccessEmails();
+  };
+
+  // Generate / regenerate access (creates auth user + temp password)
+  const performRegenerate = async (barberId: string) => {
+    const linkedUser = getLinkedUser(barberId);
+    const draft = emailDrafts[barberId];
+    const persisted = accessEmails[barberId];
+    const finalEmail = (draft !== undefined ? draft : (persisted ?? '')).trim();
+    if (!finalEmail) { toast.error('Cargá un email primero'); return; }
+
+    // Compute current rolEquipo from persisted state to send (function will validate)
+    const barber = barbers.find(b => b.id === barberId);
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
+    let rolEquipo: any = barber?.teamRole ?? 'barbero';
+    if (currentRoles.includes('owner')) rolEquipo = 'owner';
+    else if (currentRoles.includes('general_manager')) rolEquipo = 'general_manager';
+    else if (currentRoles.includes('manager')) rolEquipo = 'manager';
+    else if (currentRoles.includes('barber')) rolEquipo = 'barbero';
+
+    setSavingAccess(barberId);
+    const res = await callAccessFn({
+      barberoId: barberId,
+      accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
+      rolEquipo,
+      regenerateAccess: true,
+    });
+    setSavingAccess(null);
+    if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
+    if (res.tempPassword && res.email) {
+      setGeneratedCodes(prev => ({ ...prev, [barberId]: { email: res.email!, password: res.tempPassword! } }));
+      setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
+      toast.success('Acceso generado');
+    }
+    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+  };
+
+  // Confirm regenerate countdown
+  useEffect(() => {
+    if (!confirmRegen) { setRegenCountdown(0); return; }
+    if (!confirmRegen.isRegistered) { setRegenCountdown(0); return; }
+    setRegenCountdown(5);
+    const t = setInterval(() => setRegenCountdown(c => c <= 1 ? 0 : c - 1), 1000);
+    return () => clearInterval(t);
+  }, [confirmRegen]);
+
+
     setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
       compensationType: 'comision', fixedSalary: '', payDay: '1' });
   };
