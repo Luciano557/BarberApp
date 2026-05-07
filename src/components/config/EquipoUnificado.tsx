@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
-import { AppRole } from '@/contexts/AuthContext';
+import { AppRole, useAuth } from '@/contexts/AuthContext';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
 import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
