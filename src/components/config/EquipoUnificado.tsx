@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -96,6 +96,15 @@ export function EquipoUnificado({
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [accessEmails, setAccessEmails] = useState<Record<string, string | null>>({});
+
+  // Access UI state (per barber)
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
+  const [generatedCodes, setGeneratedCodes] = useState<Record<string, { email: string; password: string }>>({});
+  const [confirmRegen, setConfirmRegen] = useState<{ barberId: string; email: string; isRegistered: boolean } | null>(null);
+  const [regenCountdown, setRegenCountdown] = useState(0);
+  const [savingAccess, setSavingAccess] = useState<string | null>(null);
+
 
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
@@ -131,8 +140,19 @@ export function EquipoUnificado({
     if (data) setUserRoles(data as UserRole[]);
   }, []);
 
+  const fetchAccessEmails = useCallback(async () => {
+    if (barbers.length === 0) return;
+    const { data } = await supabase.from('barberos').select('id, access_email').in('id', barbers.map(b => b.id));
+    if (data) {
+      const map: Record<string, string | null> = {};
+      data.forEach((b: any) => { map[b.id] = b.access_email ?? null; });
+      setAccessEmails(map);
+    }
+  }, [barbers]);
+
   useEffect(() => { fetchPinStatus(); }, [fetchPinStatus]);
-  useEffect(() => { fetchOrgUsers(); fetchUserRoles(); }, [fetchOrgUsers, fetchUserRoles]);
+  useEffect(() => { fetchOrgUsers(); fetchUserRoles(); fetchAccessEmails(); }, [fetchOrgUsers, fetchUserRoles, fetchAccessEmails]);
+
 
   // Get linked user for a barber
   const getLinkedUser = (barberId: string): UserProfile | undefined =>
@@ -168,82 +188,120 @@ export function EquipoUnificado({
     });
   };
 
-  // Role change handler — now handles multiple roles via diff
+  // Map AppRole[] -> rol_equipo (single canonical)
+  const rolesToRolEquipo = (roles: AppRole[]): TeamRole | 'manager' | 'general_manager' | 'owner' => {
+    if (roles.includes('owner')) return 'owner' as any;
+    if (roles.includes('general_manager')) return 'general_manager' as any;
+    if (roles.includes('manager')) return 'manager' as any;
+    if (roles.includes('barber')) return 'barbero';
+    return 'otros';
+  };
+
+  // Centralized call to edge function
+  const callAccessFn = async (payload: {
+    barberoId: string;
+    accessEmail?: string | null;
+    rolEquipo?: any;
+    regenerateAccess?: boolean;
+  }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('update-team-member-access', {
+        body: {
+          barberoId: payload.barberoId,
+          organizationId,
+          sucursalId,
+          accessEmail: payload.accessEmail,
+          rolEquipo: payload.rolEquipo,
+          regenerateAccess: payload.regenerateAccess ?? false,
+        },
+      });
+      if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
+      if ((data as any)?.error) return { ok: false, error: (data as any).error };
+      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Error en la solicitud' };
+    }
+  };
+
+  // Role change handler (uses edge function for security/consistency)
   const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
-    const linkedUser = getLinkedUser(barberId);
-    if (!linkedUser) {
-      toast.error('Este miembro no tiene un usuario vinculado. Invitalo primero.');
-      return;
-    }
-
-    const currentRoles = getUserRoles(linkedUser.id);
-    const isOwner = currentRoles.includes('owner');
-    if (isOwner) {
-      toast.error('No se puede cambiar el cargo del dueño');
-      return;
-    }
-
-    // Ensure at least one role
     if (newRoles.length === 0) {
       toast.error('Debe tener al menos un cargo');
       return;
     }
-
-    const currentNonOwner: string[] = currentRoles.filter(r => r !== 'owner');
-    const toRemove = currentNonOwner.filter(r => !(newRoles as string[]).includes(r));
-    const toAdd = (newRoles as string[]).filter(r => !currentNonOwner.includes(r));
-
-    for (const role of toRemove) {
-      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role as any);
-    }
-    for (const role of toAdd) {
-      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
-    }
-
-    // Handle user_sucursales: assign sucursal for manager/barber roles
-    const needsSucursal = newRoles.includes('manager') || newRoles.includes('barber');
-    const hadSucursalRole = currentNonOwner.includes('manager') || currentNonOwner.includes('barber');
-
-    if (needsSucursal && sucursalId) {
-      // Upsert user_sucursales
-      const { data: existing } = await supabase
-        .from('user_sucursales')
-        .select('id')
-        .eq('user_id', linkedUser.id)
-        .eq('sucursal_id', sucursalId)
-        .maybeSingle();
-
-      if (!existing) {
-        await supabase.from('user_sucursales').insert({
-          user_id: linkedUser.id,
-          sucursal_id: sucursalId,
-          organization_id: organizationId,
-        });
+    const linkedUser = getLinkedUser(barberId);
+    if (linkedUser) {
+      const currentRoles = getUserRoles(linkedUser.id);
+      if (currentRoles.includes('owner')) {
+        toast.error('No se puede cambiar el cargo del dueño');
+        return;
       }
-
-      // Set default_sucursal_id
-      await supabase
-        .from('profiles')
-        .update({ default_sucursal_id: sucursalId })
-        .eq('id', linkedUser.id);
-    } else if (!needsSucursal && hadSucursalRole) {
-      // Removed all sucursal-bound roles: clean up user_sucursales
-      await supabase
-        .from('user_sucursales')
-        .delete()
-        .eq('user_id', linkedUser.id)
-        .eq('sucursal_id', sucursalId);
     }
-
-    // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
-    const teamRole: TeamRole = newRoles.includes('barber') ? 'barbero' : 'otros';
-    onUpdateBarber(barberId, { teamRole });
-
-    if (toRemove.length > 0 || toAdd.length > 0) {
-      toast.success('Cargos actualizados');
-      await fetchUserRoles();
+    const rolEquipo = rolesToRolEquipo(newRoles);
+    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+    if (!res.ok) {
+      toast.error(res.error || 'No se pudo actualizar el cargo');
+      return;
     }
+    toast.success('Cargo actualizado');
+    onUpdateBarber(barberId, { teamRole: (newRoles.includes('barber') ? 'barbero' : 'otros') as TeamRole });
+    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
   };
+
+  // Save access_email only (no auth touch)
+  const handleSaveAccessEmail = async (barberId: string) => {
+    const draft = (emailDrafts[barberId] ?? '').trim();
+    setSavingAccess(barberId);
+    const res = await callAccessFn({ barberoId: barberId, accessEmail: draft === '' ? null : draft });
+    setSavingAccess(null);
+    if (!res.ok) { toast.error(res.error || 'No se pudo guardar el email'); return; }
+    toast.success('Email de acceso guardado');
+    setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
+    await fetchAccessEmails();
+  };
+
+  // Generate / regenerate access (creates auth user + temp password)
+  const performRegenerate = async (barberId: string) => {
+    const linkedUser = getLinkedUser(barberId);
+    const draft = emailDrafts[barberId];
+    const persisted = accessEmails[barberId];
+    const finalEmail = (draft !== undefined ? draft : (persisted ?? '')).trim();
+    if (!finalEmail) { toast.error('Cargá un email primero'); return; }
+
+    // Compute current rolEquipo from persisted state to send (function will validate)
+    const barber = barbers.find(b => b.id === barberId);
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
+    let rolEquipo: any = barber?.teamRole ?? 'barbero';
+    if (currentRoles.includes('owner')) rolEquipo = 'owner';
+    else if (currentRoles.includes('general_manager')) rolEquipo = 'general_manager';
+    else if (currentRoles.includes('manager')) rolEquipo = 'manager';
+    else if (currentRoles.includes('barber')) rolEquipo = 'barbero';
+
+    setSavingAccess(barberId);
+    const res = await callAccessFn({
+      barberoId: barberId,
+      accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
+      rolEquipo,
+      regenerateAccess: true,
+    });
+    setSavingAccess(null);
+    if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
+    if (res.tempPassword && res.email) {
+      setGeneratedCodes(prev => ({ ...prev, [barberId]: { email: res.email!, password: res.tempPassword! } }));
+      setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
+      toast.success('Acceso generado');
+    }
+    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+  };
+
+  // Confirm regenerate countdown
+  useEffect(() => {
+    if (!confirmRegen) { setRegenCountdown(0); return; }
+    if (!confirmRegen.isRegistered) { setRegenCountdown(0); return; }
+    setRegenCountdown(5);
+    const t = setInterval(() => setRegenCountdown(c => c <= 1 ? 0 : c - 1), 1000);
+    return () => clearInterval(t);
+  }, [confirmRegen]);
 
   const resetForm = () => {
     setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
@@ -521,7 +579,82 @@ export function EquipoUnificado({
               );
             })()}
 
-            {/* Actions with text labels */}
+            {/* Acceso al sistema */}
+            {!isOwner && (() => {
+              const persistedEmail = accessEmails[barber.id] ?? null;
+              const draft = emailDrafts[barber.id];
+              const currentValue = draft !== undefined ? draft : (persistedEmail ?? '');
+              const isRegistered = !!linkedUser;
+              const hasPersistedEmail = !!persistedEmail;
+              const isDirty = draft !== undefined && draft !== (persistedEmail ?? '');
+              const code = generatedCodes[barber.id];
+              const saving = savingAccess === barber.id;
+
+              let stateLabel = 'Sin email de acceso';
+              let stateClass = 'text-muted-foreground';
+              if (isRegistered) { stateLabel = 'Usuario registrado'; stateClass = 'text-success'; }
+              else if (hasPersistedEmail) { stateLabel = 'Email cargado — acceso pendiente'; stateClass = 'text-primary'; }
+
+              return (
+                <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <KeyRound className="h-3.5 w-3.5" /> Acceso al sistema
+                    </span>
+                    <span className={`text-[11px] ${stateClass}`}>{stateLabel}</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email@ejemplo.com"
+                      value={currentValue}
+                      maxLength={80}
+                      onChange={(e) => setEmailDrafts(prev => ({ ...prev, [barber.id]: e.target.value }))}
+                      className="h-8 text-xs flex-1"
+                      autoComplete="off"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs"
+                        disabled={saving || !isDirty}
+                        onClick={() => handleSaveAccessEmail(barber.id)}>
+                        Guardar email
+                      </Button>
+                      <Button size="sm" className="h-8 text-xs"
+                        disabled={saving || (!hasPersistedEmail && !(draft && draft.trim()))}
+                        onClick={() => {
+                          const email = (draft !== undefined ? draft : persistedEmail) || '';
+                          setConfirmRegen({ barberId: barber.id, email: email.trim(), isRegistered });
+                        }}>
+                        {isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
+                      </Button>
+                    </div>
+                  </div>
+                  {code && (
+                    <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/30 space-y-1">
+                      <p className="text-[11px] text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                          <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{code.email}</span></div>
+                          <div><span className="text-muted-foreground">Contraseña temporal:</span> <span className="font-mono font-semibold">{code.password}</span></div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-7 px-2"
+                            onClick={() => { navigator.clipboard.writeText(`${code.email} / ${code.password}`); toast.success('Copiado'); }}>
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 px-2"
+                            onClick={() => setGeneratedCodes(prev => { const c = { ...prev }; delete c[barber.id]; return c; })}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
                 setEditingId(barber.id);
@@ -544,12 +677,6 @@ export function EquipoUnificado({
                 </Button>
               )}
 
-              {(!linkedUser || !hasSystemAccess) && barber.teamRole !== 'otros' && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs"
-                  onClick={() => setInviteBarber(barber)}>
-                  <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
-                </Button>
-              )}
 
               <Button variant="ghost" size="sm" className="h-8 text-xs"
                 onClick={() => setToggleConfirm({
@@ -615,6 +742,35 @@ export function EquipoUnificado({
         hasPin={pinDialogBarber ? !!barberPinStatus[pinDialogBarber.id] : false} onPinUpdated={fetchPinStatus} />
 
       {/* Confirmation dialog for activate/deactivate */}
+      {/* Confirm regenerate access */}
+      <AlertDialog open={!!confirmRegen} onOpenChange={(open) => !open && setConfirmRegen(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+              {confirmRegen?.isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRegen?.isRegistered
+                ? `Esta acción reemplazará la contraseña actual del usuario (${confirmRegen?.email}). El acceso anterior dejará de funcionar inmediatamente. Se generará una contraseña temporal que verás una sola vez.`
+                : `Se creará un acceso para ${confirmRegen?.email} con una contraseña temporal. La verás una sola vez.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={confirmRegen?.isRegistered && regenCountdown > 0}
+              onClick={async () => {
+                const target = confirmRegen;
+                setConfirmRegen(null);
+                if (target) await performRegenerate(target.barberId);
+              }}>
+              {confirmRegen?.isRegistered && regenCountdown > 0 ? `Confirmar (${regenCountdown}s)` : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
