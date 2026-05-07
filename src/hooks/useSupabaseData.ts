@@ -631,6 +631,9 @@ export function useSupabaseData() {
           tipo_compensacion: barber.compensationType || 'comision',
           sueldo_fijo: barber.fixedSalary || null,
           rol_equipo: barber.teamRole || 'barbero',
+          roles_equipo: (barber.rolesEquipo && barber.rolesEquipo.length > 0)
+            ? barber.rolesEquipo
+            : (barber.teamRole === 'otros' ? ['otros'] : ['barber']),
           fecha_cobro_dia: barber.payDay || 1,
         })
         .select()
