@@ -742,6 +742,35 @@ export function EquipoUnificado({
         hasPin={pinDialogBarber ? !!barberPinStatus[pinDialogBarber.id] : false} onPinUpdated={fetchPinStatus} />
 
       {/* Confirmation dialog for activate/deactivate */}
+      {/* Confirm regenerate access */}
+      <AlertDialog open={!!confirmRegen} onOpenChange={(open) => !open && setConfirmRegen(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+              {confirmRegen?.isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRegen?.isRegistered
+                ? `Esta acción reemplazará la contraseña actual del usuario (${confirmRegen?.email}). El acceso anterior dejará de funcionar inmediatamente. Se generará una contraseña temporal que verás una sola vez.`
+                : `Se creará un acceso para ${confirmRegen?.email} con una contraseña temporal. La verás una sola vez.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={confirmRegen?.isRegistered && regenCountdown > 0}
+              onClick={async () => {
+                const target = confirmRegen;
+                setConfirmRegen(null);
+                if (target) await performRegenerate(target.barberId);
+              }}>
+              {confirmRegen?.isRegistered && regenCountdown > 0 ? `Confirmar (${regenCountdown}s)` : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
