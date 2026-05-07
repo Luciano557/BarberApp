@@ -228,22 +228,58 @@ export function EquipoUnificado({
     regenerateAccess?: boolean;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
     try {
-      const { data, error } = await supabase.functions.invoke('update-team-member-access', {
-        body: {
-          barberoId: payload.barberoId,
-          organizationId,
-          sucursalId,
-          accessEmail: payload.accessEmail,
-          rolEquipo: payload.rolEquipo,
-          regenerateAccess: payload.regenerateAccess ?? false,
-        },
-      });
+      const body = {
+        barberoId: payload.barberoId,
+        organizationId,
+        sucursalId,
+        accessEmail: payload.accessEmail,
+        rolEquipo: payload.rolEquipo,
+        regenerateAccess: payload.regenerateAccess ?? false,
+      };
+      console.debug('[update-team-member-access] payload', body);
+      const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
       if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
       if ((data as any)?.error) return { ok: false, error: (data as any).error };
       return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Error en la solicitud' };
     }
+  };
+
+  // Verify rol_equipo persisted in DB after a save
+  const verifyRolEquipo = async (barberoId: string, expected: string): Promise<boolean> => {
+    const { data } = await supabase.from('barberos').select('rol_equipo').eq('id', barberoId).maybeSingle();
+    return (data as any)?.rol_equipo === expected;
+  };
+
+  // Role change handler (uses edge function for security/consistency)
+  const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
+    if (newRoles.length === 0) {
+      toast.error('Debe tener al menos un cargo');
+      return;
+    }
+    const linkedUser = getLinkedUser(barberId);
+    if (linkedUser) {
+      const currentRoles = getUserRoles(linkedUser.id);
+      if (currentRoles.includes('owner')) {
+        toast.error('No se puede cambiar el cargo del dueño');
+        return;
+      }
+    }
+    const rolEquipo = rolesToRolEquipo(newRoles);
+    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+    if (!res.ok) {
+      toast.error(res.error || 'No se pudo actualizar el cargo');
+      return;
+    }
+    const ok = await verifyRolEquipo(barberId, rolEquipo);
+    if (!ok) {
+      toast.error('El cambio no quedó persistido. Reintentá.');
+      return;
+    }
+    if (onRefreshBarbers) await onRefreshBarbers();
+    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+    toast.success('Cargo actualizado');
   };
 
   // Role change handler (uses edge function for security/consistency)
