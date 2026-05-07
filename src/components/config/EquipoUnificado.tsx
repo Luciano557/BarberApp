@@ -627,28 +627,33 @@ export function EquipoUnificado({
             </div>
 
             {/* Role multi-select — available also when there's no linked user (persists rol_equipo) */}
-            {!isOwner && (
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
-                {ASSIGNABLE_ROLES.map(role => (
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
+              {isOwner && (
+                <Badge variant="default" className="flex items-center gap-1 text-xs">
+                  {getRoleIcon('owner')} {getRoleLabel('owner')}
+                </Badge>
+              )}
+              {ASSIGNABLE_ROLES.map(role => {
+                // Owners cannot toggle hierarchical roles; only allow barber/otros toggle for them
+                if (isOwner && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
+                return (
                   <label key={role} className="flex items-center gap-1 cursor-pointer">
                     <Checkbox
                       className="h-3.5 w-3.5"
-                      checked={(assignableRoles as string[]).includes(role)}
+                      checked={(displayRoles as string[]).includes(role)}
                       onCheckedChange={(checked) => {
-                        const newRoles = checked
-                          ? [...assignableRoles, role]
-                          : assignableRoles.filter(r => r !== role);
-                        if (newRoles.length > 0) {
-                          handleChangeRoles(barber.id, newRoles);
+                        const next = enforceRoleRules(displayRoles, role, !!checked);
+                        if (next.length > 0) {
+                          handleChangeRoles(barber.id, next);
                         }
                       }}
                     />
                     <span className="text-xs">{getRoleLabel(role)}</span>
                   </label>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             {/* Extras de compensación — only for managers/GMs */}
             {(() => {
