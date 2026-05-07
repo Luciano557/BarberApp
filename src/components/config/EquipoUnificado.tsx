@@ -343,7 +343,48 @@ export function EquipoUnificado({
     }
   };
 
-  // Verify rol_equipo persisted in DB after a save
+  // Wrapper: handles MANAGER_REPLACE_REQUIRED / STALE_MANAGER_ROLE via dialogs.
+  // Returns the final result after the user has resolved any conflict (or cancelled).
+  const submitWithConflictHandling = async (
+    payload: any,
+    newMemberName: string,
+  ): Promise<any> => {
+    const res = await callAccessFn(payload);
+    if (res.ok) return res;
+
+    if (res.code === 'MANAGER_REPLACE_REQUIRED') {
+      if (!callerCanReplaceManager) {
+        toast.error('Solo el dueño o encargado general pueden reemplazar a un Encargado existente');
+        return res;
+      }
+      return await new Promise<any>((resolve) => {
+        setReplaceMgrDialog({
+          payload,
+          currentManagerName: res.data?.currentManagerName ?? 'el Encargado actual',
+          currentManagerBarberoId: res.data?.currentManagerBarberoId ?? '',
+          newMemberName,
+          onResolved: (r) => resolve(r),
+        });
+      });
+    }
+
+    if (res.code === 'STALE_MANAGER_ROLE') {
+      if (!callerCanReplaceManager) {
+        toast.error('Solo el dueño o encargado general pueden corregir esta inconsistencia');
+        return res;
+      }
+      return await new Promise<any>((resolve) => {
+        setStaleMgrDialog({
+          payload,
+          conflictName: res.data?.conflictName ?? null,
+          conflictEmail: res.data?.conflictEmail ?? null,
+          onResolved: (r) => resolve(r),
+        });
+      });
+    }
+
+    return res;
+  };
   const verifyRolEquipo = async (barberoId: string, expected: string): Promise<boolean> => {
     const { data } = await supabase.from('barberos').select('rol_equipo').eq('id', barberoId).maybeSingle();
     return (data as any)?.rol_equipo === expected;
