@@ -271,12 +271,13 @@ export function EquipoUnificado({
     roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
+    sucursalId?: string | null;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
     try {
       const body = {
         barberoId: payload.barberoId,
         organizationId,
-        sucursalId,
+        sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
         accessEmail: payload.accessEmail,
         roles: payload.roles,
         rolEquipo: payload.rolEquipo,
