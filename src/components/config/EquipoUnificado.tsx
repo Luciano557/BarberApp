@@ -529,22 +529,26 @@ export function EquipoUnificado({
                 <span className="text-[11px] text-muted-foreground">(no editable)</span>
               </div>
             )}
-            {ASSIGNABLE_ROLES.map(role => (
-              <label key={role} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={localData.roles.includes(role)}
-                  onCheckedChange={(checked) => {
-                    setLocalData(prev => ({
-                      ...prev,
-                      roles: enforceRoleRules(prev.roles, role, !!checked),
-                    }));
-                  }}
-                />
-                <span className="flex items-center gap-1.5 text-sm">
-                  {getRoleIcon(role)} {getRoleLabel(role)}
-                </span>
-              </label>
-            ))}
+            {ASSIGNABLE_ROLES.map(role => {
+              const isOwnerLocal = localData.roles.includes('owner');
+              if (isOwnerLocal && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
+              return (
+                <label key={role} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={localData.roles.includes(role)}
+                    onCheckedChange={(checked) => {
+                      setLocalData(prev => ({
+                        ...prev,
+                        roles: enforceRoleRules(prev.roles, role, !!checked),
+                      }));
+                    }}
+                  />
+                  <span className="flex items-center gap-1.5 text-sm">
+                    {getRoleIcon(role)} {getRoleLabel(role)}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
         <div className="flex justify-end gap-2">
