@@ -56,6 +56,20 @@ const getRoleIcon = (role: AppRole) => {
 
 const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber', 'otros'];
 
+// Stable form data type — shared between EquipoUnificado and StaffForm
+type StaffFormData = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  commission: string;
+  address: string;
+  dni: string;
+  roles: AppRole[];
+  compensationType: CompensationType;
+  fixedSalary: string;
+  payDay: string;
+};
+
 // Enforce valid role combinations when user toggles a role
 function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean): AppRole[] {
   let next = new Set(current);
