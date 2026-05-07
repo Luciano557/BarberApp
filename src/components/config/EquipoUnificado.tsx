@@ -391,7 +391,7 @@ export function EquipoUnificado({
           return;
         }
       }
-      const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+      const res = await callAccessFn({ barberoId: barberId, roles: data.roles });
       if (!res.ok) {
         toast.error(res.error || 'No se pudo guardar el cargo');
         return;
