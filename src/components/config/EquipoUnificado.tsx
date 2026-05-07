@@ -492,7 +492,7 @@ export function EquipoUnificado({
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
     const rolEquipo = rolesToRolEquipo(data.roles);
     if (barberId) {
-      // 1. Persist cargo (and sucursal) via edge function FIRST. If it fails, abort.
+      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
       const linkedUser = getLinkedUser(barberId);
       if (linkedUser) {
         const currentRoles = getUserRoles(linkedUser.id);
@@ -501,22 +501,38 @@ export function EquipoUnificado({
           return;
         }
       }
-      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
-      const res = await callAccessFn({
-        barberoId: barberId,
-        roles: data.roles,
-        sucursalId: targetBarber?.sucursalId ?? sucursalId,
-      });
-      if (!res.ok) {
-        toast.error(res.error || 'No se pudo guardar el cargo');
-        return;
+
+      // Detect whether cargo/sucursal/access actually changed.
+      // If only personal fields changed, skip the edge function entirely
+      // (avoids triggering manager validation on unrelated edits).
+      const currentDisplayRoles = targetBarber ? getDisplayRoles(targetBarber) : [];
+      const sortedA = [...currentDisplayRoles].sort().join(',');
+      const sortedB = [...data.roles].sort().join(',');
+      const rolesChanged = sortedA !== sortedB;
+      const newSucursalId = targetBarber?.sucursalId ?? sucursalId;
+      const sucursalChanged = (targetBarber?.sucursalId ?? null) !== (newSucursalId ?? null);
+
+      if (rolesChanged || sucursalChanged) {
+        const memberName = `${data.firstName} ${data.lastName}`.trim();
+        const res = await submitWithConflictHandling({
+          barberoId: barberId,
+          roles: data.roles,
+          sucursalId: newSucursalId,
+        }, memberName);
+        if (!res.ok) {
+          if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+            toast.error(res.error || 'No se pudo guardar el cargo');
+          }
+          return;
+        }
+        const ok = await verifyRolEquipo(barberId, rolEquipo);
+        if (!ok) {
+          toast.error('El cambio no quedó persistido. Reintentá.');
+          return;
+        }
       }
-      const ok = await verifyRolEquipo(barberId, rolEquipo);
-      if (!ok) {
-        toast.error('El cambio no quedó persistido. Reintentá.');
-        return;
-      }
-      // 2. Persist personal fields (without overriding teamRole — edge function already set rol_equipo)
+
+      // Persist personal fields
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
@@ -524,7 +540,6 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
       });
-      // 3. Refetch authoritative source
       if (onRefreshBarbers) await onRefreshBarbers();
       await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
       toast.success('Integrante actualizado');
