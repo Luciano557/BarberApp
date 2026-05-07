@@ -235,6 +235,7 @@ export function SucursalTabContent({
           sucursales={allSucursales}
           onAddBarber={onAddBarber}
           onUpdateBarber={onUpdateBarber}
+          onRefreshBarbers={onRefreshBarbers}
         />
 
         {/* Catálogo de Servicios */}
