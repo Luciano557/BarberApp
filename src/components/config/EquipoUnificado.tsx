@@ -122,17 +122,17 @@ export function EquipoUnificado({
 
   // Conflict resolution dialogs (manager replacement / stale role)
   const [replaceMgrDialog, setReplaceMgrDialog] = useState<{
-    payload: AccessFnPayload;
+    payload: any;
     currentManagerName: string;
     currentManagerBarberoId: string;
     newMemberName: string;
-    onResolved: (res: AccessFnResult) => void;
+    onResolved: (res: any) => void;
   } | null>(null);
   const [staleMgrDialog, setStaleMgrDialog] = useState<{
-    payload: AccessFnPayload;
+    payload: any;
     conflictName: string | null;
     conflictEmail: string | null;
-    onResolved: (res: AccessFnResult) => void;
+    onResolved: (res: any) => void;
   } | null>(null);
 
   // User/role data
