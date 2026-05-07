@@ -367,6 +367,7 @@ export function EquipoUnificado({
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
       roles: rolesToSend,
       regenerateAccess: true,
+      sucursalId: barber?.sucursalId ?? sucursalId,
     });
     setSavingAccess(null);
     if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
