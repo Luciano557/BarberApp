@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
-import { AppRole } from '@/contexts/AuthContext';
+import { AppRole, useAuth } from '@/contexts/AuthContext';
+
 import { InviteUserDialog } from '@/components/InviteUserDialog';
 import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
@@ -115,6 +116,24 @@ export function EquipoUnificado({
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+
+  const { roles: callerRoles } = useAuth();
+  const callerCanReplaceManager = callerRoles.includes('owner') || callerRoles.includes('general_manager');
+
+  // Conflict resolution dialogs (manager replacement / stale role)
+  const [replaceMgrDialog, setReplaceMgrDialog] = useState<{
+    payload: any;
+    currentManagerName: string;
+    currentManagerBarberoId: string;
+    newMemberName: string;
+    onResolved: (res: any) => void;
+  } | null>(null);
+  const [staleMgrDialog, setStaleMgrDialog] = useState<{
+    payload: any;
+    conflictName: string | null;
+    conflictEmail: string | null;
+    onResolved: (res: any) => void;
+  } | null>(null);
 
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
@@ -264,36 +283,108 @@ export function EquipoUnificado({
     return ['barber'];
   };
 
-  // Centralized call to edge function
-  const callAccessFn = async (payload: {
+  // Centralized call to edge function — always returns a controlled result
+  type AccessFnPayload = {
     barberoId: string;
     accessEmail?: string | null;
     roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
     sucursalId?: string | null;
-  }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
+    replaceExistingManager?: boolean;
+    existingManagerBarberoId?: string | null;
+    resolveStaleManagerConflict?: boolean;
+  };
+  type AccessFnResult = {
+    ok: boolean;
+    code?: string;
+    error?: string;
+    data?: any;
+    tempPassword?: string | null;
+    email?: string | null;
+  };
+  const callAccessFn = async (payload: AccessFnPayload): Promise<AccessFnResult> => {
+    const body: any = {
+      barberoId: payload.barberoId,
+      organizationId,
+      sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
+      accessEmail: payload.accessEmail,
+      roles: payload.roles,
+      rolEquipo: payload.rolEquipo,
+      regenerateAccess: payload.regenerateAccess ?? false,
+    };
+    if (payload.replaceExistingManager) body.replaceExistingManager = true;
+    if (payload.existingManagerBarberoId) body.existingManagerBarberoId = payload.existingManagerBarberoId;
+    if (payload.resolveStaleManagerConflict) body.resolveStaleManagerConflict = true;
+
     try {
-      const body = {
-        barberoId: payload.barberoId,
-        organizationId,
-        sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
-        accessEmail: payload.accessEmail,
-        roles: payload.roles,
-        rolEquipo: payload.rolEquipo,
-        regenerateAccess: payload.regenerateAccess ?? false,
-      };
       console.debug('[update-team-member-access] payload', body);
       const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
-      if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
-      if ((data as any)?.error) return { ok: false, error: (data as any).error };
-      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
+      if (error) {
+        // Try to extract structured JSON body from FunctionsHttpError
+        let parsed: any = null;
+        const ctxResp = (error as any)?.context?.response;
+        if (ctxResp && typeof ctxResp.json === 'function') {
+          try { parsed = await ctxResp.json(); } catch { parsed = null; }
+        }
+        return {
+          ok: false,
+          code: parsed?.code,
+          error: parsed?.error || (error as any).message || 'Error en la solicitud',
+          data: parsed,
+        };
+      }
+      if ((data as any)?.error) {
+        return { ok: false, code: (data as any)?.code, error: (data as any).error, data };
+      }
+      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email, data };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Error en la solicitud' };
     }
   };
 
-  // Verify rol_equipo persisted in DB after a save
+  // Wrapper: handles MANAGER_REPLACE_REQUIRED / STALE_MANAGER_ROLE via dialogs.
+  // Returns the final result after the user has resolved any conflict (or cancelled).
+  const submitWithConflictHandling = async (
+    payload: any,
+    newMemberName: string,
+  ): Promise<any> => {
+    const res = await callAccessFn(payload);
+    if (res.ok) return res;
+
+    if (res.code === 'MANAGER_REPLACE_REQUIRED') {
+      if (!callerCanReplaceManager) {
+        toast.error('Solo el dueño o encargado general pueden reemplazar a un Encargado existente');
+        return res;
+      }
+      return await new Promise<any>((resolve) => {
+        setReplaceMgrDialog({
+          payload,
+          currentManagerName: res.data?.currentManagerName ?? 'el Encargado actual',
+          currentManagerBarberoId: res.data?.currentManagerBarberoId ?? '',
+          newMemberName,
+          onResolved: (r) => resolve(r),
+        });
+      });
+    }
+
+    if (res.code === 'STALE_MANAGER_ROLE') {
+      if (!callerCanReplaceManager) {
+        toast.error('Solo el dueño o encargado general pueden corregir esta inconsistencia');
+        return res;
+      }
+      return await new Promise<any>((resolve) => {
+        setStaleMgrDialog({
+          payload,
+          conflictName: res.data?.conflictName ?? null,
+          conflictEmail: res.data?.conflictEmail ?? null,
+          onResolved: (r) => resolve(r),
+        });
+      });
+    }
+
+    return res;
+  };
   const verifyRolEquipo = async (barberoId: string, expected: string): Promise<boolean> => {
     const { data } = await supabase.from('barberos').select('rol_equipo').eq('id', barberoId).maybeSingle();
     return (data as any)?.rol_equipo === expected;
@@ -315,13 +406,16 @@ export function EquipoUnificado({
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
     const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
-    const res = await callAccessFn({
+    const memberName = targetBarber ? `${targetBarber.firstName} ${targetBarber.lastName}`.trim() : 'el integrante';
+    const res = await submitWithConflictHandling({
       barberoId: barberId,
       roles: newRoles,
       sucursalId: targetBarber?.sucursalId ?? sucursalId,
-    });
+    }, memberName);
     if (!res.ok) {
-      toast.error(res.error || 'No se pudo actualizar el cargo');
+      if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+        toast.error(res.error || 'No se pudo actualizar el cargo');
+      }
       return;
     }
     const ok = await verifyRolEquipo(barberId, rolEquipo);
@@ -362,15 +456,21 @@ export function EquipoUnificado({
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
-    const res = await callAccessFn({
+    const memberName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : 'el integrante';
+    const res = await submitWithConflictHandling({
       barberoId: barberId,
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
       roles: rolesToSend,
       regenerateAccess: true,
       sucursalId: barber?.sucursalId ?? sucursalId,
-    });
+    }, memberName);
     setSavingAccess(null);
-    if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
+    if (!res.ok) {
+      if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+        toast.error(res.error || 'No se pudo generar el acceso');
+      }
+      return;
+    }
     if (res.tempPassword && res.email) {
       setGeneratedCodes(prev => ({ ...prev, [barberId]: { email: res.email!, password: res.tempPassword! } }));
       setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
@@ -398,7 +498,7 @@ export function EquipoUnificado({
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
     const rolEquipo = rolesToRolEquipo(data.roles);
     if (barberId) {
-      // 1. Persist cargo (and sucursal) via edge function FIRST. If it fails, abort.
+      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
       const linkedUser = getLinkedUser(barberId);
       if (linkedUser) {
         const currentRoles = getUserRoles(linkedUser.id);
@@ -407,22 +507,38 @@ export function EquipoUnificado({
           return;
         }
       }
-      const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
-      const res = await callAccessFn({
-        barberoId: barberId,
-        roles: data.roles,
-        sucursalId: targetBarber?.sucursalId ?? sucursalId,
-      });
-      if (!res.ok) {
-        toast.error(res.error || 'No se pudo guardar el cargo');
-        return;
+
+      // Detect whether cargo/sucursal/access actually changed.
+      // If only personal fields changed, skip the edge function entirely
+      // (avoids triggering manager validation on unrelated edits).
+      const currentDisplayRoles = targetBarber ? getDisplayRoles(targetBarber) : [];
+      const sortedA = [...currentDisplayRoles].sort().join(',');
+      const sortedB = [...data.roles].sort().join(',');
+      const rolesChanged = sortedA !== sortedB;
+      const newSucursalId = targetBarber?.sucursalId ?? sucursalId;
+      const sucursalChanged = (targetBarber?.sucursalId ?? null) !== (newSucursalId ?? null);
+
+      if (rolesChanged || sucursalChanged) {
+        const memberName = `${data.firstName} ${data.lastName}`.trim();
+        const res = await submitWithConflictHandling({
+          barberoId: barberId,
+          roles: data.roles,
+          sucursalId: newSucursalId,
+        }, memberName);
+        if (!res.ok) {
+          if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+            toast.error(res.error || 'No se pudo guardar el cargo');
+          }
+          return;
+        }
+        const ok = await verifyRolEquipo(barberId, rolEquipo);
+        if (!ok) {
+          toast.error('El cambio no quedó persistido. Reintentá.');
+          return;
+        }
       }
-      const ok = await verifyRolEquipo(barberId, rolEquipo);
-      if (!ok) {
-        toast.error('El cambio no quedó persistido. Reintentá.');
-        return;
-      }
-      // 2. Persist personal fields (without overriding teamRole — edge function already set rol_equipo)
+
+      // Persist personal fields
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
@@ -430,7 +546,6 @@ export function EquipoUnificado({
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
       });
-      // 3. Refetch authoritative source
       if (onRefreshBarbers) await onRefreshBarbers();
       await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
       toast.success('Integrante actualizado');
@@ -910,6 +1025,103 @@ export function EquipoUnificado({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmToggle}>
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Manager replacement confirmation */}
+      <AlertDialog open={!!replaceMgrDialog} onOpenChange={(open) => {
+        if (!open && replaceMgrDialog) {
+          replaceMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
+          setReplaceMgrDialog(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Reemplazar Encargado de Sucursal
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {replaceMgrDialog && (
+                <>
+                  Estás a punto de cambiar el rango de <strong>{replaceMgrDialog.newMemberName}</strong>.
+                  Este rango actualmente pertenece a <strong>{replaceMgrDialog.currentManagerName}</strong>.
+                  Si confirmás el cambio, {replaceMgrDialog.currentManagerName} dejará de ser Encargado de Sucursal.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const target = replaceMgrDialog;
+              setReplaceMgrDialog(null);
+              if (!target) return;
+              const retryRes = await callAccessFn({
+                ...target.payload,
+                replaceExistingManager: true,
+                existingManagerBarberoId: target.currentManagerBarberoId,
+              });
+              if (retryRes.ok) {
+                if (onRefreshBarbers) await onRefreshBarbers();
+                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                toast.success('Encargado reemplazado');
+              } else {
+                toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+              }
+              target.onResolved(retryRes);
+            }}>
+              Confirmar reemplazo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stale manager role inconsistency */}
+      <AlertDialog open={!!staleMgrDialog} onOpenChange={(open) => {
+        if (!open && staleMgrDialog) {
+          staleMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
+          setStaleMgrDialog(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Inconsistencia detectada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {staleMgrDialog && (
+                <>
+                  Detectamos una inconsistencia: <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'un usuario'}</strong> figura
+                  como Encargado en permisos reales, pero no aparece como Encargado en el equipo.
+                  Para continuar, Vittro debe corregir esa sincronización.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const target = staleMgrDialog;
+              setStaleMgrDialog(null);
+              if (!target) return;
+              const retryRes = await callAccessFn({
+                ...target.payload,
+                resolveStaleManagerConflict: true,
+              });
+              if (retryRes.ok) {
+                if (onRefreshBarbers) await onRefreshBarbers();
+                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                toast.success('Inconsistencia corregida');
+              } else {
+                toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+              }
+              target.onResolved(retryRes);
+            }}>
+              Corregir y continuar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
