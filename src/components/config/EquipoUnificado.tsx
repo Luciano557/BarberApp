@@ -265,30 +265,61 @@ export function EquipoUnificado({
     return ['barber'];
   };
 
-  // Centralized call to edge function
-  const callAccessFn = async (payload: {
+  // Centralized call to edge function — always returns a controlled result
+  type AccessFnPayload = {
     barberoId: string;
     accessEmail?: string | null;
     roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
     sucursalId?: string | null;
-  }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
+    replaceExistingManager?: boolean;
+    existingManagerBarberoId?: string | null;
+    resolveStaleManagerConflict?: boolean;
+  };
+  type AccessFnResult = {
+    ok: boolean;
+    code?: string;
+    error?: string;
+    data?: any;
+    tempPassword?: string | null;
+    email?: string | null;
+  };
+  const callAccessFn = async (payload: AccessFnPayload): Promise<AccessFnResult> => {
+    const body: any = {
+      barberoId: payload.barberoId,
+      organizationId,
+      sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
+      accessEmail: payload.accessEmail,
+      roles: payload.roles,
+      rolEquipo: payload.rolEquipo,
+      regenerateAccess: payload.regenerateAccess ?? false,
+    };
+    if (payload.replaceExistingManager) body.replaceExistingManager = true;
+    if (payload.existingManagerBarberoId) body.existingManagerBarberoId = payload.existingManagerBarberoId;
+    if (payload.resolveStaleManagerConflict) body.resolveStaleManagerConflict = true;
+
     try {
-      const body = {
-        barberoId: payload.barberoId,
-        organizationId,
-        sucursalId: payload.sucursalId !== undefined ? payload.sucursalId : sucursalId,
-        accessEmail: payload.accessEmail,
-        roles: payload.roles,
-        rolEquipo: payload.rolEquipo,
-        regenerateAccess: payload.regenerateAccess ?? false,
-      };
       console.debug('[update-team-member-access] payload', body);
       const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
-      if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
-      if ((data as any)?.error) return { ok: false, error: (data as any).error };
-      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
+      if (error) {
+        // Try to extract structured JSON body from FunctionsHttpError
+        let parsed: any = null;
+        const ctxResp = (error as any)?.context?.response;
+        if (ctxResp && typeof ctxResp.json === 'function') {
+          try { parsed = await ctxResp.json(); } catch { parsed = null; }
+        }
+        return {
+          ok: false,
+          code: parsed?.code,
+          error: parsed?.error || (error as any).message || 'Error en la solicitud',
+          data: parsed,
+        };
+      }
+      if ((data as any)?.error) {
+        return { ok: false, code: (data as any)?.code, error: (data as any).error, data };
+      }
+      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email, data };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Error en la solicitud' };
     }
