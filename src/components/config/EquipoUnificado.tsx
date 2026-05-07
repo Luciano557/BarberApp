@@ -282,30 +282,7 @@ export function EquipoUnificado({
     toast.success('Cargo actualizado');
   };
 
-  // Role change handler (uses edge function for security/consistency)
-  const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
-    if (newRoles.length === 0) {
-      toast.error('Debe tener al menos un cargo');
-      return;
-    }
-    const linkedUser = getLinkedUser(barberId);
-    if (linkedUser) {
-      const currentRoles = getUserRoles(linkedUser.id);
-      if (currentRoles.includes('owner')) {
-        toast.error('No se puede cambiar el cargo del dueño');
-        return;
-      }
-    }
-    const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
-    if (!res.ok) {
-      toast.error(res.error || 'No se pudo actualizar el cargo');
-      return;
-    }
-    toast.success('Cargo actualizado');
-    onUpdateBarber(barberId, { teamRole: (newRoles.includes('barber') ? 'barbero' : 'otros') as TeamRole });
-    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
-  };
+  // (legacy duplicate handleChangeRoles removed)
 
   // Save access_email only (no auth touch)
   const handleSaveAccessEmail = async (barberId: string) => {
