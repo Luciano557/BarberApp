@@ -487,8 +487,8 @@ export function EquipoUnificado({
     if (!finalEmail) { toast.error('Cargá un email primero'); return; }
 
     // Compute current roles from persisted state to send (function will validate)
-    const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : (barber ? rolEquipoToRoles(barber.teamRole) : []);
+    const barber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+    const currentRoles = barber ? getDisplayRoles(barber) : [];
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
