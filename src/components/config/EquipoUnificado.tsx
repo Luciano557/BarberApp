@@ -948,7 +948,7 @@ export function EquipoUnificado({
 
       {/* Manager replacement confirmation */}
       <AlertDialog open={!!replaceMgrDialog} onOpenChange={(open) => {
-        if (!open && replaceMgrDialog) {
+        if (!open && replaceMgrDialog && !resolvingReplaceDialogRef.current) {
           replaceMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
           setReplaceMgrDialog(null);
         }
@@ -973,21 +973,26 @@ export function EquipoUnificado({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               const target = replaceMgrDialog;
-              setReplaceMgrDialog(null);
               if (!target) return;
-              const retryRes = await callAccessFn({
-                ...target.payload,
-                replaceExistingManager: true,
-                existingManagerBarberoId: target.currentManagerBarberoId,
-              });
-              if (retryRes.ok) {
-                if (onRefreshBarbers) await onRefreshBarbers();
-                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
-                toast.success('Encargado reemplazado');
-              } else {
-                toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+              resolvingReplaceDialogRef.current = true;
+              try {
+                const retryRes = await callAccessFn({
+                  ...target.payload,
+                  replaceExistingManager: true,
+                  existingManagerBarberoId: target.currentManagerBarberoId,
+                });
+                if (retryRes.ok) {
+                  if (onRefreshBarbers) await onRefreshBarbers();
+                  await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                  toast.success('Encargado reemplazado');
+                } else {
+                  toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+                }
+                target.onResolved(retryRes);
+              } finally {
+                setReplaceMgrDialog(null);
+                resolvingReplaceDialogRef.current = false;
               }
-              target.onResolved(retryRes);
             }}>
               Confirmar reemplazo
             </AlertDialogAction>
