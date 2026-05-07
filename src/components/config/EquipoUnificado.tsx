@@ -55,6 +55,28 @@ const getRoleIcon = (role: AppRole) => {
 
 const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber', 'otros'];
 
+// Enforce valid role combinations when user toggles a role
+function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean): AppRole[] {
+  let next = new Set(current);
+  if (checked) next.add(toggled); else next.delete(toggled);
+
+  if (checked) {
+    if (toggled === 'otros') {
+      // 'otros' is exclusive
+      next = new Set<AppRole>(['otros']);
+    } else {
+      // Any non-'otros' role removes 'otros'
+      next.delete('otros');
+      // Hierarchical roles are mutually exclusive
+      if (toggled === 'owner') { next.delete('general_manager'); next.delete('manager'); }
+      if (toggled === 'general_manager') { next.delete('owner'); next.delete('manager'); }
+      if (toggled === 'manager') { next.delete('owner'); next.delete('general_manager'); }
+    }
+  }
+  if (next.size === 0) next.add('barber');
+  return Array.from(next);
+}
+
 interface UserProfile {
   id: string;
   email: string;
