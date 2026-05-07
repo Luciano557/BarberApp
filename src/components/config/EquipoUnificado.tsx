@@ -111,7 +111,7 @@ interface EquipoUnificadoProps {
   allBarbers: Barber[];
   sucursales?: { id: string; nombre: string }[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
-  onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
+  onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
 }
 
@@ -576,13 +576,15 @@ export function EquipoUnificado({
         }
       }
 
-      // Persist personal fields
-      onUpdateBarber(barberId, {
+      // Persist personal fields + sync roles locally (idempotent: edge fn already wrote them)
+      await onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
+        rolesEquipo: data.roles,
+        teamRole: rolEquipo,
       });
       if (onRefreshBarbers) await onRefreshBarbers();
       await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
