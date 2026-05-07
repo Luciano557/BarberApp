@@ -358,7 +358,7 @@ export function EquipoUnificado({
 
     // Compute current roles from persisted state to send (function will validate)
     const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRoles(barber?.teamRole as any);
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : (barber ? rolEquipoToRoles(barber.teamRole) : []);
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
