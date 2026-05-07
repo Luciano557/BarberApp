@@ -314,7 +314,12 @@ export function EquipoUnificado({
       }
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberoId: barberId, roles: newRoles });
+    const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+    const res = await callAccessFn({
+      barberoId: barberId,
+      roles: newRoles,
+      sucursalId: targetBarber?.sucursalId ?? sucursalId,
+    });
     if (!res.ok) {
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
