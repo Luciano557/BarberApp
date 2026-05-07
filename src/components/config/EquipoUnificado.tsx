@@ -347,23 +347,42 @@ export function EquipoUnificado({
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
-    const teamRole: TeamRole = data.roles.includes('barber') ? 'barbero' : 'otros';
+    const rolEquipo = rolesToRolEquipo(data.roles);
     if (barberId) {
+      // 1. Persist cargo (and sucursal) via edge function FIRST. If it fails, abort.
+      const linkedUser = getLinkedUser(barberId);
+      if (linkedUser) {
+        const currentRoles = getUserRoles(linkedUser.id);
+        if (currentRoles.includes('owner') && rolEquipo !== 'owner') {
+          toast.error('No se puede cambiar el cargo del dueño');
+          return;
+        }
+      }
+      const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+      if (!res.ok) {
+        toast.error(res.error || 'No se pudo guardar el cargo');
+        return;
+      }
+      const ok = await verifyRolEquipo(barberId, rolEquipo);
+      if (!ok) {
+        toast.error('El cambio no quedó persistido. Reintentá.');
+        return;
+      }
+      // 2. Persist personal fields (without overriding teamRole — edge function already set rol_equipo)
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
-        teamRole,
       });
-      // Update roles if linked user exists
-      const linkedUser = getLinkedUser(barberId);
-      if (linkedUser) {
-        await handleChangeRoles(barberId, data.roles);
-      }
+      // 3. Refetch authoritative source
+      if (onRefreshBarbers) await onRefreshBarbers();
+      await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+      toast.success('Integrante actualizado');
       setEditingId(null);
     } else {
+      const teamRole: TeamRole = (rolEquipo === 'barbero' || rolEquipo === 'otros' ? rolEquipo : 'barbero') as TeamRole;
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
