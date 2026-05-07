@@ -170,12 +170,25 @@ export function EquipoUnificado({
     return getUserRoles(linkedUser.id);
   };
 
-  // Get the highest role for a barber (for sorting)
+  // Get the highest role for a barber (for sorting) — uses display roles (rol_equipo first)
   const getBarberHighestRole = (barber: Barber): AppRole | null => {
-    const roles = getBarberRoles(barber);
+    const linkedUser = getLinkedUser(barber.id);
+    const roles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRolesSafe(barber.teamRole);
     if (roles.length === 0) return null;
     return roles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b])[0];
   };
+
+  // Local helper available before rolEquipoToRoles is defined below
+  function rolEquipoToRolesSafe(re: string | null | undefined): AppRole[] {
+    switch (re) {
+      case 'owner': return ['owner'];
+      case 'general_manager': return ['general_manager'];
+      case 'manager': return ['manager'];
+      case 'barbero': return ['barber'];
+      case 'otros': return ['otros'];
+      default: return [];
+    }
+  }
 
   // Sort barbers by role hierarchy
   const sortByHierarchy = (list: Barber[]): Barber[] => {
