@@ -259,6 +259,7 @@ export function EquipoUnificado({
   const callAccessFn = async (payload: {
     barberoId: string;
     accessEmail?: string | null;
+    roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
@@ -268,6 +269,7 @@ export function EquipoUnificado({
         organizationId,
         sucursalId,
         accessEmail: payload.accessEmail,
+        roles: payload.roles,
         rolEquipo: payload.rolEquipo,
         regenerateAccess: payload.regenerateAccess ?? false,
       };
@@ -296,13 +298,13 @@ export function EquipoUnificado({
     const linkedUser = getLinkedUser(barberId);
     if (linkedUser) {
       const currentRoles = getUserRoles(linkedUser.id);
-      if (currentRoles.includes('owner')) {
-        toast.error('No se puede cambiar el cargo del dueño');
+      if (currentRoles.includes('owner') && !newRoles.includes('owner')) {
+        toast.error('No se puede quitar el cargo de dueño');
         return;
       }
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+    const res = await callAccessFn({ barberoId: barberId, roles: newRoles });
     if (!res.ok) {
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
