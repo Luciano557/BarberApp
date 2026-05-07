@@ -140,8 +140,19 @@ export function EquipoUnificado({
     if (data) setUserRoles(data as UserRole[]);
   }, []);
 
+  const fetchAccessEmails = useCallback(async () => {
+    if (barbers.length === 0) return;
+    const { data } = await supabase.from('barberos').select('id, access_email').in('id', barbers.map(b => b.id));
+    if (data) {
+      const map: Record<string, string | null> = {};
+      data.forEach((b: any) => { map[b.id] = b.access_email ?? null; });
+      setAccessEmails(map);
+    }
+  }, [barbers]);
+
   useEffect(() => { fetchPinStatus(); }, [fetchPinStatus]);
-  useEffect(() => { fetchOrgUsers(); fetchUserRoles(); }, [fetchOrgUsers, fetchUserRoles]);
+  useEffect(() => { fetchOrgUsers(); fetchUserRoles(); fetchAccessEmails(); }, [fetchOrgUsers, fetchUserRoles, fetchAccessEmails]);
+
 
   // Get linked user for a barber
   const getLinkedUser = (barberId: string): UserProfile | undefined =>
