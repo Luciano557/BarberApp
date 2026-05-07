@@ -1002,7 +1002,7 @@ export function EquipoUnificado({
 
       {/* Stale manager role inconsistency */}
       <AlertDialog open={!!staleMgrDialog} onOpenChange={(open) => {
-        if (!open && staleMgrDialog) {
+        if (!open && staleMgrDialog && !resolvingStaleDialogRef.current) {
           staleMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
           setStaleMgrDialog(null);
         }
@@ -1027,20 +1027,25 @@ export function EquipoUnificado({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               const target = staleMgrDialog;
-              setStaleMgrDialog(null);
               if (!target) return;
-              const retryRes = await callAccessFn({
-                ...target.payload,
-                resolveStaleManagerConflict: true,
-              });
-              if (retryRes.ok) {
-                if (onRefreshBarbers) await onRefreshBarbers();
-                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
-                toast.success('Inconsistencia corregida');
-              } else {
-                toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+              resolvingStaleDialogRef.current = true;
+              try {
+                const retryRes = await callAccessFn({
+                  ...target.payload,
+                  resolveStaleManagerConflict: true,
+                });
+                if (retryRes.ok) {
+                  if (onRefreshBarbers) await onRefreshBarbers();
+                  await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                  toast.success('Inconsistencia corregida');
+                } else {
+                  toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+                }
+                target.onResolved(retryRes);
+              } finally {
+                setStaleMgrDialog(null);
+                resolvingStaleDialogRef.current = false;
               }
-              target.onResolved(retryRes);
             }}>
               Corregir y continuar
             </AlertDialogAction>
