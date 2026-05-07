@@ -321,11 +321,29 @@ export function EquipoUnificado({
       console.debug('[update-team-member-access] payload', body);
       const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
       if (error) {
-        // Try to extract structured JSON body from FunctionsHttpError
+        // Try to extract structured JSON body from FunctionsHttpError.
+        // The Response body may only be consumable once, so clone() before reading.
         let parsed: any = null;
         const ctxResp = (error as any)?.context?.response;
-        if (ctxResp && typeof ctxResp.json === 'function') {
-          try { parsed = await ctxResp.json(); } catch { parsed = null; }
+        if (ctxResp) {
+          try {
+            const cloned = typeof ctxResp.clone === 'function' ? ctxResp.clone() : ctxResp;
+            parsed = await cloned.json();
+          } catch {
+            try {
+              const cloned2 = typeof ctxResp.clone === 'function' ? ctxResp.clone() : ctxResp;
+              const txt = await cloned2.text();
+              try { parsed = JSON.parse(txt); } catch { parsed = null; }
+            } catch { parsed = null; }
+          }
+        }
+        // Fallback: parse JSON embedded in error.message ("...returned 409: Error, {json}")
+        if (!parsed && typeof (error as any)?.message === 'string') {
+          const msg: string = (error as any).message;
+          const idx = msg.indexOf('{');
+          if (idx >= 0) {
+            try { parsed = JSON.parse(msg.slice(idx)); } catch { parsed = null; }
+          }
         }
         return {
           ok: false,
