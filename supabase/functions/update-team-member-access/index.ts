@@ -200,12 +200,17 @@ serve(async (req: Request): Promise<Response> => {
 
     const finalSucursalId = sucursalId ?? barbero.sucursal_id;
 
-    // Manager uniqueness BEFORE any mutation
+    // Manager uniqueness BEFORE any mutation — distinguishes:
+    //  A) Real visible conflict (another barbero in branch with manager role/roles_equipo)
+    //  B) Stale conflict (user_roles.manager + user_sucursales but no visible barbero)
     if (normalizedRoles && normalizedRoles.includes("manager")) {
       if (!finalSucursalId) {
         return jsonResponse(400, { error: "El Encargado de Sucursal requiere una sucursal asignada" });
       }
-      // Look up active managers in this branch using roles_equipo OR rol_equipo legacy
+
+      const callerIsOwnerOrGM = isOwner || isGM;
+
+      // ===== A) Visible conflict =====
       const { data: existingMgr } = await admin
         .from("barberos")
         .select("id, nombre, apellido, roles_equipo, rol_equipo")
@@ -213,44 +218,93 @@ serve(async (req: Request): Promise<Response> => {
         .eq("sucursal_id", finalSucursalId)
         .eq("activo", true)
         .neq("id", barberoId);
-      const conflict = (existingMgr || []).find((m: any) =>
+      const visibleConflict = (existingMgr || []).find((m: any) =>
         (Array.isArray(m.roles_equipo) && m.roles_equipo.includes("manager")) ||
         m.rol_equipo === "manager"
       );
-      if (conflict) {
-        return jsonResponse(409, {
-          error: `La sucursal ya tiene un Encargado activo (${conflict.nombre} ${conflict.apellido}). Cambiá su cargo antes de asignar otro.`,
-        });
-      }
-
-      // Also validate against user_roles (real auth permissions)
-      const { data: mgrUserRoles } = await admin
-        .from("user_roles")
-        .select("user_id, profiles!inner(organization_id, barbero_id), user_sucursales!inner(sucursal_id)")
-        .eq("role", "manager");
-      // The above complex join may not work via PostgREST auto-embeds; do it in two steps:
-      const { data: managersWithRole } = await admin
-        .from("user_roles").select("user_id").eq("role", "manager");
-      const candidateUserIds = (managersWithRole || []).map((r: any) => r.user_id);
-      if (candidateUserIds.length > 0) {
-        const { data: candidateProfiles } = await admin
-          .from("profiles")
-          .select("id, barbero_id, organization_id")
-          .in("id", candidateUserIds)
+      if (visibleConflict) {
+        if (!replaceExistingManager) {
+          return jsonResponse(409, {
+            ok: false,
+            code: "MANAGER_REPLACE_REQUIRED",
+            currentManagerBarberoId: visibleConflict.id,
+            currentManagerName: `${visibleConflict.nombre} ${visibleConflict.apellido}`.trim(),
+            sucursalId: finalSucursalId,
+            error: `La sucursal ya tiene un Encargado activo (${visibleConflict.nombre} ${visibleConflict.apellido}).`,
+          });
+        }
+        if (!callerIsOwnerOrGM) {
+          return jsonResponse(403, { error: "Solo el dueño o encargado general pueden reemplazar a un Encargado existente" });
+        }
+        if (existingManagerBarberoId && existingManagerBarberoId !== visibleConflict.id) {
+          return jsonResponse(409, { error: "El Encargado actual cambió. Reintentá la operación." });
+        }
+        // Demote previous manager
+        const prevRolesEquipo: string[] = Array.isArray(visibleConflict.roles_equipo) ? visibleConflict.roles_equipo : [];
+        const hadBarber = prevRolesEquipo.includes("barber") || (visibleConflict.rol_equipo === "barbero");
+        const newPrevRoles: AppRole[] = hadBarber ? ["barber"] : ["otros"];
+        const newPrevRolEquipo: RolEquipo = hadBarber ? "barbero" : "otros";
+        const { error: demoteErr } = await admin
+          .from("barberos")
+          .update({ roles_equipo: newPrevRoles, rol_equipo: newPrevRolEquipo })
+          .eq("id", visibleConflict.id)
           .eq("organization_id", organizationId);
-        const orgUserIds = (candidateProfiles || [])
-          .filter((p: any) => p.barbero_id !== barberoId)
-          .map((p: any) => p.id);
-        if (orgUserIds.length > 0) {
-          const { data: branchAssign } = await admin
-            .from("user_sucursales")
-            .select("user_id")
-            .in("user_id", orgUserIds)
-            .eq("sucursal_id", finalSucursalId);
-          if (branchAssign && branchAssign.length > 0) {
-            return jsonResponse(409, {
-              error: "La sucursal ya tiene un usuario con cargo Encargado asignado. Cambiá su cargo antes de asignar otro.",
-            });
+        if (demoteErr) return jsonResponse(500, { error: `No se pudo degradar al Encargado anterior: ${demoteErr.message}` });
+
+        // Sync prev manager's user_roles (remove 'manager', preserve others, ensure barber if applicable)
+        const { data: prevProfile } = await admin
+          .from("profiles").select("id").eq("barbero_id", visibleConflict.id).maybeSingle();
+        if (prevProfile?.id) {
+          await admin.from("user_roles").delete().eq("user_id", prevProfile.id).eq("role", "manager");
+          if (hadBarber) {
+            const { data: hasBarber } = await admin.from("user_roles")
+              .select("user_id").eq("user_id", prevProfile.id).eq("role", "barber").maybeSingle();
+            if (!hasBarber) {
+              await admin.from("user_roles").insert({ user_id: prevProfile.id, role: "barber" });
+            }
+          }
+        }
+      } else {
+        // ===== B) Stale conflict =====
+        const { data: managersWithRole } = await admin
+          .from("user_roles").select("user_id").eq("role", "manager");
+        const candidateUserIds = (managersWithRole || []).map((r: any) => r.user_id);
+        if (candidateUserIds.length > 0) {
+          const { data: candidateProfiles } = await admin
+            .from("profiles")
+            .select("id, barbero_id, organization_id, email, full_name")
+            .in("id", candidateUserIds)
+            .eq("organization_id", organizationId);
+          const candidates = (candidateProfiles || []).filter((p: any) => p.barbero_id !== barberoId);
+          if (candidates.length > 0) {
+            const orgUserIds = candidates.map((p: any) => p.id);
+            const { data: branchAssign } = await admin
+              .from("user_sucursales")
+              .select("user_id")
+              .in("user_id", orgUserIds)
+              .eq("sucursal_id", finalSucursalId);
+            const staleUserIds = (branchAssign || []).map((b: any) => b.user_id);
+            if (staleUserIds.length > 0) {
+              const stale = candidates.find((p: any) => staleUserIds.includes(p.id));
+              if (!resolveStaleManagerConflict) {
+                return jsonResponse(409, {
+                  ok: false,
+                  code: "STALE_MANAGER_ROLE",
+                  conflictType: "stale_user_role",
+                  conflictUserId: stale?.id ?? null,
+                  conflictBarberoId: stale?.barbero_id ?? null,
+                  conflictEmail: stale?.email ?? null,
+                  conflictName: stale?.full_name ?? null,
+                  sucursalId: finalSucursalId,
+                  error: "Hay una inconsistencia: este usuario figura como Encargado en permisos reales, pero no aparece como Encargado en la ficha del equipo.",
+                });
+              }
+              if (!callerIsOwnerOrGM) {
+                return jsonResponse(403, { error: "Solo el dueño o encargado general pueden corregir esta inconsistencia" });
+              }
+              // Remove only 'manager' role from stale users in this branch
+              await admin.from("user_roles").delete().in("user_id", staleUserIds).eq("role", "manager");
+            }
           }
         }
       }
