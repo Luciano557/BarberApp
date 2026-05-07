@@ -1,8 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Barber } from '@/types/barbershop';
-import { Turno } from '../hooks/useAgendaData';
-import { formatHHMM } from '../lib/timeUtils';
+import { Turno } from './hooks/useAgendaData';
+import { formatHHMM } from './lib/timeUtils';
 
 interface MoveConfirmDialogProps {
   open: boolean;
