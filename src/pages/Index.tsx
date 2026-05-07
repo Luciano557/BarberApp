@@ -116,7 +116,7 @@ const Index = () => {
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers.filter(b => b.teamRole !== 'otros')}
+              barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
               discounts={discounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
