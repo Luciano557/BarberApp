@@ -579,7 +579,82 @@ export function EquipoUnificado({
               );
             })()}
 
-            {/* Actions with text labels */}
+            {/* Acceso al sistema */}
+            {!isOwner && (() => {
+              const persistedEmail = accessEmails[barber.id] ?? null;
+              const draft = emailDrafts[barber.id];
+              const currentValue = draft !== undefined ? draft : (persistedEmail ?? '');
+              const isRegistered = !!linkedUser;
+              const hasPersistedEmail = !!persistedEmail;
+              const isDirty = draft !== undefined && draft !== (persistedEmail ?? '');
+              const code = generatedCodes[barber.id];
+              const saving = savingAccess === barber.id;
+
+              let stateLabel = 'Sin email de acceso';
+              let stateClass = 'text-muted-foreground';
+              if (isRegistered) { stateLabel = 'Usuario registrado'; stateClass = 'text-success'; }
+              else if (hasPersistedEmail) { stateLabel = 'Email cargado — acceso pendiente'; stateClass = 'text-primary'; }
+
+              return (
+                <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                      <KeyRound className="h-3.5 w-3.5" /> Acceso al sistema
+                    </span>
+                    <span className={`text-[11px] ${stateClass}`}>{stateLabel}</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email@ejemplo.com"
+                      value={currentValue}
+                      maxLength={80}
+                      onChange={(e) => setEmailDrafts(prev => ({ ...prev, [barber.id]: e.target.value }))}
+                      className="h-8 text-xs flex-1"
+                      autoComplete="off"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="h-8 text-xs"
+                        disabled={saving || !isDirty}
+                        onClick={() => handleSaveAccessEmail(barber.id)}>
+                        Guardar email
+                      </Button>
+                      <Button size="sm" className="h-8 text-xs"
+                        disabled={saving || (!hasPersistedEmail && !(draft && draft.trim()))}
+                        onClick={() => {
+                          const email = (draft !== undefined ? draft : persistedEmail) || '';
+                          setConfirmRegen({ barberId: barber.id, email: email.trim(), isRegistered });
+                        }}>
+                        {isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
+                      </Button>
+                    </div>
+                  </div>
+                  {code && (
+                    <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/30 space-y-1">
+                      <p className="text-[11px] text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs">
+                          <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{code.email}</span></div>
+                          <div><span className="text-muted-foreground">Contraseña temporal:</span> <span className="font-mono font-semibold">{code.password}</span></div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-7 px-2"
+                            onClick={() => { navigator.clipboard.writeText(`${code.email} / ${code.password}`); toast.success('Copiado'); }}>
+                            <Copy className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 px-2"
+                            onClick={() => setGeneratedCodes(prev => { const c = { ...prev }; delete c[barber.id]; return c; })}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+
             <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
                 setEditingId(barber.id);
