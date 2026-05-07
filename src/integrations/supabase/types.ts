@@ -153,6 +153,7 @@ export type Database = {
       }
       barberos: {
         Row: {
+          access_email: string | null
           activo: boolean
           apellido: string
           comision: number
@@ -171,6 +172,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          access_email?: string | null
           activo?: boolean
           apellido: string
           comision?: number
@@ -189,6 +191,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          access_email?: string | null
           activo?: boolean
           apellido?: string
           comision?: number
