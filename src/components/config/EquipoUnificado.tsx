@@ -321,18 +321,20 @@ export function EquipoUnificado({
       console.debug('[update-team-member-access] payload', body);
       const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
       if (error) {
-        // Try to extract structured JSON body from FunctionsHttpError.
-        // The Response body may only be consumable once, so clone() before reading.
+        // FunctionsHttpError: in supabase-js v2, error.context IS the Response,
+        // but some versions wrap it as { response }. Handle both.
         let parsed: any = null;
-        const ctxResp = (error as any)?.context?.response;
+        const ctx: any = (error as any)?.context;
+        const ctxResp: any =
+          ctx && typeof ctx.clone === 'function' ? ctx :
+          ctx?.response && typeof ctx.response.clone === 'function' ? ctx.response :
+          null;
         if (ctxResp) {
           try {
-            const cloned = typeof ctxResp.clone === 'function' ? ctxResp.clone() : ctxResp;
-            parsed = await cloned.json();
+            parsed = await ctxResp.clone().json();
           } catch {
             try {
-              const cloned2 = typeof ctxResp.clone === 'function' ? ctxResp.clone() : ctxResp;
-              const txt = await cloned2.text();
+              const txt = await ctxResp.clone().text();
               try { parsed = JSON.parse(txt); } catch { parsed = null; }
             } catch { parsed = null; }
           }
