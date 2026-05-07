@@ -528,12 +528,10 @@ export function EquipoUnificado({
                 <Checkbox
                   checked={localData.roles.includes(role)}
                   onCheckedChange={(checked) => {
-                    setLocalData(prev => {
-                      const newRoles = checked
-                        ? [...prev.roles, role]
-                        : prev.roles.filter(r => r !== role);
-                      return { ...prev, roles: newRoles.length > 0 ? newRoles : prev.roles };
-                    });
+                    setLocalData(prev => ({
+                      ...prev,
+                      roles: enforceRoleRules(prev.roles, role, !!checked),
+                    }));
                   }}
                 />
                 <span className="flex items-center gap-1.5 text-sm">
