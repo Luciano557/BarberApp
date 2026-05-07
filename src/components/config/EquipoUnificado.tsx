@@ -148,6 +148,10 @@ export function EquipoUnificado({
     conflictEmail: string | null;
     onResolved: (res: any) => void;
   } | null>(null);
+  // Refs to prevent double-resolution race when AlertDialogAction confirms
+  // (Radix closes the dialog → onOpenChange fires before the action handler completes).
+  const resolvingReplaceDialogRef = useRef(false);
+  const resolvingStaleDialogRef = useRef(false);
 
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
