@@ -92,6 +92,107 @@ function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean
   return Array.from(next);
 }
 
+// --- New role helpers (UI-only) ---
+function getHierarchicalRole(roles: AppRole[]): 'owner' | 'general_manager' | 'manager' | null {
+  if (roles.includes('owner')) return 'owner';
+  if (roles.includes('general_manager')) return 'general_manager';
+  if (roles.includes('manager')) return 'manager';
+  return null;
+}
+
+function hasOperationalBarber(roles: AppRole[]): boolean {
+  return roles.includes('barber');
+}
+
+function normalizeRoles(roles: AppRole[]): AppRole[] {
+  let set = new Set(roles);
+  if (set.has('owner')) {
+    set.delete('manager');
+    set.delete('general_manager');
+    set.delete('otros');
+  }
+  // Never both hierarchical at once (defensive)
+  if (set.has('manager') && set.has('general_manager')) {
+    set.delete('general_manager');
+  }
+  // Remove 'otros' if any other role is present
+  if (set.size > 1 && set.has('otros')) set.delete('otros');
+  if (set.size === 1 && set.has('otros')) return ['otros'];
+  if (set.size === 0) return ['otros'];
+  // Stable order
+  const order: AppRole[] = ['owner', 'general_manager', 'manager', 'barber', 'otros'];
+  return order.filter(r => set.has(r));
+}
+
+function toggleHierarchical(roles: AppRole[], target: 'general_manager' | 'manager'): AppRole[] {
+  const set = new Set(roles);
+  if (set.has(target)) {
+    set.delete(target);
+  } else {
+    set.add(target);
+    if (target === 'general_manager') set.delete('manager');
+    else set.delete('general_manager');
+    set.delete('otros');
+  }
+  return normalizeRoles(Array.from(set));
+}
+
+function toggleBarber(roles: AppRole[]): AppRole[] {
+  const set = new Set(roles);
+  if (set.has('barber')) set.delete('barber');
+  else { set.add('barber'); set.delete('otros'); }
+  return normalizeRoles(Array.from(set));
+}
+
+// --- Selectable role card component ---
+interface RoleCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  selected: boolean;
+  state?: 'normal' | 'replaceable' | 'disabled';
+  auxiliaryLabel?: string;
+  onClick?: () => void;
+}
+
+const RoleCard: React.FC<RoleCardProps> = ({ icon, title, description, selected, state = 'normal', auxiliaryLabel, onClick }) => {
+  const isDisabled = state === 'disabled';
+  const isReplaceable = state === 'replaceable';
+
+  const base = 'w-full text-left rounded-lg border p-3 transition-colors duration-150 flex gap-3 items-start';
+  const stateClass = isDisabled
+    ? 'border-border bg-muted/40 opacity-50 cursor-not-allowed'
+    : selected
+    ? 'border-primary bg-primary/5'
+    : isReplaceable
+    ? 'border-border bg-background opacity-60 hover:opacity-80'
+    : 'border-border bg-background hover:bg-accent/40';
+
+  return (
+    <button
+      type="button"
+      disabled={isDisabled}
+      onClick={onClick}
+      className={`${base} ${stateClass}`}
+      aria-pressed={selected}
+    >
+      <span className={`mt-0.5 ${selected ? 'text-primary' : 'text-muted-foreground'}`}>
+        {icon}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-2">
+          <span className={`text-sm ${selected ? 'font-medium text-foreground' : 'text-foreground'}`}>{title}</span>
+          {selected && <Check className="h-3.5 w-3.5 text-primary" />}
+        </span>
+        <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
+        {auxiliaryLabel && (
+          <span className="block text-[11px] text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
+        )}
+      </span>
+    </button>
+  );
+};
+
 interface UserProfile {
   id: string;
   email: string;
