@@ -56,6 +56,20 @@ const getRoleIcon = (role: AppRole) => {
 
 const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber', 'otros'];
 
+// Stable form data type — shared between EquipoUnificado and StaffForm
+type StaffFormData = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  commission: string;
+  address: string;
+  dni: string;
+  roles: AppRole[];
+  compensationType: CompensationType;
+  fixedSalary: string;
+  payDay: string;
+};
+
 // Enforce valid role combinations when user toggles a role
 function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean): AppRole[] {
   let next = new Set(current);
@@ -592,132 +606,10 @@ export function EquipoUnificado({
     setToggleConfirm(null);
   };
 
-  // --- Staff Form ---
-  const StaffForm = React.memo(({ isEdit, barberId, initialData, onSave, onCancel }: {
-    isEdit: boolean; barberId?: string;
-    initialData: typeof formData;
-    onSave: (data: typeof formData) => void;
-    onCancel: () => void;
-  }) => {
-    const [localData, setLocalData] = useState(initialData);
-    const [localCommissionError, setLocalCommissionError] = useState('');
-
-    const isComision = localData.compensationType === 'comision';
-    const commissionRequired = isComision && (localData.roles.includes('barber') || localData.roles.includes('manager'));
-
-    const validateLocalCommission = (value: string): boolean => {
-      if (!commissionRequired && (value === '' || value === '0')) {
-        setLocalCommissionError(''); return true;
-      }
-      const num = Number(value);
-      if (value === '' || isNaN(num)) { setLocalCommissionError('Ingresa un número válido'); return false; }
-      if (num < 0 || num > 100) { setLocalCommissionError('Debe estar entre 0 y 100'); return false; }
-      setLocalCommissionError(''); return true;
-    };
-
-    const handleSubmit = () => {
-      if (!localData.firstName || !localData.lastName || !localData.phone) return;
-      if (isComision && commissionRequired && !localData.commission) return;
-      if (isComision && !validateLocalCommission(localData.commission)) return;
-      if (!isComision && !localData.fixedSalary) return;
-      onSave(localData);
-    };
-
-    return (
-      <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-lg animate-scale-in">
-        <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
-          <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
-          <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
-        </div>
-        {/* Compensation type selector */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Tipo de compensación *</label>
-          <Select value={localData.compensationType} onValueChange={(v) => setLocalData(prev => ({ ...prev, compensationType: v as CompensationType }))}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="comision">Por comisión (%)</SelectItem>
-              <SelectItem value="fijo">Sueldo fijo mensual ($)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {/* Commission or Fixed Salary */}
-        {isComision ? (
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">{commissionRequired ? 'Comisión % *' : 'Comisión % (opcional)'}</label>
-            <Input type="text" inputMode="numeric" placeholder="Ej: 40" value={localData.commission}
-              onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
-              onBlur={() => validateLocalCommission(localData.commission)}
-              className={localCommissionError ? 'border-destructive' : ''} autoComplete="off" />
-            {localCommissionError && <p className="text-xs text-destructive mt-1">{localCommissionError}</p>}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
-              <CurrencyInput placeholder="Ej: 350.000" value={localData.fixedSalary}
-                onChange={(v) => setLocalData(prev => ({ ...prev, fixedSalary: v }))} />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Día de cobro (1-28) *</label>
-              <Input type="number" inputMode="numeric" placeholder="1" min={1} max={28} value={localData.payDay}
-                onChange={(e) => {
-                  const val = Math.min(28, Math.max(1, Number(e.target.value) || 1));
-                  setLocalData(prev => ({ ...prev, payDay: String(val) }));
-                }} autoComplete="off" />
-            </div>
-          </div>
-        )}
-        {/* Role selector — multi-select with checkboxes */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
-          <div className="space-y-2 p-3 border border-border rounded-md">
-            {localData.roles.includes('owner') && (
-              <div className="flex items-center gap-2 text-sm">
-                {getRoleIcon('owner')} <span>{getRoleLabel('owner')}</span>
-                <span className="text-[11px] text-muted-foreground">(no editable)</span>
-              </div>
-            )}
-            {ASSIGNABLE_ROLES.map(role => {
-              const isOwnerLocal = localData.roles.includes('owner');
-              if (isOwnerLocal && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
-              return (
-                <label key={role} className="flex items-center gap-2 cursor-pointer">
-                  <Checkbox
-                    checked={localData.roles.includes(role)}
-                    onCheckedChange={(checked) => {
-                      setLocalData(prev => ({
-                        ...prev,
-                        roles: enforceRoleRules(prev.roles, role, !!checked),
-                      }));
-                    }}
-                  />
-                  <span className="flex items-center gap-1.5 text-sm">
-                    {getRoleIcon(role)} {getRoleLabel(role)}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
-          <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-            disabled={!localData.firstName || !localData.lastName || !localData.phone || localData.roles.length === 0 || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
-            <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
-          </Button>
-        </div>
-      </div>
-    );
-  });
+  // StaffForm is declared at module level (see bottom of file) so its identity
+  // remains stable across parent re-renders. This prevents the form from
+  // unmounting/remounting (which would reset checkbox state) when the parent
+  // re-fetches data while the user is editing.
 
   // --- Render a barber item ---
   const renderBarberItem = (barber: Barber) => {
@@ -1149,3 +1041,137 @@ export function EquipoUnificado({
     </>
   );
 }
+
+// --- Staff Form (module-level so identity is stable across parent re-renders) ---
+interface StaffFormProps {
+  isEdit: boolean;
+  barberId?: string;
+  initialData: StaffFormData;
+  onSave: (data: StaffFormData) => void;
+  onCancel: () => void;
+}
+
+const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData, onSave, onCancel }: StaffFormProps) {
+  const [localData, setLocalData] = useState<StaffFormData>(initialData);
+  const [localCommissionError, setLocalCommissionError] = useState('');
+
+  // Reset only when switching to a different barber (or entering/leaving add mode).
+  // Do NOT reset on every initialData reference change — the parent may re-render
+  // and produce a new object while the user is editing.
+  useEffect(() => {
+    setLocalData(initialData);
+    setLocalCommissionError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barberId]);
+
+  const isComision = localData.compensationType === 'comision';
+  const commissionRequired = isComision && (localData.roles.includes('barber') || localData.roles.includes('manager'));
+
+  const validateLocalCommission = (value: string): boolean => {
+    if (!commissionRequired && (value === '' || value === '0')) {
+      setLocalCommissionError(''); return true;
+    }
+    const num = Number(value);
+    if (value === '' || isNaN(num)) { setLocalCommissionError('Ingresa un número válido'); return false; }
+    if (num < 0 || num > 100) { setLocalCommissionError('Debe estar entre 0 y 100'); return false; }
+    setLocalCommissionError(''); return true;
+  };
+
+  const handleSubmit = () => {
+    if (!localData.firstName || !localData.lastName || !localData.phone) return;
+    if (isComision && commissionRequired && !localData.commission) return;
+    if (isComision && !validateLocalCommission(localData.commission)) return;
+    if (!isComision && !localData.fixedSalary) return;
+    onSave(localData);
+  };
+
+  return (
+    <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-lg animate-scale-in">
+      <div className="grid grid-cols-2 gap-3">
+        <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
+        <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
+        <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">Tipo de compensación *</label>
+        <Select value={localData.compensationType} onValueChange={(v) => setLocalData(prev => ({ ...prev, compensationType: v as CompensationType }))}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="comision">Por comisión (%)</SelectItem>
+            <SelectItem value="fijo">Sueldo fijo mensual ($)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {isComision ? (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">{commissionRequired ? 'Comisión % *' : 'Comisión % (opcional)'}</label>
+          <Input type="text" inputMode="numeric" placeholder="Ej: 40" value={localData.commission}
+            onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
+            onBlur={() => validateLocalCommission(localData.commission)}
+            className={localCommissionError ? 'border-destructive' : ''} autoComplete="off" />
+          {localCommissionError && <p className="text-xs text-destructive mt-1">{localCommissionError}</p>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
+            <CurrencyInput placeholder="Ej: 350.000" value={localData.fixedSalary}
+              onChange={(v) => setLocalData(prev => ({ ...prev, fixedSalary: v }))} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Día de cobro (1-28) *</label>
+            <Input type="number" inputMode="numeric" placeholder="1" min={1} max={28} value={localData.payDay}
+              onChange={(e) => {
+                const val = Math.min(28, Math.max(1, Number(e.target.value) || 1));
+                setLocalData(prev => ({ ...prev, payDay: String(val) }));
+              }} autoComplete="off" />
+          </div>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
+        <div className="space-y-2 p-3 border border-border rounded-md">
+          {localData.roles.includes('owner') && (
+            <div className="flex items-center gap-2 text-sm">
+              {getRoleIcon('owner')} <span>{getRoleLabel('owner')}</span>
+              <span className="text-[11px] text-muted-foreground">(no editable)</span>
+            </div>
+          )}
+          {ASSIGNABLE_ROLES.map(role => {
+            const isOwnerLocal = localData.roles.includes('owner');
+            if (isOwnerLocal && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
+            return (
+              <label key={role} className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={localData.roles.includes(role)}
+                  onCheckedChange={(checked) => {
+                    setLocalData(prev => ({
+                      ...prev,
+                      roles: enforceRoleRules(prev.roles, role, !!checked),
+                    }));
+                  }}
+                />
+                <span className="flex items-center gap-1.5 text-sm">
+                  {getRoleIcon(role)} {getRoleLabel(role)}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
+        <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
+          disabled={!localData.firstName || !localData.lastName || !localData.phone || localData.roles.length === 0 || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
+        </Button>
+      </div>
+    </div>
+  );
+});
