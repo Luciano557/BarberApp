@@ -341,20 +341,16 @@ export function EquipoUnificado({
     const finalEmail = (draft !== undefined ? draft : (persisted ?? '')).trim();
     if (!finalEmail) { toast.error('Cargá un email primero'); return; }
 
-    // Compute current rolEquipo from persisted state to send (function will validate)
+    // Compute current roles from persisted state to send (function will validate)
     const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    let rolEquipo: any = barber?.teamRole ?? 'barbero';
-    if (currentRoles.includes('owner')) rolEquipo = 'owner';
-    else if (currentRoles.includes('general_manager')) rolEquipo = 'general_manager';
-    else if (currentRoles.includes('manager')) rolEquipo = 'manager';
-    else if (currentRoles.includes('barber')) rolEquipo = 'barbero';
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRoles(barber?.teamRole as any);
+    const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
     const res = await callAccessFn({
       barberoId: barberId,
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
-      rolEquipo,
+      roles: rolesToSend,
       regenerateAccess: true,
     });
     setSavingAccess(null);
