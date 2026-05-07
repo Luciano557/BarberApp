@@ -303,7 +303,7 @@ export function EquipoUnificado({
     return () => clearInterval(t);
   }, [confirmRegen]);
 
-
+  const resetForm = () => {
     setFormData({ firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'],
       compensationType: 'comision', fixedSalary: '', payDay: '1' });
   };
