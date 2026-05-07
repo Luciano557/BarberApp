@@ -290,9 +290,7 @@ export function EquipoUnificado({
   const getDisplayRoles = (barber: Barber): AppRole[] => {
     if (barber.rolesEquipo && barber.rolesEquipo.length > 0) return barber.rolesEquipo;
     const fromTeamRole = rolEquipoToRoles(barber.teamRole);
-    if (fromTeamRole.length > 0 && !(fromTeamRole.length === 1 && fromTeamRole[0] === 'barber' && !barber.teamRole)) {
-      return fromTeamRole;
-    }
+    if (fromTeamRole.length > 0) return fromTeamRole;
     const linkedUser = getLinkedUser(barber.id);
     if (linkedUser) {
       const ur = getUserRoles(linkedUser.id);
@@ -489,8 +487,8 @@ export function EquipoUnificado({
     if (!finalEmail) { toast.error('Cargá un email primero'); return; }
 
     // Compute current roles from persisted state to send (function will validate)
-    const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : (barber ? rolEquipoToRoles(barber.teamRole) : []);
+    const barber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
+    const currentRoles = barber ? getDisplayRoles(barber) : [];
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
@@ -621,7 +619,7 @@ export function EquipoUnificado({
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
     const linkedRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    // Visual cargos: prioritize barberos.rol_equipo (barber.teamRole). If linked user has roles, use those.
+    // Visual cargos: siempre desde rolesEquipo (multirol). teamRole es solo rol principal derivado.
     const displayRoles = getDisplayRoles(barber);
     const assignableRoles = displayRoles.filter(r => r !== 'owner');
     const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
