@@ -1315,7 +1315,7 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
         <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-          disabled={!localData.firstName || !localData.lastName || !localData.phone || localData.roles.length === 0 || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
           <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
         </Button>
       </div>
