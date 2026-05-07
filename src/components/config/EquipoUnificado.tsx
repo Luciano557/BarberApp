@@ -96,6 +96,15 @@ export function EquipoUnificado({
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [accessEmails, setAccessEmails] = useState<Record<string, string | null>>({});
+
+  // Access UI state (per barber)
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
+  const [generatedCodes, setGeneratedCodes] = useState<Record<string, { email: string; password: string }>>({});
+  const [confirmRegen, setConfirmRegen] = useState<{ barberId: string; email: string; isRegistered: boolean } | null>(null);
+  const [regenCountdown, setRegenCountdown] = useState(0);
+  const [savingAccess, setSavingAccess] = useState<string | null>(null);
+
 
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
