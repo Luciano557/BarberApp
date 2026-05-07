@@ -523,6 +523,12 @@ export function EquipoUnificado({
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
           <div className="space-y-2 p-3 border border-border rounded-md">
+            {localData.roles.includes('owner') && (
+              <div className="flex items-center gap-2 text-sm">
+                {getRoleIcon('owner')} <span>{getRoleLabel('owner')}</span>
+                <span className="text-[11px] text-muted-foreground">(no editable)</span>
+              </div>
+            )}
             {ASSIGNABLE_ROLES.map(role => (
               <label key={role} className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
