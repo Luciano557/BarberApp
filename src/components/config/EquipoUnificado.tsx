@@ -245,14 +245,23 @@ export function EquipoUnificado({
     }
   };
 
-  // Visual cargo source of truth: prefer barber.teamRole (rol_equipo), fall back to linked user_roles
+  // Visual cargo source of truth (priority):
+  // 1) barberos.roles_equipo (multirol)
+  // 2) barberos.rol_equipo (rol principal)
+  // 3) user_roles del usuario vinculado (fallback)
+  // 4) ['barber'] default
   const getDisplayRoles = (barber: Barber): AppRole[] => {
+    if (barber.rolesEquipo && barber.rolesEquipo.length > 0) return barber.rolesEquipo;
+    const fromTeamRole = rolEquipoToRoles(barber.teamRole);
+    if (fromTeamRole.length > 0 && !(fromTeamRole.length === 1 && fromTeamRole[0] === 'barber' && !barber.teamRole)) {
+      return fromTeamRole;
+    }
     const linkedUser = getLinkedUser(barber.id);
     if (linkedUser) {
       const ur = getUserRoles(linkedUser.id);
       if (ur.length > 0) return ur;
     }
-    return rolEquipoToRoles((barber.teamRole as string) ?? null);
+    return ['barber'];
   };
 
   // Centralized call to edge function
