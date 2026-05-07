@@ -456,15 +456,21 @@ export function EquipoUnificado({
     const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
-    const res = await callAccessFn({
+    const memberName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : 'el integrante';
+    const res = await submitWithConflictHandling({
       barberoId: barberId,
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
       roles: rolesToSend,
       regenerateAccess: true,
       sucursalId: barber?.sucursalId ?? sucursalId,
-    });
+    }, memberName);
     setSavingAccess(null);
-    if (!res.ok) { toast.error(res.error || 'No se pudo generar el acceso'); return; }
+    if (!res.ok) {
+      if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+        toast.error(res.error || 'No se pudo generar el acceso');
+      }
+      return;
+    }
     if (res.tempPassword && res.email) {
       setGeneratedCodes(prev => ({ ...prev, [barberId]: { email: res.email!, password: res.tempPassword! } }));
       setEmailDrafts(prev => { const c = { ...prev }; delete c[barberId]; return c; });
