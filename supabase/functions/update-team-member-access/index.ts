@@ -13,8 +13,9 @@ interface Body {
   barberoId: string;
   organizationId: string;
   sucursalId?: string | null;
-  accessEmail?: string | null; // null = clear, undefined = don't touch
-  rolEquipo?: RolEquipo;
+  accessEmail?: string | null;
+  roles?: AppRole[]; // multi-role (preferred)
+  rolEquipo?: RolEquipo; // legacy compat
   regenerateAccess?: boolean;
 }
 
@@ -22,12 +23,45 @@ const ROLE_RANK: Record<AppRole, number> = {
   owner: 0, general_manager: 1, manager: 2, barber: 3, otros: 4,
 };
 
-function rolEquipoToAppRole(r: RolEquipo): AppRole | null {
-  if (r === "owner") return "owner";
-  if (r === "general_manager") return "general_manager";
-  if (r === "manager") return "manager";
-  if (r === "barbero") return "barber";
-  return null; // otros => no real role
+function rolesToRolEquipo(roles: AppRole[]): RolEquipo {
+  if (roles.includes("owner")) return "owner";
+  if (roles.includes("general_manager")) return "general_manager";
+  if (roles.includes("manager")) return "manager";
+  if (roles.includes("barber")) return "barbero";
+  return "otros";
+}
+
+function rolEquipoToRoles(re: RolEquipo): AppRole[] {
+  if (re === "owner") return ["owner"];
+  if (re === "general_manager") return ["general_manager"];
+  if (re === "manager") return ["manager"];
+  if (re === "barbero") return ["barber"];
+  return ["otros"];
+}
+
+function normalizeRoles(input: AppRole[]): AppRole[] {
+  const set = new Set(input.filter(r => ["owner","general_manager","manager","barber","otros"].includes(r)));
+  if (set.has("otros")) return ["otros"]; // exclusive
+  // hierarchical: keep only the highest one
+  const hier: AppRole[] = ["owner","general_manager","manager"].filter(r => set.has(r as AppRole)) as AppRole[];
+  const top = hier[0]; // highest
+  const out: AppRole[] = [];
+  if (top) out.push(top);
+  if (set.has("barber")) out.push("barber");
+  if (out.length === 0) out.push("barber");
+  return out;
+}
+
+function validateRolesCombination(roles: AppRole[]): string | null {
+  if (roles.length === 0) return "Debe tener al menos un cargo";
+  const unique = Array.from(new Set(roles));
+  if (unique.includes("otros") && unique.length > 1) return "El cargo 'Otros' no puede combinarse con otros";
+  const hierCount = ["owner","general_manager","manager"].filter(r => unique.includes(r as AppRole)).length;
+  if (hierCount > 1) return "Solo puede haber un cargo jerárquico (owner/general_manager/manager)";
+  for (const r of unique) {
+    if (!["owner","general_manager","manager","barber","otros"].includes(r)) return `Cargo inválido: ${r}`;
+  }
+  return null;
 }
 
 function generatePassword(): string {
@@ -38,7 +72,7 @@ function generatePassword(): string {
 }
 
 function isEmail(s: string): boolean {
-  return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(s);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
 function jsonResponse(status: number, body: unknown) {
@@ -67,14 +101,25 @@ serve(async (req: Request): Promise<Response> => {
     if (authErr || !caller) return jsonResponse(401, { error: "No autorizado" });
 
     const body: Body = await req.json();
-    const { barberoId, organizationId, sucursalId, accessEmail, rolEquipo, regenerateAccess } = body;
+    const { barberoId, organizationId, sucursalId, accessEmail, regenerateAccess } = body;
 
     if (!barberoId || !organizationId) {
       return jsonResponse(400, { error: "Datos incompletos" });
     }
 
-    if (rolEquipo !== undefined && !["owner","general_manager","manager","barbero","otros"].includes(rolEquipo as string)) {
-      return jsonResponse(400, { error: `rolEquipo inválido: ${rolEquipo}` });
+    // Resolve roles array (preferred) or fall back to single rolEquipo
+    let rolesInput: AppRole[] | undefined = undefined;
+    if (body.roles !== undefined) {
+      rolesInput = body.roles;
+    } else if (body.rolEquipo !== undefined) {
+      rolesInput = rolEquipoToRoles(body.rolEquipo);
+    }
+
+    let normalizedRoles: AppRole[] | undefined = undefined;
+    if (rolesInput !== undefined) {
+      const err = validateRolesCombination(rolesInput);
+      if (err) return jsonResponse(400, { error: err });
+      normalizedRoles = normalizeRoles(rolesInput);
     }
 
     // Caller roles
@@ -83,89 +128,99 @@ serve(async (req: Request): Promise<Response> => {
     const callerRoles: AppRole[] = (callerRolesData || []).map((r: any) => r.role);
     if (callerRoles.length === 0) return jsonResponse(403, { error: "Sin permisos" });
 
-    // Caller must belong to org
     const { data: callerProfile } = await admin
       .from("profiles").select("organization_id").eq("id", caller.id).single();
     if (callerProfile?.organization_id !== organizationId) {
       return jsonResponse(403, { error: "Organización no coincide" });
     }
 
-    const callerRank = Math.min(...callerRoles.map(r => ROLE_RANK[r] ?? 99));
     const isOwner = callerRoles.includes("owner");
     const isGM = callerRoles.includes("general_manager");
     const isManager = callerRoles.includes("manager");
 
-    if (callerRoles.includes("barber") && !isOwner && !isGM && !isManager) {
+    if (!isOwner && !isGM && !isManager) {
       return jsonResponse(403, { error: "Sin permisos" });
     }
 
     // Load target barbero
     const { data: barbero, error: barberoErr } = await admin
       .from("barberos")
-      .select("id, organization_id, sucursal_id, rol_equipo, access_email, nombre, apellido, activo")
+      .select("id, organization_id, sucursal_id, rol_equipo, roles_equipo, access_email, nombre, apellido, activo")
       .eq("id", barberoId).single();
     if (barberoErr || !barbero) return jsonResponse(404, { error: "Miembro no encontrado" });
     if (barbero.organization_id !== organizationId) {
       return jsonResponse(403, { error: "Miembro de otra organización" });
     }
 
-    // Find linked user (profile with barbero_id)
     const { data: linkedProfile } = await admin
       .from("profiles").select("id, email").eq("barbero_id", barberoId).maybeSingle();
     const targetUserId: string | null = linkedProfile?.id ?? null;
 
-    // Existing target roles (for permission checks)
     let targetRoles: AppRole[] = [];
     if (targetUserId) {
       const { data: trData } = await admin
         .from("user_roles").select("role").eq("user_id", targetUserId);
       targetRoles = (trData || []).map((r: any) => r.role);
     }
-    const targetIsOwner = targetRoles.includes("owner");
-    const targetIsGM = targetRoles.includes("general_manager");
+    const targetIsOwner = targetRoles.includes("owner") || (barbero.roles_equipo || []).includes("owner");
+    const targetIsGM = targetRoles.includes("general_manager") || (barbero.roles_equipo || []).includes("general_manager");
 
-    // Manager restrictions
-    if (isManager && !isOwner && !isGM) {
-      if (targetIsOwner || targetIsGM) {
-        return jsonResponse(403, { error: "No podés modificar a un dueño o encargado general" });
+    // Permissions on role assignment
+    if (normalizedRoles) {
+      // Manager restrictions
+      if (isManager && !isOwner && !isGM) {
+        if (targetIsOwner || targetIsGM) {
+          return jsonResponse(403, { error: "No podés modificar a un dueño o encargado general" });
+        }
+        if (normalizedRoles.some(r => r === "owner" || r === "general_manager" || r === "manager")) {
+          return jsonResponse(403, { error: "No podés asignar este cargo" });
+        }
       }
-      if (rolEquipo && (rolEquipo === "owner" || rolEquipo === "general_manager" || rolEquipo === "manager")) {
-        return jsonResponse(403, { error: "No podés asignar este cargo" });
+      // Only owner can grant/keep owner role; nobody else can assign owner
+      if (normalizedRoles.includes("owner") && !isOwner) {
+        return jsonResponse(403, { error: "Solo el dueño puede asignar el cargo 'Dueño'" });
       }
-    }
-    // Only owner/GM can assign manager
-    if (rolEquipo === "manager" && !isOwner && !isGM) {
-      return jsonResponse(403, { error: "Solo dueño o encargado general pueden asignar Encargado" });
-    }
-    // Nobody downgrades the owner
-    if (targetIsOwner && rolEquipo && rolEquipo !== "owner") {
-      return jsonResponse(403, { error: "No se puede cambiar el cargo del dueño" });
+      // Only owner/GM can assign manager
+      if (normalizedRoles.includes("manager") && !isOwner && !isGM) {
+        return jsonResponse(403, { error: "Solo dueño o encargado general pueden asignar Encargado" });
+      }
+      // Only owner can assign general_manager
+      if (normalizedRoles.includes("general_manager") && !isOwner) {
+        return jsonResponse(403, { error: "Solo el dueño puede asignar Encargado General" });
+      }
+      // Owner cannot be downgraded by anyone (including owner removing their own)
+      if (targetIsOwner && !normalizedRoles.includes("owner")) {
+        return jsonResponse(403, { error: "No se puede quitar el cargo de dueño" });
+      }
     }
 
-    // Validate manager uniqueness BEFORE any mutation
-    const finalRolEquipo: RolEquipo = (rolEquipo ?? barbero.rol_equipo) as RolEquipo;
     const finalSucursalId = sucursalId ?? barbero.sucursal_id;
 
-    if (finalRolEquipo === "manager") {
+    // Manager uniqueness BEFORE any mutation
+    if (normalizedRoles && normalizedRoles.includes("manager")) {
       if (!finalSucursalId) {
         return jsonResponse(400, { error: "El Encargado de Sucursal requiere una sucursal asignada" });
       }
+      // Look up active managers in this branch using roles_equipo OR rol_equipo legacy
       const { data: existingMgr } = await admin
         .from("barberos")
-        .select("id, nombre, apellido")
+        .select("id, nombre, apellido, roles_equipo, rol_equipo")
         .eq("organization_id", organizationId)
         .eq("sucursal_id", finalSucursalId)
-        .eq("rol_equipo", "manager")
         .eq("activo", true)
         .neq("id", barberoId);
-      if (existingMgr && existingMgr.length > 0) {
+      const conflict = (existingMgr || []).find((m: any) =>
+        (Array.isArray(m.roles_equipo) && m.roles_equipo.includes("manager")) ||
+        m.rol_equipo === "manager"
+      );
+      if (conflict) {
         return jsonResponse(409, {
-          error: `La sucursal ya tiene un Encargado activo (${existingMgr[0].nombre} ${existingMgr[0].apellido}). Cambiá su cargo antes de asignar otro.`,
+          error: `La sucursal ya tiene un Encargado activo (${conflict.nombre} ${conflict.apellido}). Cambiá su cargo antes de asignar otro.`,
         });
       }
     }
 
-    // Email validation + uniqueness within org
+    // Email validation
     let emailToPersist: string | null | undefined = accessEmail;
     if (typeof accessEmail === "string") {
       if (accessEmail.trim() === "") {
@@ -174,7 +229,6 @@ serve(async (req: Request): Promise<Response> => {
         const e = accessEmail.trim().toLowerCase();
         if (!isEmail(e)) return jsonResponse(400, { error: "Email inválido" });
         emailToPersist = e;
-        // Duplicate inside org (other barberos)
         const { data: dup } = await admin
           .from("barberos").select("id")
           .eq("organization_id", organizationId)
@@ -186,19 +240,23 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
+    const finalRolEquipo: RolEquipo = normalizedRoles
+      ? rolesToRolEquipo(normalizedRoles)
+      : (barbero.rol_equipo as RolEquipo);
+
     if (regenerateAccess) {
       const finalEmail = (typeof emailToPersist === "string" ? emailToPersist : barbero.access_email);
       if (!finalEmail) return jsonResponse(400, { error: "Falta email para generar acceso" });
-      // Real role required
-      const appRole = rolEquipoToAppRole(finalRolEquipo);
-      if (!appRole) return jsonResponse(400, { error: "El cargo 'Otros' no permite acceso al sistema" });
+      if (finalRolEquipo === "otros") return jsonResponse(400, { error: "El cargo 'Otros' no permite acceso al sistema" });
     }
 
-    // ===== MUTATIONS START =====
-    // 1. Update barberos (access_email + rol_equipo + sucursal)
+    // ===== MUTATIONS =====
     const updates: any = {};
     if (emailToPersist !== undefined) updates.access_email = emailToPersist;
-    if (rolEquipo !== undefined) updates.rol_equipo = rolEquipo;
+    if (normalizedRoles) {
+      updates.rol_equipo = finalRolEquipo;
+      updates.roles_equipo = normalizedRoles;
+    }
     if (sucursalId !== undefined) updates.sucursal_id = sucursalId;
 
     if (Object.keys(updates).length > 0) {
@@ -212,11 +270,9 @@ serve(async (req: Request): Promise<Response> => {
 
     if (regenerateAccess) {
       const finalEmail = (typeof emailToPersist === "string" ? emailToPersist : barbero.access_email)!;
-      const appRole = rolEquipoToAppRole(finalRolEquipo)!;
       tempPassword = generatePassword();
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
-      // Find any auth user with that email
       const { data: list } = await admin.auth.admin.listUsers();
       const existing = list?.users?.find(u => u.email?.toLowerCase() === finalEmail.toLowerCase());
 
@@ -239,7 +295,6 @@ serve(async (req: Request): Promise<Response> => {
         resultUserId = created.user.id;
       }
 
-      // Upsert profile (link barbero_id, org, email)
       const { error: pErr } = await admin
         .from("profiles")
         .upsert({
@@ -250,16 +305,18 @@ serve(async (req: Request): Promise<Response> => {
           barbero_id: barberoId,
           default_sucursal_id: finalSucursalId ?? null,
         }, { onConflict: "id" });
-      if (pErr) return jsonResponse(500, { error: `Perfil: ${pErr.message}. Estado: Auth creado, perfil incompleto. Reintentá.` });
+      if (pErr) return jsonResponse(500, { error: `Perfil: ${pErr.message}.` });
 
-      // user_roles: replace with single role
+      // Sync user_roles with multi-role array (filter 'otros' — not stored as a real role)
+      const rolesForAuth = (normalizedRoles ?? rolEquipoToRoles(finalRolEquipo)).filter(r => r !== "otros");
       await admin.from("user_roles").delete().eq("user_id", resultUserId!);
-      const { error: rErr } = await admin
-        .from("user_roles").insert({ user_id: resultUserId!, role: appRole });
-      if (rErr) return jsonResponse(500, { error: `Cargo: ${rErr.message}. Reintentá.` });
+      if (rolesForAuth.length > 0) {
+        const rows = rolesForAuth.map(role => ({ user_id: resultUserId!, role }));
+        const { error: rErr } = await admin.from("user_roles").insert(rows);
+        if (rErr) return jsonResponse(500, { error: `Cargo: ${rErr.message}.` });
+      }
 
-      // user_sucursales sync
-      if (finalSucursalId && (appRole === "manager" || appRole === "barber")) {
+      if (finalSucursalId && rolesForAuth.some(r => r === "manager" || r === "barber")) {
         await admin.from("user_sucursales").delete().eq("user_id", resultUserId!);
         await admin.from("user_sucursales").insert({
           user_id: resultUserId!,
@@ -267,30 +324,25 @@ serve(async (req: Request): Promise<Response> => {
           organization_id: organizationId,
         });
       }
-    } else if (targetUserId && (rolEquipo !== undefined || emailToPersist !== undefined || sucursalId !== undefined)) {
-      // Sync existing user without regenerating password
+    } else if (targetUserId && (normalizedRoles || emailToPersist !== undefined || sucursalId !== undefined)) {
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
-      // Email change on registered user
       if (typeof emailToPersist === "string" && emailToPersist && emailToPersist !== linkedProfile?.email?.toLowerCase()) {
         const { error: eErr } = await admin.auth.admin.updateUserById(targetUserId, { email: emailToPersist, email_confirm: true });
         if (eErr) return jsonResponse(500, { error: `Auth email: ${eErr.message}` });
         await admin.from("profiles").update({ email: emailToPersist, full_name: fullName }).eq("id", targetUserId);
       }
 
-      // Role sync
-      if (rolEquipo !== undefined) {
-        const appRole = rolEquipoToAppRole(rolEquipo);
-        // Preserve owner
-        if (!targetIsOwner) {
-          await admin.from("user_roles").delete().eq("user_id", targetUserId);
-          if (appRole) {
-            await admin.from("user_roles").insert({ user_id: targetUserId, role: appRole });
-          }
+      if (normalizedRoles) {
+        // Preserve owner — already validated above
+        const rolesForAuth = normalizedRoles.filter(r => r !== "otros");
+        await admin.from("user_roles").delete().eq("user_id", targetUserId);
+        if (rolesForAuth.length > 0) {
+          const rows = rolesForAuth.map(role => ({ user_id: targetUserId, role }));
+          await admin.from("user_roles").insert(rows);
         }
       }
 
-      // Sucursal sync
       if (finalSucursalId) {
         const { data: existingS } = await admin.from("user_sucursales")
           .select("id").eq("user_id", targetUserId).eq("sucursal_id", finalSucursalId).maybeSingle();
@@ -308,6 +360,8 @@ serve(async (req: Request): Promise<Response> => {
       tempPassword,
       email: typeof emailToPersist === "string" ? emailToPersist : barbero.access_email,
       userId: resultUserId,
+      roles: normalizedRoles ?? null,
+      rolEquipo: finalRolEquipo,
     });
   } catch (e: any) {
     console.error("update-team-member-access error:", e);

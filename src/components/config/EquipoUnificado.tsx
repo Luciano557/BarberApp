@@ -55,6 +55,28 @@ const getRoleIcon = (role: AppRole) => {
 
 const ASSIGNABLE_ROLES: AppRole[] = ['general_manager', 'manager', 'barber', 'otros'];
 
+// Enforce valid role combinations when user toggles a role
+function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean): AppRole[] {
+  let next = new Set(current);
+  if (checked) next.add(toggled); else next.delete(toggled);
+
+  if (checked) {
+    if (toggled === 'otros') {
+      // 'otros' is exclusive
+      next = new Set<AppRole>(['otros']);
+    } else {
+      // Any non-'otros' role removes 'otros'
+      next.delete('otros');
+      // Hierarchical roles are mutually exclusive
+      if (toggled === 'owner') { next.delete('general_manager'); next.delete('manager'); }
+      if (toggled === 'general_manager') { next.delete('owner'); next.delete('manager'); }
+      if (toggled === 'manager') { next.delete('owner'); next.delete('general_manager'); }
+    }
+  }
+  if (next.size === 0) next.add('barber');
+  return Array.from(next);
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -237,6 +259,7 @@ export function EquipoUnificado({
   const callAccessFn = async (payload: {
     barberoId: string;
     accessEmail?: string | null;
+    roles?: AppRole[];
     rolEquipo?: any;
     regenerateAccess?: boolean;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
@@ -246,6 +269,7 @@ export function EquipoUnificado({
         organizationId,
         sucursalId,
         accessEmail: payload.accessEmail,
+        roles: payload.roles,
         rolEquipo: payload.rolEquipo,
         regenerateAccess: payload.regenerateAccess ?? false,
       };
@@ -274,13 +298,13 @@ export function EquipoUnificado({
     const linkedUser = getLinkedUser(barberId);
     if (linkedUser) {
       const currentRoles = getUserRoles(linkedUser.id);
-      if (currentRoles.includes('owner')) {
-        toast.error('No se puede cambiar el cargo del dueño');
+      if (currentRoles.includes('owner') && !newRoles.includes('owner')) {
+        toast.error('No se puede quitar el cargo de dueño');
         return;
       }
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+    const res = await callAccessFn({ barberoId: barberId, roles: newRoles });
     if (!res.ok) {
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
@@ -317,20 +341,16 @@ export function EquipoUnificado({
     const finalEmail = (draft !== undefined ? draft : (persisted ?? '')).trim();
     if (!finalEmail) { toast.error('Cargá un email primero'); return; }
 
-    // Compute current rolEquipo from persisted state to send (function will validate)
+    // Compute current roles from persisted state to send (function will validate)
     const barber = barbers.find(b => b.id === barberId);
-    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    let rolEquipo: any = barber?.teamRole ?? 'barbero';
-    if (currentRoles.includes('owner')) rolEquipo = 'owner';
-    else if (currentRoles.includes('general_manager')) rolEquipo = 'general_manager';
-    else if (currentRoles.includes('manager')) rolEquipo = 'manager';
-    else if (currentRoles.includes('barber')) rolEquipo = 'barbero';
+    const currentRoles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRoles(barber?.teamRole as any);
+    const rolesToSend = currentRoles.length > 0 ? currentRoles : ['barber' as AppRole];
 
     setSavingAccess(barberId);
     const res = await callAccessFn({
       barberoId: barberId,
       accessEmail: draft !== undefined ? (draft === '' ? null : draft) : undefined,
-      rolEquipo,
+      roles: rolesToSend,
       regenerateAccess: true,
     });
     setSavingAccess(null);
@@ -371,7 +391,7 @@ export function EquipoUnificado({
           return;
         }
       }
-      const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+      const res = await callAccessFn({ barberoId: barberId, roles: data.roles });
       if (!res.ok) {
         toast.error(res.error || 'No se pudo guardar el cargo');
         return;
@@ -503,24 +523,32 @@ export function EquipoUnificado({
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
           <div className="space-y-2 p-3 border border-border rounded-md">
-            {ASSIGNABLE_ROLES.map(role => (
-              <label key={role} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={localData.roles.includes(role)}
-                  onCheckedChange={(checked) => {
-                    setLocalData(prev => {
-                      const newRoles = checked
-                        ? [...prev.roles, role]
-                        : prev.roles.filter(r => r !== role);
-                      return { ...prev, roles: newRoles.length > 0 ? newRoles : prev.roles };
-                    });
-                  }}
-                />
-                <span className="flex items-center gap-1.5 text-sm">
-                  {getRoleIcon(role)} {getRoleLabel(role)}
-                </span>
-              </label>
-            ))}
+            {localData.roles.includes('owner') && (
+              <div className="flex items-center gap-2 text-sm">
+                {getRoleIcon('owner')} <span>{getRoleLabel('owner')}</span>
+                <span className="text-[11px] text-muted-foreground">(no editable)</span>
+              </div>
+            )}
+            {ASSIGNABLE_ROLES.map(role => {
+              const isOwnerLocal = localData.roles.includes('owner');
+              if (isOwnerLocal && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
+              return (
+                <label key={role} className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={localData.roles.includes(role)}
+                    onCheckedChange={(checked) => {
+                      setLocalData(prev => ({
+                        ...prev,
+                        roles: enforceRoleRules(prev.roles, role, !!checked),
+                      }));
+                    }}
+                  />
+                  <span className="flex items-center gap-1.5 text-sm">
+                    {getRoleIcon(role)} {getRoleLabel(role)}
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </div>
         <div className="flex justify-end gap-2">
@@ -551,7 +579,7 @@ export function EquipoUnificado({
             initialData={{
               firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
               commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-              roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
+              roles: displayRoles.length > 0 ? displayRoles : ['barber'],
               compensationType: barber.compensationType || 'comision',
               fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
               payDay: barber.payDay != null ? String(barber.payDay) : '1',
@@ -609,28 +637,33 @@ export function EquipoUnificado({
             </div>
 
             {/* Role multi-select — available also when there's no linked user (persists rol_equipo) */}
-            {!isOwner && (
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
-                {ASSIGNABLE_ROLES.map(role => (
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
+              {isOwner && (
+                <Badge variant="default" className="flex items-center gap-1 text-xs">
+                  {getRoleIcon('owner')} {getRoleLabel('owner')}
+                </Badge>
+              )}
+              {ASSIGNABLE_ROLES.map(role => {
+                // Owners cannot toggle hierarchical roles; only allow barber/otros toggle for them
+                if (isOwner && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
+                return (
                   <label key={role} className="flex items-center gap-1 cursor-pointer">
                     <Checkbox
                       className="h-3.5 w-3.5"
-                      checked={(assignableRoles as string[]).includes(role)}
+                      checked={(displayRoles as string[]).includes(role)}
                       onCheckedChange={(checked) => {
-                        const newRoles = checked
-                          ? [...assignableRoles, role]
-                          : assignableRoles.filter(r => r !== role);
-                        if (newRoles.length > 0) {
-                          handleChangeRoles(barber.id, newRoles);
+                        const next = enforceRoleRules(displayRoles, role, !!checked);
+                        if (next.length > 0) {
+                          handleChangeRoles(barber.id, next);
                         }
                       }}
                     />
                     <span className="text-xs">{getRoleLabel(role)}</span>
                   </label>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             {/* Extras de compensación — only for managers/GMs */}
             {(() => {
@@ -729,7 +762,7 @@ export function EquipoUnificado({
                 setFormData({
                   firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
                   commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-                  roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
+                  roles: displayRoles.length > 0 ? displayRoles : ['barber'],
                   compensationType: barber.compensationType || 'comision',
                   fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
                   payDay: barber.payDay != null ? String(barber.payDay) : '1',
