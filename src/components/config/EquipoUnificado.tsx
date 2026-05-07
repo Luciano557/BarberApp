@@ -752,7 +752,7 @@ export function EquipoUnificado({
                 setFormData({
                   firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
                   commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-                  roles: assignableRoles.length > 0 ? assignableRoles : ['barber'],
+                  roles: displayRoles.length > 0 ? displayRoles : ['barber'],
                   compensationType: barber.compensationType || 'comision',
                   fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
                   payDay: barber.payDay != null ? String(barber.payDay) : '1',
