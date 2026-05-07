@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -91,6 +91,107 @@ function enforceRoleRules(current: AppRole[], toggled: AppRole, checked: boolean
   if (next.size === 0) next.add('barber');
   return Array.from(next);
 }
+
+// --- New role helpers (UI-only) ---
+function getHierarchicalRole(roles: AppRole[]): 'owner' | 'general_manager' | 'manager' | null {
+  if (roles.includes('owner')) return 'owner';
+  if (roles.includes('general_manager')) return 'general_manager';
+  if (roles.includes('manager')) return 'manager';
+  return null;
+}
+
+function hasOperationalBarber(roles: AppRole[]): boolean {
+  return roles.includes('barber');
+}
+
+function normalizeRoles(roles: AppRole[]): AppRole[] {
+  let set = new Set(roles);
+  if (set.has('owner')) {
+    set.delete('manager');
+    set.delete('general_manager');
+    set.delete('otros');
+  }
+  // Never both hierarchical at once (defensive)
+  if (set.has('manager') && set.has('general_manager')) {
+    set.delete('general_manager');
+  }
+  // Remove 'otros' if any other role is present
+  if (set.size > 1 && set.has('otros')) set.delete('otros');
+  if (set.size === 1 && set.has('otros')) return ['otros'];
+  if (set.size === 0) return ['otros'];
+  // Stable order
+  const order: AppRole[] = ['owner', 'general_manager', 'manager', 'barber', 'otros'];
+  return order.filter(r => set.has(r));
+}
+
+function toggleHierarchical(roles: AppRole[], target: 'general_manager' | 'manager'): AppRole[] {
+  const set = new Set(roles);
+  if (set.has(target)) {
+    set.delete(target);
+  } else {
+    set.add(target);
+    if (target === 'general_manager') set.delete('manager');
+    else set.delete('general_manager');
+    set.delete('otros');
+  }
+  return normalizeRoles(Array.from(set));
+}
+
+function toggleBarber(roles: AppRole[]): AppRole[] {
+  const set = new Set(roles);
+  if (set.has('barber')) set.delete('barber');
+  else { set.add('barber'); set.delete('otros'); }
+  return normalizeRoles(Array.from(set));
+}
+
+// --- Selectable role card component ---
+interface RoleCardProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  selected: boolean;
+  state?: 'normal' | 'replaceable' | 'disabled';
+  auxiliaryLabel?: string;
+  onClick?: () => void;
+}
+
+const RoleCard: React.FC<RoleCardProps> = ({ icon, title, description, selected, state = 'normal', auxiliaryLabel, onClick }) => {
+  const isDisabled = state === 'disabled';
+  const isReplaceable = state === 'replaceable';
+
+  const base = 'w-full text-left rounded-lg border p-3 transition-colors duration-150 flex gap-3 items-start';
+  const stateClass = isDisabled
+    ? 'border-border bg-muted/40 opacity-50 cursor-not-allowed'
+    : selected
+    ? 'border-primary bg-primary/5'
+    : isReplaceable
+    ? 'border-border bg-background opacity-60 hover:opacity-80'
+    : 'border-border bg-background hover:bg-accent/40';
+
+  return (
+    <button
+      type="button"
+      disabled={isDisabled}
+      onClick={onClick}
+      className={`${base} ${stateClass}`}
+      aria-pressed={selected}
+    >
+      <span className={`mt-0.5 ${selected ? 'text-primary' : 'text-muted-foreground'}`}>
+        {icon}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-2">
+          <span className={`text-sm ${selected ? 'font-medium text-foreground' : 'text-foreground'}`}>{title}</span>
+          {selected && <Check className="h-3.5 w-3.5 text-primary" />}
+        </span>
+        <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
+        {auxiliaryLabel && (
+          <span className="block text-[11px] text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
+        )}
+      </span>
+    </button>
+  );
+};
 
 interface UserProfile {
   id: string;
@@ -689,33 +790,19 @@ export function EquipoUnificado({
               )}
             </div>
 
-            {/* Role multi-select — available also when there's no linked user (persists rol_equipo) */}
+            {/* Cargos: badges visuales no editables. Edición vía botón Editar. */}
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
-              {isOwner && (
-                <Badge variant="default" className="flex items-center gap-1 text-xs">
-                  {getRoleIcon('owner')} {getRoleLabel('owner')}
-                </Badge>
-              )}
-              {ASSIGNABLE_ROLES.map(role => {
-                // Owners cannot toggle hierarchical roles; only allow barber/otros toggle for them
-                if (isOwner && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
-                return (
-                  <label key={role} className="flex items-center gap-1 cursor-pointer">
-                    <Checkbox
-                      className="h-3.5 w-3.5"
-                      checked={(displayRoles as string[]).includes(role)}
-                      onCheckedChange={(checked) => {
-                        const next = enforceRoleRules(displayRoles, role, !!checked);
-                        if (next.length > 0) {
-                          handleChangeRoles(barber.id, next);
-                        }
-                      }}
-                    />
-                    <span className="text-xs">{getRoleLabel(role)}</span>
-                  </label>
-                );
-              })}
+              {(() => {
+                const allRoles: AppRole[] = isOwner
+                  ? Array.from(new Set<AppRole>(['owner', ...displayRoles]))
+                  : displayRoles;
+                return allRoles.map(role => (
+                  <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
+                    {getRoleIcon(role)} {getRoleLabel(role)}
+                  </Badge>
+                ));
+              })()}
             </div>
 
             {/* Extras de compensación — only for managers/GMs */}
@@ -1079,7 +1166,7 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
   }, [barberId]);
 
   const isComision = localData.compensationType === 'comision';
-  const commissionRequired = isComision && (localData.roles.includes('barber') || localData.roles.includes('manager'));
+  const commissionRequired = isComision && localData.roles.includes('barber');
 
   const validateLocalCommission = (value: string): boolean => {
     if (!commissionRequired && (value === '' || value === '0')) {
@@ -1148,41 +1235,87 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
           </div>
         </div>
       )}
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Cargo(s) *</label>
-        <div className="space-y-2 p-3 border border-border rounded-md">
-          {localData.roles.includes('owner') && (
-            <div className="flex items-center gap-2 text-sm">
-              {getRoleIcon('owner')} <span>{getRoleLabel('owner')}</span>
-              <span className="text-[11px] text-muted-foreground">(no editable)</span>
-            </div>
-          )}
-          {ASSIGNABLE_ROLES.map(role => {
-            const isOwnerLocal = localData.roles.includes('owner');
-            if (isOwnerLocal && (role === 'general_manager' || role === 'manager' || role === 'otros')) return null;
-            return (
-              <label key={role} className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={localData.roles.includes(role)}
-                  onCheckedChange={(checked) => {
-                    setLocalData(prev => ({
-                      ...prev,
-                      roles: enforceRoleRules(prev.roles, role, !!checked),
-                    }));
-                  }}
+      {(() => {
+        const isOwnerLocal = localData.roles.includes('owner');
+        const hier = getHierarchicalRole(localData.roles);
+        const gmSelected = hier === 'general_manager';
+        const mgrSelected = hier === 'manager';
+        const barberSelected = hasOperationalBarber(localData.roles);
+
+        return (
+          <div className="space-y-4">
+            {isOwnerLocal && (
+              <div className="flex items-start gap-2 p-3 rounded-md border border-border bg-muted/40">
+                <Shield className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div className="text-xs text-muted-foreground">
+                  Este integrante es <span className="font-medium text-foreground">Dueño del negocio</span>. Este cargo no se puede modificar desde Equipo.
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div>
+                <div className="text-sm font-medium text-foreground">Cargo jerárquico</div>
+                <div className="text-xs text-muted-foreground">Define responsabilidades de gestión dentro del negocio.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <RoleCard
+                  icon={<Shield className="h-4 w-4" />}
+                  title="Encargado General"
+                  description="Acceso amplio a gestión y configuración."
+                  selected={gmSelected}
+                  state={isOwnerLocal ? 'disabled' : (mgrSelected ? 'replaceable' : 'normal')}
+                  auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (mgrSelected ? 'Reemplaza Encargado de Sucursal.' : undefined)}
+                  onClick={isOwnerLocal ? undefined : () => setLocalData(prev => ({ ...prev, roles: toggleHierarchical(prev.roles, 'general_manager') }))}
                 />
-                <span className="flex items-center gap-1.5 text-sm">
-                  {getRoleIcon(role)} {getRoleLabel(role)}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
+                <RoleCard
+                  icon={<UserCheck className="h-4 w-4" />}
+                  title="Encargado de Sucursal"
+                  description="Gestiona la operación de esta sucursal."
+                  selected={mgrSelected}
+                  state={isOwnerLocal ? 'disabled' : (gmSelected ? 'replaceable' : 'normal')}
+                  auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (gmSelected ? 'Reemplaza Encargado General.' : undefined)}
+                  onClick={isOwnerLocal ? undefined : () => setLocalData(prev => ({ ...prev, roles: toggleHierarchical(prev.roles, 'manager') }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <div className="text-sm font-medium text-foreground">Trabajo operativo</div>
+                <div className="text-xs text-muted-foreground">Indica si esta persona también trabaja realizando servicios.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <RoleCard
+                  icon={<Scissors className="h-4 w-4" />}
+                  title="Barbero"
+                  description="Puede recibir turnos, ventas y comisiones."
+                  selected={barberSelected}
+                  onClick={() => setLocalData(prev => ({ ...prev, roles: toggleBarber(prev.roles) }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="text-xs text-muted-foreground">Este integrante quedará como:</div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {localData.roles.map((role, idx) => (
+                  <React.Fragment key={role}>
+                    {idx > 0 && <span className="text-xs text-muted-foreground">+</span>}
+                    <Badge variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
+                      {getRoleIcon(role)} {getRoleLabel(role)}
+                    </Badge>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
         <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-          disabled={!localData.firstName || !localData.lastName || !localData.phone || localData.roles.length === 0 || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
           <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
         </Button>
       </div>
