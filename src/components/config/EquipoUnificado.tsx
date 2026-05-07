@@ -406,13 +406,16 @@ export function EquipoUnificado({
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
     const targetBarber = barbers.find(b => b.id === barberId) ?? allBarbers.find(b => b.id === barberId);
-    const res = await callAccessFn({
+    const memberName = targetBarber ? `${targetBarber.firstName} ${targetBarber.lastName}`.trim() : 'el integrante';
+    const res = await submitWithConflictHandling({
       barberoId: barberId,
       roles: newRoles,
       sucursalId: targetBarber?.sucursalId ?? sucursalId,
-    });
+    }, memberName);
     if (!res.ok) {
-      toast.error(res.error || 'No se pudo actualizar el cargo');
+      if (res.code !== 'MANAGER_REPLACE_REQUIRED' && res.code !== 'STALE_MANAGER_ROLE') {
+        toast.error(res.error || 'No se pudo actualizar el cargo');
+      }
       return;
     }
     const ok = await verifyRolEquipo(barberId, rolEquipo);
