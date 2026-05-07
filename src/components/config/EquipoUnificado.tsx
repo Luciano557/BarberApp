@@ -75,6 +75,7 @@ interface EquipoUnificadoProps {
   sucursales?: { id: string; nombre: string }[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
+  onRefreshBarbers?: () => Promise<void> | void;
 }
 
 interface ToggleConfirm {
@@ -83,7 +84,7 @@ interface ToggleConfirm {
 }
 
 export function EquipoUnificado({
-  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber,
+  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
 }: EquipoUnificadoProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -169,12 +170,25 @@ export function EquipoUnificado({
     return getUserRoles(linkedUser.id);
   };
 
-  // Get the highest role for a barber (for sorting)
+  // Get the highest role for a barber (for sorting) — uses display roles (rol_equipo first)
   const getBarberHighestRole = (barber: Barber): AppRole | null => {
-    const roles = getBarberRoles(barber);
+    const linkedUser = getLinkedUser(barber.id);
+    const roles = linkedUser ? getUserRoles(linkedUser.id) : rolEquipoToRolesSafe(barber.teamRole);
     if (roles.length === 0) return null;
     return roles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b])[0];
   };
+
+  // Local helper available before rolEquipoToRoles is defined below
+  function rolEquipoToRolesSafe(re: string | null | undefined): AppRole[] {
+    switch (re) {
+      case 'owner': return ['owner'];
+      case 'general_manager': return ['general_manager'];
+      case 'manager': return ['manager'];
+      case 'barbero': return ['barber'];
+      case 'otros': return ['otros'];
+      default: return [];
+    }
+  }
 
   // Sort barbers by role hierarchy
   const sortByHierarchy = (list: Barber[]): Barber[] => {
@@ -189,12 +203,34 @@ export function EquipoUnificado({
   };
 
   // Map AppRole[] -> rol_equipo (single canonical)
-  const rolesToRolEquipo = (roles: AppRole[]): TeamRole | 'manager' | 'general_manager' | 'owner' => {
-    if (roles.includes('owner')) return 'owner' as any;
-    if (roles.includes('general_manager')) return 'general_manager' as any;
-    if (roles.includes('manager')) return 'manager' as any;
+  const rolesToRolEquipo = (roles: AppRole[]): 'owner' | 'general_manager' | 'manager' | 'barbero' | 'otros' => {
+    if (roles.includes('owner')) return 'owner';
+    if (roles.includes('general_manager')) return 'general_manager';
+    if (roles.includes('manager')) return 'manager';
     if (roles.includes('barber')) return 'barbero';
     return 'otros';
+  };
+
+  // Map rol_equipo -> AppRole[] (for visual init when there's no linked user)
+  const rolEquipoToRoles = (re: string | null | undefined): AppRole[] => {
+    switch (re) {
+      case 'owner': return ['owner'];
+      case 'general_manager': return ['general_manager'];
+      case 'manager': return ['manager'];
+      case 'barbero': return ['barber'];
+      case 'otros': return ['otros'];
+      default: return ['barber'];
+    }
+  };
+
+  // Visual cargo source of truth: prefer barber.teamRole (rol_equipo), fall back to linked user_roles
+  const getDisplayRoles = (barber: Barber): AppRole[] => {
+    const linkedUser = getLinkedUser(barber.id);
+    if (linkedUser) {
+      const ur = getUserRoles(linkedUser.id);
+      if (ur.length > 0) return ur;
+    }
+    return rolEquipoToRoles((barber.teamRole as string) ?? null);
   };
 
   // Centralized call to edge function
@@ -205,22 +241,28 @@ export function EquipoUnificado({
     regenerateAccess?: boolean;
   }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
     try {
-      const { data, error } = await supabase.functions.invoke('update-team-member-access', {
-        body: {
-          barberoId: payload.barberoId,
-          organizationId,
-          sucursalId,
-          accessEmail: payload.accessEmail,
-          rolEquipo: payload.rolEquipo,
-          regenerateAccess: payload.regenerateAccess ?? false,
-        },
-      });
+      const body = {
+        barberoId: payload.barberoId,
+        organizationId,
+        sucursalId,
+        accessEmail: payload.accessEmail,
+        rolEquipo: payload.rolEquipo,
+        regenerateAccess: payload.regenerateAccess ?? false,
+      };
+      console.debug('[update-team-member-access] payload', body);
+      const { data, error } = await supabase.functions.invoke('update-team-member-access', { body });
       if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
       if ((data as any)?.error) return { ok: false, error: (data as any).error };
       return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
     } catch (e: any) {
       return { ok: false, error: e?.message || 'Error en la solicitud' };
     }
+  };
+
+  // Verify rol_equipo persisted in DB after a save
+  const verifyRolEquipo = async (barberoId: string, expected: string): Promise<boolean> => {
+    const { data } = await supabase.from('barberos').select('rol_equipo').eq('id', barberoId).maybeSingle();
+    return (data as any)?.rol_equipo === expected;
   };
 
   // Role change handler (uses edge function for security/consistency)
@@ -243,10 +285,17 @@ export function EquipoUnificado({
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
     }
-    toast.success('Cargo actualizado');
-    onUpdateBarber(barberId, { teamRole: (newRoles.includes('barber') ? 'barbero' : 'otros') as TeamRole });
+    const ok = await verifyRolEquipo(barberId, rolEquipo);
+    if (!ok) {
+      toast.error('El cambio no quedó persistido. Reintentá.');
+      return;
+    }
+    if (onRefreshBarbers) await onRefreshBarbers();
     await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+    toast.success('Cargo actualizado');
   };
+
+  // (legacy duplicate handleChangeRoles removed)
 
   // Save access_email only (no auth touch)
   const handleSaveAccessEmail = async (barberId: string) => {
@@ -311,23 +360,42 @@ export function EquipoUnificado({
   const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
-    const teamRole: TeamRole = data.roles.includes('barber') ? 'barbero' : 'otros';
+    const rolEquipo = rolesToRolEquipo(data.roles);
     if (barberId) {
+      // 1. Persist cargo (and sucursal) via edge function FIRST. If it fails, abort.
+      const linkedUser = getLinkedUser(barberId);
+      if (linkedUser) {
+        const currentRoles = getUserRoles(linkedUser.id);
+        if (currentRoles.includes('owner') && rolEquipo !== 'owner') {
+          toast.error('No se puede cambiar el cargo del dueño');
+          return;
+        }
+      }
+      const res = await callAccessFn({ barberoId: barberId, rolEquipo });
+      if (!res.ok) {
+        toast.error(res.error || 'No se pudo guardar el cargo');
+        return;
+      }
+      const ok = await verifyRolEquipo(barberId, rolEquipo);
+      if (!ok) {
+        toast.error('El cambio no quedó persistido. Reintentá.');
+        return;
+      }
+      // 2. Persist personal fields (without overriding teamRole — edge function already set rol_equipo)
       onUpdateBarber(barberId, {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined,
         compensationType: data.compensationType,
         fixedSalary: data.compensationType === 'fijo' ? Number(data.fixedSalary) || 0 : undefined,
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
-        teamRole,
       });
-      // Update roles if linked user exists
-      const linkedUser = getLinkedUser(barberId);
-      if (linkedUser) {
-        await handleChangeRoles(barberId, data.roles);
-      }
+      // 3. Refetch authoritative source
+      if (onRefreshBarbers) await onRefreshBarbers();
+      await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+      toast.success('Integrante actualizado');
       setEditingId(null);
     } else {
+      const teamRole: TeamRole = (rolEquipo === 'barbero' || rolEquipo === 'otros' ? rolEquipo : 'barbero') as TeamRole;
       onAddBarber({
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
@@ -469,10 +537,12 @@ export function EquipoUnificado({
   // --- Render a barber item ---
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
-    const roles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    const assignableRoles = roles.filter(r => r !== 'owner');
-    const isOwner = roles.includes('owner');
-    const hasSystemAccess = roles.some(r => r !== 'otros');
+    const linkedRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
+    // Visual cargos: prioritize barberos.rol_equipo (barber.teamRole). If linked user has roles, use those.
+    const displayRoles = getDisplayRoles(barber);
+    const assignableRoles = displayRoles.filter(r => r !== 'owner');
+    const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
+    const hasSystemAccess = linkedRoles.some(r => r !== 'otros');
 
     return (
       <div key={barber.id}>
@@ -493,14 +563,12 @@ export function EquipoUnificado({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-foreground">{barber.firstName} {barber.lastName}</span>
-                {roles.filter(r => r !== 'owner' || isOwner).length > 0 ? (
-                  roles.filter(r => isOwner ? true : r !== 'owner').sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(role => (
+                {displayRoles.length > 0 ? (
+                  displayRoles.filter(r => isOwner ? true : r !== 'owner').sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(role => (
                     <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
                       {getRoleIcon(role)} {getRoleLabel(role)}
                     </Badge>
                   ))
-                ) : !linkedUser ? (
-                  <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo — Invitalo para asignar</Badge>
                 ) : (
                   <Badge variant="outline" className="text-xs text-muted-foreground">Sin cargo asignado</Badge>
                 )}
@@ -540,8 +608,8 @@ export function EquipoUnificado({
               )}
             </div>
 
-            {/* Role multi-select (only for non-owners with linked users) */}
-            {linkedUser && !isOwner && (
+            {/* Role multi-select — available also when there's no linked user (persists rol_equipo) */}
+            {!isOwner && (
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
                 {ASSIGNABLE_ROLES.map(role => (

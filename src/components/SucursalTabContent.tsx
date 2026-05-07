@@ -30,6 +30,7 @@ interface SucursalTabContentProps {
   lines: Line[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
+  onRefreshBarbers?: () => Promise<void> | void;
   onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdateService: (id: string, updates: Partial<Service>) => void;
   onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
@@ -47,7 +48,7 @@ interface SucursalTabContentProps {
 export function SucursalTabContent({
   sucursal, barbers, allBarbers, allSucursales = [],
   services, extras, discounts, lines,
-  onAddBarber, onUpdateBarber,
+  onAddBarber, onUpdateBarber, onRefreshBarbers,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
@@ -234,6 +235,7 @@ export function SucursalTabContent({
           sucursales={allSucursales}
           onAddBarber={onAddBarber}
           onUpdateBarber={onUpdateBarber}
+          onRefreshBarbers={onRefreshBarbers}
         />
 
         {/* Catálogo de Servicios */}
