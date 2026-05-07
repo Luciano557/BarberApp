@@ -677,12 +677,6 @@ export function EquipoUnificado({
                 </Button>
               )}
 
-              {(!linkedUser || !hasSystemAccess) && barber.teamRole !== 'otros' && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs"
-                  onClick={() => setInviteBarber(barber)}>
-                  <Mail className="h-3.5 w-3.5 mr-1" /> Invitar
-                </Button>
-              )}
 
               <Button variant="ghost" size="sm" className="h-8 text-xs"
                 onClick={() => setToggleConfirm({
