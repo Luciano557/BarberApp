@@ -104,7 +104,8 @@ serve(async (req: Request): Promise<Response> => {
     if (authErr || !caller) return jsonResponse(401, { error: "No autorizado" });
 
     const body: Body = await req.json();
-    const { barberoId, organizationId, sucursalId, accessEmail, regenerateAccess } = body;
+    const { barberoId, organizationId, sucursalId, accessEmail, regenerateAccess,
+            replaceExistingManager, existingManagerBarberoId, resolveStaleManagerConflict } = body;
 
     if (!barberoId || !organizationId) {
       return jsonResponse(400, { error: "Datos incompletos" });
