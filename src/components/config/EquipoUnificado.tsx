@@ -1029,6 +1029,103 @@ export function EquipoUnificado({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manager replacement confirmation */}
+      <AlertDialog open={!!replaceMgrDialog} onOpenChange={(open) => {
+        if (!open && replaceMgrDialog) {
+          replaceMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
+          setReplaceMgrDialog(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Reemplazar Encargado de Sucursal
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {replaceMgrDialog && (
+                <>
+                  Estás a punto de cambiar el rango de <strong>{replaceMgrDialog.newMemberName}</strong>.
+                  Este rango actualmente pertenece a <strong>{replaceMgrDialog.currentManagerName}</strong>.
+                  Si confirmás el cambio, {replaceMgrDialog.currentManagerName} dejará de ser Encargado de Sucursal.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const target = replaceMgrDialog;
+              setReplaceMgrDialog(null);
+              if (!target) return;
+              const retryRes = await callAccessFn({
+                ...target.payload,
+                replaceExistingManager: true,
+                existingManagerBarberoId: target.currentManagerBarberoId,
+              });
+              if (retryRes.ok) {
+                if (onRefreshBarbers) await onRefreshBarbers();
+                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                toast.success('Encargado reemplazado');
+              } else {
+                toast.error(retryRes.error || 'No se pudo reemplazar al Encargado');
+              }
+              target.onResolved(retryRes);
+            }}>
+              Confirmar reemplazo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Stale manager role inconsistency */}
+      <AlertDialog open={!!staleMgrDialog} onOpenChange={(open) => {
+        if (!open && staleMgrDialog) {
+          staleMgrDialog.onResolved({ ok: false, code: 'CANCELLED' });
+          setStaleMgrDialog(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Inconsistencia detectada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {staleMgrDialog && (
+                <>
+                  Detectamos una inconsistencia: <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'un usuario'}</strong> figura
+                  como Encargado en permisos reales, pero no aparece como Encargado en el equipo.
+                  Para continuar, Vittro debe corregir esa sincronización.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const target = staleMgrDialog;
+              setStaleMgrDialog(null);
+              if (!target) return;
+              const retryRes = await callAccessFn({
+                ...target.payload,
+                resolveStaleManagerConflict: true,
+              });
+              if (retryRes.ok) {
+                if (onRefreshBarbers) await onRefreshBarbers();
+                await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+                toast.success('Inconsistencia corregida');
+              } else {
+                toast.error(retryRes.error || 'No se pudo corregir la inconsistencia');
+              }
+              target.onResolved(retryRes);
+            }}>
+              Corregir y continuar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
