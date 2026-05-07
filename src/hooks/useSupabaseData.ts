@@ -65,7 +65,22 @@ function dbToExtra(row: any, branchRow?: ExtraSucursalRow): Extra {
   };
 }
 
+function rolEquipoToRoles(re: string | null | undefined): AppRole[] {
+  switch (re) {
+    case 'owner': return ['owner'];
+    case 'general_manager': return ['general_manager'];
+    case 'manager': return ['manager'];
+    case 'barbero': return ['barber'];
+    case 'otros': return ['otros'];
+    default: return [];
+  }
+}
+
 function dbToBarber(row: any): Barber {
+  const rolesEquipoRaw = Array.isArray(row.roles_equipo) ? (row.roles_equipo as string[]) : [];
+  const rolesEquipo: AppRole[] = rolesEquipoRaw.length > 0
+    ? (rolesEquipoRaw.filter((r): r is AppRole => ['owner','general_manager','manager','barber','otros'].includes(r)))
+    : rolEquipoToRoles(row.rol_equipo);
   return {
     id: row.id,
     uid: row.id,
@@ -75,7 +90,9 @@ function dbToBarber(row: any): Barber {
     commission: Number(row.comision) || 0,
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
-    teamRole: row.rol_equipo || 'barbero',
+    teamRole: (row.rol_equipo as TeamRole) || 'barbero',
+    rolesEquipo,
+    sucursalId: row.sucursal_id ?? null,
     payDay: row.fecha_cobro_dia || 1,
     address: undefined,
     dni: row.dni || undefined,
