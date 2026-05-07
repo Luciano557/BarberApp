@@ -30,6 +30,7 @@ interface SucursalTabContentProps {
   lines: Line[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
+  onRefreshBarbers?: () => Promise<void> | void;
   onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdateService: (id: string, updates: Partial<Service>) => void;
   onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
