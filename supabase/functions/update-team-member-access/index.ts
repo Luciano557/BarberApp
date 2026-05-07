@@ -293,8 +293,21 @@ serve(async (req: Request): Promise<Response> => {
 
     if (Object.keys(updates).length > 0) {
       const { error: updErr } = await admin
-        .from("barberos").update(updates).eq("id", barberoId);
+        .from("barberos").update(updates)
+        .eq("id", barberoId)
+        .eq("organization_id", organizationId);
       if (updErr) return jsonResponse(400, { error: `No se pudo actualizar miembro: ${updErr.message}` });
+      // Verify post-update integrity
+      const { data: verify, error: vErr } = await admin
+        .from("barberos")
+        .select("id, organization_id, rol_equipo, roles_equipo")
+        .eq("id", barberoId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (vErr || !verify) return jsonResponse(404, { error: "No se pudo verificar el miembro tras actualizar" });
+      if (normalizedRoles && verify.rol_equipo !== finalRolEquipo) {
+        return jsonResponse(500, { error: "El cargo no quedó persistido. Reintentá." });
+      }
     }
 
     let tempPassword: string | null = null;
