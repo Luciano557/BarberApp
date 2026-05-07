@@ -190,12 +190,34 @@ export function EquipoUnificado({
   };
 
   // Map AppRole[] -> rol_equipo (single canonical)
-  const rolesToRolEquipo = (roles: AppRole[]): TeamRole | 'manager' | 'general_manager' | 'owner' => {
-    if (roles.includes('owner')) return 'owner' as any;
-    if (roles.includes('general_manager')) return 'general_manager' as any;
-    if (roles.includes('manager')) return 'manager' as any;
+  const rolesToRolEquipo = (roles: AppRole[]): 'owner' | 'general_manager' | 'manager' | 'barbero' | 'otros' => {
+    if (roles.includes('owner')) return 'owner';
+    if (roles.includes('general_manager')) return 'general_manager';
+    if (roles.includes('manager')) return 'manager';
     if (roles.includes('barber')) return 'barbero';
     return 'otros';
+  };
+
+  // Map rol_equipo -> AppRole[] (for visual init when there's no linked user)
+  const rolEquipoToRoles = (re: string | null | undefined): AppRole[] => {
+    switch (re) {
+      case 'owner': return ['owner'];
+      case 'general_manager': return ['general_manager'];
+      case 'manager': return ['manager'];
+      case 'barbero': return ['barber'];
+      case 'otros': return ['otros'];
+      default: return ['barber'];
+    }
+  };
+
+  // Visual cargo source of truth: prefer barber.teamRole (rol_equipo), fall back to linked user_roles
+  const getDisplayRoles = (barber: Barber): AppRole[] => {
+    const linkedUser = getLinkedUser(barber.id);
+    if (linkedUser) {
+      const ur = getUserRoles(linkedUser.id);
+      if (ur.length > 0) return ur;
+    }
+    return rolEquipoToRoles((barber.teamRole as string) ?? null);
   };
 
   // Centralized call to edge function
