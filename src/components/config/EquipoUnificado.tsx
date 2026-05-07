@@ -238,7 +238,7 @@ export function EquipoUnificado({
       }
     }
     const rolEquipo = rolesToRolEquipo(newRoles);
-    const res = await callAccessFn({ barberId: barberId as any, barberoId: barberId, rolEquipo } as any);
+    const res = await callAccessFn({ barberoId: barberId, rolEquipo });
     if (!res.ok) {
       toast.error(res.error || 'No se pudo actualizar el cargo');
       return;
