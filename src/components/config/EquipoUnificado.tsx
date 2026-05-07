@@ -290,9 +290,7 @@ export function EquipoUnificado({
   const getDisplayRoles = (barber: Barber): AppRole[] => {
     if (barber.rolesEquipo && barber.rolesEquipo.length > 0) return barber.rolesEquipo;
     const fromTeamRole = rolEquipoToRoles(barber.teamRole);
-    if (fromTeamRole.length > 0 && !(fromTeamRole.length === 1 && fromTeamRole[0] === 'barber' && !barber.teamRole)) {
-      return fromTeamRole;
-    }
+    if (fromTeamRole.length > 0) return fromTeamRole;
     const linkedUser = getLinkedUser(barber.id);
     if (linkedUser) {
       const ur = getUserRoles(linkedUser.id);
