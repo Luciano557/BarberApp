@@ -353,6 +353,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 lines={allLines}
                 onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
                 onUpdateBarber={updateBarberFn}
+                onRefreshBarbers={fetchAllBarbers}
                 onAddService={addServiceForSucursal(s.id)}
                 onUpdateService={updateService}
                 onAddExtra={addExtraForSucursal(s.id)}
