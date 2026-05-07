@@ -168,81 +168,64 @@ export function EquipoUnificado({
     });
   };
 
-  // Role change handler — now handles multiple roles via diff
+  // Map AppRole[] -> rol_equipo (single canonical)
+  const rolesToRolEquipo = (roles: AppRole[]): TeamRole | 'manager' | 'general_manager' | 'owner' => {
+    if (roles.includes('owner')) return 'owner' as any;
+    if (roles.includes('general_manager')) return 'general_manager' as any;
+    if (roles.includes('manager')) return 'manager' as any;
+    if (roles.includes('barber')) return 'barbero';
+    return 'otros';
+  };
+
+  // Centralized call to edge function
+  const callAccessFn = async (payload: {
+    barberoId: string;
+    accessEmail?: string | null;
+    rolEquipo?: any;
+    regenerateAccess?: boolean;
+  }): Promise<{ ok: boolean; tempPassword?: string | null; email?: string | null; error?: string }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('update-team-member-access', {
+        body: {
+          barberoId: payload.barberoId,
+          organizationId,
+          sucursalId,
+          accessEmail: payload.accessEmail,
+          rolEquipo: payload.rolEquipo,
+          regenerateAccess: payload.regenerateAccess ?? false,
+        },
+      });
+      if (error) return { ok: false, error: (error as any).message || 'Error en la solicitud' };
+      if ((data as any)?.error) return { ok: false, error: (data as any).error };
+      return { ok: true, tempPassword: (data as any)?.tempPassword, email: (data as any)?.email };
+    } catch (e: any) {
+      return { ok: false, error: e?.message || 'Error en la solicitud' };
+    }
+  };
+
+  // Role change handler (uses edge function for security/consistency)
   const handleChangeRoles = async (barberId: string, newRoles: AppRole[]) => {
-    const linkedUser = getLinkedUser(barberId);
-    if (!linkedUser) {
-      toast.error('Este miembro no tiene un usuario vinculado. Invitalo primero.');
-      return;
-    }
-
-    const currentRoles = getUserRoles(linkedUser.id);
-    const isOwner = currentRoles.includes('owner');
-    if (isOwner) {
-      toast.error('No se puede cambiar el cargo del dueño');
-      return;
-    }
-
-    // Ensure at least one role
     if (newRoles.length === 0) {
       toast.error('Debe tener al menos un cargo');
       return;
     }
-
-    const currentNonOwner: string[] = currentRoles.filter(r => r !== 'owner');
-    const toRemove = currentNonOwner.filter(r => !(newRoles as string[]).includes(r));
-    const toAdd = (newRoles as string[]).filter(r => !currentNonOwner.includes(r));
-
-    for (const role of toRemove) {
-      await supabase.from('user_roles').delete().eq('user_id', linkedUser.id).eq('role', role as any);
-    }
-    for (const role of toAdd) {
-      await supabase.from('user_roles').insert({ user_id: linkedUser.id, role: role as any });
-    }
-
-    // Handle user_sucursales: assign sucursal for manager/barber roles
-    const needsSucursal = newRoles.includes('manager') || newRoles.includes('barber');
-    const hadSucursalRole = currentNonOwner.includes('manager') || currentNonOwner.includes('barber');
-
-    if (needsSucursal && sucursalId) {
-      // Upsert user_sucursales
-      const { data: existing } = await supabase
-        .from('user_sucursales')
-        .select('id')
-        .eq('user_id', linkedUser.id)
-        .eq('sucursal_id', sucursalId)
-        .maybeSingle();
-
-      if (!existing) {
-        await supabase.from('user_sucursales').insert({
-          user_id: linkedUser.id,
-          sucursal_id: sucursalId,
-          organization_id: organizationId,
-        });
+    const linkedUser = getLinkedUser(barberId);
+    if (linkedUser) {
+      const currentRoles = getUserRoles(linkedUser.id);
+      if (currentRoles.includes('owner')) {
+        toast.error('No se puede cambiar el cargo del dueño');
+        return;
       }
-
-      // Set default_sucursal_id
-      await supabase
-        .from('profiles')
-        .update({ default_sucursal_id: sucursalId })
-        .eq('id', linkedUser.id);
-    } else if (!needsSucursal && hadSucursalRole) {
-      // Removed all sucursal-bound roles: clean up user_sucursales
-      await supabase
-        .from('user_sucursales')
-        .delete()
-        .eq('user_id', linkedUser.id)
-        .eq('sucursal_id', sucursalId);
     }
-
-    // Sync teamRole: if 'barber' is among roles → 'barbero', else 'otros'
-    const teamRole: TeamRole = newRoles.includes('barber') ? 'barbero' : 'otros';
-    onUpdateBarber(barberId, { teamRole });
-
-    if (toRemove.length > 0 || toAdd.length > 0) {
-      toast.success('Cargos actualizados');
-      await fetchUserRoles();
+    const rolEquipo = rolesToRolEquipo(newRoles);
+    const res = await callAccessFn({ barberId: barberId as any, barberoId: barberId, rolEquipo } as any);
+    if (!res.ok) {
+      toast.error(res.error || 'No se pudo actualizar el cargo');
+      return;
     }
+    toast.success('Cargo actualizado');
+    onUpdateBarber(barberId, { teamRole: (newRoles.includes('barber') ? 'barbero' : 'otros') as TeamRole });
+    await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
   };
 
   const resetForm = () => {
