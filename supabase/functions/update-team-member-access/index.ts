@@ -73,6 +73,10 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse(400, { error: "Datos incompletos" });
     }
 
+    if (rolEquipo !== undefined && !["owner","general_manager","manager","barbero","otros"].includes(rolEquipo as string)) {
+      return jsonResponse(400, { error: `rolEquipo inválido: ${rolEquipo}` });
+    }
+
     // Caller roles
     const { data: callerRolesData } = await admin
       .from("user_roles").select("role").eq("user_id", caller.id);
