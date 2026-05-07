@@ -619,7 +619,7 @@ export function EquipoUnificado({
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
     const linkedRoles = linkedUser ? getUserRoles(linkedUser.id) : [];
-    // Visual cargos: prioritize barberos.rol_equipo (barber.teamRole). If linked user has roles, use those.
+    // Visual cargos: siempre desde rolesEquipo (multirol). teamRole es solo rol principal derivado.
     const displayRoles = getDisplayRoles(barber);
     const assignableRoles = displayRoles.filter(r => r !== 'owner');
     const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
