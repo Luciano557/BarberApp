@@ -48,7 +48,7 @@ interface SucursalTabContentProps {
 export function SucursalTabContent({
   sucursal, barbers, allBarbers, allSucursales = [],
   services, extras, discounts, lines,
-  onAddBarber, onUpdateBarber,
+  onAddBarber, onUpdateBarber, onRefreshBarbers,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
