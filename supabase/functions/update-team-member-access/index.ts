@@ -17,6 +17,9 @@ interface Body {
   roles?: AppRole[]; // multi-role (preferred)
   rolEquipo?: RolEquipo; // legacy compat
   regenerateAccess?: boolean;
+  replaceExistingManager?: boolean;
+  existingManagerBarberoId?: string | null;
+  resolveStaleManagerConflict?: boolean;
 }
 
 const ROLE_RANK: Record<AppRole, number> = {
