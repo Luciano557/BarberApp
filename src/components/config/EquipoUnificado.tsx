@@ -1166,7 +1166,7 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
   }, [barberId]);
 
   const isComision = localData.compensationType === 'comision';
-  const commissionRequired = isComision && (localData.roles.includes('barber') || localData.roles.includes('manager'));
+  const commissionRequired = isComision && localData.roles.includes('barber');
 
   const validateLocalCommission = (value: string): boolean => {
     if (!commissionRequired && (value === '' || value === '0')) {
