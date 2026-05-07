@@ -117,6 +117,24 @@ export function EquipoUnificado({
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
 
+  const { roles: callerRoles } = useAuth();
+  const callerCanReplaceManager = callerRoles.includes('owner') || callerRoles.includes('general_manager');
+
+  // Conflict resolution dialogs (manager replacement / stale role)
+  const [replaceMgrDialog, setReplaceMgrDialog] = useState<{
+    payload: AccessFnPayload;
+    currentManagerName: string;
+    currentManagerBarberoId: string;
+    newMemberName: string;
+    onResolved: (res: AccessFnResult) => void;
+  } | null>(null);
+  const [staleMgrDialog, setStaleMgrDialog] = useState<{
+    payload: AccessFnPayload;
+    conflictName: string | null;
+    conflictEmail: string | null;
+    onResolved: (res: AccessFnResult) => void;
+  } | null>(null);
+
   // User/role data
   const [orgUsers, setOrgUsers] = useState<UserProfile[]>([]);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
