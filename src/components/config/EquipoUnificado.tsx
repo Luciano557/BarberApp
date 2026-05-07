@@ -84,7 +84,7 @@ interface ToggleConfirm {
 }
 
 export function EquipoUnificado({
-  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber,
+  sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
 }: EquipoUnificadoProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
