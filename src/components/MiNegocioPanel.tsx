@@ -282,11 +282,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   };
 
   // --- Helpers to scope catalog data by sucursal ---
+  // `allServices`/`allExtras` ya vienen enriquecidos con `servicios_sucursales`/`extras_sucursales`
+  // para la sucursal activa (currentSucursal). Cuando la tab activa coincide, devolvemos esa lista
+  // tal cual; así Mi Negocio › Sucursal › Servicios y Cobrar comparten exactamente la misma fuente.
+  // Para tabs que no son la activa devolvemos lista vacía y evitamos mostrar datos de otra sucursal
+  // mientras se sincroniza el cambio (handleTabChange ya dispara setCurrentSucursal).
   const getServicesForSucursal = (sucursalId: string) =>
-    allServices.filter(s => s.sucursalId === sucursalId);
+    currentSucursal?.id === sucursalId ? allServices : [];
 
   const getExtrasForSucursal = (sucursalId: string) =>
-    allExtras.filter(e => e.sucursalId === sucursalId);
+    currentSucursal?.id === sucursalId ? allExtras : [];
 
   // Wrap add functions to inject sucursalId
   const addServiceForSucursal = useCallback((sucursalId: string) => {

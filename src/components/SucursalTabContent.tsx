@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -57,6 +58,8 @@ export function SucursalTabContent({
   onGoToGeneralConfig,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
+  const { isOwner, isGeneralManager } = useAuth();
+  const canManageServiceStructure = isOwner || isGeneralManager;
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -250,6 +253,8 @@ export function SucursalTabContent({
             onDeleteDiscount={onDeleteDiscount}
             onToggleDiscountActive={onToggleDiscountActive}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
+            canCreateServices={canManageServiceStructure}
+            canEditServiceStructure={canManageServiceStructure}
           />
         </div>
 

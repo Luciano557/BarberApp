@@ -1,105 +1,76 @@
-## Cambio UX selector de cargos en Equipo
+## Objetivo
 
-Reemplazar el selector de checkboxes planos por tarjetas seleccionables en `src/components/config/EquipoUnificado.tsx`. Cambio puramente visual y de interacción. No se tocan edge functions, DB, migraciones, `roles_equipo`, `rol_equipo`, `user_roles`, `user_sucursales`, lógica de permisos, `handleFormSave`, `submitWithConflictHandling`, `handleChangeRoles`, `getDisplayRoles`, persistencia, diálogos de reemplazo de Encargado, sección Acceso al sistema, ni `ExtrasCompensacion`.
+Corregir tres problemas relacionados:
 
-Modelo interno se mantiene: `localData.roles: AppRole[]`.
+1. El encargado de sucursal (manager) puede crear o editar campos estructurales de servicios desde la UI, pero la operación termina rompiendo silenciosamente.
+2. Mi Negocio › Sucursal › Servicios y Cobrar muestran listas distintas para la misma sucursal.
+3. El barbero no debe entrar a Cobrar; un usuario con cargos manager + barber sí.
 
-### Alcance
+Sin tocar ventas históricas, agenda, caja, comisiones ni multi-tenant.
 
-Único archivo: `src/components/config/EquipoUnificado.tsx`.
+## Cambios
 
-### 1. Helpers nuevos (módulo, junto a `enforceRoleRules`)
+### 1. Backend (ya aplicado en migración)
 
-- `getHierarchicalRole(roles): 'owner' | 'general_manager' | 'manager' | null`
-- `hasOperationalBarber(roles): boolean`
-- `normalizeRoles(roles): AppRole[]`
-  - Si tiene `owner` → quita `manager`, `general_manager`, `otros`. Permite `owner` o `owner+barber`.
-  - Si tiene cualquier rol distinto de `otros` → quita `otros`.
-  - Nunca permite `manager + general_manager` (los toggles ya lo evitan).
-  - Si queda vacío → `['otros']`.
-- `toggleHierarchical(roles, target)` con `target ∈ {'general_manager','manager'}`:
-  - Si `target` ya está activo → lo quita.
-  - Si no → lo agrega, quita el otro jerárquico, quita `otros`, conserva `barber` si estaba.
-  - Devuelve `normalizeRoles`.
-- `toggleBarber(roles)`:
-  - Si `barber` activo → lo quita.
-  - Si no → lo agrega, quita `otros`.
-  - Devuelve `normalizeRoles`.
+- Se quita la política ALL sobre `servicios` que daba acceso al manager.
+- Se agregan políticas separadas INSERT / UPDATE / DELETE en `servicios` solo para `owner` y `general_manager`.
+- SELECT global para la organización se mantiene.
+- Para precio y activo por sucursal se siguen usando las funciones existentes `set_servicio_sucursal_precio` y `set_servicio_sucursal_activo`, que ya validan owner, general_manager y manager (manager limitado a su única sucursal asignada). Misma RPC para los tres cargos: no hace falta una función nueva.
 
-`enforceRoleRules` no se elimina; el form deja de usarla y pasa a usar los nuevos helpers. La card del integrante también deja de usarla (ver punto 4).
+### 2. `ServicesConfig.tsx`
 
-### 2. Form (`StaffForm`, líneas ~1151-1181)
+- Nuevas props opcionales: `canCreate` (default `true`) y `canEditStructure` (default `true`).
+- Si `canCreate === false`: ocultar el botón "Agregar servicio".
+- Si `canEditStructure === false`: nombre, duración y línea quedan en modo lectura (input deshabilitado o no editable). Solo `CurrencyInput` (precio) y el toggle de activo siguen editables.
+- Mostrar un texto auxiliar breve cuando el manager no pueda editar estructura, explicando qué puede hacer.
 
-Reemplazar el bloque actual `Cargo(s) *` por dos secciones de tarjetas más una vista previa.
+### 3. `CobrarConfig.tsx`
 
-**Bloque informativo de owner** (renderizado solo si `localData.roles.includes('owner')`, encima de las secciones):
-- Texto: "Este integrante es Dueño del negocio. Este cargo no se puede modificar desde Equipo."
-- Estilo sobrio (fondo `muted`, borde `border`, ícono de owner).
+- Pasar `canCreate` y `canEditStructure` hacia `ServicesConfig` con la misma lógica que en Mi Negocio.
 
-**A) Cargo jerárquico**
-- Título: "Cargo jerárquico".
-- Descripción: "Define responsabilidades de gestión dentro del negocio."
-- Dos tarjetas en grid (1 col mobile, 2 cols ≥sm):
-  - "Encargado General" (`general_manager`) — descripción: "Acceso amplio a gestión y configuración."
-  - "Encargado de Sucursal" (`manager`) — descripción: "Gestiona la operación de esta sucursal."
-- Selección mutuamente exclusiva. Tocar la activa la desactiva → puede dejar al integrante sin cargo jerárquico.
-- Sin tarjeta "Sin cargo jerárquico".
-- Si está seleccionada `general_manager`, la tarjeta `manager` se muestra atenuada con texto auxiliar: "Reemplaza Encargado General." (sigue clickeable; tocarla cambia a `manager`).
-- Análogo si está seleccionada `manager`: la tarjeta `general_manager` muestra "Reemplaza Encargado de Sucursal."
-- Si `localData.roles.includes('owner')`: ambas tarjetas se muestran deshabilitadas (no clickeables) con texto: "No disponible para dueños."
+### 4. `SucursalTabContent.tsx`
 
-**B) Trabajo operativo**
-- Título: "Trabajo operativo".
-- Descripción: "Indica si esta persona también trabaja realizando servicios."
-- Una tarjeta: "Barbero" (`barber`) — descripción: "Puede recibir turnos, ventas y comisiones."
-- Toggle simple. Disponible siempre, incluso para owners.
+- Calcular permisos a partir de `useAuth()`:
+  - `canCreate = isOwner || isGeneralManager`
+  - `canEditStructure = isOwner || isGeneralManager`
+- Pasar ambas props a `ServicesConfig`.
 
-**Vista previa** debajo de las tarjetas:
-- Texto: "Este integrante quedará como:"
-- Renderiza badges según `localData.roles` usando `getRoleLabel` + `getRoleIcon` (y `getRoleBadgeVariant` si existe). Concatenados visualmente con un separador "+".
-- Casos cubiertos: `['manager','barber']` → "Encargado de Sucursal + Barbero", `['otros']` → "Otros", `['owner','barber']` → "Dueño + Barbero", etc.
+### 5. `MiNegocioGeneralTabContent.tsx`
 
-### 3. Componente local `RoleCard`
+- Pasar `canCreate=true` y `canEditStructure=true` (tab solo visible para owner/gm, no cambia comportamiento).
 
-Componente inline definido dentro del archivo (no archivo nuevo). Render como `<button type="button">`.
+### 6. `MiNegocioPanel.tsx` — unificación de fuente de datos
 
-Props: `icon`, `title`, `description`, `selected`, `state` (`'normal' | 'replaceable' | 'disabled'`), `replaceableLabel?`, `disabledLabel?`, `onClick`.
+- Reemplazar `getServicesForSucursal(sucursalId) = allServices.filter(s => s.sucursalId === sucursalId)` por la misma lista enriquecida que usa Cobrar (`allServices` ya viene con `servicios_sucursales` resuelto para la sucursal activa en `useSupabaseData`).
+- Idem para extras.
+- Para evitar mostrar datos de otra sucursal mientras se cambia de tab, pasar `currentSucursal?.id === s.id ? allServices : []` a `SucursalTabContent`. El handler de tab ya hace `setCurrentSucursal(value)`, así que la lista se refresca automáticamente.
 
-Estados visuales (tokens semánticos, sin emojis, sin colores hardcoded):
-- **Seleccionada**: `border-primary bg-primary/5`, título en `font-medium text-foreground`, ícono primario, `Check` visible a la derecha.
-- **Reemplazable** (no seleccionada pero tocarla reemplaza al jerárquico actual): `border-border opacity-60`, texto auxiliar en `text-[11px] text-muted-foreground`. Sigue clickeable.
-- **Normal no seleccionada**: `border-border bg-background hover:bg-accent/40`.
-- **Deshabilitada (owner)**: `border-border bg-muted/40 opacity-50 cursor-not-allowed`, `disabled` real, texto auxiliar.
+### 7. Cobrar — bloqueo de servicios sin precio
 
-Layout interno: ícono arriba-izquierda, título, descripción en `text-xs text-muted-foreground`. Padding cómodo, `rounded-lg`, transiciones suaves.
+- No se ocultan: siguen visibles con etiqueta "Precio pendiente".
+- `PaymentRegistration.tsx` ya bloquea la selección con un toast claro. Se confirma que el comportamiento se mantiene.
 
-### 4. Card del integrante (líneas ~692-719)
+### 8. Acceso al módulo Cobrar
 
-Reemplazar el bloque actual de checkboxes inline por badges visuales no editables:
-- Renderizar `getDisplayRoles(barber)` (incluyendo `owner` cuando aplique) como `<Badge variant="secondary">` con `getRoleIcon` + `getRoleLabel`.
-- Quitar `Checkbox`, `enforceRoleRules` y `handleChangeRoles` desde la card.
-- La edición se hace exclusivamente vía botón Editar existente (que abre `StaffForm`).
+- Confirmado: `AppSidebar` y `Index.tsx` ya gatean por `canManagePayments` (owner / general_manager / manager). Un usuario con manager + barber pasa la condición.
+- No se modifica nada en este punto.
 
-### 5. Validación de comisión
+## Detalles técnicos
 
-En `StaffForm`, cambiar:
-```
-commissionRequired = isComision && (roles.includes('barber') || roles.includes('manager'))
-```
-por:
-```
-commissionRequired = isComision && roles.includes('barber')
-```
-Un Encargado de Sucursal sin `barber` no requiere comisión obligatoria.
+- `set_servicio_sucursal_precio(_id, _precio)` y `set_servicio_sucursal_activo(_id, _activo)` ya están definidas como `SECURITY DEFINER` con `_assert_can_write_sucursal_catalog`, que valida organización, sucursal y cargo. Manager solo puede operar sobre su única sucursal asignada.
+- `useSupabaseData.updateService` ya canaliza precio y activo por estas RPCs cuando hay `sucursalId`.
+- Tras quitar la política ALL, cualquier intento del frontend de hacer `update servicios` con campos estructurales desde manager devolverá error de RLS. Por eso el bloqueo en UI (`canEditStructure`) es la primera línea de defensa.
 
-Quitar la condición `localData.roles.length === 0` del `disabled` del botón Guardar (ya nunca puede ocurrir porque `normalizeRoles` garantiza mínimo `['otros']`).
+## Qué no se toca
 
-### 6. Lo que NO cambia
+- `user_roles`, `roles_equipo`, `rol_equipo`, `user_sucursales`, `profiles`, `barberos`.
+- Historial de ventas, ingresos, cierres, comisiones, agenda.
+- Multi-tenant ni RLS de otras tablas.
 
-- `StaffFormData`, `handleFormSave`, `submitWithConflictHandling`, `handleChangeRoles`, `rolesToRolEquipo`, `getDisplayRoles`, edge functions, llamadas a Supabase, base de datos, migraciones.
-- Resto del form: nombre, apellido, teléfono, DNI, dirección, tipo de compensación, comisión, sueldo fijo, día de cobro, botones Guardar/Cancelar.
-- `ExtrasCompensacion`, sección "Acceso al sistema", diálogos de reemplazo de Encargado, lógica real de permisos.
+## Verificación
 
-### 7. Casos de prueba cubiertos
-
-A: nada → `['otros']`. B: solo Barbero → `['barber']`. C: Encargado Sucursal → `['manager']`. D: Manager+Barbero → `['manager','barber']`. E: GM+Barbero → `['general_manager','barber']`. F: desde `['otros']` selecciona Manager → `['manager']` (no agrega barber). G: desde `['manager']` toca Barbero → `['manager','barber']`. H: desmarca Barbero → `['manager']`. I: desde `['manager']` retoca Manager → `['otros']`. J: card muestra solo badges, edición vía Editar. K: desde `['general_manager','barber']` toca Manager → `['manager','barber']`. L: desde `['manager','barber']` toca GM → `['general_manager','barber']`. M: `['owner','barber']` → vista "Dueño + Barbero", tarjetas jerárquicas deshabilitadas. N: desde `['otros']` toca Barbero → `['barber']`. O: desde `['otros']` toca GM → `['general_manager']`. P: desde `['manager']` retoca Manager → `['otros']`. Q: desde `['manager','barber']` retoca Barbero → `['manager']`. R: desde `['general_manager']` retoca GM → `['otros']`.
+- Owner / GM: pueden crear, editar nombre/duración/línea, precio y activo en Mi Negocio y en Cobrar.
+- Manager: en Mi Negocio › Servicios solo puede editar precio y activo de los servicios de su sucursal. Inputs estructurales bloqueados, sin botón "Agregar".
+- Manager: en Cobrar ve los mismos servicios que en Mi Negocio › Sucursal › Servicios. "Precio pendiente" visible pero no cobrable.
+- Barber puro: no entra a Cobrar.
+- Manager + barber: entra a Cobrar normalmente.

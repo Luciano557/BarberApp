@@ -21,6 +21,8 @@ interface CobrarConfigProps {
   onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
+  canCreateServices?: boolean;
+  canEditServiceStructure?: boolean;
 }
 
 export function CobrarConfig({
@@ -30,6 +32,8 @@ export function CobrarConfig({
   onAddExtra, onUpdateExtra,
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
+  canCreateServices = true,
+  canEditServiceStructure = true,
 }: CobrarConfigProps) {
   return (
     <Tabs defaultValue="services" className="w-full">
@@ -55,6 +59,8 @@ export function CobrarConfig({
           onAdd={onAddService}
           onUpdate={onUpdateService}
           onAddLine={onAddLine}
+          canCreate={canCreateServices}
+          canEditStructure={canEditServiceStructure}
         />
       </TabsContent>
 
