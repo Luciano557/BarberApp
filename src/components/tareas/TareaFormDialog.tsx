@@ -175,7 +175,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
               variant="ghost"
               size="icon"
               className="text-primary"
-              disabled={!titulo.trim() || isPending}
+              disabled={!isValid || isPending}
               onClick={handleConfirm}
             >
               <CheckCircle className="h-5 w-5" />
@@ -192,19 +192,39 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
 
             {/* Title & Description */}
             <div className="space-y-3">
-              <Input
-                placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
-                value={titulo}
-                onChange={e => setTitulo(e.target.value)}
-                className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
-              />
-              <Textarea
-                placeholder="Notas"
-                value={descripcion}
-                onChange={e => setDescripcion(e.target.value)}
-                rows={2}
-                className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
-              />
+              <div>
+                <Input
+                  placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
+                  value={titulo}
+                  onChange={e => setTitulo(e.target.value.slice(0, TITLE_MAX))}
+                  maxLength={TITLE_MAX}
+                  aria-invalid={submitted && !!titleError}
+                  className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${submitted && titleError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {submitted && titleError ? titleError : ' '}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{trimmedTitle.length}/{TITLE_MAX}</span>
+                </div>
+              </div>
+              <div>
+                <Textarea
+                  placeholder="Descripción (opcional)"
+                  value={descripcion}
+                  onChange={e => setDescripcion(e.target.value.slice(0, DESC_MAX))}
+                  rows={3}
+                  maxLength={DESC_MAX}
+                  aria-invalid={submitted && !!descError}
+                  className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${submitted && descError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {submitted && descError ? descError : ' '}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{trimmedDesc.length}/{DESC_MAX}</span>
+                </div>
+              </div>
             </div>
 
             {/* Vencimiento (peticiones) */}
@@ -257,9 +277,10 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                   <Label className="text-xs text-muted-foreground">Asignar a</Label>
                   <Select value={asignadoId} onValueChange={setAsignadoId}>
                     <SelectTrigger className="border-0 border-b border-border rounded-none px-0">
-                      <SelectValue placeholder="Sin asignar" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={TEAM_VALUE}>Todo el equipo</SelectItem>
                       {activeBarbers.map(b => (
                         <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
                       ))}
