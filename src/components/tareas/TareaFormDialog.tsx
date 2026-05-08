@@ -62,21 +62,6 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
   const resetForm = () => {
     setTitulo('');
     setDescripcion('');
-    setAsignadoId('');
-    setHasDate(false);
-    setSelectedDate(undefined);
-    setHasTime(false);
-    setSelectedTime('09:00');
-    setRepeatPreset('never');
-    setRepeatFrequency('weekly');
-    setRepeatInterval(1);
-    setRepeatByweekday([]);
-    setVencimientoDias(60);
-  };
-
-  const resetForm = () => {
-    setTitulo('');
-    setDescripcion('');
     setAsignadoId(TEAM_VALUE);
     setHasDate(false);
     setSelectedDate(undefined);
