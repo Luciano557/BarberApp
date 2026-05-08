@@ -349,17 +349,27 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
           </p>
         </div>
-        {isTareasTab ? (
-          canManageConfig && (
-            <Button onClick={handleNuevaTarea} className="self-start sm:self-auto">
-              <Plus className="h-4 w-4 mr-2" />Nueva tarea
-            </Button>
-          )
-        ) : (
-          <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
-            <Plus className="h-4 w-4 mr-2" />Nueva petición
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            onClick={() => setFiltroEstado(filtroEstado === 'completada' ? 'activas' : 'completada')}
+          >
+            {filtroEstado === 'completada'
+              ? 'Volver a activas'
+              : (isTareasTab ? 'Ver completadas' : 'Ver cerradas')}
           </Button>
-        )}
+          {isTareasTab ? (
+            canManageConfig && (
+              <Button onClick={handleNuevaTarea}>
+                <Plus className="h-4 w-4 mr-2" />Nueva tarea
+              </Button>
+            )
+          ) : (
+            <Button onClick={handleNuevaPeticion}>
+              <Plus className="h-4 w-4 mr-2" />Nueva petición
+            </Button>
+          )}
+        </div>
       </div>
 
       <TareaFormDialog
