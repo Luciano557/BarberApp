@@ -59,7 +59,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('tareas');
-  const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [filtroEstado, setFiltroEstado] = useState('activas');
   const [filtroResp, setFiltroResp] = useState('todos');
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
