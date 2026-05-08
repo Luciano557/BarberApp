@@ -104,14 +104,15 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
       };
       onSubmit(tarea);
     } else {
-      const barber = activeBarbers.find(b => b.id === asignadoId);
-      const barberName = barber ? getBarberDisplayName(barber) : undefined;
+      const isTeam = asignadoId === TEAM_VALUE || !asignadoId;
+      const barber = !isTeam ? activeBarbers.find(b => b.id === asignadoId) : undefined;
       const tarea: TareaInsert = {
         tipo: 'tarea',
-        titulo: titulo.trim(),
-        descripcion: descripcion.trim() || undefined,
-        asignado_a_id: asignadoId || undefined,
-        asignado_a_nombre: barberName,
+        titulo: trimmedTitle,
+        descripcion: trimmedDesc || undefined,
+        asignado_a_id: isTeam ? null : asignadoId,
+        asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : undefined),
+        assignment_scope: isTeam ? 'team' : 'individual',
         fecha_limite: hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
         hora: hasTime ? selectedTime : undefined,
         repeat_preset: repeatPreset,
