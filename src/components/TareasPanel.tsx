@@ -108,7 +108,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const tareasFiltradas = useMemo(() => tareas.filter(t => {
-    if (filtroEstado !== 'todos') {
+    if (filtroEstado === 'activas') {
+      if (t.tipo === 'tarea' && t.estado === 'completada') return false;
+      if (t.tipo === 'peticion' && (t.estado === 'completada' || t.estado === 'rechazada')) return false;
+    } else if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
         if (!(t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida)) return false;
       } else if (t.estado !== filtroEstado) return false;
@@ -118,6 +121,16 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const tareasAdmin = tareasFiltradas.filter(t => t.tipo === 'tarea');
   const peticiones = tareasFiltradas.filter(t => t.tipo === 'peticion');
+
+  // Base counts (independientes del filtro visual): solo activas
+  const tareasActivasCount = useMemo(
+    () => tareas.filter(t => t.tipo === 'tarea' && t.estado !== 'completada').length,
+    [tareas]
+  );
+  const peticionesActivasCount = useMemo(
+    () => tareas.filter(t => t.tipo === 'peticion' && t.estado !== 'completada' && t.estado !== 'rechazada').length,
+    [tareas]
+  );
 
   const getRepeatDisplay = (t: TareaItem) => {
     if (!t.recurrente) return null;
