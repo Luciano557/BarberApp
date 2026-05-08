@@ -28,7 +28,6 @@ interface TareasPanelProps {
 type TareaItem = ReturnType<typeof useTareas>['tareas'][number];
 
 const ESTADO_OPTIONS_TAREA = [
-  { value: 'activas', label: 'Activas' },
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
@@ -36,7 +35,6 @@ const ESTADO_OPTIONS_TAREA = [
 ];
 
 const ESTADO_OPTIONS_PETICION = [
-  { value: 'activas', label: 'Activas' },
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'completada', label: 'Completada' },
@@ -59,7 +57,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('tareas');
-  const [filtroEstado, setFiltroEstado] = useState('activas');
+  const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroResp, setFiltroResp] = useState('todos');
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
@@ -108,10 +106,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const tareasFiltradas = useMemo(() => tareas.filter(t => {
-    if (filtroEstado === 'activas') {
-      if (t.tipo === 'tarea' && t.estado === 'completada') return false;
-      if (t.tipo === 'peticion' && (t.estado === 'completada' || t.estado === 'rechazada')) return false;
-    } else if (filtroEstado !== 'todos') {
+    if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
         if (!(t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida)) return false;
       } else if (t.estado !== filtroEstado) return false;
@@ -121,16 +116,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const tareasAdmin = tareasFiltradas.filter(t => t.tipo === 'tarea');
   const peticiones = tareasFiltradas.filter(t => t.tipo === 'peticion');
-
-  // Base counts (independientes del filtro visual): solo activas
-  const tareasActivasCount = useMemo(
-    () => tareas.filter(t => t.tipo === 'tarea' && t.estado !== 'completada').length,
-    [tareas]
-  );
-  const peticionesActivasCount = useMemo(
-    () => tareas.filter(t => t.tipo === 'peticion' && t.estado !== 'completada' && t.estado !== 'rechazada').length,
-    [tareas]
-  );
 
   const getRepeatDisplay = (t: TareaItem) => {
     if (!t.recurrente) return null;
@@ -349,27 +334,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <Button
-            variant="outline"
-            onClick={() => setFiltroEstado(filtroEstado === 'completada' ? 'activas' : 'completada')}
-          >
-            {filtroEstado === 'completada'
-              ? 'Volver a activas'
-              : (isTareasTab ? 'Ver completadas' : 'Ver cerradas')}
-          </Button>
-          {isTareasTab ? (
-            canManageConfig && (
-              <Button onClick={handleNuevaTarea}>
-                <Plus className="h-4 w-4 mr-2" />Nueva tarea
-              </Button>
-            )
-          ) : (
-            <Button onClick={handleNuevaPeticion}>
-              <Plus className="h-4 w-4 mr-2" />Nueva petición
+        {isTareasTab ? (
+          canManageConfig && (
+            <Button onClick={handleNuevaTarea} className="self-start sm:self-auto">
+              <Plus className="h-4 w-4 mr-2" />Nueva tarea
             </Button>
-          )}
-        </div>
+          )
+        ) : (
+          <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
+            <Plus className="h-4 w-4 mr-2" />Nueva petición
+          </Button>
+        )}
       </div>
 
       <TareaFormDialog
@@ -396,10 +371,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('activas'); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); }}>
         <TabsList>
-          <TabsTrigger value="tareas">Tareas ({tareasActivasCount})</TabsTrigger>
-          <TabsTrigger value="peticiones">Peticiones ({peticionesActivasCount})</TabsTrigger>
+          <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
+          <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
         </TabsList>
 
         {/* Filters bar */}
