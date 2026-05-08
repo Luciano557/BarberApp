@@ -2941,6 +2941,13 @@ export type Database = {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
       }
+      barberos_pin_status: {
+        Args: { _ids: string[] }
+        Returns: {
+          has_pin: boolean
+          id: string
+        }[]
+      }
       cerrar_ventas_generales_sucursal: {
         Args: { _fecha: string; _sucursal_id: string }
         Returns: number
@@ -2965,6 +2972,7 @@ export type Database = {
         }
         Returns: string
       }
+      current_user_has_pin: { Args: never; Returns: boolean }
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
       get_user_organization_id: { Args: { _user_id: string }; Returns: string }
@@ -2980,6 +2988,7 @@ export type Database = {
         Args: { _clientes: Json; _sucursal_id: string }
         Returns: Json
       }
+      org_has_any_pin: { Args: never; Returns: boolean }
       registrar_movimiento_stock: {
         Args: {
           _cantidad: number
