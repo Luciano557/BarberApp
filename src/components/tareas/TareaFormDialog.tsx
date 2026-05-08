@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
-import { X, CheckCircle, CalendarIcon, Clock, RefreshCw, ChevronRight } from 'lucide-react';
-import { format, isToday } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, RefreshCw } from 'lucide-react';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { RepeatPicker, getRepeatLabel } from './RepeatPicker';
@@ -25,48 +25,39 @@ interface TareaFormDialogProps {
   creadorNombre?: string;
 }
 
+const TEAM_VALUE = '__team__';
+const TITLE_MIN = 3;
+const TITLE_MAX = 80;
+const DESC_MAX = 500;
+
 export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPending, tipo, creadorNombre }: TareaFormDialogProps) {
-  const TEAM_VALUE = '__team__';
-  const TITLE_MAX = 80;
-  const TITLE_MIN = 3;
-  const DESC_MAX = 500;
+  const isPeticion = tipo === 'peticion';
+  const activeBarbers = barbers.filter(b => b.active);
 
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [asignadoId, setAsignadoId] = useState<string>(TEAM_VALUE);
   const [submitted, setSubmitted] = useState(false);
 
-  // Date
-  const [hasDate, setHasDate] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [selectedTime, setSelectedTime] = useState('');
 
-  // Time
-  const [hasTime, setHasTime] = useState(false);
-  const [selectedTime, setSelectedTime] = useState('09:00');
-
-  // Repeat
   const [repeatPreset, setRepeatPreset] = useState('never');
   const [repeatFrequency, setRepeatFrequency] = useState('weekly');
   const [repeatInterval, setRepeatInterval] = useState(1);
   const [repeatByweekday, setRepeatByweekday] = useState<number[]>([]);
-
   const [showRepeatPicker, setShowRepeatPicker] = useState(false);
   const [showCustomRepeat, setShowCustomRepeat] = useState(false);
 
-  // Vencimiento (peticiones)
   const [vencimientoDias, setVencimientoDias] = useState(60);
-
-  const isPeticion = tipo === 'peticion';
-  const activeBarbers = barbers.filter(b => b.active);
 
   const resetForm = () => {
     setTitulo('');
     setDescripcion('');
     setAsignadoId(TEAM_VALUE);
-    setHasDate(false);
     setSelectedDate(undefined);
-    setHasTime(false);
-    setSelectedTime('09:00');
+    setSelectedTime('');
     setRepeatPreset('never');
     setRepeatFrequency('weekly');
     setRepeatInterval(1);
@@ -77,6 +68,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
 
   const trimmedTitle = titulo.trim();
   const trimmedDesc = descripcion.trim();
+
   const titleError =
     trimmedTitle.length === 0
       ? 'El título es obligatorio.'
@@ -95,55 +87,41 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
     if (!isValid) return;
 
     if (isPeticion) {
-      const tarea: TareaInsert = {
+      onSubmit({
         tipo: 'peticion',
-        titulo: titulo.trim(),
-        descripcion: descripcion.trim() || undefined,
+        titulo: trimmedTitle,
+        descripcion: trimmedDesc || undefined,
         creado_por_nombre: creadorNombre,
         vencimiento_dias: vencimientoDias,
-      };
-      onSubmit(tarea);
+      });
     } else {
       const isTeam = asignadoId === TEAM_VALUE || !asignadoId;
       const barber = !isTeam ? activeBarbers.find(b => b.id === asignadoId) : undefined;
-      const tarea: TareaInsert = {
+      onSubmit({
         tipo: 'tarea',
         titulo: trimmedTitle,
         descripcion: trimmedDesc || undefined,
         asignado_a_id: isTeam ? null : asignadoId,
         asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : undefined),
         assignment_scope: isTeam ? 'team' : 'individual',
-        fecha_limite: hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
-        hora: hasTime ? selectedTime : undefined,
+        fecha_limite: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
+        hora: selectedDate && selectedTime ? selectedTime : undefined,
         repeat_preset: repeatPreset,
         repeat_frequency: repeatPreset === 'custom' ? repeatFrequency : undefined,
         repeat_interval: repeatPreset === 'custom' ? repeatInterval : undefined,
         repeat_byweekday: repeatPreset === 'custom' && repeatFrequency === 'weekly' ? repeatByweekday : undefined,
         recurrente: repeatPreset !== 'never',
-      };
-      onSubmit(tarea);
+      });
     }
 
     resetForm();
     onOpenChange(false);
   };
 
-  const handleRepeatChange = (value: string) => {
-    setRepeatPreset(value);
-    if (value !== 'never' && !hasDate) {
-      setHasDate(true);
-      if (!selectedDate) setSelectedDate(new Date());
-    }
-  };
-
-  const handleDateToggle = (checked: boolean) => {
-    setHasDate(checked);
-    if (checked && !selectedDate) {
-      setSelectedDate(new Date());
-    }
-    if (!checked) {
-      setRepeatPreset('never');
-    }
+  const handleClearDate = () => {
+    setSelectedDate(undefined);
+    setSelectedTime('');
+    setRepeatPreset('never');
   };
 
   const getRepeatDisplayLabel = () => {
@@ -153,92 +131,73 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
     return getRepeatLabel(repeatPreset);
   };
 
-  const dateSubtext = () => {
-    if (!hasDate || !selectedDate) return '';
-    if (isToday(selectedDate)) return 'hoy';
-    return format(selectedDate, 'dd MMM yyyy', { locale: es });
-  };
+  const primaryLabel = isPeticion ? 'Crear petición' : 'Crear tarea';
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto p-0">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <Button variant="ghost" size="icon" onClick={() => { resetForm(); onOpenChange(false); }}>
-              <X className="h-5 w-5" />
-            </Button>
-            <span className="font-semibold text-base">
-              {isPeticion ? 'Nueva petición' : 'Nueva tarea'}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-primary"
-              disabled={!isValid || isPending}
-              onClick={handleConfirm}
-            >
-              <CheckCircle className="h-5 w-5" />
-            </Button>
-          </div>
+      <Dialog open={open} onOpenChange={(o) => { if (!o) resetForm(); onOpenChange(o); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isPeticion ? 'Nueva petición' : 'Nueva tarea'}</DialogTitle>
+            <DialogDescription>
+              {isPeticion
+                ? 'Enviá una petición al equipo administrativo para revisión.'
+                : 'Creá una tarea operativa y asignala al equipo o a un responsable.'}
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="p-4 space-y-4">
-            {/* Creado por (peticiones) */}
+          <div className="space-y-5">
             {isPeticion && creadorNombre && (
               <div className="text-sm text-muted-foreground">
                 Creado por: <span className="font-medium text-foreground">{creadorNombre}</span>
               </div>
             )}
 
-            {/* Title & Description */}
+            {/* Información */}
             <div className="space-y-3">
-              <div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tarea-titulo">Título</Label>
                 <Input
+                  id="tarea-titulo"
                   placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
                   value={titulo}
                   onChange={e => setTitulo(e.target.value.slice(0, TITLE_MAX))}
                   maxLength={TITLE_MAX}
                   aria-invalid={submitted && !!titleError}
-                  className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
                 />
-                <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center justify-between">
                   <span className={`text-xs ${submitted && titleError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {submitted && titleError ? titleError : ' '}
+                    {submitted && titleError ? titleError : '\u00A0'}
                   </span>
                   <span className="text-xs text-muted-foreground">{trimmedTitle.length}/{TITLE_MAX}</span>
                 </div>
               </div>
-              <div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="tarea-desc">Descripción</Label>
                 <Textarea
+                  id="tarea-desc"
                   placeholder="Descripción (opcional)"
                   value={descripcion}
                   onChange={e => setDescripcion(e.target.value.slice(0, DESC_MAX))}
                   rows={3}
                   maxLength={DESC_MAX}
                   aria-invalid={submitted && !!descError}
-                  className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
+                  className="resize-none"
                 />
-                <div className="flex items-center justify-between mt-1">
+                <div className="flex items-center justify-between">
                   <span className={`text-xs ${submitted && descError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {submitted && descError ? descError : ' '}
+                    {submitted && descError ? descError : '\u00A0'}
                   </span>
                   <span className="text-xs text-muted-foreground">{trimmedDesc.length}/{DESC_MAX}</span>
                 </div>
               </div>
             </div>
 
-            {/* Vencimiento (peticiones) */}
+            {/* Peticiones: vencimiento */}
             {isPeticion && (
-              <div className="rounded-xl border border-border overflow-hidden bg-card p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Vencimiento</p>
-                    <p className="text-xs text-muted-foreground">Días hasta que la petición expire</p>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label>Vencimiento</Label>
                 <div className="flex flex-wrap gap-2">
                   {[15, 30, 60, 90].map(d => (
                     <Button
@@ -246,7 +205,6 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                       type="button"
                       variant={vencimientoDias === d ? 'default' : 'outline'}
                       size="sm"
-                      className="h-7 text-xs"
                       onClick={() => setVencimientoDias(d)}
                     >
                       {d} días
@@ -254,29 +212,29 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs text-muted-foreground shrink-0">Personalizado:</Label>
+                  <Label htmlFor="venc-custom" className="text-xs text-muted-foreground shrink-0 font-normal">Personalizado:</Label>
                   <Input
+                    id="venc-custom"
                     type="number"
                     inputMode="numeric"
                     min={1}
                     max={365}
                     value={vencimientoDias}
                     onChange={e => setVencimientoDias(parseInt(e.target.value) || 60)}
-                    className="w-20 h-7 text-xs"
+                    className="w-24 h-8"
                   />
                   <span className="text-xs text-muted-foreground">días</span>
                 </div>
               </div>
             )}
 
-            {/* Tarea-only fields */}
+            {/* Tarea: asignación + fecha */}
             {!isPeticion && (
               <>
-                {/* Assign */}
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Asignar a</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="tarea-asignado">Asignar a</Label>
                   <Select value={asignadoId} onValueChange={setAsignadoId}>
-                    <SelectTrigger className="border-0 border-b border-border rounded-none px-0">
+                    <SelectTrigger id="tarea-asignado">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,80 +246,86 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                   </Select>
                 </div>
 
-                {/* Date/Time/Repeat cards */}
-                <div className="rounded-xl border border-border overflow-hidden divide-y divide-border bg-card">
-                  {/* Date row */}
-                  <div className="px-4">
-                    <div className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-                          <CalendarIcon className="h-4 w-4 text-destructive" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">Fecha</p>
-                          {hasDate && <p className="text-xs text-muted-foreground">{dateSubtext()}</p>}
-                        </div>
+                <div className="space-y-3">
+                  <Label>Fecha y planificación</Label>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="tarea-fecha" className="text-xs text-muted-foreground font-normal">Fecha límite</Label>
+                      <div className="flex gap-2">
+                        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="tarea-fecha"
+                              type="button"
+                              variant="outline"
+                              className="flex-1 justify-start font-normal"
+                            >
+                              <CalendarIcon className="h-4 w-4 mr-2" />
+                              {selectedDate ? format(selectedDate, 'dd MMM yyyy', { locale: es }) : 'Sin fecha'}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(d) => { setSelectedDate(d); setDatePopoverOpen(false); }}
+                              locale={es}
+                              className="p-3 pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {selectedDate && (
+                          <Button type="button" variant="ghost" size="sm" onClick={handleClearDate}>
+                            Quitar
+                          </Button>
+                        )}
                       </div>
-                      <Switch checked={hasDate} onCheckedChange={handleDateToggle} />
                     </div>
-                    {hasDate && (
-                      <div className="pb-3">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={setSelectedDate}
-                          locale={es}
-                          className="p-0 pointer-events-auto mx-auto"
-                        />
-                      </div>
-                    )}
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="tarea-hora" className="text-xs text-muted-foreground font-normal">Hora</Label>
+                      <Input
+                        id="tarea-hora"
+                        type="time"
+                        value={selectedTime}
+                        onChange={e => setSelectedTime(e.target.value)}
+                        disabled={!selectedDate}
+                      />
+                    </div>
                   </div>
 
-                  {/* Time row */}
-                  <div className="px-4">
-                    <div className="flex items-center justify-between py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-status-info-bg flex items-center justify-center">
-                          <Clock className="h-4 w-4 text-status-info-foreground" />
-                        </div>
-                        <p className="text-sm font-medium">Hora</p>
-                      </div>
-                      <Switch checked={hasTime} onCheckedChange={setHasTime} />
-                    </div>
-                    {hasTime && (
-                      <div className="pb-3">
-                        <Input
-                          type="time"
-                          value={selectedTime}
-                          onChange={e => setSelectedTime(e.target.value)}
-                          className="w-32"
-                        />
-                      </div>
-                    )}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-normal">Repetir</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      onClick={() => setShowRepeatPicker(true)}
+                      disabled={!selectedDate}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <RefreshCw className="h-4 w-4" />
+                        Repetir
+                      </span>
+                      <span className="text-muted-foreground">{getRepeatDisplayLabel()}</span>
+                    </Button>
                   </div>
-
-                  {/* Repeat row */}
-                  <button
-                    className="flex items-center justify-between w-full px-4 py-3 hover:bg-muted/50 transition-colors"
-                    onClick={() => setShowRepeatPicker(true)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
-                        <RefreshCw className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <p className="text-sm font-medium">Repetir</p>
-                    </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <span className="text-sm">{getRepeatDisplayLabel()}</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </div>
-                  </button>
                 </div>
               </>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { resetForm(); onOpenChange(false); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirm} disabled={!isValid || isPending}>
+              {primaryLabel}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {!isPeticion && (
         <>
@@ -369,7 +333,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
             open={showRepeatPicker}
             onOpenChange={setShowRepeatPicker}
             value={repeatPreset}
-            onChange={handleRepeatChange}
+            onChange={(value) => setRepeatPreset(value)}
             onCustom={() => {
               setShowRepeatPicker(false);
               setShowCustomRepeat(true);
@@ -387,10 +351,6 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
               setRepeatInterval(intv);
               setRepeatByweekday(days);
               setRepeatPreset('custom');
-              if (!hasDate) {
-                setHasDate(true);
-                if (!selectedDate) setSelectedDate(new Date());
-              }
             }}
           />
         </>
