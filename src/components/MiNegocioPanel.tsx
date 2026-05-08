@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
+import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
 import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
@@ -19,7 +20,24 @@ interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
 }
 
+function rolEquipoToRolesLocal(re: string | null | undefined): AppRole[] {
+  switch (re) {
+    case 'general_manager': return ['general_manager'];
+    case 'encargado':
+    case 'manager': return ['manager'];
+    case 'barbero':
+    case 'barber': return ['barber'];
+    case 'owner': return ['owner'];
+    case 'otros': return ['otros'];
+    default: return ['barber'];
+  }
+}
+
 function dbToBarberWithSucursal(row: any): BarberWithSucursal {
+  const rolesEquipoRaw = Array.isArray(row.roles_equipo) ? (row.roles_equipo as string[]) : [];
+  const rolesEquipo: AppRole[] = rolesEquipoRaw.length > 0
+    ? rolesEquipoRaw.filter((r): r is AppRole => ['owner','general_manager','manager','barber','otros'].includes(r))
+    : rolEquipoToRolesLocal(row.rol_equipo);
   return {
     id: row.id,
     uid: row.id,
@@ -30,6 +48,7 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     teamRole: row.rol_equipo || 'barbero',
+    rolesEquipo,
     dni: row.dni || undefined,
     active: row.activo,
     sucursalId: row.sucursal_id || null,
