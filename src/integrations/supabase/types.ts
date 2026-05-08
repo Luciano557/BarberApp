@@ -2252,6 +2252,7 @@ export type Database = {
         Row: {
           asignado_a_id: string | null
           asignado_a_nombre: string | null
+          assignment_scope: string
           creado_por_id: string
           creado_por_nombre: string | null
           created_at: string
@@ -2281,6 +2282,7 @@ export type Database = {
         Insert: {
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
+          assignment_scope?: string
           creado_por_id: string
           creado_por_nombre?: string | null
           created_at?: string
@@ -2310,6 +2312,7 @@ export type Database = {
         Update: {
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
+          assignment_scope?: string
           creado_por_id?: string
           creado_por_nombre?: string | null
           created_at?: string
