@@ -28,6 +28,7 @@ interface TareasPanelProps {
 type TareaItem = ReturnType<typeof useTareas>['tareas'][number];
 
 const ESTADO_OPTIONS_TAREA = [
+  { value: 'activas', label: 'Activas' },
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
@@ -35,6 +36,7 @@ const ESTADO_OPTIONS_TAREA = [
 ];
 
 const ESTADO_OPTIONS_PETICION = [
+  { value: 'activas', label: 'Activas' },
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'completada', label: 'Completada' },
