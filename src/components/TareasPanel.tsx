@@ -396,10 +396,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('activas'); }}>
         <TabsList>
-          <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
-          <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
+          <TabsTrigger value="tareas">Tareas ({tareasActivasCount})</TabsTrigger>
+          <TabsTrigger value="peticiones">Peticiones ({peticionesActivasCount})</TabsTrigger>
         </TabsList>
 
         {/* Filters bar */}
