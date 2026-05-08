@@ -92,12 +92,13 @@ serve(async (req) => {
 
       // Check if the barbero's linked user has a global role (owner/general_manager)
       // by finding the profile linked to this barbero_id
-      const { data: linkedProfile } = await serviceClient
+      const { data: linkedProfiles } = await serviceClient
         .from('profiles')
         .select('id')
         .eq('organization_id', profile.organization_id)
         .eq('barbero_id', barbero.id)
-        .maybeSingle();
+        .limit(1);
+      const linkedProfile = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles[0] : null;
 
       let hasGlobalRole = false;
 
