@@ -21,6 +21,10 @@ interface ServicesConfigProps {
    * 'sucursal' (default) = comportamiento histórico por sucursal.
    */
   mode?: 'global' | 'sucursal';
+  /** Permite crear nuevos servicios. Default true. */
+  canCreate?: boolean;
+  /** Permite editar nombre, duración y línea. Si es false, solo precio y activo se pueden modificar. Default true. */
+  canEditStructure?: boolean;
 }
 
 interface ToggleConfirm {
@@ -28,8 +32,9 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mode = 'sucursal' }: ServicesConfigProps) {
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
   const isGlobal = mode === 'global';
+  const structureLocked = !canEditStructure;
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
@@ -82,12 +87,13 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
     if (!newName) return;
     if (!isGlobal && !newPrice) return;
     if (dur < 5) return;
-    const updates: Partial<Service> = {
-      name: newName,
-      durationMin: dur,
-      lineId: editLineId && editLineId !== 'none' ? editLineId : undefined,
-      lineName: activeLines.find(l => l.id === editLineId)?.name,
-    };
+    const updates: Partial<Service> = {};
+    if (!structureLocked) {
+      updates.name = newName;
+      updates.durationMin = dur;
+      updates.lineId = editLineId && editLineId !== 'none' ? editLineId : undefined;
+      updates.lineName = activeLines.find(l => l.id === editLineId)?.name;
+    }
     if (!isGlobal) updates.price = parseFloat(newPrice);
     onUpdate(id, updates);
     setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
@@ -133,23 +139,25 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
       {editingId === service.id ? (
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-wrap gap-2">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" maxLength={80} />
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre" className="flex-1 min-w-[120px]" maxLength={80} disabled={structureLocked} />
             {!isGlobal && (
               <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
             )}
             <div className="flex items-center gap-1">
-              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" />
+              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" disabled={structureLocked} />
               <span className="text-xs text-muted-foreground">min</span>
             </div>
             <div className="flex items-center gap-1">
-              <Select value={editLineId} onValueChange={setEditLineId}>
+              <Select value={editLineId} onValueChange={setEditLineId} disabled={structureLocked}>
                 <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sin línea</SelectItem>
                   {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
                 </SelectContent>
               </Select>
-              <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+              {!structureLocked && (
+                <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+              )}
             </div>
             <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
             <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
@@ -186,13 +194,18 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
       <Card className="border border-border bg-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base font-medium">Servicios</CardTitle>
-          {!isAdding && activeSubTab === 'active' && (
+          {!isAdding && activeSubTab === 'active' && canCreate && (
             <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
+          {structureLocked && (
+            <p className="text-xs text-muted-foreground">
+              Como encargado de sucursal, podés ajustar el precio y activar o desactivar servicios para tu sucursal. Para crear servicios o cambiar nombre, duración o línea, contactá al dueño o gerente general.
+            </p>
+          )}
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
               <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activos ({activeServices.length})</TabsTrigger>
