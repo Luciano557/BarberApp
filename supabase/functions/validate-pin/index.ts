@@ -73,13 +73,15 @@ serve(async (req) => {
     );
 
     // Find barbero with matching PIN in the same organization
-    const { data: barbero, error: barberoError } = await serviceClient
+    // Use limit(1) instead of maybeSingle to avoid PGRST116 if multiple rows match
+    const { data: barberos, error: barberoError } = await serviceClient
       .from('barberos')
       .select('id, nombre, apellido, sucursal_id')
       .eq('organization_id', profile.organization_id)
       .eq('pin_hash', pinHash)
       .eq('activo', true)
-      .maybeSingle();
+      .limit(1);
+    const barbero = barberos && barberos.length > 0 ? barberos[0] : null;
 
     if (barberoError) {
       throw barberoError;
