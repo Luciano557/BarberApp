@@ -26,9 +26,15 @@ interface TareaFormDialogProps {
 }
 
 export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPending, tipo, creadorNombre }: TareaFormDialogProps) {
+  const TEAM_VALUE = '__team__';
+  const TITLE_MAX = 80;
+  const TITLE_MIN = 3;
+  const DESC_MAX = 500;
+
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [asignadoId, setAsignadoId] = useState('');
+  const [asignadoId, setAsignadoId] = useState<string>(TEAM_VALUE);
+  const [submitted, setSubmitted] = useState(false);
 
   // Date
   const [hasDate, setHasDate] = useState(false);
@@ -68,8 +74,40 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
     setVencimientoDias(60);
   };
 
+  const resetForm = () => {
+    setTitulo('');
+    setDescripcion('');
+    setAsignadoId(TEAM_VALUE);
+    setHasDate(false);
+    setSelectedDate(undefined);
+    setHasTime(false);
+    setSelectedTime('09:00');
+    setRepeatPreset('never');
+    setRepeatFrequency('weekly');
+    setRepeatInterval(1);
+    setRepeatByweekday([]);
+    setVencimientoDias(60);
+    setSubmitted(false);
+  };
+
+  const trimmedTitle = titulo.trim();
+  const trimmedDesc = descripcion.trim();
+  const titleError =
+    trimmedTitle.length === 0
+      ? 'El título es obligatorio.'
+      : trimmedTitle.length < TITLE_MIN
+        ? `El título debe tener al menos ${TITLE_MIN} caracteres.`
+        : trimmedTitle.length > TITLE_MAX
+          ? `El título no puede superar ${TITLE_MAX} caracteres.`
+          : null;
+  const descError = trimmedDesc.length > DESC_MAX
+    ? `La descripción no puede superar ${DESC_MAX} caracteres.`
+    : null;
+  const isValid = !titleError && !descError;
+
   const handleConfirm = () => {
-    if (!titulo.trim()) return;
+    setSubmitted(true);
+    if (!isValid) return;
 
     if (isPeticion) {
       const tarea: TareaInsert = {
