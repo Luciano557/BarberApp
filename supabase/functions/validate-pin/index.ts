@@ -73,13 +73,15 @@ serve(async (req) => {
     );
 
     // Find barbero with matching PIN in the same organization
-    const { data: barbero, error: barberoError } = await serviceClient
+    // Use limit(1) instead of maybeSingle to avoid PGRST116 if multiple rows match
+    const { data: barberos, error: barberoError } = await serviceClient
       .from('barberos')
       .select('id, nombre, apellido, sucursal_id')
       .eq('organization_id', profile.organization_id)
       .eq('pin_hash', pinHash)
       .eq('activo', true)
-      .maybeSingle();
+      .limit(1);
+    const barbero = barberos && barberos.length > 0 ? barberos[0] : null;
 
     if (barberoError) {
       throw barberoError;
@@ -90,12 +92,13 @@ serve(async (req) => {
 
       // Check if the barbero's linked user has a global role (owner/general_manager)
       // by finding the profile linked to this barbero_id
-      const { data: linkedProfile } = await serviceClient
+      const { data: linkedProfiles } = await serviceClient
         .from('profiles')
         .select('id')
         .eq('organization_id', profile.organization_id)
         .eq('barbero_id', barbero.id)
-        .maybeSingle();
+        .limit(1);
+      const linkedProfile = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles[0] : null;
 
       let hasGlobalRole = false;
 
