@@ -1,76 +1,51 @@
-## Objetivo
+La migración de base ya fue ejecutada (columna `assignment_scope`, backfill, RLS estricta para barberos). Falta aplicar los cambios de aplicación.
 
-Corregir tres problemas relacionados:
+## 1. Hook `src/hooks/useTareas.ts`
+- Agregar `assignment_scope: 'individual' | 'team'` al tipo `Tarea` y a `TareaInsert`.
+- En `addTarea` (solo cuando `tipo === 'tarea'`):
+  - Sin `asignado_a_id`: forzar `assignment_scope = 'team'`, `asignado_a_nombre = 'Todo el equipo'`, `asignado_a_id = null`, `sucursal_id = currentSucursal.id`.
+  - Con `asignado_a_id`: `assignment_scope = 'individual'`.
+- No tocar recurrencia, peticiones ni resto de la lógica.
 
-1. El encargado de sucursal (manager) puede crear o editar campos estructurales de servicios desde la UI, pero la operación termina rompiendo silenciosamente.
-2. Mi Negocio › Sucursal › Servicios y Cobrar muestran listas distintas para la misma sucursal.
-3. El barbero no debe entrar a Cobrar; un usuario con cargos manager + barber sí.
+## 2. Form `src/components/TareaFormDialog.tsx` (cambios mínimos)
+- En el select "Asignar a" agregar como primera opción `Todo el equipo` con value sentinela `__team__`, seleccionado por defecto. Quitar el comportamiento "sin asignar".
+- Al confirmar mapear `__team__` a la lógica del hook (id null + scope team + nombre fijo + sucursal del contexto).
+- Validaciones inline (crear y editar, tareas y peticiones):
+  - Título: requerido, trim, 3–80 chars, contador `n/80`, mensaje inline.
+  - Descripción: opcional, trim, ≤500, contador `n/500`, mensaje inline.
+- No rediseñar el dialog ni tocar RepeatPicker / CustomRepeatSheet.
 
-Sin tocar ventas históricas, agenda, caja, comisiones ni multi-tenant.
+## 3. Rediseño `src/components/TareasPanel.tsx`
+Reescribir solo la presentación (mantener data, hooks, peticiones, PIN, contadores).
 
-## Cambios
+Header sobrio Vittro:
+- H1 `Tareas` + subtítulo: "Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo."
+- Botón principal a la derecha: `Nueva tarea` o `Nueva petición` según pestaña.
 
-### 1. Backend (ya aplicado en migración)
+Tabs `Tareas` / `Peticiones` con contadores actuales.
 
-- Se quita la política ALL sobre `servicios` que daba acceso al manager.
-- Se agregan políticas separadas INSERT / UPDATE / DELETE en `servicios` solo para `owner` y `general_manager`.
-- SELECT global para la organización se mantiene.
-- Para precio y activo por sucursal se siguen usando las funciones existentes `set_servicio_sucursal_precio` y `set_servicio_sucursal_activo`, que ya validan owner, general_manager y manager (manager limitado a su única sucursal asignada). Misma RPC para los tres cargos: no hace falta una función nueva.
+Barra de filtros única (Select de shadcn):
+- Estado, Responsable (Todos / Todo el equipo / barberos activos), Fecha, Sucursal (solo si el usuario opera en más de una).
 
-### 2. `ServicesConfig.tsx`
+Listado en grilla de `Card`:
+- `grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3`.
+- Card compacta: título, badge de estado (tokens `status-*` ya existentes), descripción 1–2 líneas, responsable (`Todo el equipo` o barbero), sucursal si aplica, fecha/hora, indicador de recurrencia, acciones según rol.
+- Acciones:
+  - Completar visible para owner/GM/manager siempre; para barbero solo en tareas individuales asignadas a él. En tareas `team` el barbero no la ve.
+  - Eliminar: solo gestores.
+  - Iniciar/otros estados: solo si ya existen hoy, no inventar nuevos.
 
-- Nuevas props opcionales: `canCreate` (default `true`) y `canEditStructure` (default `true`).
-- Si `canCreate === false`: ocultar el botón "Agregar servicio".
-- Si `canEditStructure === false`: nombre, duración y línea quedan en modo lectura (input deshabilitado o no editable). Solo `CurrencyInput` (precio) y el toggle de activo siguen editables.
-- Mostrar un texto auxiliar breve cuando el manager no pueda editar estructura, explicando qué puede hacer.
+Pestaña Peticiones: cards con misma estética, sin tocar lógica de PIN ni flujo.
 
-### 3. `CobrarConfig.tsx`
+Estado vacío: card sobria con texto y CTA cuando aplique.
 
-- Pasar `canCreate` y `canEditStructure` hacia `ServicesConfig` con la misma lógica que en Mi Negocio.
+Eliminar estética iOS: nada de chips redondos tipo Reminders, sheets full-screen, switches Apple, fondos translúcidos exagerados, esquinas extra grandes. Usar `bg-card`, `border`, `text-muted-foreground`, iconos `lucide-react`.
 
-### 4. `SucursalTabContent.tsx`
-
-- Calcular permisos a partir de `useAuth()`:
-  - `canCreate = isOwner || isGeneralManager`
-  - `canEditStructure = isOwner || isGeneralManager`
-- Pasar ambas props a `ServicesConfig`.
-
-### 5. `MiNegocioGeneralTabContent.tsx`
-
-- Pasar `canCreate=true` y `canEditStructure=true` (tab solo visible para owner/gm, no cambia comportamiento).
-
-### 6. `MiNegocioPanel.tsx` — unificación de fuente de datos
-
-- Reemplazar `getServicesForSucursal(sucursalId) = allServices.filter(s => s.sucursalId === sucursalId)` por la misma lista enriquecida que usa Cobrar (`allServices` ya viene con `servicios_sucursales` resuelto para la sucursal activa en `useSupabaseData`).
-- Idem para extras.
-- Para evitar mostrar datos de otra sucursal mientras se cambia de tab, pasar `currentSucursal?.id === s.id ? allServices : []` a `SucursalTabContent`. El handler de tab ya hace `setCurrentSucursal(value)`, así que la lista se refresca automáticamente.
-
-### 7. Cobrar — bloqueo de servicios sin precio
-
-- No se ocultan: siguen visibles con etiqueta "Precio pendiente".
-- `PaymentRegistration.tsx` ya bloquea la selección con un toast claro. Se confirma que el comportamiento se mantiene.
-
-### 8. Acceso al módulo Cobrar
-
-- Confirmado: `AppSidebar` y `Index.tsx` ya gatean por `canManagePayments` (owner / general_manager / manager). Un usuario con manager + barber pasa la condición.
-- No se modifica nada en este punto.
+## 4. Memoria
+Actualizar `mem://features/tasks/management` y `mem://features/tasks/logic-and-permissions` con: nuevo `assignment_scope`, "Todo el equipo" por defecto, RLS estricta para barberos, y eliminación de la estética iOS.
 
 ## Detalles técnicos
-
-- `set_servicio_sucursal_precio(_id, _precio)` y `set_servicio_sucursal_activo(_id, _activo)` ya están definidas como `SECURITY DEFINER` con `_assert_can_write_sucursal_catalog`, que valida organización, sucursal y cargo. Manager solo puede operar sobre su única sucursal asignada.
-- `useSupabaseData.updateService` ya canaliza precio y activo por estas RPCs cuando hay `sucursalId`.
-- Tras quitar la política ALL, cualquier intento del frontend de hacer `update servicios` con campos estructurales desde manager devolverá error de RLS. Por eso el bloqueo en UI (`canEditStructure`) es la primera línea de defensa.
-
-## Qué no se toca
-
-- `user_roles`, `roles_equipo`, `rol_equipo`, `user_sucursales`, `profiles`, `barberos`.
-- Historial de ventas, ingresos, cierres, comisiones, agenda.
-- Multi-tenant ni RLS de otras tablas.
-
-## Verificación
-
-- Owner / GM: pueden crear, editar nombre/duración/línea, precio y activo en Mi Negocio y en Cobrar.
-- Manager: en Mi Negocio › Servicios solo puede editar precio y activo de los servicios de su sucursal. Inputs estructurales bloqueados, sin botón "Agregar".
-- Manager: en Cobrar ve los mismos servicios que en Mi Negocio › Sucursal › Servicios. "Precio pendiente" visible pero no cobrable.
-- Barber puro: no entra a Cobrar.
-- Manager + barber: entra a Cobrar normalmente.
+- Tipos de Supabase se regeneran solos tras la migración aplicada.
+- Para barberos: la query de barberos activos del filtro ya restringe por RLS.
+- Para detectar multi-sucursal: usar el contexto/hook actual de sucursales (no introducir nueva fuente).
+- No agregar dependencias.
