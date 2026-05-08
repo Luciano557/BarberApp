@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
+import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
 import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
