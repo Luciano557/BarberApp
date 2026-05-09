@@ -360,6 +360,10 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onDeleteDiscount={deleteDiscountGlobal}
                 onToggleDiscountActive={setDiscountActiveGlobal}
                 onAddLine={addLine}
+                onUpdateLine={updateLine}
+                onDeleteService={deleteService}
+                onDeleteExtra={deleteExtra}
+                onDeleteLine={deleteLine}
               />
             </TabsContent>
           )}
