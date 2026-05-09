@@ -388,6 +388,17 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     }
   }, [requiresPin]);
 
+  // PIN-gated regularizar cierre
+  const handleRegularizeClick = useCallback((barber: BarberSummary) => {
+    if (requiresPin) {
+      setPendingRegularizeBarber(barber);
+      setPinAction('regularize');
+      setPinGateOpen(true);
+    } else {
+      setRegularizingBarber(barber);
+    }
+  }, [requiresPin]);
+
   // PIN-gated history views
   const handleHistoryClick = useCallback(() => {
     if (requiresPin) {
@@ -425,11 +436,14 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         setHistoryOpen(true);
       } else if (pinAction === 'anulacionesHistory') {
         setAnulacionesHistoryOpen(true);
+      } else if (pinAction === 'regularize' && pendingRegularizeBarber) {
+        setRegularizingBarber(pendingRegularizeBarber);
+        setPendingRegularizeBarber(null);
       }
       setPinAction(null);
     }
     return result;
-  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, onDateChange]);
+  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, pendingRegularizeBarber, onDateChange]);
 
   const VOID_REASONS = [
     'Servicios duplicados o faltantes',
