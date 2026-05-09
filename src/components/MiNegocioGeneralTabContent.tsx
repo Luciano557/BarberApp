@@ -94,6 +94,7 @@ export function MiNegocioGeneralTabContent({
           <Tabs defaultValue="services" className="w-full">
             <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
               <TabsTrigger value="services" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Servicios</TabsTrigger>
+              <TabsTrigger value="lines" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Líneas de servicio</TabsTrigger>
               <TabsTrigger value="extras" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Extras</TabsTrigger>
               <TabsTrigger value="productos" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Productos</TabsTrigger>
               <TabsTrigger value="discounts" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Descuentos</TabsTrigger>
@@ -111,6 +112,9 @@ export function MiNegocioGeneralTabContent({
                 onDeleteLine={guarded(onDeleteLine)}
                 onDelete={guarded(onDeleteService)}
               />
+            </TabsContent>
+
+            <TabsContent value="lines" className="mt-6">
               <LinesConfig
                 lines={lines}
                 onAdd={onAddLine}
