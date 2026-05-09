@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
+import { calcComisionProductos, ProductoCfg } from '@/lib/comisionProductos';
 
 interface BarberSummary {
   barberId: string;  // UUID del barbero
@@ -196,6 +197,53 @@ export function useCashClosing() {
     // Generate unique identifier for this day/barber combo
     const identificador = crypto.randomUUID();
 
+    // === Comisión por productos vendidos ===
+    // 1) Recolectar producto_ids vendidos por este barbero
+    const productoIds = new Set<string>();
+    barberTxs.forEach(tx => (tx.productos || []).forEach(p => p.producto_id && productoIds.add(p.producto_id)));
+
+    // 2) Cargar configs de productos_sucursal y config activa del barbero (en paralelo)
+    const [{ data: prodCfgRows }, { data: barberoCfgRow }] = await Promise.all([
+      productoIds.size > 0 && currentSucursal?.id
+        ? supabase
+            .from('productos_sucursal')
+            .select('producto_id, comision_modo, comision_porcentaje, precio_costo')
+            .eq('sucursal_id', currentSucursal.id)
+            .in('producto_id', Array.from(productoIds))
+        : Promise.resolve({ data: [] as any[] }),
+      supabase
+        .from('comision_productos_config')
+        .select('porcentaje, activa')
+        .eq('barbero_id', barber.barberId)
+        .eq('organization_id', organization.id)
+        .eq('activa', true)
+        .maybeSingle(),
+    ]);
+
+    const prodCfgMap: Record<string, ProductoCfg> = {};
+    (prodCfgRows || []).forEach((r: any) => {
+      prodCfgMap[r.producto_id] = {
+        comision_modo: (r.comision_modo as any) || 'barbero',
+        comision_porcentaje: r.comision_porcentaje,
+        precio_costo: r.precio_costo,
+      };
+    });
+
+    const flatProductos = barberTxs.flatMap(tx =>
+      (tx.productos || []).map(p => ({
+        producto_id: p.producto_id,
+        cantidad: p.cantidad,
+        precio_unitario: p.precio_unitario,
+      }))
+    );
+
+    const { total: comisionProductosTotal, lineas: comisionLineasMap } = calcComisionProductos(
+      flatProductos,
+      barberoCfgRow as any,
+      prodCfgMap,
+    );
+    const comisionProductosPct = (barberoCfgRow as any)?.porcentaje ?? null;
+
     // Prepare the insert data with barbero_id (UUID) as source of truth
     const insertData = {
       barbero: normalizedBarberName,
@@ -229,6 +277,7 @@ export function useCashClosing() {
       productos_cantidad: productosCantidad,
       productos_efectivo: productosEfectivo,
       productos_digital: productosDigital,
+      comision_productos: comisionProductosTotal,
     };
 
     const { data: ingreso, error } = await supabase
@@ -251,6 +300,7 @@ export function useCashClosing() {
       const dominante = [...pagos].sort((a, b) => b.amount - a.amount)[0];
       const paymentMethod = dominante?.method === 'efectivo' ? 'efectivo' : 'digital';
       tx.productos.forEach(p => {
+        const linea = comisionLineasMap.get(p.producto_id);
         productosRows.push({
           ingreso_id: ingreso.id,
           organization_id: organization.id,
@@ -264,6 +314,10 @@ export function useCashClosing() {
           unit_price: p.precio_unitario,
           subtotal: p.subtotal,
           payment_method: paymentMethod,
+          precio_costo_snap: linea?.precio_costo_snap ?? null,
+          comision_modo_snap: linea?.modo ?? null,
+          comision_pct_snap: linea?.pct ?? 0,
+          comision_monto: linea?.monto ?? 0,
         });
       });
     });

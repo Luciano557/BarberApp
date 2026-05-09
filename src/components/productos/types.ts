@@ -13,6 +13,8 @@ export interface Producto {
   activo: boolean;
 }
 
+export type ComisionProductoModo = 'barbero' | 'ninguna' | 'personalizada';
+
 export interface ProductoSucursal {
   id: string;
   producto_id: string;
@@ -23,6 +25,8 @@ export interface ProductoSucursal {
   margen_pct: number | null;
   stock_actual: number;
   stock_minimo: number;
+  comision_modo?: ComisionProductoModo;
+  comision_porcentaje?: number | null;
 }
 
 export interface ProductoConSucursal {

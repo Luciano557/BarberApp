@@ -41,6 +41,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
   const [stockMinimo, setStockMinimo] = useState('');
   // Stock inicial solo en creación de vínculo (si no existe productos_sucursal)
   const [stockInicial, setStockInicial] = useState('');
+  // Compensación por venta
+  const [comisionModo, setComisionModo] = useState<'barbero' | 'ninguna' | 'personalizada'>('barbero');
+  const [comisionPct, setComisionPct] = useState('');
 
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +59,8 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       setPrecioVenta(ps?.precio_venta != null ? String(ps.precio_venta) : '');
       setStockMinimo(ps?.stock_minimo != null ? String(ps.stock_minimo) : '');
       setStockInicial('');
+      setComisionModo((ps?.comision_modo as any) || 'barbero');
+      setComisionPct(ps?.comision_porcentaje != null ? String(ps.comision_porcentaje) : '');
     } else {
       setNombre('');
       setDescripcion('');
@@ -65,6 +70,8 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       setPrecioVenta('');
       setStockMinimo('');
       setStockInicial('');
+      setComisionModo('barbero');
+      setComisionPct('');
     }
   }, [open, producto]);
 
@@ -79,6 +86,16 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
 
   const handleSave = async () => {
     if (!orgId) return;
+    // Validación de comisión personalizada
+    let comision_porcentaje: number | null = null;
+    if (comisionModo === 'personalizada') {
+      const n = parseFloat(comisionPct.replace(',', '.'));
+      if (isNaN(n) || n < 0 || n > 100) {
+        toast.error('Ingresá un porcentaje de comisión entre 0 y 100');
+        return;
+      }
+      comision_porcentaje = n;
+    }
     setSaving(true);
     try {
       const nombreNorm = nombre.replace(/\s+/g, ' ').trim();
@@ -86,6 +103,12 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       const precio_costo = precioCosto ? parseFloat(precioCosto) : null;
       const precio_venta = precioVenta ? parseFloat(precioVenta) : 0;
       const stock_minimo = stockMinimo ? parseFloat(stockMinimo) : 0;
+
+      if (comisionModo !== 'ninguna' && precio_costo == null) {
+        toast.error('Para que el producto genere comisión, cargá un precio de costo.');
+        setSaving(false);
+        return;
+      }
 
       let productoId: string;
 
@@ -127,7 +150,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
             precio_venta,
             margen_pct: margenPct,
             stock_minimo,
-          })
+            comision_modo: comisionModo,
+            comision_porcentaje,
+          } as any)
           .eq('id', existingPs.id);
         if (error) throw error;
       } else {
@@ -144,7 +169,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
             margen_pct: margenPct,
             stock_minimo,
             stock_actual: 0,
-          })
+            comision_modo: comisionModo,
+            comision_porcentaje,
+          } as any)
           .select('id')
           .single();
         if (error) throw error;
@@ -287,6 +314,39 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
                 </p>
               </div>
             ) : null}
+          </div>
+
+          {/* Compensación por venta */}
+          <div className="space-y-3 border-t border-border pt-4">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Compensación por venta</h4>
+            <p className="text-xs text-muted-foreground">
+              Define cómo genera comisión este producto cuando lo vende un barbero. La comisión se calcula sobre la ganancia (precio de venta − precio de costo).
+            </p>
+            <Select value={comisionModo} onValueChange={(v: any) => setComisionModo(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="barbero">Usar regla del barbero</SelectItem>
+                <SelectItem value="ninguna">No generar comisión</SelectItem>
+                <SelectItem value="personalizada">Comisión personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+            {comisionModo === 'personalizada' && (
+              <div className="space-y-1">
+                <Label>Porcentaje (%)</Label>
+                <Input
+                  inputMode="decimal"
+                  value={comisionPct}
+                  onChange={(e) => setComisionPct(e.target.value.replace(/[^\d.,]/g, ''))}
+                  placeholder="0"
+                  maxLength={6}
+                />
+              </div>
+            )}
+            {comisionModo !== 'ninguna' && !precioCosto && (
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                Sin precio de costo cargado: el producto no podrá generar comisión.
+              </p>
+            )}
           </div>
         </div>
 

@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -59,6 +69,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
   const [selectedBarbero, setSelectedBarbero] = useState('');
   const [newPorcentaje, setNewPorcentaje] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   const openRuleBarberIds = reglas.filter(r => r.activa && !r.vigencia_hasta).map(r => r.barbero_origen_id);
   const availableBarbers = filteredBarbers.filter(b => b.active && b.id !== barberId && !openRuleBarberIds.includes(b.id));
@@ -88,6 +99,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
         .select('id, activa, scope_type, sucursal_id')
         .eq('encargado_id', barberId)
         .eq('organization_id', organizationId)
+        .eq('activa', true)
         .limit(1)
         .maybeSingle();
 
@@ -302,7 +314,18 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           <Users className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">Comisión extra por equipo</span>
         </div>
-        <Switch checked={config.activa} onCheckedChange={handleToggleConfig} />
+        <div className="flex items-center gap-2">
+          <Switch checked={config.activa} onCheckedChange={handleToggleConfig} />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+            onClick={() => setShowDelete(true)}
+            aria-label="Eliminar extra"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {config.activa && (
@@ -401,6 +424,30 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           )}
         </>
       )}
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar comisión extra por equipo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se desactiva el extra a partir de hoy. No se modifican cierres ni pagos históricos. Podés volver a configurarlo más adelante.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowDelete(false);
+                await handleToggleConfig(false);
+                setConfig(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

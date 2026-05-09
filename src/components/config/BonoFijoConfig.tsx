@@ -1,11 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, CalendarIcon } from 'lucide-react';
+import { DollarSign, CalendarIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -38,6 +48,7 @@ export function BonoFijoConfig({ barberId, organizationId, sucursalId, forceShow
   const [config, setConfig] = useState<BonoConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   // Form state
   const [monto, setMonto] = useState('');
@@ -355,7 +366,15 @@ export function BonoFijoConfig({ barberId, organizationId, sucursalId, forceShow
           <DollarSign className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">Bono fijo</span>
         </div>
-        <Switch checked={config!.activa} onCheckedChange={(checked) => { if (!checked) handleDeactivate(); }} />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+          onClick={() => setShowDelete(true)}
+          aria-label="Eliminar bono fijo"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
 
       <div className="text-sm space-y-1">
@@ -382,6 +401,26 @@ export function BonoFijoConfig({ barberId, organizationId, sucursalId, forceShow
       <Button variant="outline" size="sm" className="h-7 text-xs w-full" onClick={handleEdit}>
         Editar bono
       </Button>
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar bono fijo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se desactiva el extra a partir de hoy. No se modifican pagos ni cierres históricos. Podés volver a configurarlo más adelante.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setShowDelete(false); handleDeactivate(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
