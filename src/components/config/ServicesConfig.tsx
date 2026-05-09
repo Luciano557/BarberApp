@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Clock } from 'lucide-react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Clock, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Service, Line } from '@/types/barbershop';
+import { toast } from 'sonner';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -16,6 +18,8 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  /** Opcional: si se provee, habilita botón "Eliminar" para servicios inactivos. */
+  onDelete?: (id: string) => void;
   /**
    * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
    * 'sucursal' (default) = comportamiento histórico por sucursal.
@@ -32,7 +36,32 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
+function validateName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'El nombre no puede estar vacío.';
+  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
+  return null;
+}
+
+function validatePrice(raw: string): { ok: true; value: number } | { ok: false; error: string } {
+  const cleaned = (raw || '').toString().trim();
+  if (!cleaned) return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
+  const value = parseFloat(cleaned);
+  if (Number.isNaN(value) || value < 0) {
+    return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
+  }
+  return { ok: true, value };
+}
+
+function validateDuration(raw: string): { ok: true; value: number } | { ok: false; error: string } {
+  const value = parseInt(raw, 10);
+  if (Number.isNaN(value) || value < 5) {
+    return { ok: false, error: 'La duración debe ser de al menos 5 minutos.' };
+  }
+  return { ok: true, value };
+}
+
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
   const isGlobal = mode === 'global';
   const structureLocked = !canEditStructure;
   const [isAdding, setIsAdding] = useState(false);
@@ -49,6 +78,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
   const [newLineColor, setNewLineColor] = useState('');
   const [addLineContext, setAddLineContext] = useState<'add' | 'edit'>('add');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Service | null>(null);
 
   const LINE_COLORS = [
     { label: 'Azul', value: '#3B82F6' },
@@ -67,14 +97,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
   const activeLines = lines.filter(l => l.active);
 
   const handleAdd = () => {
-    const dur = parseInt(newDuration) || 30;
-    if (!newName) return;
-    if (!isGlobal && !newPrice) return;
-    if (dur < 5) return;
+    const nameErr = validateName(newName);
+    if (nameErr) { toast.error(nameErr); return; }
+    const dur = validateDuration(newDuration);
+    if (dur.ok === false) { toast.error(dur.error); return; }
+    let price = 0;
+    if (!isGlobal) {
+      const v = validatePrice(newPrice);
+      if (v.ok === false) { toast.error(v.error); return; }
+      price = v.value;
+    }
     onAdd({
-      name: newName,
-      price: isGlobal ? 0 : parseFloat(newPrice),
-      durationMin: dur,
+      name: newName.trim(),
+      price,
+      durationMin: dur.value,
       active: true,
       lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
       lineName: activeLines.find(l => l.id === newLineId)?.name,
@@ -83,18 +119,22 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
   };
 
   const handleUpdate = (id: string) => {
-    const dur = parseInt(editDuration) || 30;
-    if (!newName) return;
-    if (!isGlobal && !newPrice) return;
-    if (dur < 5) return;
     const updates: Partial<Service> = {};
     if (!structureLocked) {
-      updates.name = newName;
-      updates.durationMin = dur;
+      const nameErr = validateName(newName);
+      if (nameErr) { toast.error(nameErr); return; }
+      const dur = validateDuration(editDuration);
+      if (dur.ok === false) { toast.error(dur.error); return; }
+      updates.name = newName.trim();
+      updates.durationMin = dur.value;
       updates.lineId = editLineId && editLineId !== 'none' ? editLineId : undefined;
       updates.lineName = activeLines.find(l => l.id === editLineId)?.name;
     }
-    if (!isGlobal) updates.price = parseFloat(newPrice);
+    if (!isGlobal) {
+      const v = validatePrice(newPrice);
+      if (v.ok === false) { toast.error(v.error); return; }
+      updates.price = v.value;
+    }
     onUpdate(id, updates);
     setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
   };
@@ -102,20 +142,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
   const startEdit = (service: Service) => {
     setEditingId(service.id);
     setNewName(service.name);
-    setNewPrice(service.price.toString());
+    setNewPrice(service.price ? String(service.price) : '');
     setEditDuration((service.durationMin || 30).toString());
     setEditLineId(service.lineId || '');
   };
 
   const handleAddNewLine = async () => {
-    if (newLineName.trim()) {
-      const newLine = await onAddLine({ name: newLineName.trim(), active: true, color: newLineColor || undefined });
-      if (newLine) {
-        if (addLineContext === 'add') setNewLineId(newLine.id);
-        else setEditLineId(newLine.id);
-      }
-      setNewLineName(''); setNewLineColor(''); setShowAddLineDialog(false);
+    const nameErr = validateName(newLineName);
+    if (nameErr) { toast.error(nameErr); return; }
+    const newLine = await onAddLine({ name: newLineName.trim(), active: true, color: newLineColor || undefined });
+    if (newLine) {
+      if (addLineContext === 'add') setNewLineId(newLine.id);
+      else setEditLineId(newLine.id);
     }
+    setNewLineName(''); setNewLineColor(''); setShowAddLineDialog(false);
   };
 
   const openAddLineDialog = (context: 'add' | 'edit') => {
@@ -127,6 +167,12 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
     if (!toggleConfirm) return;
     onUpdate(toggleConfirm.service.id, { active: toggleConfirm.action === 'activate' });
     setToggleConfirm(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm || !onDelete) return;
+    onDelete(deleteConfirm.id);
+    setDeleteConfirm(null);
   };
 
   const isItemActive = (service: Service) =>
@@ -144,7 +190,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
               <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="Precio" className="w-28" />
             )}
             <div className="flex items-center gap-1">
-              <Input type="number" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" disabled={structureLocked} />
+              <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} placeholder="Tiempo" className="w-20" disabled={structureLocked} />
               <span className="text-xs text-muted-foreground">min</span>
             </div>
             <div className="flex items-center gap-1">
@@ -175,14 +221,37 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
             <Clock className="h-3 w-3" />{service.durationMin || 30} min
           </span>
           {!isGlobal && (
-            <span className="text-muted-foreground">${service.price.toLocaleString()}</span>
+            <span className="text-muted-foreground">${service.price.toLocaleString('es-AR')}</span>
           )}
-          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8">
+          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
             <Edit2 className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
             {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
+          {onDelete && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={itemActive}
+                      onClick={() => !itemActive && setDeleteConfirm(service)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={itemActive ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {itemActive && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </>
       )}
     </div>
@@ -219,7 +288,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
                     <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
                   )}
                   <div className="flex items-center gap-1">
-                    <Input type="number" min={5} placeholder="Tiempo" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
+                    <Input type="number" inputMode="numeric" min={5} placeholder="Tiempo" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
                     <span className="text-xs text-muted-foreground">min</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -273,11 +342,29 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, mo
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar servicio</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este elemento dejará de aparecer en el sistema. No se modificarán los registros históricos donde ya haya sido utilizado. Esta acción no se podrá deshacer desde la interfaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={showAddLineDialog} onOpenChange={setShowAddLineDialog}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Nueva Línea</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Nueva línea</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} />
+            <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} maxLength={80} />
             <div>
               <label className="text-sm font-medium text-foreground mb-2 block">Color (opcional)</label>
               <div className="flex flex-wrap gap-2">
