@@ -313,7 +313,18 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           <Users className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">Comisión extra por equipo</span>
         </div>
-        <Switch checked={config.activa} onCheckedChange={handleToggleConfig} />
+        <div className="flex items-center gap-2">
+          <Switch checked={config.activa} onCheckedChange={handleToggleConfig} />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+            onClick={() => setShowDelete(true)}
+            aria-label="Eliminar extra"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {config.activa && (
