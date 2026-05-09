@@ -125,7 +125,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     
     let query = supabase
       .from('ingresos')
-      .select('id, barbero, barbero_id')
+      .select('id, barbero, barbero_id, closed_at')
       .gte('created_at', startStr)
       .lte('created_at', endStr)
       .neq('estado', 'eliminado');
@@ -141,10 +141,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       setClosedBarbers(closedIds as Set<string>);
       
       // Store the mapping of barbero_id to ingreso id for voiding
-      const dataMap = new Map<string, { id: number; barberName: string }>();
+      const dataMap = new Map<string, { id: number; barberName: string; closed_at: string | null }>();
       data.forEach(d => {
         if (d.barbero_id) {
-          dataMap.set(d.barbero_id, { id: d.id, barberName: d.barbero || '' });
+          dataMap.set(d.barbero_id, { id: d.id, barberName: d.barbero || '', closed_at: d.closed_at ?? null });
         }
       });
       setClosedBarbersData(dataMap);
