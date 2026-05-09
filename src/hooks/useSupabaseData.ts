@@ -162,10 +162,10 @@ export function useSupabaseData() {
         : Promise.resolve({ data: [] as DescuentoSucursalRow[], error: null as any });
 
       const [servicesRes, extrasRes, barbersRes, discountsRes, servSucRes, extSucRes, descSucRes] = await Promise.all([
-        supabase.from('servicios').select('*').order('nombre'),
-        supabase.from('extras').select('*').order('nombre'),
+        supabase.from('servicios').select('*').eq('eliminado', false).order('nombre'),
+        supabase.from('extras').select('*').eq('eliminado', false).order('nombre'),
         barbersQuery,
-        supabase.from('descuentos').select('*').order('valor'),
+        supabase.from('descuentos').select('*').eq('eliminado', false).order('valor'),
         servSucPromise,
         extSucPromise,
         descSucPromise,
