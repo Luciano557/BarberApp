@@ -99,6 +99,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
         .select('id, activa, scope_type, sucursal_id')
         .eq('encargado_id', barberId)
         .eq('organization_id', organizationId)
+        .eq('activa', true)
         .limit(1)
         .maybeSingle();
 
