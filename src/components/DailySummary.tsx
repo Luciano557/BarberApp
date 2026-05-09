@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Transaction, Barber, Service, Line, PaymentMethod, isDigitalMethod } from '@/types/barbershop';
 import { format, addDays, subDays, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useCashClosing } from '@/hooks/useCashClosing';
+import { calcComisionProductos, ProductoCfg } from '@/lib/comisionProductos';
 import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
@@ -54,6 +55,7 @@ interface BarberSummary {
   serviciosBase: number;
   commissionPct: number;
   commissionAmount: number;
+  comisionProductos: number;
 }
 
 export function DailySummary({ summary, barbers, services, lines, selectedDate, onDateChange, onVoidTransaction }: DailySummaryProps) {
@@ -172,6 +174,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         serviciosBase: 0,
         commissionPct: barber.commission,
         commissionAmount: 0,
+        comisionProductos: 0,
       });
     });
 
@@ -200,6 +203,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           serviciosBase: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
+          comisionProductos: 0,
         };
         summaryMap.set(barberId, existing);
       }
@@ -223,6 +227,79 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     return Array.from(summaryMap.values()).filter(s => s.count > 0 || s.productosTotal > 0);
   }, [summary.transactions, barbers]);
 
+  // Comisión por productos en vivo (mismo helper que useCashClosing)
+  const [comisionProductosByBarber, setComisionProductosByBarber] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!organization) {
+        setComisionProductosByBarber({});
+        return;
+      }
+      const activeTxs = summary.transactions.filter(tx => tx.estado !== 'anulado' && !!tx.barberId);
+      const productoIds = new Set<string>();
+      const barberoIds = new Set<string>();
+      activeTxs.forEach(tx => {
+        (tx.productos || []).forEach(p => p.producto_id && productoIds.add(p.producto_id));
+        if ((tx.productos?.length || 0) > 0 && tx.barberId) barberoIds.add(tx.barberId);
+      });
+      if (productoIds.size === 0 || barberoIds.size === 0) {
+        if (!cancelled) setComisionProductosByBarber({});
+        return;
+      }
+      const [{ data: prodCfgRows }, { data: barberoCfgRows }] = await Promise.all([
+        currentSucursal?.id
+          ? supabase
+              .from('productos_sucursal')
+              .select('producto_id, comision_modo, comision_porcentaje, precio_costo')
+              .eq('sucursal_id', currentSucursal.id)
+              .in('producto_id', Array.from(productoIds))
+          : Promise.resolve({ data: [] as any[] }),
+        supabase
+          .from('comision_productos_config')
+          .select('barbero_id, porcentaje, activa')
+          .eq('organization_id', organization.id)
+          .eq('activa', true)
+          .in('barbero_id', Array.from(barberoIds)),
+      ]);
+      const prodCfgMap: Record<string, ProductoCfg> = {};
+      (prodCfgRows || []).forEach((r: any) => {
+        prodCfgMap[r.producto_id] = {
+          comision_modo: (r.comision_modo as any) || 'barbero',
+          comision_porcentaje: r.comision_porcentaje,
+          precio_costo: r.precio_costo,
+        };
+      });
+      const barberoCfgMap: Record<string, { porcentaje: number; activa: boolean }> = {};
+      (barberoCfgRows || []).forEach((r: any) => {
+        barberoCfgMap[r.barbero_id] = { porcentaje: Number(r.porcentaje) || 0, activa: !!r.activa };
+      });
+      const result: Record<string, number> = {};
+      const byBarber = new Map<string, { producto_id: string; cantidad: number; precio_unitario: number }[]>();
+      activeTxs.forEach(tx => {
+        if (!tx.barberId || !tx.productos?.length) return;
+        const arr = byBarber.get(tx.barberId) || [];
+        tx.productos.forEach(p => arr.push({
+          producto_id: p.producto_id,
+          cantidad: p.cantidad,
+          precio_unitario: p.precio_unitario,
+        }));
+        byBarber.set(tx.barberId, arr);
+      });
+      byBarber.forEach((items, barberoId) => {
+        const { total } = calcComisionProductos(items, barberoCfgMap[barberoId] || null, prodCfgMap);
+        result[barberoId] = total;
+      });
+      if (!cancelled) setComisionProductosByBarber(result);
+    })();
+    return () => { cancelled = true; };
+  }, [summary.transactions, organization, currentSucursal]);
+
+  const hayProductosConBarbero = useMemo(
+    () => barberSummaries.some(b => (b.productosTotal ?? 0) > 0),
+    [barberSummaries]
+  );
   // Check if selected date is in the past (for backfill CTA)
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
 
@@ -530,13 +607,22 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
-                  {barberSummaries.some(b => (b.productosTotal ?? 0) > 0) && (
+                  {hayProductosConBarbero && (
                     <div className="flex items-center justify-between py-2 border-b border-border">
                       <span className="text-sm text-muted-foreground flex items-center gap-2">
                         <Receipt className="h-4 w-4" />
                         Productos
                       </span>
                       <span className="font-semibold text-foreground">${(barber.productosTotal || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {hayProductosConBarbero && (
+                    <div className="flex items-center justify-between py-2 border-b border-border">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        Comisión productos
+                      </span>
+                      <span className="font-semibold text-foreground">${(comisionProductosByBarber[barber.barberId] || 0).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between py-2 border-b border-border">
