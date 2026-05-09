@@ -139,7 +139,7 @@ export function useSupabaseData() {
     setIsLoading(true);
     try {
       // Lines first (services depend on them)
-      const linesRes = await supabase.from('lineas').select('*').order('nombre');
+      const linesRes = await supabase.from('lineas').select('*').eq('eliminado', false).order('nombre');
       if (linesRes.error) throw linesRes.error;
       const fetchedLines = linesRes.data.map(dbToLine);
       setLines(fetchedLines);
