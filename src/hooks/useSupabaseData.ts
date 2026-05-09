@@ -1172,8 +1172,15 @@ export function useSupabaseData() {
   }, []);
 
   const deleteDiscountGlobal = useCallback(async (id: string) => {
-    await setDiscountActiveGlobal(id, false);
-  }, [setDiscountActiveGlobal]);
+    if (id === 'none') return;
+    const ok = await softDelete('descuentos', id);
+    if (ok) {
+      setDiscounts(prev => prev.filter(d => d.id !== id));
+      toast.success('Descuento eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el descuento');
+    }
+  }, [softDelete]);
 
   // Descuentos disponibles para Cobrar (compat: filtran por active operativo)
   const activeDiscounts = discounts.filter(d => d.active);
