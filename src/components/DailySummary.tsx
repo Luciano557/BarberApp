@@ -305,6 +305,34 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     () => barberSummaries.some(b => (b.productosTotal ?? 0) > 0),
     [barberSummaries]
   );
+
+  // Detección de cierres desactualizados: ventas activas posteriores a closed_at por barbero
+  const staleByBarber = useMemo(() => {
+    const result: Record<string, { count: number; total: number; lastAt: string }> = {};
+    closedBarbersData.forEach((data, barberId) => {
+      if (!data.closed_at) return;
+      const closedAtMs = new Date(data.closed_at).getTime();
+      if (Number.isNaN(closedAtMs)) return;
+      const posteriores = summary.transactions.filter(tx =>
+        tx.estado !== 'anulado' &&
+        tx.barberId === barberId &&
+        new Date(tx.createdAt).getTime() > closedAtMs
+      );
+      if (posteriores.length === 0) return;
+      const total = posteriores.reduce((s, tx) => s + (tx.total || 0), 0);
+      const lastAt = posteriores.reduce((acc, tx) => {
+        const t = new Date(tx.createdAt).getTime();
+        return t > acc ? t : acc;
+      }, 0);
+      result[barberId] = {
+        count: posteriores.length,
+        total,
+        lastAt: new Date(lastAt).toISOString(),
+      };
+    });
+    return result;
+  }, [closedBarbersData, summary.transactions]);
+
   // Check if selected date is in the past (for backfill CTA)
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
 
