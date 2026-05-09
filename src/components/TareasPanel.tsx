@@ -51,8 +51,10 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { canManageConfig, isBarber, profile } = useAuth();
+  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
+
+  const canManageTareas = isOwner || isGeneralManager || isManager;
 
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('tareas');
@@ -60,6 +62,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroResp, setFiltroResp] = useState('todos');
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
+  const [showCompletedHistory, setShowCompletedHistory] = useState(false);
 
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
