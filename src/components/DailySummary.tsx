@@ -607,13 +607,22 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
-                  {barberSummaries.some(b => (b.productosTotal ?? 0) > 0) && (
+                  {hayProductosConBarbero && (
                     <div className="flex items-center justify-between py-2 border-b border-border">
                       <span className="text-sm text-muted-foreground flex items-center gap-2">
                         <Receipt className="h-4 w-4" />
                         Productos
                       </span>
                       <span className="font-semibold text-foreground">${(barber.productosTotal || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {hayProductosConBarbero && (
+                    <div className="flex items-center justify-between py-2 border-b border-border">
+                      <span className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Percent className="h-4 w-4" />
+                        Comisión productos
+                      </span>
+                      <span className="font-semibold text-foreground">${(comisionProductosByBarber[barber.barberId] || 0).toLocaleString()}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between py-2 border-b border-border">
