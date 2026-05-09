@@ -460,7 +460,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); }}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
@@ -468,12 +468,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
         {/* Filters bar */}
         <div className="flex flex-wrap gap-2 mt-4">
-          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
           {isTareasTab && (
             <Select value={filtroResp} onValueChange={setFiltroResp}>
@@ -488,12 +490,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </Select>
           )}
 
-          <Select value={filtroFecha} onValueChange={setFiltroFecha}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroFecha} onValueChange={setFiltroFecha}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
           {showSucursalFilter && (
             <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
@@ -507,10 +511,27 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         </div>
 
         <TabsContent value="tareas" className="mt-4">
-          {tareasAdmin.length === 0 ? (
+          {showCompletedHistory ? (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold text-foreground">Tareas completadas</h2>
+                <span className="text-xs text-muted-foreground">{tareasCompletadas.length} tarea{tareasCompletadas.length === 1 ? '' : 's'}</span>
+              </div>
+              {tareasCompletadas.length === 0 ? (
+                <EmptyState
+                  label="Sin tareas completadas"
+                  hint="Cuando se completen tareas, vas a poder revisarlas acá con el detalle de quién y cuándo."
+                />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {tareasCompletadas.map(t => <CompletadaCard key={t.id} t={t} />)}
+                </div>
+              )}
+            </div>
+          ) : tareasAdmin.length === 0 ? (
             <EmptyState
-              label="No hay tareas"
-              hint={canManageConfig ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
+              label="No hay tareas activas"
+              hint={canManageTareas ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
