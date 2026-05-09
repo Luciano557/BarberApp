@@ -425,7 +425,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               </Button>
             ) : (
               <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
-                <History className="h-4 w-4 mr-2" />Historial de completadas ({tareasCompletadas.length})
+                <History className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
             )}
           </div>
