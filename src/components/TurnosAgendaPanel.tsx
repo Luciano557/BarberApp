@@ -93,7 +93,7 @@ export function TurnosAgendaPanel() {
             <CalendarClock className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Turnos y Agenda</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Turnos</h1>
             <p className="text-sm text-muted-foreground">Configurá horarios, disponibilidad y bloqueos</p>
           </div>
         </div>

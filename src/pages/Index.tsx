@@ -176,7 +176,7 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <PinProtectedSection sectionName="Turnos y Agenda">
+            <PinProtectedSection sectionName="Turnos">
               <TurnosAgendaPanel />
             </PinProtectedSection>
           )}
