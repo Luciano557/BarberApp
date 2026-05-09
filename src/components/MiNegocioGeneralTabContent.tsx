@@ -107,6 +107,8 @@ export function MiNegocioGeneralTabContent({
                 onAdd={guarded(onAddService)}
                 onUpdate={guarded(onUpdateService)}
                 onAddLine={onAddLine}
+                onUpdateLine={guarded(onUpdateLine)}
+                onDeleteLine={guarded(onDeleteLine)}
                 onDelete={guarded(onDeleteService)}
               />
               <LinesConfig
