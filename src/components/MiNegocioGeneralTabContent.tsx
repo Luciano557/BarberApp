@@ -97,6 +97,7 @@ export function MiNegocioGeneralTabContent({
               <TabsTrigger value="extras" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Extras</TabsTrigger>
               <TabsTrigger value="productos" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Productos</TabsTrigger>
               <TabsTrigger value="discounts" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Descuentos</TabsTrigger>
+              <TabsTrigger value="lines" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Líneas</TabsTrigger>
             </TabsList>
 
             <TabsContent value="services" className="mt-6">
@@ -107,6 +108,7 @@ export function MiNegocioGeneralTabContent({
                 onAdd={guarded(onAddService)}
                 onUpdate={guarded(onUpdateService)}
                 onAddLine={onAddLine}
+                onDelete={guarded(onDeleteService)}
               />
             </TabsContent>
 
@@ -116,6 +118,7 @@ export function MiNegocioGeneralTabContent({
                 extras={extras}
                 onAdd={guarded(onAddExtra)}
                 onUpdate={guarded(onUpdateExtra)}
+                onDelete={guarded(onDeleteExtra)}
               />
             </TabsContent>
 
@@ -131,6 +134,15 @@ export function MiNegocioGeneralTabContent({
                 onUpdate={guarded(onUpdateDiscount)}
                 onDelete={guarded(onDeleteDiscount)}
                 onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
+              />
+            </TabsContent>
+
+            <TabsContent value="lines" className="mt-6">
+              <LinesConfig
+                lines={lines}
+                onAdd={onAddLine}
+                onUpdate={guarded(onUpdateLine)}
+                onDelete={guarded(onDeleteLine)}
               />
             </TabsContent>
           </Tabs>
