@@ -31,7 +31,6 @@ const ESTADO_OPTIONS_TAREA = [
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
-  { value: 'completada', label: 'Completada' },
 ];
 
 const ESTADO_OPTIONS_PETICION = [
