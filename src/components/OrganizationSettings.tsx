@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Phone, MapPin, Crown, Sparkles, Zap, Globe } from 'lucide-react';
+import { Pizza, Phone, MapPin, Crown, Sparkles, Zap, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { COUNTRIES, COUNTRY_TIMEZONES } from '@/lib/dateUtils';
 
@@ -92,7 +92,7 @@ export function OrganizationSettings() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary" />
+                <Pizza className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <CardTitle className="text-lg">Mi Negocio</CardTitle>
@@ -169,7 +169,7 @@ export function OrganizationSettings() {
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-muted-foreground" />
+                <Pizza className="w-4 h-4 text-muted-foreground" />
                 <span className="font-medium">{organization.name}</span>
               </div>
               {organization.phone && (
