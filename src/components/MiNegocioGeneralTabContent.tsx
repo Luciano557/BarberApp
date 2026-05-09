@@ -6,6 +6,7 @@ import { Service, Extra, Discount, Line } from '@/types/barbershop';
 import { ServicesConfig } from './config/ServicesConfig';
 import { ExtrasConfig } from './config/ExtrasConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
+import { LinesConfig } from './config/LinesConfig';
 import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { toast } from 'sonner';
@@ -26,6 +27,10 @@ interface MiNegocioGeneralTabContentProps {
   onDeleteDiscount: (id: string) => void;
   onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  onUpdateLine: (id: string, updates: Partial<Line>) => void;
+  onDeleteService: (id: string) => void;
+  onDeleteExtra: (id: string) => void;
+  onDeleteLine: (id: string) => void;
 }
 
 /**
