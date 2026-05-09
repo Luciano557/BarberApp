@@ -66,7 +66,7 @@ function validateDuration(raw: string): { ok: true; value: number } | { ok: fals
   return { ok: true, value };
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onUpdateLine, onDeleteLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
   const isGlobal = mode === 'global';
   const structureLocked = !canEditStructure;
   const [isAdding, setIsAdding] = useState(false);
