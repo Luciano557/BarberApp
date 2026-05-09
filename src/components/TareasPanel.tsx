@@ -194,9 +194,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const TareaCard = ({ t }: { t: TareaItem }) => {
     const isTeam = t.assignment_scope === 'team';
     const isMine = !!myBarberoId && t.asignado_a_id === myBarberoId;
-    const canComplete = canManageConfig || (isBarber && !isTeam && isMine);
+    const canComplete = canManageTareas || (isBarber && !isTeam && isMine);
     const canStart = canComplete;
-    const canDelete = canManageConfig;
+    const canDelete = canManageTareas;
     const sNombre = sucursalNombre(t.sucursal_id);
     const repeatTxt = getRepeatDisplay(t);
 
