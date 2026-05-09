@@ -740,6 +740,28 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
+                  {closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId] && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Cierre desactualizado</AlertTitle>
+                      <AlertDescription className="space-y-3">
+                        <p>
+                          Hay {staleByBarber[barber.barberId].count} venta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} registrada{staleByBarber[barber.barberId].count === 1 ? '' : 's'} después de este cierre por ${staleByBarber[barber.barberId].total.toLocaleString()} (última {format(new Date(staleByBarber[barber.barberId].lastAt), 'HH:mm')}) que no está{staleByBarber[barber.barberId].count === 1 ? '' : 'n'} incluida{staleByBarber[barber.barberId].count === 1 ? '' : 's'}.
+                        </p>
+                        {canVoidClosure && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => handleRegularizeClick(barber)}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Regularizar cierre
+                          </Button>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
