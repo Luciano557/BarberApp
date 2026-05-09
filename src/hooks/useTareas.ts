@@ -32,6 +32,9 @@ export interface Tarea {
   repeat_interval: number | null;
   repeat_byweekday: number[] | null;
   vencimiento_dias: number | null;
+  completada_por_id: string | null;
+  completada_por_nombre: string | null;
+  completada_at: string | null;
   created_at: string;
   updated_at: string;
 }
