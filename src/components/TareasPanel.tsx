@@ -315,6 +315,75 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     );
   };
 
+  const CompletadaCard = ({ t }: { t: TareaItem }) => {
+    const isTeam = t.assignment_scope === 'team';
+    const sNombre = sucursalNombre(t.sucursal_id);
+    const completadaAt = (t as TareaItem & { completada_at: string | null }).completada_at;
+    const completadaPor = (t as TareaItem & { completada_por_nombre: string | null }).completada_por_nombre;
+    return (
+      <Card className="flex flex-col">
+        <CardContent className="p-4 flex flex-col gap-3 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{t.titulo}</h3>
+            <Badge variant="outline" className="text-status-success-foreground border-status-success bg-status-success-bg gap-1">
+              <CheckCircle className="w-3 h-3" />Completada
+            </Badge>
+          </div>
+
+          {t.descripcion && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{t.descripcion}</p>
+          )}
+
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              {isTeam ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+              {isTeam ? 'Todo el equipo' : (t.asignado_a_nombre || '—')}
+            </span>
+            {sNombre && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />{sNombre}
+              </span>
+            )}
+            {t.fecha_limite && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
+                {t.hora && <span>· {t.hora}</span>}
+              </span>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground border-t border-border pt-2 mt-auto space-y-0.5">
+            {completadaAt || completadaPor ? (
+              <>
+                <div className="inline-flex items-center gap-1">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completada por <span className="text-foreground font-medium">{completadaPor || '—'}</span>
+                </div>
+                {completadaAt && (
+                  <div className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {format(new Date(completadaAt), "dd MMM yyyy 'a las' HH:mm", { locale: es })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="italic">Sin registro de completado</span>
+            )}
+          </div>
+
+          {canManageTareas && (
+            <div className="flex items-center justify-end gap-1">
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const EmptyState = ({ label, hint }: { label: string; hint: string }) => (
     <Card>
       <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-center">
