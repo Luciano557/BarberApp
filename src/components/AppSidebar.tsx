@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Pizza, Lock, Receipt, ClipboardList, CalendarClock, Users } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +32,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
     ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock }] : []),
     ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
-    ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Pizza }] : []),
+    ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
@@ -83,7 +83,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         {!collapsed && (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-              <Pizza className="h-4 w-4 text-primary-foreground" />
+              <Building2 className="h-4 w-4 text-primary-foreground" />
             </div>
             <div className="min-w-0 flex-1">
               <span className="font-semibold text-sidebar-foreground text-sm block truncate">
@@ -99,7 +99,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         )}
         {collapsed && (
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-            <Pizza className="h-4 w-4 text-primary-foreground" />
+            <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
         )}
       </div>
