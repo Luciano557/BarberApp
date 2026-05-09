@@ -79,6 +79,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
   const [pendingRegularizeBarber, setPendingRegularizeBarber] = useState<BarberSummary | null>(null);
   const [isRegularizing, setIsRegularizing] = useState(false);
+  const [openStalePopover, setOpenStalePopover] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
