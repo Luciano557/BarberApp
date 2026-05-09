@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, History, ArrowLeft,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -31,7 +31,6 @@ const ESTADO_OPTIONS_TAREA = [
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
-  { value: 'completada', label: 'Completada' },
 ];
 
 const ESTADO_OPTIONS_PETICION = [
@@ -52,8 +51,10 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { canManageConfig, isBarber, profile } = useAuth();
+  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
+
+  const canManageTareas = isOwner || isGeneralManager || isManager;
 
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('tareas');
@@ -61,6 +62,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroResp, setFiltroResp] = useState('todos');
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
+  const [showCompletedHistory, setShowCompletedHistory] = useState(false);
 
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
@@ -106,6 +108,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const tareasFiltradas = useMemo(() => tareas.filter(t => {
+    // Excluir SIEMPRE completadas de la vista operativa de tareas (las peticiones se filtran abajo).
+    if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
         if (!(t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida)) return false;
@@ -116,6 +120,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const tareasAdmin = tareasFiltradas.filter(t => t.tipo === 'tarea');
   const peticiones = tareasFiltradas.filter(t => t.tipo === 'peticion');
+
+  const tareasCompletadas = useMemo(() => tareas.filter(t => {
+    if (t.tipo !== 'tarea' || t.estado !== 'completada') return false;
+    return matchesSucursal(t) && matchesResp(t);
+  }), [tareas, filtroResp, filtroSucursal]);
 
   const getRepeatDisplay = (t: TareaItem) => {
     if (!t.recurrente) return null;
@@ -185,9 +194,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const TareaCard = ({ t }: { t: TareaItem }) => {
     const isTeam = t.assignment_scope === 'team';
     const isMine = !!myBarberoId && t.asignado_a_id === myBarberoId;
-    const canComplete = canManageConfig || (isBarber && !isTeam && isMine);
+    const canComplete = canManageTareas || (isBarber && !isTeam && isMine);
     const canStart = canComplete;
-    const canDelete = canManageConfig;
+    const canDelete = canManageTareas;
     const sNombre = sucursalNombre(t.sucursal_id);
     const repeatTxt = getRepeatDisplay(t);
 
@@ -306,6 +315,75 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     );
   };
 
+  const CompletadaCard = ({ t }: { t: TareaItem }) => {
+    const isTeam = t.assignment_scope === 'team';
+    const sNombre = sucursalNombre(t.sucursal_id);
+    const completadaAt = (t as TareaItem & { completada_at: string | null }).completada_at;
+    const completadaPor = (t as TareaItem & { completada_por_nombre: string | null }).completada_por_nombre;
+    return (
+      <Card className="flex flex-col">
+        <CardContent className="p-4 flex flex-col gap-3 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{t.titulo}</h3>
+            <Badge variant="outline" className="text-status-success-foreground border-status-success bg-status-success-bg gap-1">
+              <CheckCircle className="w-3 h-3" />Completada
+            </Badge>
+          </div>
+
+          {t.descripcion && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{t.descripcion}</p>
+          )}
+
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              {isTeam ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+              {isTeam ? 'Todo el equipo' : (t.asignado_a_nombre || '—')}
+            </span>
+            {sNombre && (
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />{sNombre}
+              </span>
+            )}
+            {t.fecha_limite && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="h-3.5 w-3.5" />
+                {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
+                {t.hora && <span>· {t.hora}</span>}
+              </span>
+            )}
+          </div>
+
+          <div className="text-xs text-muted-foreground border-t border-border pt-2 mt-auto space-y-0.5">
+            {completadaAt || completadaPor ? (
+              <>
+                <div className="inline-flex items-center gap-1">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completada por <span className="text-foreground font-medium">{completadaPor || '—'}</span>
+                </div>
+                {completadaAt && (
+                  <div className="inline-flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    {format(new Date(completadaAt), "dd MMM yyyy 'a las' HH:mm", { locale: es })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="italic">Sin registro de completado</span>
+            )}
+          </div>
+
+          {canManageTareas && (
+            <div className="flex items-center justify-end gap-1">
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteTarea.mutate(t.id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   const EmptyState = ({ label, hint }: { label: string; hint: string }) => (
     <Card>
       <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-center">
@@ -335,11 +413,22 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
           </p>
         </div>
         {isTareasTab ? (
-          canManageConfig && (
-            <Button onClick={handleNuevaTarea} className="self-start sm:self-auto">
-              <Plus className="h-4 w-4 mr-2" />Nueva tarea
-            </Button>
-          )
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            {canManageTareas && !showCompletedHistory && (
+              <Button onClick={handleNuevaTarea}>
+                <Plus className="h-4 w-4 mr-2" />Nueva tarea
+              </Button>
+            )}
+            {showCompletedHistory ? (
+              <Button variant="outline" onClick={() => setShowCompletedHistory(false)}>
+                <ArrowLeft className="h-4 w-4 mr-2" />Volver a tareas activas
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
+                <History className="h-4 w-4 mr-2" />Historial de completadas ({tareasCompletadas.length})
+              </Button>
+            )}
+          </div>
         ) : (
           <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
             <Plus className="h-4 w-4 mr-2" />Nueva petición
@@ -371,7 +460,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); }}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
@@ -379,12 +468,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
         {/* Filters bar */}
         <div className="flex flex-wrap gap-2 mt-4">
-          <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
           {isTareasTab && (
             <Select value={filtroResp} onValueChange={setFiltroResp}>
@@ -399,12 +490,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </Select>
           )}
 
-          <Select value={filtroFecha} onValueChange={setFiltroFecha}>
-            <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {!(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroFecha} onValueChange={setFiltroFecha}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
           {showSucursalFilter && (
             <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
@@ -418,10 +511,27 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         </div>
 
         <TabsContent value="tareas" className="mt-4">
-          {tareasAdmin.length === 0 ? (
+          {showCompletedHistory ? (
+            <div className="space-y-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-lg font-semibold text-foreground">Tareas completadas</h2>
+                <span className="text-xs text-muted-foreground">{tareasCompletadas.length} tarea{tareasCompletadas.length === 1 ? '' : 's'}</span>
+              </div>
+              {tareasCompletadas.length === 0 ? (
+                <EmptyState
+                  label="Sin tareas completadas"
+                  hint="Cuando se completen tareas, vas a poder revisarlas acá con el detalle de quién y cuándo."
+                />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {tareasCompletadas.map(t => <CompletadaCard key={t.id} t={t} />)}
+                </div>
+              )}
+            </div>
+          ) : tareasAdmin.length === 0 ? (
             <EmptyState
-              label="No hay tareas"
-              hint={canManageConfig ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
+              label="No hay tareas activas"
+              hint={canManageTareas ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">

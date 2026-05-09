@@ -2253,6 +2253,9 @@ export type Database = {
           asignado_a_id: string | null
           asignado_a_nombre: string | null
           assignment_scope: string
+          completada_at: string | null
+          completada_por_id: string | null
+          completada_por_nombre: string | null
           creado_por_id: string
           creado_por_nombre: string | null
           created_at: string
@@ -2283,6 +2286,9 @@ export type Database = {
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
           assignment_scope?: string
+          completada_at?: string | null
+          completada_por_id?: string | null
+          completada_por_nombre?: string | null
           creado_por_id: string
           creado_por_nombre?: string | null
           created_at?: string
@@ -2313,6 +2319,9 @@ export type Database = {
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
           assignment_scope?: string
+          completada_at?: string | null
+          completada_por_id?: string | null
+          completada_por_nombre?: string | null
           creado_por_id?: string
           creado_por_nombre?: string | null
           created_at?: string

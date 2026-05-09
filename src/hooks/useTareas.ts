@@ -32,6 +32,9 @@ export interface Tarea {
   repeat_interval: number | null;
   repeat_byweekday: number[] | null;
   vencimiento_dias: number | null;
+  completada_por_id: string | null;
+  completada_por_nombre: string | null;
+  completada_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -125,7 +128,13 @@ export function useTareas() {
 
   const updateTarea = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; estado?: string; titulo?: string; descripcion?: string }) => {
-      const { error } = await supabase.from('tareas').update(updates).eq('id', id);
+      const payload: Record<string, unknown> = { ...updates };
+      if (updates.estado === 'completada') {
+        payload.completada_at = new Date().toISOString();
+        payload.completada_por_id = user?.id ?? null;
+        payload.completada_por_nombre = profile?.full_name || profile?.email || null;
+      }
+      const { error } = await supabase.from('tareas').update(payload).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
