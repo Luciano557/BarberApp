@@ -635,6 +635,45 @@ export type Database = {
           },
         ]
       }
+      comision_productos_config: {
+        Row: {
+          activa: boolean
+          barbero_id: string
+          created_at: string
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          organization_id: string
+          porcentaje: number
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          barbero_id: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          organization_id: string
+          porcentaje: number
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          barbero_id?: string
+          created_at?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          organization_id?: string
+          porcentaje?: number
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       descuentos: {
         Row: {
           activo: boolean
@@ -1103,6 +1142,7 @@ export type Database = {
           cantidad_de_50_por: number | null
           cantidad_de_servicios: number | null
           closed_at: string | null
+          comision_productos: number
           created_at: string
           deluxe: number | null
           dia: string | null
@@ -1144,6 +1184,7 @@ export type Database = {
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
           closed_at?: string | null
+          comision_productos?: number
           created_at: string
           deluxe?: number | null
           dia?: string | null
@@ -1185,6 +1226,7 @@ export type Database = {
           cantidad_de_50_por?: number | null
           cantidad_de_servicios?: number | null
           closed_at?: string | null
+          comision_productos?: number
           created_at?: string
           deluxe?: number | null
           dia?: string | null
@@ -1347,6 +1389,9 @@ export type Database = {
       ingresos_items_productos: {
         Row: {
           barbero_id: string | null
+          comision_modo_snap: string | null
+          comision_monto: number
+          comision_pct_snap: number | null
           created_at: string
           id: string
           ingreso_id: number
@@ -1354,6 +1399,7 @@ export type Database = {
           marca_nombre: string | null
           organization_id: string
           payment_method: string
+          precio_costo_snap: number | null
           producto_id: string
           producto_nombre: string
           qty: number
@@ -1363,6 +1409,9 @@ export type Database = {
         }
         Insert: {
           barbero_id?: string | null
+          comision_modo_snap?: string | null
+          comision_monto?: number
+          comision_pct_snap?: number | null
           created_at?: string
           id?: string
           ingreso_id: number
@@ -1370,6 +1419,7 @@ export type Database = {
           marca_nombre?: string | null
           organization_id: string
           payment_method?: string
+          precio_costo_snap?: number | null
           producto_id: string
           producto_nombre: string
           qty?: number
@@ -1379,6 +1429,9 @@ export type Database = {
         }
         Update: {
           barbero_id?: string | null
+          comision_modo_snap?: string | null
+          comision_monto?: number
+          comision_pct_snap?: number | null
           created_at?: string
           id?: string
           ingreso_id?: number
@@ -1386,6 +1439,7 @@ export type Database = {
           marca_nombre?: string | null
           organization_id?: string
           payment_method?: string
+          precio_costo_snap?: number | null
           producto_id?: string
           producto_nombre?: string
           qty?: number
@@ -1803,6 +1857,8 @@ export type Database = {
       productos_sucursal: {
         Row: {
           activo: boolean
+          comision_modo: string
+          comision_porcentaje: number | null
           created_at: string
           id: string
           margen_pct: number | null
@@ -1817,6 +1873,8 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          comision_modo?: string
+          comision_porcentaje?: number | null
           created_at?: string
           id?: string
           margen_pct?: number | null
@@ -1831,6 +1889,8 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          comision_modo?: string
+          comision_porcentaje?: number | null
           created_at?: string
           id?: string
           margen_pct?: number | null
