@@ -174,6 +174,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         serviciosBase: 0,
         commissionPct: barber.commission,
         commissionAmount: 0,
+        comisionProductos: 0,
       });
     });
 
@@ -202,6 +203,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           serviciosBase: 0,
           commissionPct: barberData?.commission || 0,
           commissionAmount: 0,
+          comisionProductos: 0,
         };
         summaryMap.set(barberId, existing);
       }
