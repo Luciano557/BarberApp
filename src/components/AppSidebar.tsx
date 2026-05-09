@@ -30,7 +30,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
     ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
-    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos y Agenda', icon: CalendarClock }] : []),
+    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock }] : []),
     ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
     ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
     ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
