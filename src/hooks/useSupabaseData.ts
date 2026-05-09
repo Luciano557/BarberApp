@@ -1212,6 +1212,9 @@ export function useSupabaseData() {
     setDiscountActive,
     addLine,
     updateLine,
+    deleteService,
+    deleteExtra,
+    deleteLine,
     // Global handlers (tab General de Mi Negocio)
     addServiceGlobal,
     updateServiceGlobal,
