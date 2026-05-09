@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { LineQuickEditPopover } from './LineQuickEditPopover';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -18,6 +19,10 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  /** Si se provee, habilita edición rápida de la línea seleccionada. */
+  onUpdateLine?: (id: string, updates: Partial<Line>) => void | Promise<void>;
+  /** Si se provee, habilita eliminación de líneas inactivas desde el popover. */
+  onDeleteLine?: (id: string) => void | Promise<void>;
   /** Opcional: si se provee, habilita botón "Eliminar" para servicios inactivos. */
   onDelete?: (id: string) => void;
   /**
