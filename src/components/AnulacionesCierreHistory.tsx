@@ -192,6 +192,11 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
                           </span>
                         </div>
                         <span className="font-semibold text-foreground">{record.barbero_nombre}</span>
+                        {record.motivo?.startsWith('Se registraron ventas después del cierre') && (
+                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border border-destructive/30 text-destructive">
+                            Regularización
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
                         <CalendarIcon className="h-3.5 w-3.5" />

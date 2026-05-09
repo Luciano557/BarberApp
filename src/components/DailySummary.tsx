@@ -1,9 +1,11 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle, CalendarClock } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Transaction, Barber, Service, Line, PaymentMethod, isDigitalMethod } from '@/types/barbershop';
@@ -64,16 +66,19 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const { saveCashClosing } = useCashClosing();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
-  const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string }>>(new Map());
+  const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
   const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
   const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [pinGateOpen, setPinGateOpen] = useState(false);
-  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | 'history' | 'anulacionesHistory' | null>(null);
+  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | 'history' | 'anulacionesHistory' | 'regularize' | null>(null);
   const [pendingClosingBarber, setPendingClosingBarber] = useState<BarberSummary | null>(null);
   const [pendingVoidClosure, setPendingVoidClosure] = useState<{ id: number; barberName: string } | null>(null);
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
+  const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
+  const [pendingRegularizeBarber, setPendingRegularizeBarber] = useState<BarberSummary | null>(null);
+  const [isRegularizing, setIsRegularizing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
@@ -120,7 +125,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     
     let query = supabase
       .from('ingresos')
-      .select('id, barbero, barbero_id')
+      .select('id, barbero, barbero_id, closed_at')
       .gte('created_at', startStr)
       .lte('created_at', endStr)
       .neq('estado', 'eliminado');
@@ -136,10 +141,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       setClosedBarbers(closedIds as Set<string>);
       
       // Store the mapping of barbero_id to ingreso id for voiding
-      const dataMap = new Map<string, { id: number; barberName: string }>();
+      const dataMap = new Map<string, { id: number; barberName: string; closed_at: string | null }>();
       data.forEach(d => {
         if (d.barbero_id) {
-          dataMap.set(d.barbero_id, { id: d.id, barberName: d.barbero || '' });
+          dataMap.set(d.barbero_id, { id: d.id, barberName: d.barbero || '', closed_at: d.closed_at ?? null });
         }
       });
       setClosedBarbersData(dataMap);
@@ -300,6 +305,34 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     () => barberSummaries.some(b => (b.productosTotal ?? 0) > 0),
     [barberSummaries]
   );
+
+  // Detección de cierres desactualizados: ventas activas posteriores a closed_at por barbero
+  const staleByBarber = useMemo(() => {
+    const result: Record<string, { count: number; total: number; lastAt: string }> = {};
+    closedBarbersData.forEach((data, barberId) => {
+      if (!data.closed_at) return;
+      const closedAtMs = new Date(data.closed_at).getTime();
+      if (Number.isNaN(closedAtMs)) return;
+      const posteriores = summary.transactions.filter(tx =>
+        tx.estado !== 'anulado' &&
+        tx.barberId === barberId &&
+        new Date(tx.createdAt).getTime() > closedAtMs
+      );
+      if (posteriores.length === 0) return;
+      const total = posteriores.reduce((s, tx) => s + (tx.total || 0), 0);
+      const lastAt = posteriores.reduce((acc, tx) => {
+        const t = new Date(tx.createdAt).getTime();
+        return t > acc ? t : acc;
+      }, 0);
+      result[barberId] = {
+        count: posteriores.length,
+        total,
+        lastAt: new Date(lastAt).toISOString(),
+      };
+    });
+    return result;
+  }, [closedBarbersData, summary.transactions]);
+
   // Check if selected date is in the past (for backfill CTA)
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
 
@@ -355,6 +388,17 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     }
   }, [requiresPin]);
 
+  // PIN-gated regularizar cierre
+  const handleRegularizeClick = useCallback((barber: BarberSummary) => {
+    if (requiresPin) {
+      setPendingRegularizeBarber(barber);
+      setPinAction('regularize');
+      setPinGateOpen(true);
+    } else {
+      setRegularizingBarber(barber);
+    }
+  }, [requiresPin]);
+
   // PIN-gated history views
   const handleHistoryClick = useCallback(() => {
     if (requiresPin) {
@@ -392,11 +436,14 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         setHistoryOpen(true);
       } else if (pinAction === 'anulacionesHistory') {
         setAnulacionesHistoryOpen(true);
+      } else if (pinAction === 'regularize' && pendingRegularizeBarber) {
+        setRegularizingBarber(pendingRegularizeBarber);
+        setPendingRegularizeBarber(null);
       }
       setPinAction(null);
     }
     return result;
-  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, onDateChange]);
+  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, pendingRegularizeBarber, onDateChange]);
 
   const VOID_REASONS = [
     'Servicios duplicados o faltantes',
@@ -444,6 +491,63 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       toast.error('Error al anular el cierre de caja');
     } finally {
       setIsVoidingClosure(false);
+    }
+  };
+
+  const REGULARIZE_REASON = 'Se registraron ventas después del cierre. El cierre fue regularizado automáticamente para incluir las ventas posteriores.';
+
+  // Regularizar cierre: anular el cierre actual con auditoría y crear uno nuevo actualizado
+  const handleRegularize = async () => {
+    if (!regularizingBarber || !user || !organization) return;
+    const closure = closedBarbersData.get(regularizingBarber.barberId);
+    if (!closure) {
+      toast.error('No se encontró el cierre actual');
+      return;
+    }
+
+    setIsRegularizing(true);
+    try {
+      // 1) Anular cierre actual (mismo patrón que handleVoidClosure)
+      const { error: updateError } = await supabase
+        .from('ingresos')
+        .update({ estado: 'eliminado' })
+        .eq('id', closure.id);
+      if (updateError) throw updateError;
+
+      // 2) Registrar anulación con motivo automático
+      const { error: insertError } = await supabase
+        .from('anulaciones_cierre')
+        .insert({
+          ingreso_id: closure.id,
+          barbero_nombre: closure.barberName || regularizingBarber.barberName,
+          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
+          anulado_por_id: user.id,
+          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
+          anulado_por_email: user.email || '',
+          organization_id: organization.id,
+          motivo: REGULARIZE_REASON,
+        });
+      if (insertError) throw insertError;
+
+      // 3) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
+      const success = await saveCashClosing({
+        barber: regularizingBarber,
+        transactions: summary.transactions,
+        date: validDate,
+        lines,
+      });
+      if (!success) {
+        throw new Error('No se pudo crear el cierre actualizado');
+      }
+
+      toast.success('Cierre regularizado correctamente');
+      setRegularizingBarber(null);
+      await checkClosedBarbers();
+    } catch (error) {
+      console.error('Error regularizando cierre:', error);
+      toast.error('Error al regularizar el cierre');
+    } finally {
+      setIsRegularizing(false);
     }
   };
 
@@ -636,6 +740,28 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
+                  {closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId] && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Cierre desactualizado</AlertTitle>
+                      <AlertDescription className="space-y-3">
+                        <p>
+                          Hay {staleByBarber[barber.barberId].count} venta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} registrada{staleByBarber[barber.barberId].count === 1 ? '' : 's'} después de este cierre por ${staleByBarber[barber.barberId].total.toLocaleString()} (última {format(new Date(staleByBarber[barber.barberId].lastAt), 'HH:mm')}) que no está{staleByBarber[barber.barberId].count === 1 ? '' : 'n'} incluida{staleByBarber[barber.barberId].count === 1 ? '' : 's'}.
+                        </p>
+                        {canVoidClosure && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => handleRegularizeClick(barber)}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Regularizar cierre
+                          </Button>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
@@ -1076,6 +1202,35 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         onComplete={checkClosedBarbers}
       />
 
+      {/* Regularize Closure Confirmation */}
+      <AlertDialog
+        open={!!regularizingBarber}
+        onOpenChange={(open) => { if (!open && !isRegularizing) setRegularizingBarber(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regularizar cierre</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se anulará el cierre actual de <span className="font-semibold">{regularizingBarber?.barberName}</span> y se generará un nuevo cierre actualizado con las ventas registradas después del cierre. El movimiento quedará registrado en el historial de anulaciones.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRegularizing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRegularizing}
+              onClick={(e) => { e.preventDefault(); handleRegularize(); }}
+            >
+              {isRegularizing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {isRegularizing ? 'Regularizando...' : 'Regularizar cierre'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* PIN Gate Dialog */}
       <PinGateDialog
         open={pinGateOpen}
@@ -1086,6 +1241,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           setPendingClosingBarber(null);
           setPendingVoidClosure(null);
           setPendingDate(null);
+          setPendingRegularizeBarber(null);
         }}
         sectionName={
           pinAction === 'closing' ? 'el cierre de caja' :
@@ -1093,6 +1249,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
           pinAction === 'history' ? 'el historial de cierres' :
           pinAction === 'anulacionesHistory' ? 'el historial de anulaciones' :
+          pinAction === 'regularize' ? 'regularizar el cierre' :
           'esta acción'
         }
       />
