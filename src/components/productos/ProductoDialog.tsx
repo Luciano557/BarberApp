@@ -315,6 +315,39 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
               </div>
             ) : null}
           </div>
+
+          {/* Compensación por venta */}
+          <div className="space-y-3 border-t border-border pt-4">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Compensación por venta</h4>
+            <p className="text-xs text-muted-foreground">
+              Define cómo genera comisión este producto cuando lo vende un barbero. La comisión se calcula sobre la ganancia (precio de venta − precio de costo).
+            </p>
+            <Select value={comisionModo} onValueChange={(v: any) => setComisionModo(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="barbero">Usar regla del barbero</SelectItem>
+                <SelectItem value="ninguna">No generar comisión</SelectItem>
+                <SelectItem value="personalizada">Comisión personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+            {comisionModo === 'personalizada' && (
+              <div className="space-y-1">
+                <Label>Porcentaje (%)</Label>
+                <Input
+                  inputMode="decimal"
+                  value={comisionPct}
+                  onChange={(e) => setComisionPct(e.target.value.replace(/[^\d.,]/g, ''))}
+                  placeholder="0"
+                  maxLength={6}
+                />
+              </div>
+            )}
+            {comisionModo !== 'ninguna' && !precioCosto && (
+              <p className="text-xs text-amber-600 dark:text-amber-500">
+                Sin precio de costo cargado: el producto no podrá generar comisión.
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>
