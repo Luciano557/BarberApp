@@ -1,10 +1,41 @@
 import { useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power } from 'lucide-react';
+import { Plus, Edit2, Save, X, Power, PowerOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
+import { toast } from 'sonner';
+
+function validateDiscountName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'El nombre no puede estar vacío.';
+  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
+  return null;
+}
+
+function validateDiscountValue(raw: string, type: 'percentage' | 'fixed'): { ok: true; value: number } | { ok: false; error: string } {
+  const cleaned = (raw || '').toString().trim();
+  if (!cleaned) {
+    return { ok: false, error: type === 'percentage'
+      ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
+      : 'El monto debe ser mayor a 0.' };
+  }
+  const value = parseFloat(cleaned);
+  if (Number.isNaN(value)) {
+    return { ok: false, error: 'Ingresá un valor numérico válido.' };
+  }
+  if (type === 'percentage') {
+    if (value <= 0 || value > 100) {
+      return { ok: false, error: 'El porcentaje debe ser mayor a 0 y menor o igual a 100.' };
+    }
+  } else if (value <= 0) {
+    return { ok: false, error: 'El monto debe ser mayor a 0.' };
+  }
+  return { ok: true, value };
+}
 
 interface DiscountsConfigProps {
   discounts: Discount[];
@@ -35,6 +66,7 @@ export function DiscountsConfig({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Discount | null>(null);
 
   // Form state
   const [newLabel, setNewLabel] = useState('');
@@ -61,10 +93,13 @@ export function DiscountsConfig({
   };
 
   const handleAdd = () => {
-    if (!newLabel.trim() || !newValue) return;
+    const nameErr = validateDiscountName(newLabel);
+    if (nameErr) { toast.error(nameErr); return; }
+    const v = validateDiscountValue(newValue, newType);
+    if (v.ok === false) { toast.error(v.error); return; }
     onAdd({
       label: newLabel.trim(),
-      value: parseFloat(newValue),
+      value: v.value,
       type: newType,
       rounding: newRounding,
       roundingUnit: newRoundingUnit,
@@ -77,10 +112,13 @@ export function DiscountsConfig({
   };
 
   const handleUpdate = (id: string) => {
-    if (!newLabel.trim() || !newValue) return;
+    const nameErr = validateDiscountName(newLabel);
+    if (nameErr) { toast.error(nameErr); return; }
+    const v = validateDiscountValue(newValue, newType);
+    if (v.ok === false) { toast.error(v.error); return; }
     onUpdate(id, {
       label: newLabel.trim(),
-      value: parseFloat(newValue),
+      value: v.value,
       type: newType,
       rounding: newRounding,
       roundingUnit: newRoundingUnit,
@@ -89,6 +127,12 @@ export function DiscountsConfig({
     });
     setEditingId(null);
     resetForm();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm) return;
+    onDelete(deleteConfirm.id);
+    setDeleteConfirm(null);
   };
 
   const startEdit = (d: Discount) => {
@@ -261,18 +305,41 @@ export function DiscountsConfig({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8">
+            <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8" title="Editar">
               <Edit2 className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => (onToggleActive ? onToggleActive(d.id, !flagFor(d)) : onDelete(d.id))}
-              className={flagFor(d) ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
-              title={flagFor(d) ? 'Desactivar' : 'Reactivar'}
-            >
-              <Power className="h-4 w-4" />
-            </Button>
+            {onToggleActive && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onToggleActive(d.id, !flagFor(d))}
+                className="h-8 w-8"
+                title={flagFor(d) ? 'Desactivar' : 'Activar'}
+              >
+                {flagFor(d) ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+              </Button>
+            )}
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={flagFor(d)}
+                      onClick={() => !flagFor(d) && setDeleteConfirm(d)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={flagFor(d) ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {flagFor(d) && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
@@ -343,6 +410,24 @@ export function DiscountsConfig({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar descuento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este elemento dejará de aparecer en el sistema. No se modificarán los registros históricos donde ya haya sido utilizado. Esta acción no se podrá deshacer desde la interfaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
+
