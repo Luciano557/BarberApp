@@ -423,6 +423,30 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           )}
         </>
       )}
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar comisión extra por equipo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se desactiva el extra a partir de hoy. No se modifican cierres ni pagos históricos. Podés volver a configurarlo más adelante.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowDelete(false);
+                await handleToggleConfig(false);
+                setConfig(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
