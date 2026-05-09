@@ -354,6 +354,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                             {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
                           </SelectContent>
                         </Select>
+                        {onUpdateLine && (
+                          <LineQuickEditPopover
+                            line={lines.find(l => l.id === newLineId) || null}
+                            onUpdate={onUpdateLine}
+                            onDelete={onDeleteLine}
+                            disabled={!newLineId || newLineId === 'none' || !lines.find(l => l.id === newLineId)}
+                          />
+                        )}
                         <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
                       </div>
                     </div>
