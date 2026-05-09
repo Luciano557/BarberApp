@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { LineQuickEditPopover } from './LineQuickEditPopover';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -18,6 +19,10 @@ interface ServicesConfigProps {
   onAdd: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Service>) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  /** Si se provee, habilita edición rápida de la línea seleccionada. */
+  onUpdateLine?: (id: string, updates: Partial<Line>) => void | Promise<void>;
+  /** Si se provee, habilita eliminación de líneas inactivas desde el popover. */
+  onDeleteLine?: (id: string) => void | Promise<void>;
   /** Opcional: si se provee, habilita botón "Eliminar" para servicios inactivos. */
   onDelete?: (id: string) => void;
   /**
@@ -61,7 +66,7 @@ function validateDuration(raw: string): { ok: true; value: number } | { ok: fals
   return { ok: true, value };
 }
 
-export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
+export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onUpdateLine, onDeleteLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
   const isGlobal = mode === 'global';
   const structureLocked = !canEditStructure;
   const [isAdding, setIsAdding] = useState(false);
@@ -213,6 +218,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
                   </SelectContent>
                 </Select>
+                {onUpdateLine && !structureLocked && (
+                  <LineQuickEditPopover
+                    line={lines.find(l => l.id === editLineId) || null}
+                    onUpdate={onUpdateLine}
+                    onDelete={onDeleteLine}
+                    disabled={!editLineId || editLineId === 'none' || !lines.find(l => l.id === editLineId)}
+                  />
+                )}
                 {!structureLocked && (
                   <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
                 )}
@@ -341,6 +354,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                             {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
                           </SelectContent>
                         </Select>
+                        {onUpdateLine && (
+                          <LineQuickEditPopover
+                            line={lines.find(l => l.id === newLineId) || null}
+                            onUpdate={onUpdateLine}
+                            onDelete={onDeleteLine}
+                            disabled={!newLineId || newLineId === 'none' || !lines.find(l => l.id === newLineId)}
+                          />
+                        )}
                         <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
                       </div>
                     </div>
