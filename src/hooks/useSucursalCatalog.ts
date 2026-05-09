@@ -96,10 +96,10 @@ export function useSucursalCatalog(sucursalId: string | null) {
     setIsLoading(true);
     try {
       const [linesRes, servRes, extRes, descRes, servSucRes, extSucRes, descSucRes] = await Promise.all([
-        supabase.from('lineas').select('*').order('nombre'),
-        supabase.from('servicios').select('*').order('nombre'),
-        supabase.from('extras').select('*').order('nombre'),
-        supabase.from('descuentos').select('*').order('valor'),
+        supabase.from('lineas').select('*').eq('eliminado', false).order('nombre'),
+        supabase.from('servicios').select('*').eq('eliminado', false).order('nombre'),
+        supabase.from('extras').select('*').eq('eliminado', false).order('nombre'),
+        supabase.from('descuentos').select('*').eq('eliminado', false).order('valor'),
         supabase.from('servicios_sucursales').select('*').eq('sucursal_id', sucursalId),
         supabase.from('extras_sucursales').select('*').eq('sucursal_id', sucursalId),
         supabase.from('descuentos_sucursales').select('*').eq('sucursal_id', sucursalId),
