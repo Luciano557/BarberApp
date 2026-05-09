@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Plus, Users, DollarSign, Wrench, MoreHorizontal } from 'lucide-react';
+import { Plus, Users, DollarSign, Wrench, MoreHorizontal, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Barber } from '@/types/barbershop';
 import { ComisionEquipoConfig } from './ComisionEquipoConfig';
 import { BonoFijoConfig } from './BonoFijoConfig';
+import { ComisionProductosConfig } from './ComisionProductosConfig';
 
-type ExtraType = 'comision_equipo' | 'bono_fijo';
+type ExtraType = 'comision_equipo' | 'bono_fijo' | 'comision_productos';
 
 interface ExtrasCompensacionProps {
   barber: Barber;
@@ -18,13 +19,12 @@ interface ExtrasCompensacionProps {
 export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarbers }: ExtrasCompensacionProps) {
   const [showComisionEquipo, setShowComisionEquipo] = useState(false);
   const [showBonoFijo, setShowBonoFijo] = useState(false);
+  const [showComisionProductos, setShowComisionProductos] = useState(false);
 
   const handleAddExtra = (type: ExtraType) => {
-    if (type === 'comision_equipo') {
-      setShowComisionEquipo(true);
-    } else if (type === 'bono_fijo') {
-      setShowBonoFijo(true);
-    }
+    if (type === 'comision_equipo') setShowComisionEquipo(true);
+    else if (type === 'bono_fijo') setShowBonoFijo(true);
+    else if (type === 'comision_productos') setShowComisionProductos(true);
   };
 
   return (
@@ -46,6 +46,10 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
               <DollarSign className="h-4 w-4 mr-2" />
               Bono fijo
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAddExtra('comision_productos')}>
+              <Package className="h-4 w-4 mr-2" />
+              Comisión por productos vendidos
+            </DropdownMenuItem>
             <DropdownMenuItem disabled className="text-muted-foreground">
               <Wrench className="h-4 w-4 mr-2" />
               Ajuste manual
@@ -58,7 +62,6 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
         </DropdownMenu>
       </div>
 
-      {/* Always render ComisionEquipoConfig — it auto-loads if config exists */}
       <ComisionEquipoConfig
         barberId={barber.id}
         organizationId={organizationId}
@@ -67,7 +70,6 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
         forceShow={showComisionEquipo}
       />
 
-      {/* Bono Fijo — auto-loads if config exists */}
       <div className="mt-2">
         <BonoFijoConfig
           barberId={barber.id}
@@ -76,6 +78,13 @@ export function ExtrasCompensacion({ barber, organizationId, sucursalId, allBarb
           forceShow={showBonoFijo}
         />
       </div>
+
+      <ComisionProductosConfig
+        barberId={barber.id}
+        organizationId={organizationId}
+        sucursalId={sucursalId}
+        forceShow={showComisionProductos}
+      />
     </div>
   );
 }
