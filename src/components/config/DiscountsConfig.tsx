@@ -1,10 +1,41 @@
 import { useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power } from 'lucide-react';
+import { Plus, Edit2, Save, X, Power, PowerOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
+import { toast } from 'sonner';
+
+function validateDiscountName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'El nombre no puede estar vacío.';
+  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
+  return null;
+}
+
+function validateDiscountValue(raw: string, type: 'percentage' | 'fixed'): { ok: true; value: number } | { ok: false; error: string } {
+  const cleaned = (raw || '').toString().trim();
+  if (!cleaned) {
+    return { ok: false, error: type === 'percentage'
+      ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
+      : 'El monto debe ser mayor a 0.' };
+  }
+  const value = parseFloat(cleaned);
+  if (Number.isNaN(value)) {
+    return { ok: false, error: 'Ingresá un valor numérico válido.' };
+  }
+  if (type === 'percentage') {
+    if (value <= 0 || value > 100) {
+      return { ok: false, error: 'El porcentaje debe ser mayor a 0 y menor o igual a 100.' };
+    }
+  } else if (value <= 0) {
+    return { ok: false, error: 'El monto debe ser mayor a 0.' };
+  }
+  return { ok: true, value };
+}
 
 interface DiscountsConfigProps {
   discounts: Discount[];
