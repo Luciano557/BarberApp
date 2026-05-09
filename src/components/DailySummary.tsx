@@ -55,6 +55,7 @@ interface BarberSummary {
   serviciosBase: number;
   commissionPct: number;
   commissionAmount: number;
+  comisionProductos: number;
 }
 
 export function DailySummary({ summary, barbers, services, lines, selectedDate, onDateChange, onVoidTransaction }: DailySummaryProps) {
