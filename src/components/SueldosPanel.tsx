@@ -249,6 +249,18 @@ function BarberDetailRow({
               </div>
             </div>
           )}
+          {/* Comisión por productos vendidos */}
+          {barber.comisionProductosTotal != null && barber.comisionProductosTotal > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>Comisión por productos vendidos</span>
+                <span>{formatCurrency(barber.comisionProductosTotal)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Calculada sobre la ganancia de los productos vendidos por este barbero.
+              </p>
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
@@ -699,6 +711,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const totalHistorico = Object.values(comisionData.historico).reduce((sum, v) => sum + v.monto, 0);
           saldoHistorico += totalHistorico;
         }
+        // Add historical comisión productos to saldo
+        saldoHistorico += (comisionProdHistoricoPorId[barber.id] || 0);
         // Add historical bono fijo to saldo
         saldoHistorico += (bonoHistoricoPorId[barber.id] || 0);
         
