@@ -136,6 +136,7 @@ interface BarberSalaryData {
   comisionExtraEquipo?: ComisionEquipoDetalle[];
   bonoFijoOcurrencias?: BonoFijoOcurrencia[];
   bonoFijoTotal?: number;
+  comisionProductosTotal?: number;
 }
 
 interface IngresoDetalle {
@@ -355,7 +356,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       // ALWAYS fetch ALL data for saldo calculation (historical)
       let ingHistQuery = supabase
         .from('ingresos')
-        .select('barbero_id, sueldo')
+        .select('barbero_id, sueldo, comision_productos')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
       if (currentSucursal) ingHistQuery = ingHistQuery.eq('sucursal_id', currentSucursal.id);
@@ -392,7 +393,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       // Build query for ingresos - filtered by period if set (for display)
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at')
+        .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at, comision_productos')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
