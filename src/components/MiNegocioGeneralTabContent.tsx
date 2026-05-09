@@ -47,7 +47,8 @@ export function MiNegocioGeneralTabContent({
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
-  onAddLine,
+  onAddLine, onUpdateLine,
+  onDeleteService, onDeleteExtra, onDeleteLine,
 }: MiNegocioGeneralTabContentProps) {
 
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
