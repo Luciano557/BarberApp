@@ -4,6 +4,10 @@ import { Input } from "@/components/ui/input";
 interface CurrencyInputProps extends Omit<React.ComponentProps<"input">, "value" | "onChange" | "type"> {
   value: string;
   onChange: (value: string) => void;
+  /** Mostrar símbolo de moneda como prefijo. Default true. Pasar false para usos no monetarios. */
+  showCurrencySymbol?: boolean;
+  /** Símbolo a mostrar. Default "$". */
+  currencySymbol?: string;
 }
 
 /**
