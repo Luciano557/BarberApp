@@ -48,6 +48,7 @@ export function BonoFijoConfig({ barberId, organizationId, sucursalId, forceShow
   const [config, setConfig] = useState<BonoConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   // Form state
   const [monto, setMonto] = useState('');
