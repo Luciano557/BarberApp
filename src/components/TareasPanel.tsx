@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox, History, ArrowLeft,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -425,7 +425,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               </Button>
             ) : (
               <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
-                <History className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
+                <ChartSpline className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
             )}
           </div>
