@@ -680,7 +680,12 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           bonoFijoTotal = bonoFiltrado.total;
           totalDevengado += bonoFijoTotal;
         }
-        
+
+        // Comisión por productos vendidos (filtered)
+        const comisionProductosTotal = comisionProdFiltradoPorId[barber.id] || 0;
+        if (comisionProductosTotal > 0) {
+          totalDevengado += comisionProductosTotal;
+        }
         // HISTORICAL saldo - real debt that NEVER changes with filter
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
         // For fixed salary: add historical accrual from created_at to now
@@ -736,6 +741,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           comisionExtraEquipo,
           bonoFijoOcurrencias,
           bonoFijoTotal,
+          comisionProductosTotal,
         };
       });
 
