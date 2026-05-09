@@ -110,21 +110,31 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
   const renderExtraItem = (extra: Extra) => {
     const itemActive = isItemActive(extra);
     return (
-    <div key={extra.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+    <div key={extra.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === extra.id ? (
-        <div className="flex gap-2 w-full">
-          <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1" maxLength={80} />
-          {!isGlobal && (
-            <CurrencyInput value={newPrice} onChange={setNewPrice} className="w-28" />
-          )}
-          <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-          <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+        <div className="p-3">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+            <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-10' : 'sm:col-span-7'}`}>
+              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} />
+            </div>
+            {!isGlobal && (
+              <div className="space-y-1.5 sm:col-span-3">
+                <label className="text-xs font-medium text-muted-foreground">Precio</label>
+                <CurrencyInput value={newPrice} onChange={setNewPrice} />
+              </div>
+            )}
+            <div className="flex items-center gap-2 sm:col-span-2 justify-end">
+              <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+            </div>
+          </div>
         </div>
       ) : (
-        <>
-          <span className="flex-1 font-medium text-foreground">{extra.name}</span>
+        <div className="flex items-center gap-3 p-3">
+          <span className="flex-1 font-medium text-foreground truncate">{extra.name}</span>
           {!isGlobal && (
-            <span className="text-muted-foreground">${extra.price.toLocaleString('es-AR')}</span>
+            <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
           )}
           <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
             <Edit2 className="h-4 w-4" />
@@ -155,7 +165,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
               </Tooltip>
             </TooltipProvider>
           )}
-        </>
+        </div>
       )}
     </div>
     );
