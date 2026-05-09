@@ -1202,6 +1202,35 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         onComplete={checkClosedBarbers}
       />
 
+      {/* Regularize Closure Confirmation */}
+      <AlertDialog
+        open={!!regularizingBarber}
+        onOpenChange={(open) => { if (!open && !isRegularizing) setRegularizingBarber(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regularizar cierre</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se anulará el cierre actual de <span className="font-semibold">{regularizingBarber?.barberName}</span> y se generará un nuevo cierre actualizado con las ventas registradas después del cierre. El movimiento quedará registrado en el historial de anulaciones.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRegularizing}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isRegularizing}
+              onClick={(e) => { e.preventDefault(); handleRegularize(); }}
+            >
+              {isRegularizing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {isRegularizing ? 'Regularizando...' : 'Regularizar cierre'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* PIN Gate Dialog */}
       <PinGateDialog
         open={pinGateOpen}
@@ -1212,6 +1241,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           setPendingClosingBarber(null);
           setPendingVoidClosure(null);
           setPendingDate(null);
+          setPendingRegularizeBarber(null);
         }}
         sectionName={
           pinAction === 'closing' ? 'el cierre de caja' :
@@ -1219,6 +1249,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
           pinAction === 'history' ? 'el historial de cierres' :
           pinAction === 'anulacionesHistory' ? 'el historial de anulaciones' :
+          pinAction === 'regularize' ? 'regularizar el cierre' :
           'esta acción'
         }
       />
