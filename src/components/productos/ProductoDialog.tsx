@@ -41,6 +41,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
   const [stockMinimo, setStockMinimo] = useState('');
   // Stock inicial solo en creación de vínculo (si no existe productos_sucursal)
   const [stockInicial, setStockInicial] = useState('');
+  // Compensación por venta
+  const [comisionModo, setComisionModo] = useState<'barbero' | 'ninguna' | 'personalizada'>('barbero');
+  const [comisionPct, setComisionPct] = useState('');
 
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +59,8 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       setPrecioVenta(ps?.precio_venta != null ? String(ps.precio_venta) : '');
       setStockMinimo(ps?.stock_minimo != null ? String(ps.stock_minimo) : '');
       setStockInicial('');
+      setComisionModo((ps?.comision_modo as any) || 'barbero');
+      setComisionPct(ps?.comision_porcentaje != null ? String(ps.comision_porcentaje) : '');
     } else {
       setNombre('');
       setDescripcion('');
@@ -65,6 +70,8 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       setPrecioVenta('');
       setStockMinimo('');
       setStockInicial('');
+      setComisionModo('barbero');
+      setComisionPct('');
     }
   }, [open, producto]);
 
