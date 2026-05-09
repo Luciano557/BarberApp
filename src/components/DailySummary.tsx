@@ -79,6 +79,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
   const [pendingRegularizeBarber, setPendingRegularizeBarber] = useState<BarberSummary | null>(null);
   const [isRegularizing, setIsRegularizing] = useState(false);
+  const [openStalePopover, setOpenStalePopover] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
@@ -680,13 +681,61 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             {barberSummaries.map((barber) => (
               <Card key={barber.barberId} className="border border-border bg-card">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-bold text-primary">
-                        {barber.barberName.charAt(0).toUpperCase()}
-                      </span>
+                  <CardTitle className="text-base font-semibold flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-primary">
+                          {barber.barberName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="truncate">{barber.barberName}</span>
                     </div>
-                    {barber.barberName}
+                    {closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId] && (
+                      <Popover
+                        open={openStalePopover === barber.barberId}
+                        onOpenChange={(o) => setOpenStalePopover(o ? barber.barberId : null)}
+                      >
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/5 px-2 py-0.5 text-[11px] font-medium text-destructive hover:bg-destructive/10 transition-colors shrink-0 max-w-full"
+                            aria-label="Cierre desactualizado"
+                          >
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Cierre desactualizado</span>
+                            <span className="sm:hidden">Desactualizado</span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-72 p-3 space-y-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Cierre desactualizado
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {staleByBarber[barber.barberId].count} venta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} posterior{staleByBarber[barber.barberId].count === 1 ? '' : 'es'} · ${staleByBarber[barber.barberId].total.toLocaleString()} · Última {format(new Date(staleByBarber[barber.barberId].lastAt), 'HH:mm')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Esta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} venta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} no está{staleByBarber[barber.barberId].count === 1 ? '' : 'n'} incluida{staleByBarber[barber.barberId].count === 1 ? '' : 's'} en el cierre guardado.
+                            </p>
+                          </div>
+                          {canVoidClosure && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                setOpenStalePopover(null);
+                                handleRegularizeClick(barber);
+                              }}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                              Regularizar
+                            </Button>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -740,28 +789,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </span>
                     <span className="text-lg font-bold text-primary">${barber.commissionAmount.toLocaleString()}</span>
                   </div>
-                  {closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId] && (
-                    <Alert variant="destructive" className="mt-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Cierre desactualizado</AlertTitle>
-                      <AlertDescription className="space-y-3">
-                        <p>
-                          Hay {staleByBarber[barber.barberId].count} venta{staleByBarber[barber.barberId].count === 1 ? '' : 's'} registrada{staleByBarber[barber.barberId].count === 1 ? '' : 's'} después de este cierre por ${staleByBarber[barber.barberId].total.toLocaleString()} (última {format(new Date(staleByBarber[barber.barberId].lastAt), 'HH:mm')}) que no está{staleByBarber[barber.barberId].count === 1 ? '' : 'n'} incluida{staleByBarber[barber.barberId].count === 1 ? '' : 's'}.
-                        </p>
-                        {canVoidClosure && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => handleRegularizeClick(barber)}
-                          >
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Regularizar cierre
-                          </Button>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
