@@ -679,6 +679,9 @@ export type Database = {
           activo: boolean
           aplica_a: string
           created_at: string
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           id: string
           metodo_pago: string | null
           nombre: string
@@ -694,6 +697,9 @@ export type Database = {
           activo?: boolean
           aplica_a?: string
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           metodo_pago?: string | null
           nombre: string
@@ -709,6 +715,9 @@ export type Database = {
           activo?: boolean
           aplica_a?: string
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           metodo_pago?: string | null
           nombre?: string
@@ -916,6 +925,9 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           id: string
           nombre: string
           organization_id: string | null
@@ -926,6 +938,9 @@ export type Database = {
         Insert: {
           activo?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           nombre: string
           organization_id?: string | null
@@ -936,6 +951,9 @@ export type Database = {
         Update: {
           activo?: boolean
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           nombre?: string
           organization_id?: string | null
@@ -1511,6 +1529,9 @@ export type Database = {
           activo: boolean
           color: string | null
           created_at: string
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           id: string
           nombre: string
           organization_id: string | null
@@ -1520,6 +1541,9 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           nombre: string
           organization_id?: string | null
@@ -1529,6 +1553,9 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           nombre?: string
           organization_id?: string | null
@@ -2079,6 +2106,9 @@ export type Database = {
           activo: boolean
           created_at: string
           duracion_min: number
+          eliminado: boolean
+          eliminado_at: string | null
+          eliminado_por: string | null
           id: string
           linea_id: string | null
           nombre: string
@@ -2091,6 +2121,9 @@ export type Database = {
           activo?: boolean
           created_at?: string
           duracion_min?: number
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           linea_id?: string | null
           nombre: string
@@ -2103,6 +2136,9 @@ export type Database = {
           activo?: boolean
           created_at?: string
           duracion_min?: number
+          eliminado?: boolean
+          eliminado_at?: string | null
+          eliminado_por?: string | null
           id?: string
           linea_id?: string | null
           nombre?: string
