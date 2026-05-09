@@ -66,6 +66,7 @@ export function DiscountsConfig({
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Discount | null>(null);
 
   // Form state
   const [newLabel, setNewLabel] = useState('');
