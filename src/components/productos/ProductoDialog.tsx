@@ -86,6 +86,16 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
 
   const handleSave = async () => {
     if (!orgId) return;
+    // Validación de comisión personalizada
+    let comision_porcentaje: number | null = null;
+    if (comisionModo === 'personalizada') {
+      const n = parseFloat(comisionPct.replace(',', '.'));
+      if (isNaN(n) || n < 0 || n > 100) {
+        toast.error('Ingresá un porcentaje de comisión entre 0 y 100');
+        return;
+      }
+      comision_porcentaje = n;
+    }
     setSaving(true);
     try {
       const nombreNorm = nombre.replace(/\s+/g, ' ').trim();
@@ -93,6 +103,12 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
       const precio_costo = precioCosto ? parseFloat(precioCosto) : null;
       const precio_venta = precioVenta ? parseFloat(precioVenta) : 0;
       const stock_minimo = stockMinimo ? parseFloat(stockMinimo) : 0;
+
+      if (comisionModo !== 'ninguna' && precio_costo == null) {
+        toast.error('Para que el producto genere comisión, cargá un precio de costo.');
+        setSaving(false);
+        return;
+      }
 
       let productoId: string;
 
@@ -134,7 +150,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
             precio_venta,
             margen_pct: margenPct,
             stock_minimo,
-          })
+            comision_modo: comisionModo,
+            comision_porcentaje,
+          } as any)
           .eq('id', existingPs.id);
         if (error) throw error;
       } else {
@@ -151,7 +169,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
             margen_pct: margenPct,
             stock_minimo,
             stock_actual: 0,
-          })
+            comision_modo: comisionModo,
+            comision_porcentaje,
+          } as any)
           .select('id')
           .single();
         if (error) throw error;
