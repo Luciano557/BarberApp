@@ -80,7 +80,8 @@ export function useAgendaData(
         .from('servicios')
         .select('id, nombre, duracion_min, precio')
         .eq('organization_id', organizationId)
-        .eq('activo', true),
+        .eq('activo', true)
+        .eq('eliminado', false),
       supabase
         .from('horarios_trabajo')
         .select('id, dia_semana, hora_inicio, hora_fin, activo, barbero_id')
