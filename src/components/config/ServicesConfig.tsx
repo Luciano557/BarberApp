@@ -218,6 +218,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
                   </SelectContent>
                 </Select>
+                {onUpdateLine && !structureLocked && (
+                  <LineQuickEditPopover
+                    line={lines.find(l => l.id === editLineId) || null}
+                    onUpdate={onUpdateLine}
+                    onDelete={onDeleteLine}
+                    disabled={!editLineId || editLineId === 'none' || !lines.find(l => l.id === editLineId)}
+                  />
+                )}
                 {!structureLocked && (
                   <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
                 )}
