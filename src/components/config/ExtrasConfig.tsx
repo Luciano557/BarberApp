@@ -65,7 +65,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
     let price = 0;
     if (!isGlobal) {
       const v = validatePrice(newPrice);
-      if (!v.ok) { toast.error(v.error); return; }
+      if (v.ok === false) { toast.error(v.error); return; }
       price = v.value;
     }
     onAdd({ name: newName.trim(), price, active: true });
