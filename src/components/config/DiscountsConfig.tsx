@@ -93,10 +93,13 @@ export function DiscountsConfig({
   };
 
   const handleAdd = () => {
-    if (!newLabel.trim() || !newValue) return;
+    const nameErr = validateDiscountName(newLabel);
+    if (nameErr) { toast.error(nameErr); return; }
+    const v = validateDiscountValue(newValue, newType);
+    if (v.ok === false) { toast.error(v.error); return; }
     onAdd({
       label: newLabel.trim(),
-      value: parseFloat(newValue),
+      value: v.value,
       type: newType,
       rounding: newRounding,
       roundingUnit: newRoundingUnit,
@@ -109,10 +112,13 @@ export function DiscountsConfig({
   };
 
   const handleUpdate = (id: string) => {
-    if (!newLabel.trim() || !newValue) return;
+    const nameErr = validateDiscountName(newLabel);
+    if (nameErr) { toast.error(nameErr); return; }
+    const v = validateDiscountValue(newValue, newType);
+    if (v.ok === false) { toast.error(v.error); return; }
     onUpdate(id, {
       label: newLabel.trim(),
-      value: parseFloat(newValue),
+      value: v.value,
       type: newType,
       rounding: newRounding,
       roundingUnit: newRoundingUnit,
@@ -121,6 +127,12 @@ export function DiscountsConfig({
     });
     setEditingId(null);
     resetForm();
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm) return;
+    onDelete(deleteConfirm.id);
+    setDeleteConfirm(null);
   };
 
   const startEdit = (d: Discount) => {
