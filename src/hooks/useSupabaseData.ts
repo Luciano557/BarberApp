@@ -833,10 +833,76 @@ export function useSupabaseData() {
     }
   }, [sucursalId, discounts, findDescuentoSucursalId]);
 
-  // Compatibilidad: deleteDiscount ahora desactiva (no borra)
+  // ============= Eliminación segura (soft delete) =============
+  // Allowlist estricta: SOLO estas tablas pueden ser "eliminadas".
+  type DeletableTable = 'servicios' | 'extras' | 'descuentos' | 'lineas';
+  const ALLOWED_DELETE_TABLES: ReadonlyArray<DeletableTable> = ['servicios', 'extras', 'descuentos', 'lineas'];
+
+  const softDelete = useCallback(async (table: DeletableTable, id: string): Promise<boolean> => {
+    if (!ALLOWED_DELETE_TABLES.includes(table)) {
+      console.error('[softDelete] Tabla no permitida:', table);
+      return false;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from(table)
+      .update({
+        activo: false,
+        eliminado: true,
+        eliminado_at: new Date().toISOString(),
+        eliminado_por: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) {
+      console.error('[softDelete]', table, error);
+      return false;
+    }
+    return true;
+  }, []);
+
+  const deleteService = useCallback(async (id: string) => {
+    const ok = await softDelete('servicios', id);
+    if (ok) {
+      setServices(prev => prev.filter(s => s.id !== id));
+      toast.success('Servicio eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el servicio');
+    }
+  }, [softDelete]);
+
+  const deleteExtra = useCallback(async (id: string) => {
+    const ok = await softDelete('extras', id);
+    if (ok) {
+      setExtras(prev => prev.filter(e => e.id !== id));
+      toast.success('Extra eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el extra');
+    }
+  }, [softDelete]);
+
+  const deleteLine = useCallback(async (id: string) => {
+    const ok = await softDelete('lineas', id);
+    if (ok) {
+      setLines(prev => prev.filter(l => l.id !== id));
+      // No tocar servicios.linea_id: la UI mostrará "Sin línea" para los huérfanos.
+      setServices(prev => prev.map(s => s.lineId === id ? { ...s, lineName: undefined, lineId: undefined } : s));
+      toast.success('Línea eliminada correctamente.');
+    } else {
+      toast.error('No se pudo eliminar la línea');
+    }
+  }, [softDelete]);
+
   const deleteDiscount = useCallback(async (id: string) => {
-    await setDiscountActive(id, false);
-  }, [setDiscountActive]);
+    if (id === 'none') return;
+    const ok = await softDelete('descuentos', id);
+    if (ok) {
+      setDiscounts(prev => prev.filter(d => d.id !== id));
+      toast.success('Descuento eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el descuento');
+    }
+  }, [softDelete]);
 
   // ============= Lines CRUD (sin cambios) =============
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
