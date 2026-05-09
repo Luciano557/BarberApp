@@ -78,7 +78,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
     const updates: Partial<Extra> = { name: newName.trim() };
     if (!isGlobal) {
       const v = validatePrice(newPrice);
-      if (!v.ok) { toast.error(v.error); return; }
+      if (v.ok === false) { toast.error(v.error); return; }
       updates.price = v.value;
     }
     onUpdate(id, updates);
