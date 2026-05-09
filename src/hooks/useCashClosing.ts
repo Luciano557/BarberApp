@@ -300,6 +300,7 @@ export function useCashClosing() {
       const dominante = [...pagos].sort((a, b) => b.amount - a.amount)[0];
       const paymentMethod = dominante?.method === 'efectivo' ? 'efectivo' : 'digital';
       tx.productos.forEach(p => {
+        const linea = comisionLineasMap.get(p.producto_id);
         productosRows.push({
           ingreso_id: ingreso.id,
           organization_id: organization.id,
@@ -313,6 +314,10 @@ export function useCashClosing() {
           unit_price: p.precio_unitario,
           subtotal: p.subtotal,
           payment_method: paymentMethod,
+          precio_costo_snap: linea?.precio_costo_snap ?? null,
+          comision_modo_snap: linea?.modo ?? null,
+          comision_pct_snap: linea?.pct ?? 0,
+          comision_monto: linea?.monto ?? 0,
         });
       });
     });
