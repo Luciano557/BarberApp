@@ -551,6 +551,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     }
   };
 
+  return (
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
