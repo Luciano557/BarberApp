@@ -413,11 +413,22 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
           </p>
         </div>
         {isTareasTab ? (
-          canManageConfig && (
-            <Button onClick={handleNuevaTarea} className="self-start sm:self-auto">
-              <Plus className="h-4 w-4 mr-2" />Nueva tarea
-            </Button>
-          )
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            {canManageTareas && !showCompletedHistory && (
+              <Button onClick={handleNuevaTarea}>
+                <Plus className="h-4 w-4 mr-2" />Nueva tarea
+              </Button>
+            )}
+            {showCompletedHistory ? (
+              <Button variant="outline" onClick={() => setShowCompletedHistory(false)}>
+                <ArrowLeft className="h-4 w-4 mr-2" />Volver a tareas activas
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
+                <History className="h-4 w-4 mr-2" />Historial de completadas ({tareasCompletadas.length})
+              </Button>
+            )}
+          </div>
         ) : (
           <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
             <Plus className="h-4 w-4 mr-2" />Nueva petición
