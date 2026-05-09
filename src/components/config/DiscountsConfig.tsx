@@ -305,18 +305,41 @@ export function DiscountsConfig({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8">
+            <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8" title="Editar">
               <Edit2 className="h-4 w-4" />
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => (onToggleActive ? onToggleActive(d.id, !flagFor(d)) : onDelete(d.id))}
-              className={flagFor(d) ? 'text-muted-foreground hover:text-destructive h-8 w-8' : 'text-success hover:text-success h-8 w-8'}
-              title={flagFor(d) ? 'Desactivar' : 'Reactivar'}
-            >
-              <Power className="h-4 w-4" />
-            </Button>
+            {onToggleActive && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => onToggleActive(d.id, !flagFor(d))}
+                className="h-8 w-8"
+                title={flagFor(d) ? 'Desactivar' : 'Activar'}
+              >
+                {flagFor(d) ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+              </Button>
+            )}
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={flagFor(d)}
+                      onClick={() => !flagFor(d) && setDeleteConfirm(d)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={flagFor(d) ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {flagFor(d) && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}
