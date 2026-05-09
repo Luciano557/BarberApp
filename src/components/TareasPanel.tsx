@@ -108,6 +108,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const tareasFiltradas = useMemo(() => tareas.filter(t => {
+    // Excluir SIEMPRE completadas de la vista operativa de tareas (las peticiones se filtran abajo).
+    if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
         if (!(t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida)) return false;
@@ -118,6 +120,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const tareasAdmin = tareasFiltradas.filter(t => t.tipo === 'tarea');
   const peticiones = tareasFiltradas.filter(t => t.tipo === 'peticion');
+
+  const tareasCompletadas = useMemo(() => tareas.filter(t => {
+    if (t.tipo !== 'tarea' || t.estado !== 'completada') return false;
+    return matchesSucursal(t) && matchesResp(t);
+  }), [tareas, filtroResp, filtroSucursal]);
 
   const getRepeatDisplay = (t: TareaItem) => {
     if (!t.recurrente) return null;
