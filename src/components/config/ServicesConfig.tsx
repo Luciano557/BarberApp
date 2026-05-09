@@ -295,6 +295,11 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           )}
         </CardHeader>
         <CardContent className="space-y-4">
+          {isGlobal && (
+            <p className="text-xs text-muted-foreground">
+              Los precios de los servicios se configuran por sucursal.
+            </p>
+          )}
           {structureLocked && (
             <p className="text-xs text-muted-foreground">
               Como encargado de sucursal, podés ajustar el precio y activar o desactivar servicios para tu sucursal. Para crear servicios o cambiar nombre, duración o línea, contactá al dueño o gerente general.
@@ -307,27 +312,43 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
-                <div className="flex flex-wrap gap-2 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <Input placeholder="Nombre" value={newName} onChange={(e) => setNewName(e.target.value)} className="flex-1 min-w-[120px]" maxLength={80} />
-                  {!isGlobal && (
-                    <CurrencyInput placeholder="Precio" value={newPrice} onChange={setNewPrice} className="w-28" />
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Input type="number" inputMode="numeric" min={5} placeholder="Tiempo" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-20" />
-                    <span className="text-xs text-muted-foreground">min</span>
+                <div className="p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    <div className="space-y-1.5 sm:col-span-4">
+                      <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+                      <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
+                    </div>
+                    {!isGlobal && (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-medium text-muted-foreground">Precio</label>
+                        <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
+                      </div>
+                    )}
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-medium text-muted-foreground">Duración</label>
+                      <div className="flex items-center gap-1">
+                        <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
+                        <span className="text-xs text-muted-foreground">min</span>
+                      </div>
+                    </div>
+                    <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-4' : 'sm:col-span-3'}`}>
+                      <label className="text-xs font-medium text-muted-foreground">Línea</label>
+                      <div className="flex items-center gap-1">
+                        <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
+                          <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin línea</SelectItem>
+                            {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                        <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 sm:col-span-1 justify-end">
+                      <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Select value={newLineId} onValueChange={setNewLineId}>
-                      <SelectTrigger className="w-32"><SelectValue placeholder="Línea" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin línea</SelectItem>
-                        {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
-                      </SelectContent>
-                    </Select>
-                    <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
-                  </div>
-                  <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-                  <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                 </div>
               )}
               {activeServices.map(renderServiceItem)}
