@@ -57,7 +57,8 @@ Deno.serve(async (req) => {
         .from("servicios")
         .select("id, nombre, precio, duracion_min, sucursal_id")
         .eq("organization_id", org.id)
-        .eq("activo", true),
+        .eq("activo", true)
+        .eq("eliminado", false),
     ]);
 
     return new Response(
