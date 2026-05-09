@@ -494,7 +494,63 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     }
   };
 
-  return (
+  const REGULARIZE_REASON = 'Se registraron ventas después del cierre. El cierre fue regularizado automáticamente para incluir las ventas posteriores.';
+
+  // Regularizar cierre: anular el cierre actual con auditoría y crear uno nuevo actualizado
+  const handleRegularize = async () => {
+    if (!regularizingBarber || !user || !organization) return;
+    const closure = closedBarbersData.get(regularizingBarber.barberId);
+    if (!closure) {
+      toast.error('No se encontró el cierre actual');
+      return;
+    }
+
+    setIsRegularizing(true);
+    try {
+      // 1) Anular cierre actual (mismo patrón que handleVoidClosure)
+      const { error: updateError } = await supabase
+        .from('ingresos')
+        .update({ estado: 'eliminado' })
+        .eq('id', closure.id);
+      if (updateError) throw updateError;
+
+      // 2) Registrar anulación con motivo automático
+      const { error: insertError } = await supabase
+        .from('anulaciones_cierre')
+        .insert({
+          ingreso_id: closure.id,
+          barbero_nombre: closure.barberName || regularizingBarber.barberName,
+          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
+          anulado_por_id: user.id,
+          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
+          anulado_por_email: user.email || '',
+          organization_id: organization.id,
+          motivo: REGULARIZE_REASON,
+        });
+      if (insertError) throw insertError;
+
+      // 3) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
+      const success = await saveCashClosing({
+        barber: regularizingBarber,
+        transactions: summary.transactions,
+        date: validDate,
+        lines,
+      });
+      if (!success) {
+        throw new Error('No se pudo crear el cierre actualizado');
+      }
+
+      toast.success('Cierre regularizado correctamente');
+      setRegularizingBarber(null);
+      await checkClosedBarbers();
+    } catch (error) {
+      console.error('Error regularizando cierre:', error);
+      toast.error('Error al regularizar el cierre');
+    } finally {
+      setIsRegularizing(false);
+    }
+  };
+
     <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
