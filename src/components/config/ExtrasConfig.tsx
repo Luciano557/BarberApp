@@ -1,17 +1,21 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power } from 'lucide-react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Extra } from '@/types/barbershop';
+import { toast } from 'sonner';
 
 interface ExtrasConfigProps {
   extras: Extra[];
   onAdd: (extra: Omit<Extra, 'id' | 'uid'>) => void;
   onUpdate: (id: string, updates: Partial<Extra>) => void;
+  /** Opcional: si se provee, habilita botón "Eliminar" para extras inactivos. */
+  onDelete?: (id: string) => void;
   /**
    * 'global' = edita catálogo global (sin precio); usa globalActive para Activos/Inactivos.
    * 'sucursal' (default) = comportamiento histórico por sucursal.
@@ -24,7 +28,24 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: ExtrasConfigProps) {
+function validateName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'El nombre no puede estar vacío.';
+  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
+  return null;
+}
+
+function validatePrice(raw: string): { ok: true; value: number } | { ok: false; error: string } {
+  const cleaned = (raw || '').toString().trim();
+  if (!cleaned) return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
+  const value = parseFloat(cleaned);
+  if (Number.isNaN(value) || value < 0) {
+    return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
+  }
+  return { ok: true, value };
+}
+
+export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucursal' }: ExtrasConfigProps) {
   const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,23 +53,34 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
   const [newPrice, setNewPrice] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Extra | null>(null);
 
   const flagFor = (e: Extra) => isGlobal ? (e.globalActive ?? e.active) : e.active;
   const activeExtras = extras.filter(e => flagFor(e));
   const inactiveExtras = extras.filter(e => !flagFor(e));
 
   const handleAdd = () => {
-    if (!newName) return;
-    if (!isGlobal && !newPrice) return;
-    onAdd({ name: newName, price: isGlobal ? 0 : parseFloat(newPrice), active: true });
+    const nameErr = validateName(newName);
+    if (nameErr) { toast.error(nameErr); return; }
+    let price = 0;
+    if (!isGlobal) {
+      const v = validatePrice(newPrice);
+      if (!v.ok) { toast.error(v.error); return; }
+      price = v.value;
+    }
+    onAdd({ name: newName.trim(), price, active: true });
     setNewName(''); setNewPrice(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
-    if (!newName) return;
-    if (!isGlobal && !newPrice) return;
-    const updates: Partial<Extra> = { name: newName };
-    if (!isGlobal) updates.price = parseFloat(newPrice);
+    const nameErr = validateName(newName);
+    if (nameErr) { toast.error(nameErr); return; }
+    const updates: Partial<Extra> = { name: newName.trim() };
+    if (!isGlobal) {
+      const v = validatePrice(newPrice);
+      if (!v.ok) { toast.error(v.error); return; }
+      updates.price = v.value;
+    }
     onUpdate(id, updates);
     setEditingId(null); setNewName(''); setNewPrice('');
   };
@@ -56,13 +88,20 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
   const startEdit = (extra: Extra) => {
     setEditingId(extra.id);
     setNewName(extra.name);
-    setNewPrice(extra.price.toString());
+    // CurrencyInput espera string "1234.5" en formato clean (punto decimal).
+    setNewPrice(extra.price ? String(extra.price) : '');
   };
 
   const handleConfirmToggle = () => {
     if (!toggleConfirm) return;
     onUpdate(toggleConfirm.extra.id, { active: toggleConfirm.action === 'activate' });
     setToggleConfirm(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm || !onDelete) return;
+    onDelete(deleteConfirm.id);
+    setDeleteConfirm(null);
   };
 
   const isItemActive = (extra: Extra) =>
@@ -85,14 +124,37 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
         <>
           <span className="flex-1 font-medium text-foreground">{extra.name}</span>
           {!isGlobal && (
-            <span className="text-muted-foreground">${extra.price.toLocaleString()}</span>
+            <span className="text-muted-foreground">${extra.price.toLocaleString('es-AR')}</span>
           )}
-          <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8">
+          <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
             <Edit2 className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
             {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
           </Button>
+          {onDelete && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={itemActive}
+                      onClick={() => !itemActive && setDeleteConfirm(extra)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={itemActive ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {itemActive && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </>
       )}
     </div>
@@ -159,6 +221,24 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, mode = 'sucursal' }: Ext
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmToggle}>
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar extra</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este elemento dejará de aparecer en el sistema. No se modificarán los registros históricos donde ya haya sido utilizado. Esta acción no se podrá deshacer desde la interfaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
