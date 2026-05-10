@@ -56,10 +56,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     switch (organization.plan) {
       case 'premium':
         return { label: 'Premium', variant: 'default' as const };
-      case 'basic':
-        return { label: 'Basic', variant: 'secondary' as const };
+      case 'profesional':
+        return { label: 'Profesional', variant: 'secondary' as const };
       default:
-        return { label: 'Free', variant: 'outline' as const };
+        return { label: 'Básico', variant: 'outline' as const };
     }
   };
 
