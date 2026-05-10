@@ -287,7 +287,7 @@ serve(async (req: Request): Promise<Response> => {
             if (staleUserIds.length > 0) {
               const stale = candidates.find((p: any) => staleUserIds.includes(p.id));
               if (!resolveStaleManagerConflict) {
-                return jsonResponse(409, {
+                return jsonResponse(200, {
                   ok: false,
                   code: "STALE_MANAGER_ROLE",
                   conflictType: "stale_user_role",
