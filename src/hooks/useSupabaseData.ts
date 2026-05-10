@@ -1,11 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Service, Extra, Barber, Discount, Line } from '@/types/barbershop';
+import { Service, Extra, Barber, Discount, Line, TeamRole } from '@/types/barbershop';
+import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 
-// Transform database rows to app types
+// ============= Branch row shapes =============
+type ServicioSucursalRow = { id: string; servicio_id: string; sucursal_id: string; precio: number; activo: boolean };
+type ExtraSucursalRow = { id: string; extra_id: string; sucursal_id: string; precio: number; activo: boolean };
+type DescuentoSucursalRow = { id: string; descuento_id: string; sucursal_id: string; activo: boolean };
+
+// ============= Transforms =============
 function dbToLine(row: any): Line {
   return {
     id: row.id,
@@ -15,33 +21,66 @@ function dbToLine(row: any): Line {
   };
 }
 
-function dbToService(row: any, lines: Line[]): Service {
+function dbToService(row: any, lines: Line[], branchRow?: ServicioSucursalRow): Service {
   const line = lines.find(l => l.id === row.linea_id);
+  const globalActive: boolean = !!row.activo;
+  const hasBranch = !!branchRow;
+  const price = hasBranch ? Number(branchRow!.precio) : Number(row.precio);
+  const branchActive = hasBranch ? !!branchRow!.activo : undefined;
+  const operativeActive = hasBranch ? (globalActive && !!branchActive) : globalActive;
   return {
     id: row.id,
     uid: row.id,
     name: row.nombre,
-    price: Number(row.precio),
+    price,
     durationMin: row.duracion_min ?? 30,
     lineId: row.linea_id || undefined,
     lineName: line?.name,
     sucursalId: row.sucursal_id || undefined,
-    active: row.activo,
+    active: operativeActive,
+    globalActive,
+    branchActive,
+    sucursalConfigId: branchRow?.id,
+    priceConfigured: price > 0,
   };
 }
 
-function dbToExtra(row: any): Extra {
+function dbToExtra(row: any, branchRow?: ExtraSucursalRow): Extra {
+  const globalActive: boolean = !!row.activo;
+  const hasBranch = !!branchRow;
+  const price = hasBranch ? Number(branchRow!.precio) : Number(row.precio);
+  const branchActive = hasBranch ? !!branchRow!.activo : undefined;
+  const operativeActive = hasBranch ? (globalActive && !!branchActive) : globalActive;
   return {
     id: row.id,
     uid: row.id,
     name: row.nombre,
-    price: Number(row.precio),
+    price,
     sucursalId: row.sucursal_id || undefined,
-    active: row.activo,
+    active: operativeActive,
+    globalActive,
+    branchActive,
+    sucursalConfigId: branchRow?.id,
+    priceConfigured: price > 0,
   };
 }
 
+function rolEquipoToRoles(re: string | null | undefined): AppRole[] {
+  switch (re) {
+    case 'owner': return ['owner'];
+    case 'general_manager': return ['general_manager'];
+    case 'manager': return ['manager'];
+    case 'barbero': return ['barber'];
+    case 'otros': return ['otros'];
+    default: return [];
+  }
+}
+
 function dbToBarber(row: any): Barber {
+  const rolesEquipoRaw = Array.isArray(row.roles_equipo) ? (row.roles_equipo as string[]) : [];
+  const rolesEquipo: AppRole[] = rolesEquipoRaw.length > 0
+    ? (rolesEquipoRaw.filter((r): r is AppRole => ['owner','general_manager','manager','barber','otros'].includes(r)))
+    : rolEquipoToRoles(row.rol_equipo);
   return {
     id: row.id,
     uid: row.id,
@@ -51,7 +90,9 @@ function dbToBarber(row: any): Barber {
     commission: Number(row.comision) || 0,
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
-    teamRole: row.rol_equipo || 'barbero',
+    teamRole: (row.rol_equipo as TeamRole) || 'barbero',
+    rolesEquipo,
+    sucursalId: row.sucursal_id ?? null,
     payDay: row.fecha_cobro_dia || 1,
     address: undefined,
     dni: row.dni || undefined,
@@ -59,7 +100,11 @@ function dbToBarber(row: any): Barber {
   };
 }
 
-function dbToDiscount(row: any): Discount {
+function dbToDiscount(row: any, branchRow?: DescuentoSucursalRow): Discount {
+  const globalActive: boolean = row.activo !== false;
+  const hasBranch = !!branchRow;
+  const branchActive = hasBranch ? !!branchRow!.activo : undefined;
+  const operativeActive = hasBranch ? (globalActive && !!branchActive) : globalActive;
   return {
     id: row.id,
     label: row.nombre,
@@ -69,12 +114,19 @@ function dbToDiscount(row: any): Discount {
     roundingUnit: Number(row.redondeo_unidad) || 100,
     paymentMethod: row.metodo_pago || 'todos',
     sucursalId: row.sucursal_id || undefined,
+    appliesTo: row.aplica_a === 'productos' ? 'productos' : 'servicios',
+    active: operativeActive,
+    globalActive,
+    branchActive,
+    sucursalConfigId: branchRow?.id,
   };
 }
 
 export function useSupabaseData() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
+  const sucursalId = currentSucursal?.id ?? null;
+
   const [services, setServices] = useState<Service[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -86,53 +138,160 @@ export function useSupabaseData() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch lines first since services depend on them
-      const linesRes = await supabase.from('lineas').select('*').order('nombre');
+      // Lines first (services depend on them)
+      const linesRes = await supabase.from('lineas').select('*').eq('eliminado', false).order('nombre');
       if (linesRes.error) throw linesRes.error;
       const fetchedLines = linesRes.data.map(dbToLine);
       setLines(fetchedLines);
 
-      // Build barberos query — filter by sucursal when one is selected
+      // Barberos query — filter by sucursal when one is selected
       let barbersQuery = supabase.from('barberos').select('*').order('nombre');
-      if (currentSucursal?.id) {
-        barbersQuery = barbersQuery.eq('sucursal_id', currentSucursal.id);
+      if (sucursalId) {
+        barbersQuery = barbersQuery.eq('sucursal_id', sucursalId);
       }
 
-      const [servicesRes, extrasRes, barbersRes, discountsRes] = await Promise.all([
-        supabase.from('servicios').select('*').order('nombre'),
-        supabase.from('extras').select('*').order('nombre'),
+      // Branch-config queries (only when sucursal active)
+      const servSucPromise = sucursalId
+        ? supabase.from('servicios_sucursales').select('*').eq('sucursal_id', sucursalId)
+        : Promise.resolve({ data: [] as ServicioSucursalRow[], error: null as any });
+      const extSucPromise = sucursalId
+        ? supabase.from('extras_sucursales').select('*').eq('sucursal_id', sucursalId)
+        : Promise.resolve({ data: [] as ExtraSucursalRow[], error: null as any });
+      const descSucPromise = sucursalId
+        ? supabase.from('descuentos_sucursales').select('*').eq('sucursal_id', sucursalId)
+        : Promise.resolve({ data: [] as DescuentoSucursalRow[], error: null as any });
+
+      const [servicesRes, extrasRes, barbersRes, discountsRes, servSucRes, extSucRes, descSucRes] = await Promise.all([
+        supabase.from('servicios').select('*').eq('eliminado', false).order('nombre'),
+        supabase.from('extras').select('*').eq('eliminado', false).order('nombre'),
         barbersQuery,
-        supabase.from('descuentos').select('*').order('valor'),
+        supabase.from('descuentos').select('*').eq('eliminado', false).order('valor'),
+        servSucPromise,
+        extSucPromise,
+        descSucPromise,
       ]);
 
       if (servicesRes.error) throw servicesRes.error;
       if (extrasRes.error) throw extrasRes.error;
       if (barbersRes.error) throw barbersRes.error;
       if (discountsRes.error) throw discountsRes.error;
+      if ((servSucRes as any).error) throw (servSucRes as any).error;
+      if ((extSucRes as any).error) throw (extSucRes as any).error;
+      if ((descSucRes as any).error) throw (descSucRes as any).error;
 
-      setServices(servicesRes.data.map(row => dbToService(row, fetchedLines)));
-      setExtras(extrasRes.data.map(dbToExtra));
+      const servSucMap = new Map<string, ServicioSucursalRow>();
+      ((servSucRes.data as ServicioSucursalRow[]) || []).forEach(r => servSucMap.set(r.servicio_id, r));
+      const extSucMap = new Map<string, ExtraSucursalRow>();
+      ((extSucRes.data as ExtraSucursalRow[]) || []).forEach(r => extSucMap.set(r.extra_id, r));
+      const descSucMap = new Map<string, DescuentoSucursalRow>();
+      ((descSucRes.data as DescuentoSucursalRow[]) || []).forEach(r => descSucMap.set(r.descuento_id, r));
+
+      // Build services with branch enrichment; if sucursal active and config missing, warn + skip
+      const builtServices: Service[] = [];
+      for (const row of servicesRes.data) {
+        if (sucursalId) {
+          const br = servSucMap.get(row.id);
+          if (!br) {
+            console.warn('[useSupabaseData] Falta servicios_sucursales para servicio', row.id, 'sucursal', sucursalId);
+            continue;
+          }
+          builtServices.push(dbToService(row, fetchedLines, br));
+        } else {
+          builtServices.push(dbToService(row, fetchedLines));
+        }
+      }
+      setServices(builtServices);
+
+      const builtExtras: Extra[] = [];
+      for (const row of extrasRes.data) {
+        if (sucursalId) {
+          const br = extSucMap.get(row.id);
+          if (!br) {
+            console.warn('[useSupabaseData] Falta extras_sucursales para extra', row.id, 'sucursal', sucursalId);
+            continue;
+          }
+          builtExtras.push(dbToExtra(row, br));
+        } else {
+          builtExtras.push(dbToExtra(row));
+        }
+      }
+      setExtras(builtExtras);
+
       setBarbers(barbersRes.data.map(dbToBarber));
-      
-      // Add "Sin descuento" option and map database discounts
-      const dbDiscounts = discountsRes.data.map(dbToDiscount);
-      setDiscounts([
-        { id: 'none', label: 'Sin descuento', value: 0, type: 'percentage', rounding: 'cliente', roundingUnit: 100, paymentMethod: 'todos' },
-        ...dbDiscounts,
-      ]);
+
+      const builtDiscounts: Discount[] = [];
+      for (const row of discountsRes.data) {
+        if (sucursalId) {
+          const br = descSucMap.get(row.id);
+          if (!br) {
+            console.warn('[useSupabaseData] Falta descuentos_sucursales para descuento', row.id, 'sucursal', sucursalId);
+            continue;
+          }
+          builtDiscounts.push(dbToDiscount(row, br));
+        } else {
+          builtDiscounts.push(dbToDiscount(row));
+        }
+      }
+      setDiscounts(builtDiscounts);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Error al cargar datos');
     } finally {
       setIsLoading(false);
     }
-  }, [currentSucursal?.id]);
+  }, [sucursalId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Services CRUD
+  // ============= Helpers para resolver sucursalConfigId =============
+  const findServicioSucursalId = useCallback(async (servicioId: string): Promise<string | null> => {
+    if (!sucursalId) return null;
+    const { data, error } = await supabase
+      .from('servicios_sucursales')
+      .select('id')
+      .eq('servicio_id', servicioId)
+      .eq('sucursal_id', sucursalId)
+      .maybeSingle();
+    if (error) {
+      console.warn('[useSupabaseData] Error buscando servicios_sucursales:', error);
+      return null;
+    }
+    return data?.id ?? null;
+  }, [sucursalId]);
+
+  const findExtraSucursalId = useCallback(async (extraId: string): Promise<string | null> => {
+    if (!sucursalId) return null;
+    const { data, error } = await supabase
+      .from('extras_sucursales')
+      .select('id')
+      .eq('extra_id', extraId)
+      .eq('sucursal_id', sucursalId)
+      .maybeSingle();
+    if (error) {
+      console.warn('[useSupabaseData] Error buscando extras_sucursales:', error);
+      return null;
+    }
+    return data?.id ?? null;
+  }, [sucursalId]);
+
+  const findDescuentoSucursalId = useCallback(async (descuentoId: string): Promise<string | null> => {
+    if (!sucursalId) return null;
+    const { data, error } = await supabase
+      .from('descuentos_sucursales')
+      .select('id')
+      .eq('descuento_id', descuentoId)
+      .eq('sucursal_id', sucursalId)
+      .maybeSingle();
+    if (error) {
+      console.warn('[useSupabaseData] Error buscando descuentos_sucursales:', error);
+      return null;
+    }
+    return data?.id ?? null;
+  }, [sucursalId]);
+
+  // ============= Services CRUD =============
   const addService = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
@@ -140,23 +299,69 @@ export function useSupabaseData() {
     }
     try {
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
-      
+
+      // 1. Insert global SIN propagar precio. precio=0 placeholder, sucursal_id=null.
       const { data, error } = await supabase
         .from('servicios')
-        .insert({ 
-          nombre: normalizedName, 
-          precio: service.price, 
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
           duracion_min: service.durationMin || 30,
-          activo: service.active,
+          activo: true,
           linea_id: service.lineId || null,
           organization_id: organization.id,
-          sucursal_id: service.sucursalId || null,
+          sucursal_id: null,
         })
         .select()
         .single();
-      
       if (error) throw error;
-      const newService = dbToService(data, lines);
+
+      let branchRow: ServicioSucursalRow | undefined;
+
+      // 2-4. Si hay sucursal activa, buscar fila creada por trigger y aplicar precio/activo via RPC
+      if (sucursalId) {
+        const branchId = await findServicioSucursalId(data.id);
+        if (!branchId) {
+          console.warn('[addService] No se encontró servicios_sucursales tras insert; se omiten precio/activo por sucursal');
+        } else {
+          // Precio
+          if (service.price > 0) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_servicio_sucursal_precio', {
+              _id: branchId,
+              _precio: service.price,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ServicioSucursalRow;
+          }
+          // Activo (solo si difiere del default true)
+          if (service.active === false) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_servicio_sucursal_activo', {
+              _id: branchId,
+              _activo: false,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ServicioSucursalRow;
+          }
+          if (!branchRow) {
+            // Releer estado actual
+            const { data: br } = await supabase
+              .from('servicios_sucursales')
+              .select('*')
+              .eq('id', branchId)
+              .maybeSingle();
+            if (br) branchRow = br as ServicioSucursalRow;
+          }
+        }
+      } else if (service.price > 0) {
+        console.warn('[addService] Hay precio pero no hay sucursal activa; el precio NO se aplica globalmente.');
+      }
+
+      const newService = dbToService(data, lines, branchRow);
+      // Si hay sucursal y no hay branchRow, no agregar al state (consistente con fetch)
+      if (sucursalId && !branchRow) {
+        toast.success('Servicio agregado');
+        return newService;
+      }
       setServices(prev => [...prev, newService]);
       toast.success('Servicio agregado');
       return newService;
@@ -165,37 +370,98 @@ export function useSupabaseData() {
       toast.error('Error al agregar servicio');
       return null;
     }
-  }, [lines, organization]);
+  }, [lines, organization, sucursalId, findServicioSucursalId]);
 
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
+      // 1. Globales: nombre / duracion_min / linea_id (NUNCA precio ni activo si hay sucursal)
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
-      if (updates.price !== undefined) dbUpdates.precio = updates.price;
       if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
-      if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
+      // Sin sucursal: active toggle global directo
+      if (!sucursalId && updates.active !== undefined) dbUpdates.activo = updates.active;
 
-      const { error } = await supabase
-        .from('servicios')
-        .update(dbUpdates)
-        .eq('id', id);
-      
-      if (error) throw error;
-      
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('servicios').update(dbUpdates).eq('id', id);
+        if (error) throw error;
+      }
+
+      // 2. Por sucursal: precio + activo via RPCs
+      let branchRow: ServicioSucursalRow | undefined;
+      if (sucursalId && (updates.price !== undefined || updates.active !== undefined)) {
+        // Resolver sucursalConfigId desde state o re-consultar
+        let branchId = updates.sucursalConfigId
+          ?? services.find(s => s.id === id)?.sucursalConfigId
+          ?? null;
+        if (!branchId) branchId = await findServicioSucursalId(id);
+
+        if (!branchId) {
+          console.warn('[updateService] No existe servicios_sucursales para', id, '— se omiten precio/activo');
+        } else {
+          if (updates.price !== undefined) {
+            if (updates.price < 0) {
+              toast.error('El precio no puede ser negativo');
+            } else {
+              const { data: rpcData, error: rpcErr } = await supabase.rpc('set_servicio_sucursal_precio', {
+                _id: branchId,
+                _precio: updates.price,
+              });
+              if (rpcErr) throw rpcErr;
+              if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ServicioSucursalRow;
+            }
+          }
+          if (updates.active !== undefined) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_servicio_sucursal_activo', {
+              _id: branchId,
+              _activo: updates.active,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ServicioSucursalRow;
+          }
+        }
+      } else if (!sucursalId && updates.price !== undefined) {
+        console.warn('[updateService] Hay price pero no hay sucursal activa; ignorado (no se escribe global).');
+      }
+
+      // 3. Mergear en state
       const updatedLine = updates.lineId ? lines.find(l => l.id === updates.lineId) : undefined;
-      const finalUpdates = updates.lineId !== undefined 
-        ? { ...updates, lineName: updatedLine?.name } 
-        : updates;
-      
-      setServices(prev => prev.map(s => s.id === id ? { ...s, ...finalUpdates } : s));
+      setServices(prev => prev.map(s => {
+        if (s.id !== id) return s;
+        const merged: Service = { ...s };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre ?? updates.name;
+        if (updates.durationMin !== undefined) merged.durationMin = updates.durationMin;
+        if (updates.lineId !== undefined) {
+          merged.lineId = updates.lineId || undefined;
+          merged.lineName = updatedLine?.name;
+        }
+        if (!sucursalId && updates.active !== undefined) {
+          merged.active = updates.active;
+          merged.globalActive = updates.active;
+        }
+        if (branchRow) {
+          merged.price = Number(branchRow.precio);
+          merged.branchActive = !!branchRow.activo;
+          merged.sucursalConfigId = branchRow.id;
+          merged.priceConfigured = Number(branchRow.precio) > 0;
+          merged.active = !!merged.globalActive && !!branchRow.activo;
+        } else if (sucursalId && updates.active !== undefined) {
+          // Optimistic si no hubo retorno de RPC
+          merged.branchActive = updates.active;
+          merged.active = !!merged.globalActive && updates.active;
+        } else if (sucursalId && updates.price !== undefined && updates.price >= 0) {
+          merged.price = updates.price;
+          merged.priceConfigured = updates.price > 0;
+        }
+        return merged;
+      }));
     } catch (error) {
       console.error('Error updating service:', error);
       toast.error('Error al actualizar servicio');
     }
-  }, [lines]);
+  }, [lines, sucursalId, services, findServicioSucursalId]);
 
-  // Extras CRUD
+  // ============= Extras CRUD =============
   const addExtra = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
@@ -203,21 +469,60 @@ export function useSupabaseData() {
     }
     try {
       const normalizedName = extra.name.replace(/\s+/g, ' ').trim();
-      
+
       const { data, error } = await supabase
         .from('extras')
-        .insert({ 
-          nombre: normalizedName, 
-          precio: extra.price, 
-          activo: extra.active,
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
+          activo: true,
           organization_id: organization.id,
-          sucursal_id: extra.sucursalId || null,
+          sucursal_id: null,
         })
         .select()
         .single();
-      
       if (error) throw error;
-      const newExtra = dbToExtra(data);
+
+      let branchRow: ExtraSucursalRow | undefined;
+      if (sucursalId) {
+        const branchId = await findExtraSucursalId(data.id);
+        if (!branchId) {
+          console.warn('[addExtra] No se encontró extras_sucursales tras insert');
+        } else {
+          if (extra.price > 0) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_extra_sucursal_precio', {
+              _id: branchId,
+              _precio: extra.price,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ExtraSucursalRow;
+          }
+          if (extra.active === false) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_extra_sucursal_activo', {
+              _id: branchId,
+              _activo: false,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ExtraSucursalRow;
+          }
+          if (!branchRow) {
+            const { data: br } = await supabase
+              .from('extras_sucursales')
+              .select('*')
+              .eq('id', branchId)
+              .maybeSingle();
+            if (br) branchRow = br as ExtraSucursalRow;
+          }
+        }
+      } else if (extra.price > 0) {
+        console.warn('[addExtra] Hay precio pero no hay sucursal activa; el precio NO se aplica globalmente.');
+      }
+
+      const newExtra = dbToExtra(data, branchRow);
+      if (sucursalId && !branchRow) {
+        toast.success('Extra agregado');
+        return newExtra;
+      }
       setExtras(prev => [...prev, newExtra]);
       toast.success('Extra agregado');
       return newExtra;
@@ -226,29 +531,84 @@ export function useSupabaseData() {
       toast.error('Error al agregar extra');
       return null;
     }
-  }, [organization]);
+  }, [organization, sucursalId, findExtraSucursalId]);
 
   const updateExtra = useCallback(async (id: string, updates: Partial<Extra>) => {
     try {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
-      if (updates.price !== undefined) dbUpdates.precio = updates.price;
-      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (!sucursalId && updates.active !== undefined) dbUpdates.activo = updates.active;
 
-      const { error } = await supabase
-        .from('extras')
-        .update(dbUpdates)
-        .eq('id', id);
-      
-      if (error) throw error;
-      setExtras(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('extras').update(dbUpdates).eq('id', id);
+        if (error) throw error;
+      }
+
+      let branchRow: ExtraSucursalRow | undefined;
+      if (sucursalId && (updates.price !== undefined || updates.active !== undefined)) {
+        let branchId = updates.sucursalConfigId
+          ?? extras.find(e => e.id === id)?.sucursalConfigId
+          ?? null;
+        if (!branchId) branchId = await findExtraSucursalId(id);
+
+        if (!branchId) {
+          console.warn('[updateExtra] No existe extras_sucursales para', id);
+        } else {
+          if (updates.price !== undefined) {
+            if (updates.price < 0) {
+              toast.error('El precio no puede ser negativo');
+            } else {
+              const { data: rpcData, error: rpcErr } = await supabase.rpc('set_extra_sucursal_precio', {
+                _id: branchId,
+                _precio: updates.price,
+              });
+              if (rpcErr) throw rpcErr;
+              if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ExtraSucursalRow;
+            }
+          }
+          if (updates.active !== undefined) {
+            const { data: rpcData, error: rpcErr } = await supabase.rpc('set_extra_sucursal_activo', {
+              _id: branchId,
+              _activo: updates.active,
+            });
+            if (rpcErr) throw rpcErr;
+            if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as ExtraSucursalRow;
+          }
+        }
+      } else if (!sucursalId && updates.price !== undefined) {
+        console.warn('[updateExtra] Hay price pero no hay sucursal activa; ignorado.');
+      }
+
+      setExtras(prev => prev.map(e => {
+        if (e.id !== id) return e;
+        const merged: Extra = { ...e };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre ?? updates.name;
+        if (!sucursalId && updates.active !== undefined) {
+          merged.active = updates.active;
+          merged.globalActive = updates.active;
+        }
+        if (branchRow) {
+          merged.price = Number(branchRow.precio);
+          merged.branchActive = !!branchRow.activo;
+          merged.sucursalConfigId = branchRow.id;
+          merged.priceConfigured = Number(branchRow.precio) > 0;
+          merged.active = !!merged.globalActive && !!branchRow.activo;
+        } else if (sucursalId && updates.active !== undefined) {
+          merged.branchActive = updates.active;
+          merged.active = !!merged.globalActive && updates.active;
+        } else if (sucursalId && updates.price !== undefined && updates.price >= 0) {
+          merged.price = updates.price;
+          merged.priceConfigured = updates.price > 0;
+        }
+        return merged;
+      }));
     } catch (error) {
       console.error('Error updating extra:', error);
       toast.error('Error al actualizar extra');
     }
-  }, []);
+  }, [sucursalId, extras, findExtraSucursalId]);
 
-  // Barbers CRUD
+  // ============= Barbers CRUD (sin cambios) =============
   const addBarber = useCallback(async (barber: Omit<Barber, 'id' | 'uid'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
@@ -257,7 +617,6 @@ export function useSupabaseData() {
     try {
       const normalizedFirstName = barber.firstName.replace(/\s+/g, ' ').trim();
       const normalizedLastName = barber.lastName.replace(/\s+/g, ' ').trim();
-      
       const { data, error } = await supabase
         .from('barberos')
         .insert({
@@ -272,11 +631,13 @@ export function useSupabaseData() {
           tipo_compensacion: barber.compensationType || 'comision',
           sueldo_fijo: barber.fixedSalary || null,
           rol_equipo: barber.teamRole || 'barbero',
+          roles_equipo: (barber.rolesEquipo && barber.rolesEquipo.length > 0)
+            ? barber.rolesEquipo
+            : (barber.teamRole === 'otros' ? ['otros'] : ['barber']),
           fecha_cobro_dia: barber.payDay || 1,
         })
         .select()
         .single();
-      
       if (error) throw error;
       const newBarber = dbToBarber(data);
       setBarbers(prev => [...prev, newBarber]);
@@ -287,7 +648,7 @@ export function useSupabaseData() {
       toast.error('Error al agregar barbero');
       return null;
     }
-  }, [organization]);
+  }, [organization, currentSucursal?.id]);
 
   const updateBarber = useCallback(async (id: string, updates: Partial<Barber>) => {
     try {
@@ -301,13 +662,10 @@ export function useSupabaseData() {
       if (updates.compensationType !== undefined) dbUpdates.tipo_compensacion = updates.compensationType;
       if (updates.fixedSalary !== undefined) dbUpdates.sueldo_fijo = updates.fixedSalary || null;
       if (updates.teamRole !== undefined) dbUpdates.rol_equipo = updates.teamRole;
+      if (updates.rolesEquipo !== undefined) dbUpdates.roles_equipo = updates.rolesEquipo;
       if (updates.payDay !== undefined) dbUpdates.fecha_cobro_dia = updates.payDay;
 
-      const { error } = await supabase
-        .from('barberos')
-        .update(dbUpdates)
-        .eq('id', id);
-      
+      const { error } = await supabase.from('barberos').update(dbUpdates).eq('id', id);
       if (error) throw error;
       setBarbers(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
     } catch (error) {
@@ -316,31 +674,51 @@ export function useSupabaseData() {
     }
   }, []);
 
-  // Discounts CRUD
+  // ============= Discounts CRUD =============
   const addDiscount = useCallback(async (discount: Omit<Discount, 'id'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
       return null;
     }
     try {
+      const appliesTo = discount.appliesTo || 'servicios';
       const { data, error } = await supabase
         .from('descuentos')
         .insert({
-          nombre: discount.label,
+          nombre: discount.label.replace(/\s+/g, ' ').trim(),
           valor: discount.value,
           tipo: discount.type === 'fixed' ? 'monto' : 'porcentaje',
           redondeo: discount.rounding || 'cliente',
           redondeo_unidad: discount.roundingUnit || 100,
           metodo_pago: discount.paymentMethod || 'todos',
           activo: true,
+          aplica_a: appliesTo,
           organization_id: organization.id,
-          sucursal_id: discount.sucursalId || null,
         })
         .select()
         .single();
-      
       if (error) throw error;
-      const newDiscount = dbToDiscount(data);
+
+      let branchRow: DescuentoSucursalRow | undefined;
+      if (sucursalId) {
+        const branchId = await findDescuentoSucursalId(data.id);
+        if (!branchId) {
+          console.warn('[addDiscount] No se encontró descuentos_sucursales tras insert');
+        } else {
+          const { data: br } = await supabase
+            .from('descuentos_sucursales')
+            .select('*')
+            .eq('id', branchId)
+            .maybeSingle();
+          if (br) branchRow = br as DescuentoSucursalRow;
+        }
+      }
+
+      const newDiscount = dbToDiscount(data, branchRow);
+      if (sucursalId && !branchRow) {
+        toast.success('Descuento agregado');
+        return newDiscount;
+      }
       setDiscounts(prev => [...prev, newDiscount]);
       toast.success('Descuento agregado');
       return newDiscount;
@@ -349,50 +727,184 @@ export function useSupabaseData() {
       toast.error('Error al agregar descuento');
       return null;
     }
-  }, [organization]);
+  }, [organization, sucursalId, findDescuentoSucursalId]);
 
   const updateDiscount = useCallback(async (id: string, updates: Partial<Discount>) => {
     if (id === 'none') return;
     try {
+      // 1. Globales (label / value / type / rounding / roundingUnit / paymentMethod / appliesTo)
       const dbUpdates: any = {};
-      if (updates.label !== undefined) dbUpdates.nombre = updates.label;
+      if (updates.label !== undefined) dbUpdates.nombre = updates.label.replace(/\s+/g, ' ').trim();
       if (updates.value !== undefined) dbUpdates.valor = updates.value;
       if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'monto' : 'porcentaje';
       if (updates.rounding !== undefined) dbUpdates.redondeo = updates.rounding;
       if (updates.roundingUnit !== undefined) dbUpdates.redondeo_unidad = updates.roundingUnit;
       if (updates.paymentMethod !== undefined) dbUpdates.metodo_pago = updates.paymentMethod;
+      if (updates.appliesTo !== undefined) dbUpdates.aplica_a = updates.appliesTo;
+      // Sin sucursal: active toggle global directo
+      if (!sucursalId && updates.active !== undefined) dbUpdates.activo = updates.active;
 
-      const { error } = await supabase
-        .from('descuentos')
-        .update(dbUpdates)
-        .eq('id', id);
-      
-      if (error) throw error;
-      setDiscounts(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+      if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('descuentos').update(dbUpdates).eq('id', id);
+        if (error) throw error;
+      }
+
+      // 2. Por sucursal: active via RPC
+      let branchRow: DescuentoSucursalRow | undefined;
+      if (sucursalId && updates.active !== undefined) {
+        let branchId = updates.sucursalConfigId
+          ?? discounts.find(d => d.id === id)?.sucursalConfigId
+          ?? null;
+        if (!branchId) branchId = await findDescuentoSucursalId(id);
+
+        if (!branchId) {
+          console.warn('[updateDiscount] No existe descuentos_sucursales para', id);
+        } else {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc('set_descuento_sucursal_activo', {
+            _id: branchId,
+            _activo: updates.active,
+          });
+          if (rpcErr) throw rpcErr;
+          if (rpcData) branchRow = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as DescuentoSucursalRow;
+        }
+      }
+
+      setDiscounts(prev => prev.map(d => {
+        if (d.id !== id) return d;
+        const merged: Discount = { ...d, ...updates };
+        if (!sucursalId && updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          merged.active = updates.active;
+        }
+        if (branchRow) {
+          merged.branchActive = !!branchRow.activo;
+          merged.sucursalConfigId = branchRow.id;
+          merged.active = !!merged.globalActive && !!branchRow.activo;
+        } else if (sucursalId && updates.active !== undefined) {
+          merged.branchActive = updates.active;
+          merged.active = !!merged.globalActive && updates.active;
+        }
+        return merged;
+      }));
     } catch (error) {
       console.error('Error updating discount:', error);
       toast.error('Error al actualizar descuento');
     }
+  }, [sucursalId, discounts, findDescuentoSucursalId]);
+
+  // Toggle activo/inactivo (con sucursal → branch RPC; sin sucursal → global)
+  const setDiscountActive = useCallback(async (id: string, activo: boolean) => {
+    if (id === 'none') return;
+    try {
+      if (sucursalId) {
+        const target = discounts.find(d => d.id === id);
+        let branchId = target?.sucursalConfigId ?? null;
+        if (!branchId) branchId = await findDescuentoSucursalId(id);
+        if (!branchId) {
+          console.warn('[setDiscountActive] No existe descuentos_sucursales para', id);
+          toast.error('No se pudo actualizar el descuento en esta sucursal');
+          return;
+        }
+        const { data: rpcData, error } = await supabase.rpc('set_descuento_sucursal_activo', {
+          _id: branchId,
+          _activo: activo,
+        });
+        if (error) throw error;
+        const branchRow = rpcData ? ((Array.isArray(rpcData) ? rpcData[0] : rpcData) as DescuentoSucursalRow) : undefined;
+        setDiscounts(prev => prev.map(d => {
+          if (d.id !== id) return d;
+          const branchActive = branchRow ? !!branchRow.activo : activo;
+          return {
+            ...d,
+            branchActive,
+            sucursalConfigId: branchRow?.id ?? d.sucursalConfigId,
+            active: !!d.globalActive && branchActive,
+          };
+        }));
+      } else {
+        const { error } = await supabase.from('descuentos').update({ activo }).eq('id', id);
+        if (error) throw error;
+        setDiscounts(prev => prev.map(d => d.id === id ? { ...d, globalActive: activo, active: activo } : d));
+      }
+      toast.success(activo ? 'Descuento reactivado' : 'Descuento desactivado');
+    } catch (error) {
+      console.error('Error toggling discount:', error);
+      toast.error('Error al actualizar descuento');
+    }
+  }, [sucursalId, discounts, findDescuentoSucursalId]);
+
+  // ============= Eliminación segura (soft delete) =============
+  // Allowlist estricta: SOLO estas tablas pueden ser "eliminadas".
+  type DeletableTable = 'servicios' | 'extras' | 'descuentos' | 'lineas';
+  const ALLOWED_DELETE_TABLES: ReadonlyArray<DeletableTable> = ['servicios', 'extras', 'descuentos', 'lineas'];
+
+  const softDelete = useCallback(async (table: DeletableTable, id: string): Promise<boolean> => {
+    if (!ALLOWED_DELETE_TABLES.includes(table)) {
+      console.error('[softDelete] Tabla no permitida:', table);
+      return false;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from(table)
+      .update({
+        activo: false,
+        eliminado: true,
+        eliminado_at: new Date().toISOString(),
+        eliminado_por: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) {
+      console.error('[softDelete]', table, error);
+      return false;
+    }
+    return true;
   }, []);
+
+  const deleteService = useCallback(async (id: string) => {
+    const ok = await softDelete('servicios', id);
+    if (ok) {
+      setServices(prev => prev.filter(s => s.id !== id));
+      toast.success('Servicio eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el servicio');
+    }
+  }, [softDelete]);
+
+  const deleteExtra = useCallback(async (id: string) => {
+    const ok = await softDelete('extras', id);
+    if (ok) {
+      setExtras(prev => prev.filter(e => e.id !== id));
+      toast.success('Extra eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el extra');
+    }
+  }, [softDelete]);
+
+  const deleteLine = useCallback(async (id: string) => {
+    const ok = await softDelete('lineas', id);
+    if (ok) {
+      setLines(prev => prev.filter(l => l.id !== id));
+      // No tocar servicios.linea_id: la UI mostrará "Sin línea" para los huérfanos.
+      setServices(prev => prev.map(s => s.lineId === id ? { ...s, lineName: undefined, lineId: undefined } : s));
+      toast.success('Línea eliminada correctamente.');
+    } else {
+      toast.error('No se pudo eliminar la línea');
+    }
+  }, [softDelete]);
 
   const deleteDiscount = useCallback(async (id: string) => {
     if (id === 'none') return;
-    try {
-      const { error } = await supabase
-        .from('descuentos')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
+    const ok = await softDelete('descuentos', id);
+    if (ok) {
       setDiscounts(prev => prev.filter(d => d.id !== id));
-      toast.success('Descuento eliminado');
-    } catch (error) {
-      console.error('Error deleting discount:', error);
-      toast.error('Error al eliminar descuento');
+      toast.success('Descuento eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el descuento');
     }
-  }, []);
+  }, [softDelete]);
 
-  // Lines CRUD
+  // ============= Lines CRUD (sin cambios) =============
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
@@ -401,15 +913,14 @@ export function useSupabaseData() {
     try {
       const { data, error } = await supabase
         .from('lineas')
-        .insert({ 
-          nombre: line.name, 
+        .insert({
+          nombre: line.name,
           activo: line.active,
           color: line.color || null,
           organization_id: organization.id,
         })
         .select()
         .single();
-      
       if (error) throw error;
       const newLine = dbToLine(data);
       setLines(prev => [...prev, newLine]);
@@ -429,24 +940,252 @@ export function useSupabaseData() {
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.color !== undefined) dbUpdates.color = updates.color || null;
 
-      const { error } = await supabase
-        .from('lineas')
-        .update(dbUpdates)
-        .eq('id', id);
-      
+      const { error } = await supabase.from('lineas').update(dbUpdates).eq('id', id);
       if (error) throw error;
       setLines(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
-      
+
       if (updates.name !== undefined) {
-        setServices(prev => prev.map(s => 
-          s.lineId === id ? { ...s, lineName: updates.name } : s
-        ));
+        setServices(prev => prev.map(s => s.lineId === id ? { ...s, lineName: updates.name } : s));
       }
     } catch (error) {
       console.error('Error updating line:', error);
       toast.error('Error al actualizar línea');
     }
   }, []);
+
+  // ============= GLOBAL handlers (tab "General" en Mi Negocio) =============
+  // Estos handlers NO miran currentSucursal y NUNCA tocan tablas *_sucursales ni RPCs de sucursal.
+  // Escriben siempre sobre las tablas globales (servicios / extras / descuentos).
+
+  const addServiceGlobal = useCallback(async (service: Omit<Service, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const normalizedName = service.name.replace(/\s+/g, ' ').trim();
+      const { data, error } = await supabase
+        .from('servicios')
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
+          duracion_min: service.durationMin || 30,
+          activo: service.active !== false,
+          linea_id: service.lineId || null,
+          organization_id: organization.id,
+          sucursal_id: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newService = dbToService(data, lines);
+      setServices(prev => [...prev, newService]);
+      toast.success('Servicio agregado');
+      return newService;
+    } catch (error) {
+      console.error('Error adding service (global):', error);
+      toast.error('Error al agregar servicio');
+      return null;
+    }
+  }, [organization, lines]);
+
+  const updateServiceGlobal = useCallback(async (id: string, updates: Partial<Service>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
+      if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
+      if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('servicios').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      const updatedLine = updates.lineId ? lines.find(l => l.id === updates.lineId) : undefined;
+      setServices(prev => prev.map(s => {
+        if (s.id !== id) return s;
+        const merged: Service = { ...s };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre;
+        if (updates.durationMin !== undefined) merged.durationMin = updates.durationMin;
+        if (updates.lineId !== undefined) {
+          merged.lineId = updates.lineId || undefined;
+          merged.lineName = updatedLine?.name;
+        }
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating service (global):', error);
+      toast.error('Error al actualizar servicio');
+    }
+  }, [lines]);
+
+  const addExtraGlobal = useCallback(async (extra: Omit<Extra, 'id' | 'uid'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const normalizedName = extra.name.replace(/\s+/g, ' ').trim();
+      const { data, error } = await supabase
+        .from('extras')
+        .insert({
+          nombre: normalizedName,
+          precio: 0,
+          activo: extra.active !== false,
+          organization_id: organization.id,
+          sucursal_id: null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newExtra = dbToExtra(data);
+      setExtras(prev => [...prev, newExtra]);
+      toast.success('Extra agregado');
+      return newExtra;
+    } catch (error) {
+      console.error('Error adding extra (global):', error);
+      toast.error('Error al agregar extra');
+      return null;
+    }
+  }, [organization]);
+
+  const updateExtraGlobal = useCallback(async (id: string, updates: Partial<Extra>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('extras').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      setExtras(prev => prev.map(e => {
+        if (e.id !== id) return e;
+        const merged: Extra = { ...e };
+        if (updates.name !== undefined) merged.name = dbUpdates.nombre;
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating extra (global):', error);
+      toast.error('Error al actualizar extra');
+    }
+  }, []);
+
+  const addDiscountGlobal = useCallback(async (discount: Omit<Discount, 'id'>) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return null;
+    }
+    try {
+      const appliesTo = discount.appliesTo || 'servicios';
+      const { data, error } = await supabase
+        .from('descuentos')
+        .insert({
+          nombre: discount.label.replace(/\s+/g, ' ').trim(),
+          valor: discount.value,
+          tipo: discount.type === 'fixed' ? 'monto' : 'porcentaje',
+          redondeo: discount.rounding || 'cliente',
+          redondeo_unidad: discount.roundingUnit || 100,
+          metodo_pago: discount.paymentMethod || 'todos',
+          activo: discount.active !== false,
+          aplica_a: appliesTo,
+          organization_id: organization.id,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newDiscount = dbToDiscount(data);
+      setDiscounts(prev => [...prev, newDiscount]);
+      toast.success('Descuento agregado');
+      return newDiscount;
+    } catch (error) {
+      console.error('Error adding discount (global):', error);
+      toast.error('Error al agregar descuento');
+      return null;
+    }
+  }, [organization]);
+
+  const updateDiscountGlobal = useCallback(async (id: string, updates: Partial<Discount>) => {
+    if (id === 'none') return;
+    try {
+      const dbUpdates: any = {};
+      if (updates.label !== undefined) dbUpdates.nombre = updates.label.replace(/\s+/g, ' ').trim();
+      if (updates.value !== undefined) dbUpdates.valor = updates.value;
+      if (updates.type !== undefined) dbUpdates.tipo = updates.type === 'fixed' ? 'monto' : 'porcentaje';
+      if (updates.rounding !== undefined) dbUpdates.redondeo = updates.rounding;
+      if (updates.roundingUnit !== undefined) dbUpdates.redondeo_unidad = updates.roundingUnit;
+      if (updates.paymentMethod !== undefined) dbUpdates.metodo_pago = updates.paymentMethod;
+      if (updates.appliesTo !== undefined) dbUpdates.aplica_a = updates.appliesTo;
+      if (updates.active !== undefined) dbUpdates.activo = updates.active;
+
+      if (Object.keys(dbUpdates).length === 0) return;
+
+      const { error } = await supabase.from('descuentos').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+
+      setDiscounts(prev => prev.map(d => {
+        if (d.id !== id) return d;
+        const merged: Discount = { ...d, ...updates };
+        if (updates.active !== undefined) {
+          merged.globalActive = updates.active;
+          const branchActive = merged.branchActive;
+          merged.active = branchActive === undefined ? updates.active : (updates.active && branchActive);
+        }
+        return merged;
+      }));
+    } catch (error) {
+      console.error('Error updating discount (global):', error);
+      toast.error('Error al actualizar descuento');
+    }
+  }, []);
+
+  const setDiscountActiveGlobal = useCallback(async (id: string, activo: boolean) => {
+    if (id === 'none') return;
+    try {
+      const { error } = await supabase.from('descuentos').update({ activo }).eq('id', id);
+      if (error) throw error;
+      setDiscounts(prev => prev.map(d => {
+        if (d.id !== id) return d;
+        const branchActive = d.branchActive;
+        return {
+          ...d,
+          globalActive: activo,
+          active: branchActive === undefined ? activo : (activo && branchActive),
+        };
+      }));
+      toast.success(activo ? 'Descuento reactivado' : 'Descuento desactivado');
+    } catch (error) {
+      console.error('Error toggling discount (global):', error);
+      toast.error('Error al actualizar descuento');
+    }
+  }, []);
+
+  const deleteDiscountGlobal = useCallback(async (id: string) => {
+    if (id === 'none') return;
+    const ok = await softDelete('descuentos', id);
+    if (ok) {
+      setDiscounts(prev => prev.filter(d => d.id !== id));
+      toast.success('Descuento eliminado correctamente.');
+    } else {
+      toast.error('No se pudo eliminar el descuento');
+    }
+  }, [softDelete]);
+
+  // Descuentos disponibles para Cobrar (compat: filtran por active operativo)
+  const activeDiscounts = discounts.filter(d => d.active);
+  const serviceDiscounts = activeDiscounts.filter(d => d.appliesTo === 'servicios');
+  const productDiscounts = activeDiscounts.filter(d => d.appliesTo === 'productos');
 
   return {
     isLoading,
@@ -457,6 +1196,8 @@ export function useSupabaseData() {
     barbers: barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
+    serviceDiscounts,
+    productDiscounts,
     lines: lines.filter(l => l.active),
     allLines: lines,
     addService,
@@ -468,8 +1209,21 @@ export function useSupabaseData() {
     addDiscount,
     updateDiscount,
     deleteDiscount,
+    setDiscountActive,
     addLine,
     updateLine,
+    deleteService,
+    deleteExtra,
+    deleteLine,
+    // Global handlers (tab General de Mi Negocio)
+    addServiceGlobal,
+    updateServiceGlobal,
+    addExtraGlobal,
+    updateExtraGlobal,
+    addDiscountGlobal,
+    updateDiscountGlobal,
+    setDiscountActiveGlobal,
+    deleteDiscountGlobal,
     refreshData: fetchData,
   };
 }

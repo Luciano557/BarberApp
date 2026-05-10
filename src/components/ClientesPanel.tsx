@@ -7,14 +7,16 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import { useClientes } from '@/hooks/useClientes';
 import { NuevoClienteDialog } from './clientes/NuevoClienteDialog';
 import { ClienteDetailDialog } from './clientes/ClienteDetailDialog';
+import { ImportClientesDialog } from './clientes/import/ImportClientesDialog';
 import { toast } from 'sonner';
 
 export function ClientesPanel() {
   const { currentSucursal, isAllMode } = useSucursal();
-  const { clientes, isLoading, error } = useClientes();
+  const { clientes, isLoading, error, refresh } = useClientes();
 
   const [search, setSearch] = useState('');
   const [showNuevo, setShowNuevo] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -35,7 +37,7 @@ export function ClientesPanel() {
     : 'Gestioná la lista de clientes de esta sucursal.';
 
   const handleImportClick = () => {
-    toast('La importación de clientes estará disponible próximamente.');
+    setShowImport(true);
   };
 
   const handleWhatsappClick = (e: React.MouseEvent) => {
@@ -147,6 +149,12 @@ export function ClientesPanel() {
         clienteId={selectedClienteId}
         open={selectedClienteId !== null}
         onOpenChange={(o) => { if (!o) setSelectedClienteId(null); }}
+      />
+
+      <ImportClientesDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        onImported={refresh}
       />
     </div>
   );

@@ -1,13 +1,29 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
+import { ProductoCartInput } from '@/hooks/useTransactions';
+import { Badge } from '@/components/ui/badge';
+
+const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -15,6 +31,7 @@ interface PaymentRegistrationProps {
   barbers: Barber[];
   discounts: Discount[];
   lines?: Line[];
+  sucursalId?: string | null;
   onNavigateToTareas?: () => void;
   onSubmit: (data: {
     barberId: string;
@@ -29,6 +46,7 @@ interface PaymentRegistrationProps {
     payments?: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     subtotal: number;
     total: number;
+    productos?: ProductoCartInput[];
   }) => Promise<any | null>;
 }
 
@@ -37,16 +55,18 @@ type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
 const STEPS: Step[] = ['barber', 'service', 'extras', 'discount', 'payment'];
 
 const STEP_INFO = {
-  barber: { title: 'Barbero', subtitle: 'Selecciona quién atendió', icon: User },
+  barber: { title: 'Barbero', subtitle: 'Elegí quién atendió o sumá productos', icon: User },
   service: { title: 'Servicio', subtitle: 'Selecciona el servicio principal', icon: Scissors },
   extras: { title: 'Extras', subtitle: 'Agrega extras opcionales', icon: Sparkles },
-  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde', icon: Tag },
+  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde (solo servicios)', icon: Tag },
   payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
+export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], sucursalId, onSubmit, onNavigateToTareas }: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const canEditProductPrice = isOwner || isGeneralManager || isManager;
   const [currentStep, setCurrentStep] = useState<Step>('barber');
   const [selectedBarber, setSelectedBarber] = useState('');
   const [selectedService, setSelectedService] = useState('');
@@ -59,6 +79,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   const [showTasksBubble, setShowTasksBubble] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Productos
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [cartBarberId, setCartBarberId] = useState<string | null>(null);
+  const [cartBarberName, setCartBarberName] = useState<string | null>(null);
+  // Asignación explícita de la venta de productos: pending | no_barber | barber
+  type ProductSaleAssignment = 'pending' | 'no_barber' | 'barber';
+  const [productSaleAssignment, setProductSaleAssignment] = useState<ProductSaleAssignment>('pending');
+  // Cancelar venta
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const { methods, getRecargoPct, loading: methodsLoading } = usePaymentMethodsConfig();
   const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
@@ -84,11 +114,21 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     [extras, selectedExtras]
   );
 
-  const subtotal = useMemo(() => {
+  // Subtotal de servicios (servicio + extras). NO incluye productos.
+  const subtotalServicios = useMemo(() => {
     const servicePrice = service?.price || 0;
     const extrasTotal = selectedExtrasData.reduce((sum, e) => sum + e.price, 0);
     return servicePrice + extrasTotal;
   }, [service, selectedExtrasData]);
+
+  // Subtotal de productos (precio_unitario * cantidad). No se le aplican descuentos.
+  const subtotalProductos = useMemo(
+    () => cart.reduce((sum, it) => sum + it.precio_unitario * it.cantidad, 0),
+    [cart]
+  );
+
+  // Subtotal total (servicios + productos)
+  const subtotal = subtotalServicios + subtotalProductos;
 
   const selectedDiscountData = useMemo(() => {
     return discounts.find(d => d.id === selectedDiscount);
@@ -101,73 +141,126 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     return selectedDiscountData.paymentMethod === paymentMethod;
   }, [selectedDiscountData, paymentMethod]);
 
+  // Descuento se aplica SOLO sobre el subtotal de servicios
   const discountAmount = useMemo(() => {
     if (!selectedDiscountData || selectedDiscountData.value === 0) return 0;
-    // If discount doesn't apply to selected payment method, no discount
     if (!isDiscountValidForPayment) return 0;
-    
+    if (subtotalServicios === 0) return 0;
+
     if (selectedDiscountData.type === 'fixed') {
-      return selectedDiscountData.value;
+      return Math.min(selectedDiscountData.value, subtotalServicios);
     }
-    // percentage with rounding
-    const rawDiscount = subtotal * (selectedDiscountData.value / 100);
+    const rawDiscount = subtotalServicios * (selectedDiscountData.value / 100);
     const rounding = selectedDiscountData.rounding || 'cliente';
     const unit = selectedDiscountData.roundingUnit || 1;
-    
-    // Apply rounding based on type and unit
+
     let roundedDiscount: number;
     if (unit === 1) {
-      // No unit rounding, just apply direction
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount); break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount); break;
         default: roundedDiscount = Math.floor(rawDiscount); break;
       }
     } else {
-      // Apply unit-based rounding
       switch (rounding) {
         case 'negocio': roundedDiscount = Math.ceil(rawDiscount / unit) * unit; break;
         case 'matematico': roundedDiscount = Math.round(rawDiscount / unit) * unit; break;
         default: roundedDiscount = Math.floor(rawDiscount / unit) * unit; break;
       }
     }
-    
     return roundedDiscount;
-  }, [subtotal, selectedDiscountData, isDiscountValidForPayment]);
+  }, [subtotalServicios, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
 
   const goToNextStep = useCallback(() => {
-    const nextIndex = currentStepIndex + 1;
-    if (nextIndex < STEPS.length) {
-      setCurrentStep(STEPS[nextIndex]);
+    if (currentStepIndex < STEPS.length - 1) {
+      setCurrentStep(STEPS[currentStepIndex + 1]);
     }
   }, [currentStepIndex]);
 
   const goToPrevStep = useCallback(() => {
-    const prevIndex = currentStepIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStep(STEPS[prevIndex]);
+    if (currentStepIndex > 0) {
+      setCurrentStep(STEPS[currentStepIndex - 1]);
     }
   }, [currentStepIndex]);
 
   const handleSelectBarber = useCallback((barberId: string) => {
+    const b = barbers.find(x => x.uid === barberId);
+    const fullName = b ? `${b.firstName} ${b.lastName}` : '';
+
+    if (cart.length > 0) {
+      // Carrito asignado a otro barbero: bloquear.
+      if (productSaleAssignment === 'barber' && cartBarberId && cartBarberId !== barberId) {
+        toast({
+          title: 'Productos asignados a otro barbero',
+          description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación tocando ese barbero u otra opción, o cancelá la venta para empezar de nuevo.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      // pending | no_barber | mismo barber → asignar/reasignar al barbero tocado.
+      setProductSaleAssignment('barber');
+      setCartBarberId(barberId);
+      setCartBarberName(fullName);
+    }
+
     setSelectedBarber(barberId);
     setTimeout(() => goToNextStep(), 100);
-  }, [goToNextStep]);
+  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast]);
+
+  const handleSelectNoBarber = useCallback(() => {
+    setProductSaleAssignment('no_barber');
+    setCartBarberId(null);
+    setCartBarberName(null);
+    setSelectedBarber('');
+    setSelectedService('');
+    setSelectedExtras([]);
+    setSelectedDiscount('none');
+    // Helper: hoy va directo a payment. Encapsulado para que en el futuro pueda enrutar a un step de descuento de productos.
+    setCurrentStep('payment');
+  }, []);
 
   const handleSelectService = useCallback((serviceId: string) => {
+    if (!selectedBarber) {
+      toast({
+        title: 'Falta barbero',
+        description: 'Para agregar un servicio, primero seleccioná un barbero.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const svc = services.find(s => s.id === serviceId);
+    if (!svc || isPriceMissing(svc.price)) {
+      toast({
+        title: 'Precio pendiente',
+        description: 'Definí un precio para este ítem antes de cobrarlo.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSelectedService(serviceId);
     setTimeout(() => goToNextStep(), 100);
-  }, [goToNextStep]);
+  }, [selectedBarber, goToNextStep, toast, services]);
+
 
   const handleToggleExtra = useCallback((extraId: string) => {
-    setSelectedExtras(prev =>
-      prev.includes(extraId)
-        ? prev.filter(id => id !== extraId)
-        : [...prev, extraId]
-    );
-  }, []);
+    setSelectedExtras(prev => {
+      if (prev.includes(extraId)) {
+        return prev.filter(id => id !== extraId);
+      }
+      const ex = extras.find(e => e.id === extraId);
+      if (!ex || isPriceMissing(ex.price)) {
+        toast({
+          title: 'Precio pendiente',
+          description: 'Definí un precio para este ítem antes de cobrarlo.',
+          variant: 'destructive',
+        });
+        return prev;
+      }
+      return [...prev, extraId];
+    });
+  }, [extras, toast]);
 
   const handleSelectDiscount = useCallback((discountId: string) => {
     setSelectedDiscount(discountId);
@@ -294,15 +387,50 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     setSplitMode(false);
     setEfectivoAmount('');
     setMpAmount('');
+    setCart([]);
+    setCartBarberId(null);
+    setCartBarberName(null);
+    setProductSaleAssignment('pending');
     setCurrentStep('barber');
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedBarber || !selectedService || !paymentMethod) {
+    const hasService = !!selectedService;
+    const hasProducts = cart.length > 0;
+
+    if (!hasService && !hasProducts) {
       toast({
-        title: "Campos requeridos",
-        description: "Por favor completa todos los pasos.",
-        variant: "destructive",
+        title: 'Venta vacía',
+        description: 'Agregá al menos un servicio o un producto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const invalidService = hasService && isPriceMissing(service?.price);
+    const invalidExtras = selectedExtrasData.some(e => isPriceMissing(e.price));
+    const invalidProducts = cart.some(it => isPriceMissing(it.precio_unitario));
+    if (invalidService || invalidExtras || invalidProducts) {
+      toast({
+        title: 'Ítems sin precio',
+        description: 'Hay ítems sin precio configurado. Definí el precio antes de cobrar.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (hasService && !selectedBarber) {
+      toast({
+        title: 'Falta barbero',
+        description: 'Seleccioná el barbero que atendió el servicio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!paymentMethod) {
+      toast({
+        title: 'Falta método de pago',
+        description: 'Seleccioná cómo paga el cliente.',
+        variant: 'destructive',
       });
       return;
     }
@@ -345,12 +473,30 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         primaryMethod = paymentMethod;
       }
 
+      const productosPayload: ProductoCartInput[] = cart.map(it => ({
+        producto_id: it.producto_id,
+        producto_sucursal_id: it.producto_sucursal_id,
+        producto_nombre: it.nombre,
+        marca_id: it.marca_id,
+        marca_nombre: it.marca_nombre,
+        precio_unitario: it.precio_unitario,
+        cantidad: it.cantidad,
+      }));
+
+      // Si hay servicio: barbero del servicio. Si solo productos: depende de la asignación.
+      const finalBarberId = hasService
+        ? (barber?.id || '')
+        : (productSaleAssignment === 'barber' ? (cartBarberId || '') : '');
+      const finalBarberName = hasService
+        ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
+        : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
+
       const result = await onSubmit({
-        barberId: barber!.id,
-        barberName: `${barber!.firstName} ${barber!.lastName}`,
-        serviceId: service!.id,
-        serviceName: service!.name,
-        servicePrice: service!.price,
+        barberId: finalBarberId,
+        barberName: finalBarberName,
+        serviceId: service?.id || '',
+        serviceName: service?.name || '',
+        servicePrice: service?.price || 0,
         extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
         discount: selectedDiscountData?.value || 0,
         discountType: selectedDiscountData?.type || 'percentage',
@@ -358,14 +504,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         payments,
         subtotal,
         total,
+        productos: productosPayload,
       });
 
       if (result) {
+        const summaryLabel = hasService ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
         toast({
           title: "✅ Cobro guardado correctamente",
           description: recargoTotal > 0
-            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${service!.name}`
-            : `$${total.toLocaleString()} - ${service!.name}`,
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
+            : `$${total.toLocaleString()} - ${summaryLabel}`,
         });
         resetForm();
       } else {
@@ -384,7 +532,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar]);
+  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart, cartBarberId, cartBarberName, productSaleAssignment]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -395,6 +543,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
         if (currentStep === 'barber' && barbers[index]) {
           handleSelectBarber(barbers[index].uid);
+        } else if (currentStep === 'barber' && cart.length > 0 && index === barbers.length) {
+          handleSelectNoBarber();
         } else if (currentStep === 'service' && services[index]) {
           handleSelectService(services[index].id);
         } else if (currentStep === 'extras' && extras[index]) {
@@ -434,7 +584,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
@@ -488,26 +638,147 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       <div className="min-h-[320px]">
         {/* Barber Step */}
         {currentStep === 'barber' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {barbers.map((barber, index) => (
-              <button
-                key={barber.uid}
-                onClick={() => handleSelectBarber(barber.uid)}
-                className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
-                  selectedBarber === barber.uid
-                    ? 'border-secondary bg-secondary/5'
-                    : 'border-border bg-card hover:bg-muted/50'
-                }`}
-              >
-                <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                  {index + 1}
-                </span>
-                <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                  <User className="h-6 w-6 text-muted-foreground" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {barbers.map((barber, index) => {
+                const isSelected =
+                  selectedBarber === barber.uid ||
+                  (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
+                return (
+                  <button
+                    key={barber.uid}
+                    onClick={() => handleSelectBarber(barber.uid)}
+                    className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                      isSelected
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                      <User className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                  </button>
+                );
+              })}
+
+              {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
+              {cart.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleSelectNoBarber}
+                  className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                    productSaleAssignment === 'no_barber'
+                      ? 'border-secondary bg-secondary/5'
+                      : 'border-dashed border-border bg-card hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
+                    {barbers.length + 1}
+                  </span>
+                  <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-medium text-center text-foreground">Sin barbero</p>
+                  <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
+                </button>
+              )}
+            </div>
+
+            {/* Bloque productos: solo en paso inicial */}
+            <div className="rounded-lg border border-border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Productos</span>
+                  {cart.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {productSaleAssignment === 'barber' && cartBarberName
+                        ? `· Asignados a ${cartBarberName}`
+                        : productSaleAssignment === 'no_barber'
+                        ? '· Sin barbero'
+                        : '· Elegí barbero o tocá Sin barbero para continuar'}
+                    </span>
+                  )}
                 </div>
-                <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
-              </button>
-            ))}
+                {cart.length > 0 && (
+                  <span className="text-sm font-semibold text-foreground">
+                    ${subtotalProductos.toLocaleString('es-AR')}
+                  </span>
+                )}
+              </div>
+
+              {cart.length === 0 ? (
+                <div className="px-4 py-5 text-center space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Sumá productos a la venta. Después elegí un barbero o tocá "Sin barbero".
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={!sucursalId}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Añadir producto
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-3 space-y-2">
+                  {cart.map((it) => (
+                    <div
+                      key={it.producto_sucursal_id}
+                      className="flex items-center gap-3 p-2.5 rounded-md border border-border bg-background"
+                    >
+                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{it.nombre}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {it.marca_nombre ? `${it.marca_nombre} · ` : ''}
+                          {it.cantidad} × ${it.precio_unitario.toLocaleString('es-AR')}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground">
+                        ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                          setCart(prev => {
+                            const next = prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id);
+                            if (next.length === 0) {
+                              setProductSaleAssignment('pending');
+                              setCartBarberId(null);
+                              setCartBarberName(null);
+                            }
+                            return next;
+                          });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setPickerOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Agregar más productos
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -555,6 +826,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     {group.services.map((service) => {
                       globalIndex++;
                       const idx = globalIndex;
+                      const blocked = isPriceMissing(service.price);
                       return (
                         <button
                           key={service.id}
@@ -563,15 +835,19 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                             selectedService === service.id
                               ? 'border-secondary bg-secondary/5'
                               : 'border-border bg-card hover:bg-muted/50'
-                          }`}
+                          } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                           style={group.lineColor ? { borderLeftWidth: '3px', borderLeftColor: selectedService === service.id ? undefined : group.lineColor } : undefined}
                         >
                           <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                             {idx}
                           </span>
-                          <div className="flex justify-between items-center pl-6">
+                          <div className="flex justify-between items-center pl-6 gap-2">
                             <span className="font-medium text-foreground">{service.name}</span>
-                            <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            {blocked ? (
+                              <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                            ) : (
+                              <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
+                            )}
                           </div>
                         </button>
                       );
@@ -579,6 +855,23 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </div>
                 </div>
               ))}
+
+              {/* Ir a pago sin servicio: solo si hay productos asignados a este barbero y no se eligió servicio */}
+              {cart.length > 0 && selectedBarber && !selectedService && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={() => {
+                    setSelectedService('');
+                    setSelectedExtras([]);
+                    setSelectedDiscount('none');
+                    setCurrentStep('payment');
+                  }}
+                >
+                  Ir a pago sin servicio <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           );
         })()}
@@ -587,30 +880,39 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {currentStep === 'extras' && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {extras.map((extra, index) => (
-                <button
-                  key={extra.id}
-                  onClick={() => handleToggleExtra(extra.id)}
-                  className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
-                    selectedExtras.includes(extra.id)
-                      ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
-                    {index + 1}
-                  </span>
-                  {selectedExtras.includes(extra.id) && (
-                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
-                      <Check className="h-3 w-3" />
+              {extras.map((extra, index) => {
+                const blocked = isPriceMissing(extra.price);
+                return (
+                  <button
+                    key={extra.id}
+                    onClick={() => handleToggleExtra(extra.id)}
+                    className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
+                      selectedExtras.includes(extra.id)
+                        ? 'border-secondary bg-secondary/5'
+                        : 'border-border bg-card hover:bg-muted/50'
+                    } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    {selectedExtras.includes(extra.id) && (
+                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                    <div className="pt-3">
+                      <p className="font-medium text-foreground text-center">{extra.name}</p>
+                      {blocked ? (
+                        <div className="flex justify-center mt-1">
+                          <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
+                      )}
                     </div>
-                  )}
-                  <div className="pt-3">
-                    <p className="font-medium text-foreground text-center">{extra.name}</p>
-                    <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
 
             <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
@@ -619,9 +921,39 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           </div>
         )}
 
+        {/* Resumen compacto del carrito en pasos posteriores a 'barber' (solo lectura) */}
+        {cart.length > 0 && (currentStep === 'service' || currentStep === 'extras' || currentStep === 'discount') && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span className="text-muted-foreground truncate">
+                {cart.length} producto{cart.length > 1 ? 's' : ''} · {productSaleAssignment === 'barber' && cartBarberName ? `Asignados a ${cartBarberName}` : productSaleAssignment === 'no_barber' ? 'Sin barbero' : 'Sin asignar'}
+              </span>
+            </div>
+            <span className="font-semibold text-foreground flex-shrink-0">
+              ${subtotalProductos.toLocaleString('es-AR')}
+            </span>
+          </div>
+        )}
+
         {/* Discount Step */}
         {currentStep === 'discount' && (
+          <div className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <button
+              key="none"
+              onClick={() => handleSelectDiscount('none')}
+              className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                selectedDiscount === 'none'
+                  ? 'border-secondary bg-secondary/5'
+                  : 'border-border bg-card hover:bg-muted/50'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
+                <Check className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="font-medium text-center text-foreground">Sin descuento</p>
+            </button>
             {discounts.map((discount, index) => {
               const rounding = discount.rounding || 'cliente';
               const rawCalc = discount.type === 'fixed' 
@@ -670,6 +1002,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 </button>
               );
             })}
+          </div>
+            <Button
+              onClick={() => {
+                const isValid = selectedDiscount === 'none' || discounts.some(d => d.id === selectedDiscount);
+                if (!selectedDiscount || !isValid) {
+                  handleSelectDiscount('none');
+                  return;
+                }
+                goToNextStep();
+              }}
+              className="w-full h-12 bg-foreground hover:bg-foreground/90"
+            >
+              Continuar <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         )}
 
@@ -816,23 +1162,62 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-6">
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Barbero</span>
-                  <span className="font-medium">{barber ? `${barber.firstName} ${barber.lastName}` : ''}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Servicio</span>
-                  <span className="font-medium">{service?.name}</span>
-                </div>
+                {(() => {
+                  let displayBarberName: string | null = null;
+                  if (barber) {
+                    displayBarberName = `${barber.firstName} ${barber.lastName}`;
+                  } else if (cart.length > 0) {
+                    if (productSaleAssignment === 'barber' && cartBarberName) {
+                      displayBarberName = cartBarberName;
+                    } else if (productSaleAssignment === 'no_barber') {
+                      displayBarberName = 'Sin barbero';
+                    }
+                  }
+                  if (!displayBarberName) return null;
+                  return (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Barbero</span>
+                      <span className="font-medium">{displayBarberName}</span>
+                    </div>
+                  );
+                })()}
+                {service && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Servicio</span>
+                    <span className="font-medium">{service.name}</span>
+                  </div>
+                )}
                 {selectedExtrasData.length > 0 && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Extras</span>
                     <span className="font-medium">{selectedExtrasData.map(e => e.name).join(', ')}</span>
                   </div>
                 )}
-                <div className="flex justify-between pt-3 border-t border-border">
+                {cart.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Productos</span>
+                      <span className="font-medium">${subtotalProductos.toLocaleString('es-AR')}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground pl-2 space-y-0.5">
+                      {cart.map(it => (
+                        <div key={it.producto_sucursal_id} className="flex justify-between">
+                          <span className="truncate pr-2">{it.cantidad}× {it.nombre}</span>
+                          <span>${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {subtotalServicios > 0 && (
+                  <div className="flex justify-between pt-3 border-t border-border">
+                    <span className="text-muted-foreground">Subtotal servicios</span>
+                    <span className="font-medium">${subtotalServicios.toLocaleString('es-AR')}</span>
+                  </div>
+                )}
+                <div className={`flex justify-between ${subtotalServicios > 0 ? '' : 'pt-3 border-t border-border'}`}>
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${subtotal.toLocaleString()}</span>
+                  <span className="font-medium">${subtotal.toLocaleString('es-AR')}</span>
                 </div>
                 {selectedDiscountData && selectedDiscountData.value > 0 && (
                   isDiscountValidForPayment ? (
@@ -884,17 +1269,68 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </div>
 
       {/* Navigation */}
-      {currentStepIndex > 0 && (
-        <div className="flex justify-start pt-4 border-t border-border">
-          <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </Button>
+      {(currentStepIndex > 0 || cart.length > 0 || !!selectedBarber || !!selectedService) && (
+        <div className="flex items-center justify-between gap-2 pt-4 border-t border-border">
+          {currentStepIndex > 0 ? (
+            <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Volver
+            </Button>
+          ) : <span />}
+          {(cart.length > 0 || !!selectedBarber || !!selectedService || selectedExtras.length > 0 || selectedDiscount !== 'none') && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCancelOpen(true)}
+              className="gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <X className="h-4 w-4" /> Cancelar venta
+            </Button>
+          )}
         </div>
       )}
 
-      {/* Pending Tasks Bubble - fixed bottom */}
-      {/* Daily Turnos Viewer */}
-      <DailyTurnosViewer />
+      {/* Daily Turnos Viewer — solo en el paso inicial */}
+      {currentStep === 'barber' && <DailyTurnosViewer />}
+
+      {sucursalId && (
+        <ProductoPickerDialog
+          open={pickerOpen}
+          sucursalId={sucursalId}
+          canEditPrice={canEditProductPrice}
+          initialCart={cart}
+          onClose={() => setPickerOpen(false)}
+          onConfirm={(items) => {
+            setCart(items);
+            // Si el carrito quedó vacío tras editar, resetear asignación.
+            if (items.length === 0) {
+              setProductSaleAssignment('pending');
+              setCartBarberId(null);
+              setCartBarberName(null);
+            }
+          }}
+        />
+      )}
+
+      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar venta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se va a limpiar el barbero, servicio, extras, descuento, pagos y los productos del carrito. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { resetForm(); setCancelOpen(false); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sí, cancelar venta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       {showTasksBubble && pendingTasks.length > 0 && (
         <div

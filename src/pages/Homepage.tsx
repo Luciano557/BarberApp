@@ -182,7 +182,7 @@ const screens = {
     content: (
       <div className="space-y-2">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-semibold">Turnos y Agenda</p>
+          <p className="text-sm font-semibold">Turnos</p>
           <span className="text-[9px] border border-slate-100 rounded px-2 py-1 text-slate-400">lun 13 – dom 19/04</span>
         </div>
         {[

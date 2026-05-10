@@ -4,6 +4,10 @@ import { Input } from "@/components/ui/input";
 interface CurrencyInputProps extends Omit<React.ComponentProps<"input">, "value" | "onChange" | "type"> {
   value: string;
   onChange: (value: string) => void;
+  /** Mostrar símbolo de moneda como prefijo. Default true. Pasar false para usos no monetarios. */
+  showCurrencySymbol?: boolean;
+  /** Símbolo a mostrar. Default "$". */
+  currencySymbol?: string;
 }
 
 /**
@@ -53,7 +57,7 @@ function cleanValue(display: string): string {
 }
 
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
-  ({ value, onChange, ...props }, ref) => {
+  ({ value, onChange, showCurrencySymbol = true, currencySymbol = "$", className, ...props }, ref) => {
     const [displayValue, setDisplayValue] = React.useState(() => formatForDisplay(value));
     const inputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -75,7 +79,7 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
       // Clean and reformat
       const clean = cleanValue(raw);
       const newDisplay = formatForDisplay(clean);
-      
+
       setDisplayValue(newDisplay);
       onChange(clean);
 
@@ -100,15 +104,38 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
       [ref]
     );
 
+    if (!showCurrencySymbol) {
+      return (
+        <Input
+          {...props}
+          ref={setRefs}
+          type="text"
+          inputMode="decimal"
+          value={displayValue}
+          onChange={handleChange}
+          className={className}
+        />
+      );
+    }
+
     return (
-      <Input
-        {...props}
-        ref={setRefs}
-        type="text"
-        inputMode="decimal"
-        value={displayValue}
-        onChange={handleChange}
-      />
+      <div className="relative w-full">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground select-none"
+        >
+          {currencySymbol}
+        </span>
+        <Input
+          {...props}
+          ref={setRefs}
+          type="text"
+          inputMode="decimal"
+          value={displayValue}
+          onChange={handleChange}
+          className={`pl-7 ${className ?? ""}`}
+        />
+      </div>
     );
   }
 );

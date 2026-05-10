@@ -33,10 +33,10 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
   const fetchPinStatus = useCallback(async () => {
     if (barbers.length === 0) return;
     try {
-      const { data, error } = await supabase.from('barberos').select('id, pin_hash').in('id', barbers.map(b => b.id));
+      const { data, error } = await supabase.rpc('barberos_pin_status', { _ids: barbers.map(b => b.id) });
       if (error) throw error;
       const status: Record<string, boolean> = {};
-      data?.forEach(b => { status[b.id] = !!b.pin_hash; });
+      data?.forEach((b: { id: string; has_pin: boolean }) => { status[b.id] = !!b.has_pin; });
       setBarberPinStatus(status);
     } catch (error) {
       console.error('Error fetching PIN status:', error);

@@ -176,13 +176,15 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
   const handleSaveContacto = async () => {
     const n = nombre.trim();
     const a = apellido.trim();
-    if (!n || !a) { toast.error('Nombre y apellido son obligatorios'); return; }
+    if (!n) { toast.error('El nombre es obligatorio'); return; }
     const e = email.trim();
+    const t = telefono.trim();
+    if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { toast.error('Email inválido'); return; }
     await persist({
       nombre: n,
       apellido: a,
-      telefono: telefono.trim() || null,
+      telefono: t || null,
       email: e || null,
     }, 'Datos de contacto actualizados');
   };
@@ -311,7 +313,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between gap-3 pr-6">
               <span className="flex items-center gap-2">
-                {cliente ? `${cliente.nombre} ${cliente.apellido}` : 'Cliente'}
+                {cliente ? [cliente.nombre, cliente.apellido].filter(Boolean).join(' ') : 'Cliente'}
                 {cliente?.bloqueado && (
                   <Badge variant="destructive" className="text-[10px] gap-1">
                     <ShieldAlert className="h-3 w-3" />
@@ -358,7 +360,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                         <Input value={nombre} onChange={(e) => setNombre(e.target.value)} />
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs">Apellido *</Label>
+                        <Label className="text-xs">Apellido</Label>
                         <Input value={apellido} onChange={(e) => setApellido(e.target.value)} />
                       </div>
                     </div>
@@ -739,7 +741,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
           <AlertDialogHeader>
             <AlertDialogTitle>Eliminar cliente</AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Eliminar a <span className="font-medium text-foreground">{cliente?.nombre} {cliente?.apellido}</span>?
+              ¿Eliminar a <span className="font-medium text-foreground">{cliente ? [cliente.nombre, cliente.apellido].filter(Boolean).join(' ') : ''}</span>?
               Esta acción ocultará el cliente de la lista. El historial de turnos se conserva.
             </AlertDialogDescription>
           </AlertDialogHeader>

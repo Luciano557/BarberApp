@@ -16,6 +16,8 @@ export interface Tarea {
   asignado_a_nombre: string | null;
   creado_por_id: string;
   creado_por_nombre: string | null;
+  assignment_scope: 'individual' | 'team';
+  sucursal_id: string | null;
   recurrente: boolean;
   frecuencia_dias: number | null;
   recurrencia_tipo: string | null;
@@ -30,6 +32,9 @@ export interface Tarea {
   repeat_interval: number | null;
   repeat_byweekday: number[] | null;
   vencimiento_dias: number | null;
+  completada_por_id: string | null;
+  completada_por_nombre: string | null;
+  completada_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,8 +43,10 @@ export interface TareaInsert {
   tipo: 'tarea' | 'peticion';
   titulo: string;
   descripcion?: string;
-  asignado_a_id?: string;
+  asignado_a_id?: string | null;
   asignado_a_nombre?: string;
+  assignment_scope?: 'individual' | 'team';
+  sucursal_id?: string | null;
   creado_por_nombre?: string;
   fecha_limite?: string;
   hora?: string;
@@ -82,13 +89,33 @@ export function useTareas() {
     mutationFn: async (tarea: TareaInsert) => {
       if (!organization?.id || !user?.id) throw new Error('No org or user');
       const { creado_por_nombre, ...rest } = tarea;
+      // Resolver scope para tareas internas
+      let assignment_scope: 'individual' | 'team' = rest.assignment_scope ?? 'individual';
+      let asignado_a_id = rest.asignado_a_id ?? null;
+      let asignado_a_nombre = rest.asignado_a_nombre;
+      let sucursal_id = rest.sucursal_id ?? currentSucursal?.id ?? null;
+
+      if (tarea.tipo === 'tarea') {
+        if (!asignado_a_id) {
+          assignment_scope = 'team';
+          asignado_a_nombre = 'Todo el equipo';
+          asignado_a_id = null;
+          sucursal_id = currentSucursal?.id ?? sucursal_id;
+        } else {
+          assignment_scope = 'individual';
+        }
+      }
+
       const { error } = await supabase.from('tareas').insert({
+        ...rest,
         organization_id: organization.id,
-        sucursal_id: currentSucursal?.id || null,
+        sucursal_id,
+        asignado_a_id,
+        asignado_a_nombre,
+        assignment_scope,
         creado_por_id: user.id,
         creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
         recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,
-        ...rest,
       });
       if (error) throw error;
     },
@@ -101,7 +128,13 @@ export function useTareas() {
 
   const updateTarea = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; estado?: string; titulo?: string; descripcion?: string }) => {
-      const { error } = await supabase.from('tareas').update(updates).eq('id', id);
+      const payload: Record<string, unknown> = { ...updates };
+      if (updates.estado === 'completada') {
+        payload.completada_at = new Date().toISOString();
+        payload.completada_por_id = user?.id ?? null;
+        payload.completada_por_nombre = profile?.full_name || profile?.email || null;
+      }
+      const { error } = await supabase.from('tareas').update(payload).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {

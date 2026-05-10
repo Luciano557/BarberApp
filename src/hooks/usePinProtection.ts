@@ -36,21 +36,16 @@ export function usePinProtection() {
     }
 
     try {
-      // Check if any barbero in org has a PIN
-      const { data, error } = await supabase
-        .from('barberos')
-        .select('id, pin_hash')
-        .eq('organization_id', organization.id)
-        .eq('activo', true)
-        .not('pin_hash', 'is', null);
-
-      if (error) throw error;
-      setHasPinConfigured(data && data.length > 0);
+      // Check if any barbero in org has a PIN (no pin_hash exposed to frontend)
+      const { data: orgHasPin, error: orgErr } = await supabase.rpc('org_has_any_pin');
+      if (orgErr) throw orgErr;
+      setHasPinConfigured(!!orgHasPin);
 
       // Check if current user's own barbero has a PIN
       if (profile?.barbero_id) {
-        const userBarberoHasPin = data?.some(b => b.id === profile.barbero_id) ?? false;
-        setUserHasOwnPin(userBarberoHasPin);
+        const { data: ownPin, error: ownErr } = await supabase.rpc('current_user_has_pin');
+        if (ownErr) throw ownErr;
+        setUserHasOwnPin(!!ownPin);
       } else {
         setUserHasOwnPin(false);
       }

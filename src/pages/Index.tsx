@@ -15,6 +15,7 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -90,6 +91,7 @@ const Index = () => {
   } = useSupabaseData();
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
+  const { currentSucursal } = useSucursal();
 
   const summary = getDailySummary();
 
@@ -114,9 +116,10 @@ const Index = () => {
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers.filter(b => b.teamRole !== 'otros')}
+              barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
               discounts={discounts}
               lines={lines}
+              sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
             />
@@ -173,7 +176,7 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <PinProtectedSection sectionName="Turnos y Agenda">
+            <PinProtectedSection sectionName="Turnos">
               <TurnosAgendaPanel />
             </PinProtectedSection>
           )}

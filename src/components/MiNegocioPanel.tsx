@@ -11,14 +11,33 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
+import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
+import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
 
 interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
 }
 
+function rolEquipoToRolesLocal(re: string | null | undefined): AppRole[] {
+  switch (re) {
+    case 'general_manager': return ['general_manager'];
+    case 'encargado':
+    case 'manager': return ['manager'];
+    case 'barbero':
+    case 'barber': return ['barber'];
+    case 'owner': return ['owner'];
+    case 'otros': return ['otros'];
+    default: return ['barber'];
+  }
+}
+
 function dbToBarberWithSucursal(row: any): BarberWithSucursal {
+  const rolesEquipoRaw = Array.isArray(row.roles_equipo) ? (row.roles_equipo as string[]) : [];
+  const rolesEquipo: AppRole[] = rolesEquipoRaw.length > 0
+    ? rolesEquipoRaw.filter((r): r is AppRole => ['owner','general_manager','manager','barber','otros'].includes(r))
+    : rolEquipoToRolesLocal(row.rol_equipo);
   return {
     id: row.id,
     uid: row.id,
@@ -29,6 +48,7 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     teamRole: row.rol_equipo || 'barbero',
+    rolesEquipo,
     dni: row.dni || undefined,
     active: row.activo,
     sucursalId: row.sucursal_id || null,
@@ -41,12 +61,17 @@ interface MiNegocioPanelProps {
 
 export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}) {
   const { organization } = useOrganization();
-  const { currentSucursal, refreshSucursales } = useSucursal();
+  const { currentSucursal, refreshSucursales, setCurrentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, user } = useAuth();
   const {
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
-    addDiscount, updateDiscount, deleteDiscount, addLine, updateLine,
+    addDiscount, updateDiscount, deleteDiscount, setDiscountActive, addLine, updateLine,
+    deleteService, deleteExtra, deleteLine,
+    addServiceGlobal, updateServiceGlobal,
+    addExtraGlobal, updateExtraGlobal,
+    addDiscountGlobal, updateDiscountGlobal,
+    setDiscountActiveGlobal, deleteDiscountGlobal,
   } = useSupabaseData();
 
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
@@ -58,6 +83,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
+  const showGeneralTab = isOwner || isGeneralManager;
+  const GENERAL_TAB = '__general__';
+  const storageKey = organization?.id ? `vittro:miNegocio:activeTab:${organization.id}` : null;
+
+  // activeTab es la única fuente visual. Se inicializa de forma perezosa desde localStorage
+  // para que un remount conserve la tab elegida sin depender de currentSucursal.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined' || !storageKey) return '';
+    try { return localStorage.getItem(storageKey) || ''; } catch { return ''; }
+  });
 
   const fetchAllSucursales = useCallback(async () => {
     if (!organization?.id) return;
@@ -105,10 +140,82 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
 
-  // Default tab: use current sucursal from panel selector if it exists in visible list
-  const defaultTabId = (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id))
-    ? currentSucursal.id
-    : visibleSucursales[0]?.id;
+  // Helper: ¿es esta tab válida con el estado actual?
+  const isValidTab = useCallback((tab: string) => {
+    if (!tab) return false;
+    if (tab === GENERAL_TAB) return showGeneralTab;
+    return visibleSucursales.some(s => s.id === tab);
+  }, [showGeneralTab, visibleSucursales]);
+
+  // Inicializa activeTab cuando todavía no hay una tab válida elegida.
+  // No se ejecuta más una vez que activeTab es válida — así, cambiar de sucursal
+  // o que currentSucursal se sincronice no recalcula la tab visual.
+  useEffect(() => {
+    if (!organization?.id) return;
+    if (isValidTab(activeTab)) return;
+    // Esperar a saber qué sucursales hay (para manager esperar a tener la lista filtrada)
+    if (isManagerOnly && managerSucursalIds.length === 0 && allSucursales.length > 0) {
+      // Aún sincronizando permisos del manager
+      return;
+    }
+    if (allSucursales.length === 0 && !showGeneralTab) return;
+
+    const stored = storageKey ? (() => {
+      try { return localStorage.getItem(storageKey); } catch { return null; }
+    })() : null;
+
+    if (stored && isValidTab(stored)) {
+      setActiveTab(stored);
+      return;
+    }
+
+    if (isManagerOnly) {
+      if (visibleSucursales[0]) setActiveTab(visibleSucursales[0].id);
+      return;
+    }
+
+    // Owner / GM: priorizar currentSucursal si es visible, luego primera sucursal, y por último General.
+    if (currentSucursal && visibleSucursales.some(s => s.id === currentSucursal.id)) {
+      setActiveTab(currentSucursal.id);
+    } else if (visibleSucursales[0]) {
+      setActiveTab(visibleSucursales[0].id);
+    } else if (showGeneralTab) {
+      setActiveTab(GENERAL_TAB);
+    }
+  }, [
+    activeTab, isValidTab, organization?.id, storageKey, showGeneralTab,
+    isManagerOnly, managerSucursalIds.length, allSucursales.length,
+    visibleSucursales, currentSucursal,
+  ]);
+
+  // Validación defensiva: si la tab activa dejó de ser válida (sucursal eliminada/desactivada,
+  // cambio de organización o de permisos), elegir un fallback. Nunca degradar a General mientras
+  // exista una sucursal visible.
+  useEffect(() => {
+    if (!activeTab) return;
+    if (isValidTab(activeTab)) return;
+    if (visibleSucursales[0]) {
+      setActiveTab(visibleSucursales[0].id);
+    } else if (showGeneralTab) {
+      setActiveTab(GENERAL_TAB);
+    } else {
+      setActiveTab('');
+    }
+  }, [activeTab, isValidTab, visibleSucursales, showGeneralTab]);
+
+  // Handler único: cambia tab + persiste localStorage. NO escribe null en currentSucursal al entrar a General.
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, value); } catch { /* ignore */ }
+    }
+    if (value === GENERAL_TAB) return;
+    if (currentSucursal?.id !== value) {
+      setCurrentSucursal(value);
+    }
+  }, [storageKey, currentSucursal?.id, setCurrentSucursal]);
+
+  const generalIsReady = activeTab === GENERAL_TAB;
 
   // --- Barber CRUD ---
   const addBarberToSucursal = useCallback(async (sucursalId: string, barber: Omit<Barber, 'id' | 'uid'>) => {
@@ -176,14 +283,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   };
 
   // --- Helpers to scope catalog data by sucursal ---
+  // `allServices`/`allExtras` ya vienen enriquecidos con `servicios_sucursales`/`extras_sucursales`
+  // para la sucursal activa (currentSucursal). Cuando la tab activa coincide, devolvemos esa lista
+  // tal cual; así Mi Negocio › Sucursal › Servicios y Cobrar comparten exactamente la misma fuente.
+  // Para tabs que no son la activa devolvemos lista vacía y evitamos mostrar datos de otra sucursal
+  // mientras se sincroniza el cambio (handleTabChange ya dispara setCurrentSucursal).
   const getServicesForSucursal = (sucursalId: string) =>
-    allServices.filter(s => s.sucursalId === sucursalId);
+    currentSucursal?.id === sucursalId ? allServices : [];
 
   const getExtrasForSucursal = (sucursalId: string) =>
-    allExtras.filter(e => e.sucursalId === sucursalId);
-
-  const getDiscountsForSucursal = (sucursalId: string) =>
-    discounts.filter(d => d.id === 'none' || d.sucursalId === sucursalId);
+    currentSucursal?.id === sucursalId ? allExtras : [];
 
   // Wrap add functions to inject sucursalId
   const addServiceForSucursal = useCallback((sucursalId: string) => {
@@ -197,12 +306,6 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       return addExtra({ ...extra, sucursalId });
     };
   }, [addExtra]);
-
-  const addDiscountForSucursal = useCallback((sucursalId: string) => {
-    return (discount: Parameters<typeof addDiscount>[0]) => {
-      return addDiscount({ ...discount, sucursalId });
-    };
-  }, [addDiscount]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -222,11 +325,16 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
         </div>
       </div>
 
-      {/* Tabs por sucursal */}
-      {visibleSucursales.length > 0 && (
-        <Tabs defaultValue={defaultTabId} className="w-full">
-          {visibleSucursales.length > 1 && (
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+      {/* Tabs */}
+      {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          {(showGeneralTab || visibleSucursales.length > 1) && (
+            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
+              {showGeneralTab && (
+                <TabsTrigger value={GENERAL_TAB} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                  General
+                </TabsTrigger>
+              )}
               {visibleSucursales.map(s => (
                 <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
                   {s.nombre}
@@ -234,6 +342,33 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
               ))}
             </TabsList>
           )}
+
+          {showGeneralTab && (
+            <TabsContent value={GENERAL_TAB}>
+              <MiNegocioGeneralTabContent
+                isReady={generalIsReady}
+                services={allServices}
+                extras={allExtras}
+                discounts={discounts}
+                lines={allLines}
+                onAddService={addServiceGlobal}
+                onUpdateService={updateServiceGlobal}
+                onAddExtra={addExtraGlobal}
+                onUpdateExtra={updateExtraGlobal}
+                onAddDiscount={addDiscountGlobal}
+                onUpdateDiscount={updateDiscountGlobal}
+                onDeleteDiscount={deleteDiscountGlobal}
+                onToggleDiscountActive={setDiscountActiveGlobal}
+                onAddLine={addLine}
+                onUpdateLine={updateLine}
+                onDeleteService={deleteService}
+                onDeleteExtra={deleteExtra}
+                onDeleteLine={deleteLine}
+              />
+            </TabsContent>
+          )}
+
+
           {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
               <SucursalTabContent
@@ -243,17 +378,19 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 allSucursales={allSucursales}
                 services={getServicesForSucursal(s.id)}
                 extras={getExtrasForSucursal(s.id)}
-                discounts={getDiscountsForSucursal(s.id)}
+                discounts={discounts}
                 lines={allLines}
                 onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
                 onUpdateBarber={updateBarberFn}
+                onRefreshBarbers={fetchAllBarbers}
                 onAddService={addServiceForSucursal(s.id)}
                 onUpdateService={updateService}
                 onAddExtra={addExtraForSucursal(s.id)}
                 onUpdateExtra={updateExtra}
-                onAddDiscount={addDiscountForSucursal(s.id)}
+                onAddDiscount={addDiscount}
                 onUpdateDiscount={updateDiscount}
                 onDeleteDiscount={deleteDiscount}
+                onToggleDiscountActive={setDiscountActive}
                 onAddLine={addLine}
                 onUpdateLine={updateLine}
                 onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}

@@ -1,0 +1,252 @@
+import { useState } from 'react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Line } from '@/types/barbershop';
+import { toast } from 'sonner';
+
+const LINE_COLORS = [
+  { label: 'Azul', value: '#3B82F6' },
+  { label: 'Verde', value: '#22C55E' },
+  { label: 'Dorado', value: '#EAB308' },
+  { label: 'Rojo', value: '#EF4444' },
+  { label: 'Violeta', value: '#8B5CF6' },
+  { label: 'Naranja', value: '#F97316' },
+  { label: 'Rosa', value: '#EC4899' },
+  { label: 'Gris', value: '#6B7280' },
+];
+
+interface LinesConfigProps {
+  lines: Line[];
+  onAdd: (line: Omit<Line, 'id'>) => Promise<Line | null>;
+  onUpdate: (id: string, updates: Partial<Line>) => void;
+  onDelete?: (id: string) => void;
+}
+
+interface ToggleConfirm {
+  line: Line;
+  action: 'activate' | 'deactivate';
+}
+
+function validateName(name: string): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'El nombre no puede estar vacío.';
+  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
+  return null;
+}
+
+export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string>('');
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Line | null>(null);
+
+  const active = lines.filter(l => l.active);
+  const inactive = lines.filter(l => !l.active);
+
+  const resetForm = () => { setName(''); setColor(''); };
+
+  const handleAdd = async () => {
+    const err = validateName(name);
+    if (err) { toast.error(err); return; }
+    await onAdd({ name: name.trim(), active: true, color: color || undefined });
+    resetForm();
+    setIsAdding(false);
+  };
+
+  const handleUpdate = (id: string) => {
+    const err = validateName(name);
+    if (err) { toast.error(err); return; }
+    onUpdate(id, { name: name.trim(), color: color || undefined });
+    setEditingId(null);
+    resetForm();
+  };
+
+  const startEdit = (line: Line) => {
+    setEditingId(line.id);
+    setName(line.name);
+    setColor(line.color || '');
+  };
+
+  const handleConfirmToggle = () => {
+    if (!toggleConfirm) return;
+    onUpdate(toggleConfirm.line.id, { active: toggleConfirm.action === 'activate' });
+    setToggleConfirm(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirm || !onDelete) return;
+    onDelete(deleteConfirm.id);
+    setDeleteConfirm(null);
+  };
+
+  const ColorPicker = (
+    <div className="flex flex-wrap gap-2">
+      {LINE_COLORS.map(c => (
+        <button
+          key={c.value}
+          type="button"
+          onClick={() => setColor(color === c.value ? '' : c.value)}
+          className={`w-7 h-7 rounded-full border-2 transition-colors ${color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+          style={{ backgroundColor: c.value }}
+          title={c.label}
+        />
+      ))}
+    </div>
+  );
+
+  const renderLine = (line: Line) => {
+    const isEditing = editingId === line.id;
+    return (
+      <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+        {isEditing ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2 items-center">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" className="flex-1" maxLength={80} />
+              <Button size="icon" onClick={() => handleUpdate(line.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" onClick={() => { setEditingId(null); resetForm(); }}><X className="h-4 w-4" /></Button>
+            </div>
+            {ColorPicker}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            {line.color && (
+              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: line.color }} />
+            )}
+            <span className="flex-1 font-medium text-foreground">{line.name}</span>
+            <Button size="icon" variant="ghost" onClick={() => startEdit(line)} className="h-8 w-8" title="Editar">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setToggleConfirm({ line, action: line.active ? 'deactivate' : 'activate' })}
+              className="h-8 w-8"
+              title={line.active ? 'Desactivar' : 'Activar'}
+            >
+              {line.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+            </Button>
+            {onDelete && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={line.active}
+                        onClick={() => !line.active && setDeleteConfirm(line)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                        title={line.active ? undefined : 'Eliminar'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {line.active && (
+                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <Card className="border border-border bg-card">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base font-medium">Líneas de servicio</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Agrupá tus servicios por línea. El color elegido se refleja en todos los servicios asociados.
+            </p>
+          </div>
+          {!isAdding && activeSubTab === 'active' && (
+            <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activas ({active.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivas ({inactive.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="active" className="mt-4 space-y-2">
+              {isAdding && (
+                <div className="flex flex-col gap-3 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
+                  <div className="flex gap-2 items-center">
+                    <Input placeholder="Nombre (ej: Essencial, Deluxe)" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" maxLength={80} />
+                    <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}><X className="h-4 w-4" /></Button>
+                  </div>
+                  {ColorPicker}
+                </div>
+              )}
+              {active.map(renderLine)}
+              {active.length === 0 && !isAdding && (
+                <p className="text-sm text-muted-foreground text-center py-4">No hay líneas activas</p>
+              )}
+            </TabsContent>
+            <TabsContent value="inactive" className="mt-4 space-y-2">
+              {inactive.map(renderLine)}
+              {inactive.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No hay líneas inactivas</p>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {toggleConfirm?.action === 'deactivate' ? 'Desactivar línea' : 'Activar línea'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {toggleConfirm?.action === 'deactivate'
+                ? `¿Estás seguro de que querés desactivar "${toggleConfirm?.line.name}"? Los servicios asociados seguirán existiendo, pero la línea no aparecerá como opción.`
+                : `¿Querés volver a activar "${toggleConfirm?.line.name}"?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmToggle}>
+              {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar línea</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta línea dejará de aparecer en el sistema. Los servicios que la usaban seguirán existiendo y quedarán sin línea. No se modificarán los registros históricos. Esta acción no se podrá deshacer desde la interfaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

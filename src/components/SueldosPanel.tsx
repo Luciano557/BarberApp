@@ -136,6 +136,7 @@ interface BarberSalaryData {
   comisionExtraEquipo?: ComisionEquipoDetalle[];
   bonoFijoOcurrencias?: BonoFijoOcurrencia[];
   bonoFijoTotal?: number;
+  comisionProductosTotal?: number;
 }
 
 interface IngresoDetalle {
@@ -248,6 +249,18 @@ function BarberDetailRow({
               </div>
             </div>
           )}
+          {/* Comisión por productos vendidos */}
+          {barber.comisionProductosTotal != null && barber.comisionProductosTotal > 0 && (
+            <div className="p-3 rounded-md bg-primary/5 border border-primary/20 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>Comisión por productos vendidos</span>
+                <span>{formatCurrency(barber.comisionProductosTotal)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Calculada sobre la ganancia de los productos vendidos por este barbero.
+              </p>
+            </div>
+          )}
           {/* Ingresos Detail */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
@@ -355,7 +368,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       // ALWAYS fetch ALL data for saldo calculation (historical)
       let ingHistQuery = supabase
         .from('ingresos')
-        .select('barbero_id, sueldo')
+        .select('barbero_id, sueldo, comision_productos')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo');
       if (currentSucursal) ingHistQuery = ingHistQuery.eq('sucursal_id', currentSucursal.id);
@@ -374,10 +387,14 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       // Calculate HISTORICAL totals for saldo (real debt - never changes with filter)
       const devengadoHistoricoPorId: Record<string, number> = {};
-      ingresosHistoricos?.forEach(ingreso => {
+      const comisionProdHistoricoPorId: Record<string, number> = {};
+      ingresosHistoricos?.forEach((ingreso: any) => {
         const barberoId = ingreso.barbero_id;
         if (barberoId) {
           devengadoHistoricoPorId[barberoId] = (devengadoHistoricoPorId[barberoId] || 0) + (ingreso.sueldo || 0);
+          const cp = Number(ingreso.comision_productos) || 0;
+          devengadoHistoricoPorId[barberoId] += cp;
+          comisionProdHistoricoPorId[barberoId] = (comisionProdHistoricoPorId[barberoId] || 0) + cp;
         }
       });
 
@@ -392,7 +409,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       // Build query for ingresos - filtered by period if set (for display)
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at')
+        .select('id, barbero, barbero_id, sueldo, total_facturado, efectivo, mp, dia, created_at, comision_productos')
         .eq('organization_id', organization.id)
         .eq('estado', 'activo')
         .order('created_at', { ascending: false });
@@ -432,10 +449,13 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
       // Calculate FILTERED devengado per barber (for display)
       const devengadoFiltradoPorId: Record<string, number> = {};
-      (ingresosFiltrados as IngresoRaw[] | null)?.forEach(ingreso => {
+      const comisionProdFiltradoPorId: Record<string, number> = {};
+      (ingresosFiltrados as any[] | null)?.forEach(ingreso => {
         const barberoId = ingreso.barbero_id;
         if (barberoId) {
           devengadoFiltradoPorId[barberoId] = (devengadoFiltradoPorId[barberoId] || 0) + (ingreso.sueldo || 0);
+          const cp = Number(ingreso.comision_productos) || 0;
+          comisionProdFiltradoPorId[barberoId] = (comisionProdFiltradoPorId[barberoId] || 0) + cp;
         }
       });
 
@@ -672,7 +692,12 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           bonoFijoTotal = bonoFiltrado.total;
           totalDevengado += bonoFijoTotal;
         }
-        
+
+        // Comisión por productos vendidos (filtered)
+        const comisionProductosTotal = comisionProdFiltradoPorId[barber.id] || 0;
+        if (comisionProductosTotal > 0) {
+          totalDevengado += comisionProductosTotal;
+        }
         // HISTORICAL saldo - real debt that NEVER changes with filter
         let saldoHistorico = (devengadoHistoricoPorId[barber.id] || 0) - (pagadoHistoricoPorId[barber.id] || 0);
         // For fixed salary: add historical accrual from created_at to now
@@ -686,6 +711,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const totalHistorico = Object.values(comisionData.historico).reduce((sum, v) => sum + v.monto, 0);
           saldoHistorico += totalHistorico;
         }
+        // Add historical comisión productos to saldo
+        saldoHistorico += (comisionProdHistoricoPorId[barber.id] || 0);
         // Add historical bono fijo to saldo
         saldoHistorico += (bonoHistoricoPorId[barber.id] || 0);
         
@@ -728,6 +755,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           comisionExtraEquipo,
           bonoFijoOcurrencias,
           bonoFijoTotal,
+          comisionProductosTotal,
         };
       });
 

@@ -26,9 +26,15 @@ interface TareaFormDialogProps {
 }
 
 export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPending, tipo, creadorNombre }: TareaFormDialogProps) {
+  const TEAM_VALUE = '__team__';
+  const TITLE_MAX = 80;
+  const TITLE_MIN = 3;
+  const DESC_MAX = 500;
+
   const [titulo, setTitulo] = useState('');
   const [descripcion, setDescripcion] = useState('');
-  const [asignadoId, setAsignadoId] = useState('');
+  const [asignadoId, setAsignadoId] = useState<string>(TEAM_VALUE);
+  const [submitted, setSubmitted] = useState(false);
 
   // Date
   const [hasDate, setHasDate] = useState(false);
@@ -56,7 +62,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
   const resetForm = () => {
     setTitulo('');
     setDescripcion('');
-    setAsignadoId('');
+    setAsignadoId(TEAM_VALUE);
     setHasDate(false);
     setSelectedDate(undefined);
     setHasTime(false);
@@ -66,10 +72,27 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
     setRepeatInterval(1);
     setRepeatByweekday([]);
     setVencimientoDias(60);
+    setSubmitted(false);
   };
 
+  const trimmedTitle = titulo.trim();
+  const trimmedDesc = descripcion.trim();
+  const titleError =
+    trimmedTitle.length === 0
+      ? 'El título es obligatorio.'
+      : trimmedTitle.length < TITLE_MIN
+        ? `El título debe tener al menos ${TITLE_MIN} caracteres.`
+        : trimmedTitle.length > TITLE_MAX
+          ? `El título no puede superar ${TITLE_MAX} caracteres.`
+          : null;
+  const descError = trimmedDesc.length > DESC_MAX
+    ? `La descripción no puede superar ${DESC_MAX} caracteres.`
+    : null;
+  const isValid = !titleError && !descError;
+
   const handleConfirm = () => {
-    if (!titulo.trim()) return;
+    setSubmitted(true);
+    if (!isValid) return;
 
     if (isPeticion) {
       const tarea: TareaInsert = {
@@ -81,14 +104,15 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
       };
       onSubmit(tarea);
     } else {
-      const barber = activeBarbers.find(b => b.id === asignadoId);
-      const barberName = barber ? getBarberDisplayName(barber) : undefined;
+      const isTeam = asignadoId === TEAM_VALUE || !asignadoId;
+      const barber = !isTeam ? activeBarbers.find(b => b.id === asignadoId) : undefined;
       const tarea: TareaInsert = {
         tipo: 'tarea',
-        titulo: titulo.trim(),
-        descripcion: descripcion.trim() || undefined,
-        asignado_a_id: asignadoId || undefined,
-        asignado_a_nombre: barberName,
+        titulo: trimmedTitle,
+        descripcion: trimmedDesc || undefined,
+        asignado_a_id: isTeam ? null : asignadoId,
+        asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : undefined),
+        assignment_scope: isTeam ? 'team' : 'individual',
         fecha_limite: hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
         hora: hasTime ? selectedTime : undefined,
         repeat_preset: repeatPreset,
@@ -151,7 +175,7 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
               variant="ghost"
               size="icon"
               className="text-primary"
-              disabled={!titulo.trim() || isPending}
+              disabled={!isValid || isPending}
               onClick={handleConfirm}
             >
               <CheckCircle className="h-5 w-5" />
@@ -168,19 +192,39 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
 
             {/* Title & Description */}
             <div className="space-y-3">
-              <Input
-                placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
-                value={titulo}
-                onChange={e => setTitulo(e.target.value)}
-                className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
-              />
-              <Textarea
-                placeholder="Notas"
-                value={descripcion}
-                onChange={e => setDescripcion(e.target.value)}
-                rows={2}
-                className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
-              />
+              <div>
+                <Input
+                  placeholder={isPeticion ? 'Título de la petición' : 'Título de la tarea'}
+                  value={titulo}
+                  onChange={e => setTitulo(e.target.value.slice(0, TITLE_MAX))}
+                  maxLength={TITLE_MAX}
+                  aria-invalid={submitted && !!titleError}
+                  className="text-base font-medium border-0 border-b border-border rounded-none px-0 focus-visible:ring-0"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${submitted && titleError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {submitted && titleError ? titleError : ' '}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{trimmedTitle.length}/{TITLE_MAX}</span>
+                </div>
+              </div>
+              <div>
+                <Textarea
+                  placeholder="Descripción (opcional)"
+                  value={descripcion}
+                  onChange={e => setDescripcion(e.target.value.slice(0, DESC_MAX))}
+                  rows={3}
+                  maxLength={DESC_MAX}
+                  aria-invalid={submitted && !!descError}
+                  className="border-0 border-b border-border rounded-none px-0 focus-visible:ring-0 resize-none text-sm"
+                />
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${submitted && descError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {submitted && descError ? descError : ' '}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{trimmedDesc.length}/{DESC_MAX}</span>
+                </div>
+              </div>
             </div>
 
             {/* Vencimiento (peticiones) */}
@@ -233,9 +277,10 @@ export function TareaFormDialog({ open, onOpenChange, barbers, onSubmit, isPendi
                   <Label className="text-xs text-muted-foreground">Asignar a</Label>
                   <Select value={asignadoId} onValueChange={setAsignadoId}>
                     <SelectTrigger className="border-0 border-b border-border rounded-none px-0">
-                      <SelectValue placeholder="Sin asignar" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={TEAM_VALUE}>Todo el equipo</SelectItem>
                       {activeBarbers.map(b => (
                         <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
                       ))}

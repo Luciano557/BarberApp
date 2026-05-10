@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -30,6 +31,7 @@ interface SucursalTabContentProps {
   lines: Line[];
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void;
+  onRefreshBarbers?: () => Promise<void> | void;
   onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
   onUpdateService: (id: string, updates: Partial<Service>) => void;
   onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
@@ -37,6 +39,7 @@ interface SucursalTabContentProps {
   onAddDiscount: (discount: Omit<Discount, 'id'>) => void;
   onUpdateDiscount: (id: string, updates: Partial<Discount>) => void;
   onDeleteDiscount: (id: string) => void;
+  onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onSucursalUpdated: () => void;
@@ -46,15 +49,17 @@ interface SucursalTabContentProps {
 export function SucursalTabContent({
   sucursal, barbers, allBarbers, allSucursales = [],
   services, extras, discounts, lines,
-  onAddBarber, onUpdateBarber,
+  onAddBarber, onUpdateBarber, onRefreshBarbers,
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
-  onAddDiscount, onUpdateDiscount, onDeleteDiscount,
+  onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onSucursalUpdated,
   onGoToGeneralConfig,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
+  const { isOwner, isGeneralManager } = useAuth();
+  const canManageServiceStructure = isOwner || isGeneralManager;
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -233,18 +238,23 @@ export function SucursalTabContent({
           sucursales={allSucursales}
           onAddBarber={onAddBarber}
           onUpdateBarber={onUpdateBarber}
+          onRefreshBarbers={onRefreshBarbers}
         />
 
         {/* Catálogo de Servicios */}
         <div className="space-y-4 mt-6">
           <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
           <CobrarConfig
+            sucursalId={sucursal.id}
             services={services} extras={extras} discounts={discounts} lines={lines}
             onAddService={onAddService} onUpdateService={onUpdateService}
             onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
             onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
             onDeleteDiscount={onDeleteDiscount}
+            onToggleDiscountActive={onToggleDiscountActive}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
+            canCreateServices={canManageServiceStructure}
+            canEditServiceStructure={canManageServiceStructure}
           />
         </div>
 

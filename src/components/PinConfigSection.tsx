@@ -43,14 +43,9 @@ export function PinConfigSection() {
     }
     
     try {
-      const { data, error } = await supabase
-        .from('barberos')
-        .select('pin_hash')
-        .eq('id', profile.barbero_id)
-        .single();
-
+      const { data, error } = await supabase.rpc('current_user_has_pin');
       if (error) throw error;
-      setHasPin(!!data?.pin_hash);
+      setHasPin(!!data);
     } catch (error) {
       console.error('Error checking PIN:', error);
       setHasPin(false);

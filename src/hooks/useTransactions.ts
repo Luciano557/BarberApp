@@ -8,11 +8,11 @@ import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
 
 interface VentaInsert {
-  barbero_id: string;
-  barbero_nombre: string;
-  servicio_id: string;
-  servicio_nombre: string;
-  precio_servicio: number;
+  barbero_id: string | null;
+  barbero_nombre: string | null;
+  servicio_id: string | null;
+  servicio_nombre: string | null;
+  precio_servicio: number | null;
   descuento_pct: number;
   metodo_pago: PaymentMethod;
   total_final: number;
@@ -20,6 +20,17 @@ interface VentaInsert {
   total_cobrado: number;
   organization_id: string;
   sucursal_id?: string | null;
+  tipo_venta: 'servicio' | 'productos' | 'mixta';
+}
+
+export interface ProductoCartInput {
+  producto_id: string;
+  producto_sucursal_id: string;
+  producto_nombre: string;
+  marca_id: string | null;
+  marca_nombre: string | null;
+  precio_unitario: number;
+  cantidad: number;
 }
 
 interface VentaExtraInsert {
@@ -72,14 +83,16 @@ export function useTransactions() {
       return;
     }
 
-    // Cargar extras de cada venta
+    // Cargar extras, pagos y productos de cada venta
     const ventaIds = ventas.map(v => v.id);
-    const [extrasRes, pagosRes] = await Promise.all([
+    const [extrasRes, pagosRes, productosRes] = await Promise.all([
       supabase.from('venta_extra').select('*').in('venta_id', ventaIds),
       supabase.from('venta_pagos').select('*').in('venta_id', ventaIds).order('orden', { ascending: true }),
+      supabase.from('venta_producto').select('*').in('venta_id', ventaIds),
     ]);
     const ventaExtras = extrasRes.data;
     const ventaPagos = pagosRes.data;
+    const ventaProductos = productosRes.data;
 
     const extrasMap = new Map<string, { uid: string; name: string; price: number }[]>();
     ventaExtras?.forEach(ve => {
@@ -108,8 +121,23 @@ export function useTransactions() {
       pagosMap.set(p.venta_id, list);
     });
 
+    const productosMap = new Map<string, import('@/types/barbershop').TransactionProducto[]>();
+    ventaProductos?.forEach((vp: any) => {
+      const list = productosMap.get(vp.venta_id) || [];
+      list.push({
+        producto_id: vp.producto_id,
+        producto_sucursal_id: vp.producto_sucursal_id ?? null,
+        producto_nombre: vp.producto_nombre,
+        marca_id: vp.marca_id ?? null,
+        marca_nombre: vp.marca_nombre ?? null,
+        precio_unitario: Number(vp.precio_unitario) || 0,
+        cantidad: Number(vp.cantidad) || 0,
+        subtotal: Number(vp.subtotal) || 0,
+      });
+      productosMap.set(vp.venta_id, list);
+    });
+
     const txs: Transaction[] = ventas.map(v => {
-      // Source of truth: venta_pagos rows; fallback for legacy ventas: synthesize 1 entry
       const pagos = pagosMap.get(v.id);
       const baseTotal = Number(v.total_final);
       const recargoTotal = Number((v as any).recargo_total) || 0;
@@ -123,22 +151,38 @@ export function useTransactions() {
             recargoMonto: 0,
             basePago: baseTotal,
           }];
+
+      const tipoVentaRaw = (v as any).tipo_venta as string | null;
+      const productos = productosMap.get(v.id) || [];
+      const productosTotal = productos.reduce((s, p) => s + p.subtotal, 0);
+      const tipoVenta: 'servicio' | 'productos' | 'mixta' =
+        tipoVentaRaw === 'productos' || tipoVentaRaw === 'servicio' || tipoVentaRaw === 'mixta'
+          ? tipoVentaRaw
+          : (v.servicio_id ? (productos.length > 0 ? 'mixta' : 'servicio') : 'productos');
+      const serviciosBase = tipoVenta === 'productos' ? 0 : Math.max(0, baseTotal - productosTotal);
+      const serviceCount = tipoVenta === 'productos' || !v.servicio_id ? 0 : 1;
+
       return {
         id: v.id,
         barberId: v.barbero_id,
         barberName: v.barbero_nombre,
         serviceId: v.servicio_id,
         serviceName: v.servicio_nombre,
-        servicePrice: Number(v.precio_servicio),
+        servicePrice: Number(v.precio_servicio) || 0,
         extras: extrasMap.get(v.id) || [],
         discount: Number(v.descuento_pct) || 0,
         discountType: 'percentage' as const,
         paymentMethod: v.metodo_pago as PaymentMethod,
         payments,
-        subtotal: Number(v.precio_servicio) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
+        subtotal: (Number(v.precio_servicio) || 0) + (extrasMap.get(v.id) || []).reduce((s, e) => s + e.price, 0),
         total: baseTotal,
         recargoTotal,
         totalCobrado,
+        tipoVenta,
+        productosTotal,
+        serviciosBase,
+        serviceCount,
+        productos,
         createdAt: new Date(v.fecha_hora),
         estado: (v as any).estado || 'activo',
         anuladoAt: (v as any).anulado_at ? new Date((v as any).anulado_at) : undefined,
@@ -156,7 +200,7 @@ export function useTransactions() {
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (
-    transaction: Omit<Transaction, 'id' | 'createdAt'>
+    transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & { productos?: ProductoCartInput[] }
   ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
@@ -173,9 +217,26 @@ export function useTransactions() {
       return null;
     }
 
+    const productos = transaction.productos || [];
+    const hasService = !!transaction.serviceId;
+    const hasProducts = productos.length > 0;
+
+    if (!hasService && !hasProducts) {
+      toast.error('Agregá al menos un servicio o producto');
+      return null;
+    }
+
+    const tipoVenta: 'servicio' | 'productos' | 'mixta' =
+      hasService && hasProducts ? 'mixta' : hasService ? 'servicio' : 'productos';
+
+    if (tipoVenta !== 'productos' && !transaction.barberId) {
+      toast.error('Seleccioná un barbero para registrar el servicio');
+      return null;
+    }
+
     // Normalize names to avoid spacing issues
-    const normalizedBarberName = transaction.barberName.replace(/\s+/g, ' ').trim();
-    const normalizedServiceName = transaction.serviceName.replace(/\s+/g, ' ').trim();
+    const normalizedBarberName = transaction.barberName ? transaction.barberName.replace(/\s+/g, ' ').trim() : null;
+    const normalizedServiceName = transaction.serviceName ? transaction.serviceName.replace(/\s+/g, ' ').trim() : null;
 
     // BASE = transaction.total. Cada pago trae basePago + recargo (o sólo amount = base si legacy).
     // Normalizar: garantizar basePago, recargoMonto, recargoPct y amount = basePago + recargoMonto.
@@ -188,7 +249,6 @@ export function useTransactions() {
       let basePago = p.basePago;
       let recargoMonto = p.recargoMonto;
       if (basePago == null) {
-        // Pago legacy: amount es base, sin recargo
         basePago = Number(p.amount) || 0;
         recargoMonto = recargoMonto ?? 0;
       }
@@ -213,23 +273,23 @@ export function useTransactions() {
     const recargoTotal = sumRecargo;
     const totalCobrado = sumCobrado || baseTotal;
 
-    // Legacy field: usar el método con mayor monto cobrado como primary
     const primaryMethod = [...normalizedPayments].sort((a, b) => b.amount - a.amount)[0].method;
 
     // Insertar venta principal
     const ventaData: VentaInsert = {
-      barbero_id: transaction.barberId,
+      barbero_id: transaction.barberId || null,
       barbero_nombre: normalizedBarberName,
-      servicio_id: transaction.serviceId,
+      servicio_id: transaction.serviceId || null,
       servicio_nombre: normalizedServiceName,
-      precio_servicio: transaction.servicePrice,
+      precio_servicio: hasService ? transaction.servicePrice : null,
       descuento_pct: transaction.discount,
       metodo_pago: primaryMethod,
-      total_final: baseTotal,           // BASE comisionable (intacto)
-      recargo_total: recargoTotal,      // NUEVO
-      total_cobrado: totalCobrado,      // NUEVO
+      total_final: baseTotal,
+      recargo_total: recargoTotal,
+      total_cobrado: totalCobrado,
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
+      tipo_venta: tipoVenta,
     };
 
     const { data: venta, error: ventaError } = await supabase
@@ -240,6 +300,7 @@ export function useTransactions() {
 
     if (ventaError) {
       console.error('Error inserting venta:', ventaError);
+      toast.error('Error al guardar la venta');
       return null;
     }
 
@@ -249,7 +310,7 @@ export function useTransactions() {
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       metodo_pago: p.method,
-      monto: p.amount,                  // base + recargo (lo que entra a caja)
+      monto: p.amount,
       base_pago: p.basePago,
       recargo_pct: p.recargoPct,
       recargo_monto: p.recargoMonto,
@@ -283,14 +344,75 @@ export function useTransactions() {
       }
     }
 
+    // Insertar productos y descontar stock
+    if (hasProducts) {
+      const productosData = productos.map(p => ({
+        venta_id: venta.id,
+        organization_id: organization.id,
+        sucursal_id: currentSucursal.id,
+        producto_id: p.producto_id,
+        producto_sucursal_id: p.producto_sucursal_id,
+        producto_nombre: p.producto_nombre,
+        marca_id: p.marca_id,
+        marca_nombre: p.marca_nombre,
+        precio_unitario: p.precio_unitario,
+        cantidad: p.cantidad,
+        subtotal: p.precio_unitario * p.cantidad,
+        barbero_id: transaction.barberId || null,
+      }));
+
+      const { error: vpError } = await supabase
+        .from('venta_producto')
+        .insert(productosData as any);
+
+      if (vpError) {
+        console.error('Error inserting venta_producto:', vpError);
+        toast.error('Error al guardar productos en la venta');
+      }
+
+      // Descontar stock con RPC (atomic + audit)
+      for (const p of productos) {
+        const { error: stockErr } = await supabase.rpc('registrar_movimiento_stock', {
+          _producto_sucursal_id: p.producto_sucursal_id,
+          _tipo: 'venta',
+          _cantidad: -p.cantidad,
+          _motivo: null,
+          _venta_id: venta.id,
+        });
+        if (stockErr) {
+          console.error('Error registering stock movement:', stockErr);
+        }
+      }
+    }
+
     // Agregar al estado local
+    const productosEnriched = productos.map(p => ({
+      producto_id: p.producto_id,
+      producto_sucursal_id: p.producto_sucursal_id,
+      producto_nombre: p.producto_nombre,
+      marca_id: p.marca_id,
+      marca_nombre: p.marca_nombre,
+      precio_unitario: p.precio_unitario,
+      cantidad: p.cantidad,
+      subtotal: p.precio_unitario * p.cantidad,
+    }));
+    const productosTotal = productosEnriched.reduce((s, p) => s + p.subtotal, 0);
+    const serviciosBase = tipoVenta === 'productos' ? 0 : Math.max(0, baseTotal - productosTotal);
+    const serviceCount = tipoVenta === 'productos' || !transaction.serviceId ? 0 : 1;
+
+    const { productos: _ignored, ...txRest } = transaction;
     const newTransaction: Transaction = {
-      ...transaction,
+      ...txRest,
       payments: normalizedPayments,
       paymentMethod: primaryMethod,
       total: baseTotal,
       recargoTotal,
       totalCobrado,
+      tipoVenta,
+      productosTotal,
+      serviciosBase,
+      serviceCount,
+      productos: productosEnriched,
       id: venta.id,
       createdAt: new Date(venta.fecha_hora),
     };
