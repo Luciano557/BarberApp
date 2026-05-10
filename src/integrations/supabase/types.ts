@@ -1670,6 +1670,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_active: boolean | null
+          last_payment_at: string | null
           logo_url: string | null
           name: string
           peticiones_vencimiento_dias: number
@@ -1685,6 +1686,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_payment_at?: string | null
           logo_url?: string | null
           name: string
           peticiones_vencimiento_dias?: number
@@ -1700,6 +1702,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_active?: boolean | null
+          last_payment_at?: string | null
           logo_url?: string | null
           name?: string
           peticiones_vencimiento_dias?: number
