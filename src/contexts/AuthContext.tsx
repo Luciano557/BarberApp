@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: fullName,
           business_name: businessName || 'Mi Barbería',
           country: country || 'AR',
-          business_plan: (plan || 'free').toLowerCase(),
+          business_plan: (plan || 'basico').toLowerCase(),
         }
       }
     });
