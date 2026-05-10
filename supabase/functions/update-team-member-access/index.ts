@@ -224,7 +224,7 @@ serve(async (req: Request): Promise<Response> => {
       );
       if (visibleConflict) {
         if (!replaceExistingManager) {
-          return jsonResponse(409, {
+          return jsonResponse(200, {
             ok: false,
             code: "MANAGER_REPLACE_REQUIRED",
             currentManagerBarberoId: visibleConflict.id,
