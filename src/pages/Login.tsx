@@ -8,9 +8,9 @@ import { toast } from 'sonner';
 import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
 
 const PLANS = [
-  { id: 'free',    label: 'Básico',      price: '$30.000'  },
-  { id: 'basic',   label: 'Profesional', price: '$50.000'  },
-  { id: 'premium', label: 'Premium',     price: '$100.000' },
+  { id: 'basico',      label: 'Básico',      price: '$30.000'  },
+  { id: 'profesional', label: 'Profesional', price: '$50.000'  },
+  { id: 'premium',     label: 'Premium',     price: '$100.000' },
 ] as const;
 type PlanId = typeof PLANS[number]['id'];
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +34,7 @@ export default function Login() {
   const [registerName, setRegisterName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [country, setCountry] = useState('AR');
-  const [plan, setPlan] = useState<PlanId>('free');
+  const [plan, setPlan] = useState<PlanId>('basico');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +87,9 @@ export default function Login() {
       setIsLoading(false);
       return;
     }
+    // Forzar cierre de sesión previa para que no se herede la org de otro usuario
+    try { await supabase.auth.signOut(); } catch {}
+
     // Guardar email para la pantalla de verificación (limpiado tras éxito)
     localStorage.setItem('pending_verification_email', registerEmail);
 
