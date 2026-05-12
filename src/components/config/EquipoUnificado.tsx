@@ -24,7 +24,8 @@ const ROLE_HIERARCHY: Record<AppRole, number> = {
   general_manager: 1,
   manager: 2,
   barber: 3,
-  otros: 4,
+  sucursal_account: 4,
+  otros: 5,
 };
 
 const getRoleLabel = (role: AppRole) => {

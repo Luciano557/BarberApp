@@ -25,7 +25,7 @@ interface SucursalContextType {
 const SucursalContext = createContext<SucursalContextType | undefined>(undefined);
 
 export function SucursalProvider({ children }: { children: ReactNode }) {
-  const { user, isOwner, isGeneralManager, isLoading: authLoading } = useAuth();
+  const { user, isOwner, isGeneralManager, isSucursalAccount, isLoading: authLoading } = useAuth();
   const { organization, isLoading: orgLoading } = useOrganization();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [currentSucursal, setCurrentSucursalState] = useState<Sucursal | null>(null);
@@ -99,6 +99,8 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
   }, [user, organization, authLoading, orgLoading]);
 
   const setCurrentSucursal = useCallback(async (id: string | null) => {
+    // Sucursal accounts are locked to their assigned sucursal — no switching.
+    if (isSucursalAccount) return;
     // Block branch switching for non-owner/GM users
     if (!isOwner && !isGeneralManager) return;
 
@@ -118,9 +120,10 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-  }, [sucursales, user, isOwner, isGeneralManager]);
+  }, [sucursales, user, isOwner, isGeneralManager, isSucursalAccount]);
 
-  const isAllMode = (isOwner || isGeneralManager) && currentSucursal === null;
+  // Sucursal accounts never have "Todas" mode.
+  const isAllMode = !isSucursalAccount && (isOwner || isGeneralManager) && currentSucursal === null;
 
   return (
     <SucursalContext.Provider
