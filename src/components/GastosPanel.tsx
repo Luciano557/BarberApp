@@ -282,6 +282,12 @@ export function GastosPanel() {
       />
 
       {/* Historial */}
+      <SucursalViewPinGate
+        actionKey="ver_gastos"
+        sucursalId={currentSucursal?.id ?? null}
+        isSucursalAccount={isSucursalAccount}
+        viewLabel="los gastos"
+      >
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
