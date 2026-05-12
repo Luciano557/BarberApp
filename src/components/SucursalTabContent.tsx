@@ -278,6 +278,18 @@ export function SucursalTabContent({
         </div>
 
       </div>
+
+      <Sheet open={cuentaOpen} onOpenChange={setCuentaOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Cuenta de sucursal — {sucursal.nombre}</SheetTitle>
+            <SheetDescription>
+              Acceso operativo y reglas de PIN específicas para esta sucursal.
+            </SheetDescription>
+          </SheetHeader>
+          <CuentaSucursalBlock sucursal={sucursal} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
