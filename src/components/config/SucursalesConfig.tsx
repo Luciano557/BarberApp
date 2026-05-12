@@ -12,7 +12,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Plus, Edit2, Trash2, Users, UserCheck, Shield, Scissors } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, Users, UserCheck, Shield, Scissors, KeyRound } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { CuentaSucursalBlock } from './CuentaSucursalBlock';
 import { toast } from 'sonner';
 
 interface UserProfile {
@@ -62,6 +64,8 @@ const getRoleIcon = (role: AppRole) => {
 export function SucursalesConfig() {
   const { organization } = useOrganization();
   const { sucursales, refreshSucursales } = useSucursal();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const [cuentaSucursal, setCuentaSucursal] = useState<Sucursal | null>(null);
   const { allBarbers } = useSupabaseData();
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
@@ -301,6 +305,12 @@ export function SucursalesConfig() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
+                  {(isOwner || isGeneralManager || (isManager && sucursales.some(s => s.id === suc.id))) && (
+                    <Button variant="outline" size="sm" onClick={() => setCuentaSucursal(suc)} className="px-3 py-1.5 text-xs font-medium">
+                      <KeyRound className="h-3.5 w-3.5 mr-1.5" />
+                      Cuenta de sucursal
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => handleOpenAssign(suc)} className="px-3 py-1.5 text-xs font-medium">
                     <Users className="h-3.5 w-3.5 mr-1.5" />
                     Ver/Editar Equipo
@@ -460,6 +470,17 @@ export function SucursalesConfig() {
           </div>
         </DialogContent>
       </Dialog>
+      <Sheet open={cuentaSucursal !== null} onOpenChange={(o) => { if (!o) setCuentaSucursal(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Cuenta de sucursal — {cuentaSucursal?.nombre}</SheetTitle>
+            <SheetDescription>
+              Acceso operativo y reglas de PIN específicas para esta sucursal.
+            </SheetDescription>
+          </SheetHeader>
+          {cuentaSucursal && <CuentaSucursalBlock sucursal={cuentaSucursal} />}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
