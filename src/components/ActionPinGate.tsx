@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useRef, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PinGateDialog } from '@/components/PinGateDialog';
+import { useAuth } from '@/contexts/AuthContext';
 import { SucursalActionKey, SUCURSAL_ACTION_LABELS } from '@/lib/sucursalActions';
 import { toast } from 'sonner';
 
@@ -35,7 +36,20 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingState | null>(null);
   const pendingRef = useRef<PendingState | null>(null);
 
+  // Bypass: el PIN solo aplica a cuentas de sucursal. El resto de cuentas personales
+  // (owner, general_manager, manager, barber) nunca pasa por el flujo de PIN.
+  const { isSucursalAccount } = useAuth();
+  const isSucursalAccountRef = useRef(isSucursalAccount);
+  useEffect(() => {
+    isSucursalAccountRef.current = isSucursalAccount;
+  }, [isSucursalAccount]);
+
   const requirePinForAction = useCallback<RequireFn>(async (actionKey, sucursalId, organizationId) => {
+    // Cuentas personales: ejecutan la acción directamente, sin PIN.
+    if (!isSucursalAccountRef.current) {
+      return { ok: true, validatedByRole: null, validatedByUserId: null, userName: null };
+    }
+
     // 1. Resolver organization_id si no vino: del profile del usuario actual
     let orgId = organizationId ?? null;
     if (!orgId) {
