@@ -336,6 +336,7 @@ function BarberDetailRow({
 export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
+  const requirePinForAction = useRequirePinForAction();
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
