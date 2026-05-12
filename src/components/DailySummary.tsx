@@ -1124,6 +1124,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               disabled={isSaving}
               onClick={async () => {
                 if (!closingBarber) return;
+                const gate = await requirePinForAction('cerrar_caja', currentSucursal?.id ?? null);
+                if (!gate.ok) return;
                 setIsSaving(true);
                 const success = await saveCashClosing({
                   barber: closingBarber,
