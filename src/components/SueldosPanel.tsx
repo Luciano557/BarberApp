@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth, addDays, addWeeks, addYears } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 
 /**
  * Calcula el devengado de sueldo fijo usando meses calendario reales.
