@@ -89,8 +89,11 @@ export function MiNegocioGeneralTabContent({
       )}
 
       <div className={!isReady ? 'opacity-60 pointer-events-none select-none' : ''}>
+        {/* Cuentas de sucursal */}
+        <CuentasSucursalConfig />
+
         {/* Catálogo */}
-        <div className="space-y-4">
+        <div className="space-y-4 mt-8">
           <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
           <Tabs defaultValue="services" className="w-full">
             <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
