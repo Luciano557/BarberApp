@@ -65,6 +65,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { saveCashClosing } = useCashClosing();
+  const requirePinForAction = useRequirePinForAction();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
