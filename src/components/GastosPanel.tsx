@@ -19,6 +19,7 @@ import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/Cus
 import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
@@ -71,10 +72,19 @@ export function GastosPanel() {
   const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
   const requirePinForAction = useRequirePinForAction();
   const { currentSucursal } = useSucursal();
+  const { isSucursalAccount } = useAuth();
   
   const [anularState, setAnularState] = useState<{ id: number; motivo: string } | null>(null);
   const [anulando, setAnulando] = useState(false);
+  const [gastosViewUnlocked, setGastosViewUnlocked] = useState(false);
+  const shouldGateGastosView = isSucursalAccount && !gastosViewUnlocked;
   const { recurrentes, syncGastosRecurrentes, addRecurrente, toggleRecurrente, deleteRecurrente } = useGastosRecurrentes();
+
+  const handleUnlockGastosView = async () => {
+    const gate = await requirePinForAction('ver_gastos', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+    setGastosViewUnlocked(true);
+  };
 
   // Wire up the recurrentes sync into useGastos
   useEffect(() => {
@@ -285,21 +295,30 @@ export function GastosPanel() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Historial</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium min-w-[120px] text-center capitalize">
-                {format(selectedMonth, 'MMMM yyyy', { locale: es })}
-              </span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {!shouldGateGastosView && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[120px] text-center capitalize">
+                  {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {shouldGateGastosView ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+              <p className="text-sm text-muted-foreground max-w-sm">
+                El detalle de gastos puede requerir autorización.
+              </p>
+              <Button onClick={handleUnlockGastosView}>Ver gastos</Button>
+            </div>
+          ) : isLoading ? (
             <p className="text-muted-foreground text-center py-4">Cargando...</p>
           ) : gastos.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No hay gastos en este período</p>

@@ -1,78 +1,86 @@
-# Fase 3 — Confirmación de visibilidad + limpieza técnica en DailySummary
+# Fase 4 — Wiring de acciones sensibles con PIN (v2)
 
-## Estado funcional verificado
+## Resumen de auditoría
 
-La parte funcional de Fase 3 ya está cubierta por código existente:
+Wiring correcto hoy: `cerrar_caja`, `anular_transaccion`, `anular_cierre_caja`, `regularizar_cierre_caja`, `ver_historial_caja`, `registrar_gasto`, `anular_gasto`, `registrar_pago_sueldo`, `crear_tarea`, `editar_tarea`, `completar_tarea`.
 
-- `AuthContext`: `canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount`, y `canManageConfig = isOwner || isGeneralManager`. Cuenta de sucursal queda fuera de Mi Negocio y Configuración.
-- `AppSidebar` arma el menú a partir de esos flags, así que para `sucursal_account` solo aparecen Cobrar, Caja, Finanzas, Tareas, Turnos y Clientes. Mi Negocio y Configuración no se renderizan.
-- `FinanzasPanel` tiene rama dedicada para `isSucursalAccount` que solo muestra las tabs Gastos y Sueldos.
-- Caja, Finanzas y Turnos abren sin PIN. Las acciones sensibles siguen pasando por `requirePinForAction` con los actionKeys ya existentes.
+Sin uso real: `editar_gasto` (no hay flujo de edición). `PinProtectedSection.tsx` y `SucursalViewPinGate.tsx` quedan huérfanos pero no se tocan en esta fase.
 
-No hay cambios funcionales pendientes en estos archivos.
+Faltantes a cablear: `bloquear_cliente`, `ver_gastos` (solo bloque sensible), `ver_sueldos` (solo bloque sensible).
 
-## Cambios a aplicar
+## Cambios
 
-Archivo único: `src/components/DailySummary.tsx`.
+### 1. `src/components/clientes/ClienteDetailDialog.tsx` — `bloquear_cliente`
 
-### 1. Reemplazar `useMemo` por `useEffect`
-
-Líneas 150–152:
+- Imports si faltan: `useRequirePinForAction` desde `@/components/ActionPinGate`, `useSucursal` desde `@/contexts/SucursalContext`.
+- En el componente: `const requirePinForAction = useRequirePinForAction();` y `const { currentSucursal } = useSucursal();`.
+- En `handleConfirmBlock`, antes de `blockCliente`:
 
 ```ts
-useMemo(() => {
-  checkClosedBarbers();
-}, [checkClosedBarbers]);
+const gate = await requirePinForAction('bloquear_cliente', currentSucursal?.id ?? null);
+if (!gate.ok) return;
 ```
 
-Pasa a:
+- No tocar `handleConfirmUnblock`.
+
+### 2. `src/components/GastosPanel.tsx` — gate manual solo sobre la vista sensible
+
+- **No** disparar PIN al montar.
+- Form "Registrar gasto" siempre visible (cubierto por `registrar_gasto` al confirmar).
+- Mantener intactos los gates de `registrar_gasto` y `anular_gasto`.
+- Estado: `const [gastosViewUnlocked, setGastosViewUnlocked] = useState(false);`.
+- `useAuth` desde `@/contexts/AuthContext`: `const { isSucursalAccount } = useAuth();`.
+- Derivado: `const shouldGateGastosView = isSucursalAccount && !gastosViewUnlocked;`.
+- Handler:
 
 ```ts
-useEffect(() => {
-  checkClosedBarbers();
-}, [checkClosedBarbers]);
+const handleUnlockGastosView = async () => {
+  const gate = await requirePinForAction('ver_gastos', currentSucursal?.id ?? null);
+  if (!gate.ok) return;
+  setGastosViewUnlocked(true);
+};
 ```
 
-`useEffect` ya está importado. `checkClosedBarbers` consulta Supabase y actualiza estado, así que corresponde un efecto, no un memo.
+- En el `Card` "Historial":
+  - Si `shouldGateGastosView`: reemplazar `CardContent` por placeholder discreto con copy breve ("El detalle de gastos puede requerir autorización.") y `<Button onClick={handleUnlockGastosView}>Ver gastos</Button>`. Header se conserva o se simplifica sin exponer datos. Ocultar también el paginador de mes mientras esté gateado.
+  - Si no: render actual (tabla + total + paginador).
+- No tocar `GastosRecurrentesList` ni form de gastos recurrentes.
 
-### 2. Eliminar código muerto del historial de anulaciones
+### 3. `src/components/SueldosPanel.tsx` — gate manual solo sobre la vista sensible
 
-Verificado en el archivo:
+- **No** disparar PIN al montar.
+- Mantener intacto el gate de `registrar_pago_sueldo`.
+- Estado: `const [sueldosViewUnlocked, setSueldosViewUnlocked] = useState(false);`.
+- `useAuth` y `useSucursal` si no están.
+- Derivado: `const shouldGateSueldosView = isSucursalAccount && !sueldosViewUnlocked;`.
+- Handler:
 
-- Línea 79: `const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);` — declarado y nunca leído por el JSX.
-- Línea 381: `handleAnulacionesHistoryClick` (useCallback con `requirePinForAction('ver_historial_caja', …)` que setea `setAnulacionesHistoryOpen(true)`) — nunca se enlaza a ningún botón.
-- Línea 538: `<AnulacionesCierreHistory barbers={barbers} />` — se renderiza directamente, no controlado por ese estado.
+```ts
+const handleUnlockSueldosView = async () => {
+  const gate = await requirePinForAction('ver_sueldos', currentSucursal?.id ?? null);
+  if (!gate.ok) return;
+  setSueldosViewUnlocked(true);
+};
+```
 
-Eliminar:
+- Antes de editar, leer `SueldosPanel.tsx` para identificar bloques sensibles (resumen / detalle por barbero / liquidaciones / historial de pagos) vs. acciones operativas (registrar pago).
+- Si `shouldGateSueldosView`: reemplazar bloques sensibles por placeholder con `<Button onClick={handleUnlockSueldosView}>Ver sueldos</Button>`. Conservar visible la acción de registrar pago si existe como entrada operativa independiente.
 
-- La declaración del `useState` (línea 79).
-- El `useCallback` completo de `handleAnulacionesHistoryClick`.
+## Comportamiento esperado
 
-No tocar:
+Cuenta de sucursal:
+- Finanzas no abre PIN al entrar.
+- Gastos: form visible; historial detrás de `ver_gastos`.
+- Sueldos: detalle detrás de `ver_sueldos`.
+- Bloquear cliente pasa por `bloquear_cliente`.
 
-- El render `<AnulacionesCierreHistory barbers={barbers} />`.
-- El import de `AnulacionesCierreHistory`.
-
-### 3. No reintroducir imports muertos
-
-Mantener limpio: no deben volver a aparecer `PaymentMethod`, `Alert`, `AlertDescription`, `AlertTitle`.
+Cuentas personales (owner / general_manager / manager / barber):
+- No ven placeholder ni `PinGateDialog`. Render normal según permisos.
 
 ## Lo que NO se toca
 
-`AuthContext`, `AppSidebar`, `FinanzasPanel`, `ActionPinGate`, `requirePinForAction`, `validate-pin`, `set-pin`, `user_pins`, RLS, edge functions, modelo de roles, métodos de pago, `sucursalActions.ts`, actionKeys existentes, auditoría, inserts a `anulaciones_cierre`, ni el componente `AnulacionesCierreHistory`.
+`AuthContext`, `ActionPinGate`, `PinGateDialog`, `validate-pin`, `set-pin`, `user_pins`, RLS, edge functions, roles, métodos de pago, Mi Negocio, `sucursalActions.ts`, auditoría, DB, invitaciones, permisos generales, defaults de PIN, `PinProtectedSection.tsx`, `SucursalViewPinGate.tsx`. No se agregan actionKeys nuevos. No se agrega `regularizar_dia_caja`.
 
-No se agregan actionKeys nuevos. No se agrega `regularizar_dia_caja`. No se modifica el flujo de Regularizar día.
+## Riesgos
 
-ActionKeys de Caja en `DailySummary` se mantienen tal cual: `cerrar_caja`, `anular_transaccion`, `anular_cierre_caja`, `regularizar_cierre_caja`, `ver_historial_caja`.
-
-## Confirmaciones a entregar
-
-1. Cuenta de sucursal ve solo Cobrar, Caja, Finanzas, Tareas, Turnos y Clientes (sin Mi Negocio ni Configuración).
-2. Finanzas para Cuenta de sucursal muestra solo Gastos y Sueldos.
-3. Turnos y Finanzas no piden PIN al entrar; el PIN solo se evalúa por acción/vista sensible vía `requirePinForAction`.
-4. `DailySummary.tsx` usa `useEffect` para `checkClosedBarbers`, sin `anulacionesHistoryOpen` ni `handleAnulacionesHistoryClick`, y sin imports muertos.
-5. Auditoría intacta: `anulaciones_cierre` y `AnulacionesCierreHistory` siguen funcionando igual.
-
-## Riesgo
-
-Bajo. Cambio acotado a limpieza técnica en un único archivo, sin tocar lógica de PIN, Caja, Finanzas ni auditoría.
+Bajo. Tres archivos, sin disparos automáticos de PIN. El flag `isSucursalAccount` garantiza que cuentas personales nunca vean placeholder.
