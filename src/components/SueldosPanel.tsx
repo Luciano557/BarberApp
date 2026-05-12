@@ -1015,115 +1015,128 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {shouldGateSueldosView ? (
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalDevengado, 0))}
+          <CardContent className="flex flex-col items-center justify-center py-10 gap-3 text-center">
+            <p className="text-sm text-muted-foreground max-w-sm">
+              El detalle de sueldos puede requerir autorización.
             </p>
+            <Button onClick={handleUnlockSueldosView}>Ver sueldos</Button>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-status-success-foreground">
-              {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalPagado, 0))}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Saldo Pendiente (histórico)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={cn(
-              "text-2xl font-bold",
-              salaryData.reduce((acc, b) => acc + b.saldo, 0) > 0 ? "text-destructive" : 
-              salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-status-warning-foreground" : "text-muted-foreground"
-            )}>
-              {formatCurrency(salaryData.reduce((acc, b) => acc + b.saldo, 0))}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalDevengado, 0))}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-status-success-foreground">
+                  {formatCurrency(salaryData.reduce((acc, b) => acc + b.totalPagado, 0))}
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Saldo Pendiente (histórico)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className={cn(
+                  "text-2xl font-bold",
+                  salaryData.reduce((acc, b) => acc + b.saldo, 0) > 0 ? "text-destructive" : 
+                  salaryData.reduce((acc, b) => acc + b.saldo, 0) < 0 ? "text-status-warning-foreground" : "text-muted-foreground"
+                )}>
+                  {formatCurrency(salaryData.reduce((acc, b) => acc + b.saldo, 0))}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Salary Table per Barber with expandable details */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen por Empleado</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {salaryData.map(barber => (
-            <BarberDetailRow 
-              key={barber.barberId} 
-              barber={barber} 
-              formatCurrency={formatCurrency}
-              getSaldoBadge={getSaldoBadge}
-            />
-          ))}
-          {salaryData.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">
-              No hay datos de sueldos registrados
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Payment History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Historial de Pagos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Empleado</TableHead>
-                <TableHead>Concepto</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagos.map(pago => (
-                <TableRow key={pago.id}>
-                  <TableCell>
-                    {format(new Date(pago.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
-                  </TableCell>
-                  <TableCell className="font-medium">{pago.barbero_nombre}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {pago.concepto || '-'}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-status-success-foreground">
-                    {formatCurrency(pago.monto)}
-                  </TableCell>
-                </TableRow>
+          {/* Salary Table per Barber with expandable details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen por Empleado</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {salaryData.map(barber => (
+                <BarberDetailRow 
+                  key={barber.barberId} 
+                  barber={barber} 
+                  formatCurrency={formatCurrency}
+                  getSaldoBadge={getSaldoBadge}
+                />
               ))}
-              {pagos.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                    No hay pagos registrados
-                  </TableCell>
-                </TableRow>
+              {salaryData.length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  No hay datos de sueldos registrados
+                </p>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Payment History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historial de Pagos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagos.map(pago => (
+                    <TableRow key={pago.id}>
+                      <TableCell>
+                        {format(new Date(pago.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                      </TableCell>
+                      <TableCell className="font-medium">{pago.barbero_nombre}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {pago.concepto || '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-status-success-foreground">
+                        {formatCurrency(pago.monto)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {pagos.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No hay pagos registrados
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
