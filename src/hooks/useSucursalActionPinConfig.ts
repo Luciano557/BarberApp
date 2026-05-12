@@ -75,12 +75,34 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
           { onConflict: 'organization_id,sucursal_id,action_key' },
         );
       if (error) throw error;
+      toast.success('Cambio guardado', { duration: 1500 });
     } catch (e: any) {
       console.error('setRequiresPin', e);
       toast.error('No se pudo guardar el cambio');
       await fetchRows();
     } finally {
       setSaving(null);
+    }
+  }, [orgId, scope, targetSucursalId, fetchRows]);
+
+  const seedOverrides = useCallback(async (values: Record<SucursalActionKey, boolean>) => {
+    if (!orgId || scope !== 'sucursal' || !targetSucursalId) return;
+    const payload = (Object.keys(values) as SucursalActionKey[]).map(action => ({
+      organization_id: orgId,
+      sucursal_id: targetSucursalId,
+      action_key: action,
+      requires_pin: values[action],
+    }));
+    try {
+      const { error } = await supabase
+        .from('sucursal_action_pin_config')
+        .upsert(payload, { onConflict: 'organization_id,sucursal_id,action_key' });
+      if (error) throw error;
+      await fetchRows();
+      toast.success('Configuración personalizada activada');
+    } catch (e: any) {
+      console.error('seedOverrides', e);
+      toast.error('No se pudo activar la configuración personalizada');
     }
   }, [orgId, scope, targetSucursalId, fetchRows]);
 
@@ -103,5 +125,5 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
 
   const hasOverrides = scope === 'sucursal' && rows.length > 0;
 
-  return { valuesByAction, setRequiresPin, clearOverrides, hasOverrides, isLoading, saving, refetch: fetchRows };
+  return { valuesByAction, setRequiresPin, clearOverrides, seedOverrides, hasOverrides, isLoading, saving, refetch: fetchRows };
 }

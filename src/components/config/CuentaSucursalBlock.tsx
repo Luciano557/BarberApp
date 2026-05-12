@@ -10,10 +10,21 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Copy, KeyRound, RefreshCw, Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { PinActionsToggleList } from './PinActionsToggleList';
 import { RegenerarPasswordDialog } from './RegenerarPasswordDialog';
+import { SUCURSAL_ACTION_GROUPS, SucursalActionKey } from '@/lib/sucursalActions';
 
 interface Props {
   sucursal: Sucursal;
@@ -40,18 +51,44 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
   const { account, isLoading, refetch } = useSucursalAccount(sucursal.id);
   const [regenOpen, setRegenOpen] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [confirmInheritOpen, setConfirmInheritOpen] = useState(false);
+  const [togglingMode, setTogglingMode] = useState(false);
 
   const sucursalConfig = useSucursalActionPinConfig({ scope: 'sucursal', sucursalId: sucursal.id });
   const orgConfig = useSucursalActionPinConfig({ scope: 'org' });
-  const [usarConfigGeneral, setUsarConfigGeneral] = useState<boolean | null>(null);
 
-  // Resolver estado real desde overrides existentes
-  const effectiveUsarGeneral = usarConfigGeneral ?? !sucursalConfig.hasOverrides;
+  const usarGeneral = !sucursalConfig.hasOverrides;
 
-  const handleToggleUsarGeneral = async (value: boolean) => {
-    setUsarConfigGeneral(value);
-    if (value && sucursalConfig.hasOverrides) {
+  const handleSwitchChange = async (value: boolean) => {
+    if (value) {
+      // OFF -> ON: pedir confirmación
+      if (sucursalConfig.hasOverrides) {
+        setConfirmInheritOpen(true);
+      }
+      return;
+    }
+    // ON -> OFF: sembrar overrides inmediatamente con valores efectivos generales
+    setTogglingMode(true);
+    try {
+      const snapshot = {} as Record<SucursalActionKey, boolean>;
+      for (const group of SUCURSAL_ACTION_GROUPS) {
+        for (const action of group.actions) {
+          snapshot[action] = orgConfig.valuesByAction(action);
+        }
+      }
+      await sucursalConfig.seedOverrides(snapshot);
+    } finally {
+      setTogglingMode(false);
+    }
+  };
+
+  const handleConfirmInherit = async () => {
+    setTogglingMode(true);
+    try {
       await sucursalConfig.clearOverrides();
+    } finally {
+      setTogglingMode(false);
+      setConfirmInheritOpen(false);
     }
   };
 
@@ -139,10 +176,22 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
       {/* PIN config para esta sucursal */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Configuración de PIN para esta sucursal</CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Definí si esta sucursal usa la configuración general o tiene reglas propias.
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm">Configuración de PIN para esta sucursal</CardTitle>
+                {!usarGeneral && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-5">Personalizada</Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Definí si esta sucursal usa la configuración general o tiene reglas propias.
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
@@ -151,24 +200,30 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
                 Usar configuración general
               </Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {effectiveUsarGeneral
+                {usarGeneral
                   ? 'Esta sucursal usa la configuración general de Cuentas de sucursal.'
                   : 'Esta sucursal tiene reglas propias que tienen prioridad sobre la configuración general.'}
               </p>
             </div>
             <Switch
               id="usar-config-general"
-              checked={effectiveUsarGeneral}
-              onCheckedChange={handleToggleUsarGeneral}
+              checked={usarGeneral}
+              disabled={togglingMode || sucursalConfig.isLoading || orgConfig.isLoading}
+              onCheckedChange={handleSwitchChange}
             />
           </div>
 
-          {effectiveUsarGeneral ? (
-            <PinActionsToggleList
-              values={(a) => orgConfig.valuesByAction(a)}
-              disabled
-              isLoading={orgConfig.isLoading}
-            />
+          {usarGeneral ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Estos valores se gestionan desde Configuración general.
+              </p>
+              <PinActionsToggleList
+                values={(a) => orgConfig.valuesByAction(a)}
+                disabled
+                isLoading={orgConfig.isLoading}
+              />
+            </>
           ) : (
             <PinActionsToggleList
               values={(a) => sucursalConfig.valuesByAction(a)}
@@ -187,6 +242,23 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
         sucursalNombre={sucursal.nombre}
         onCompleted={refetch}
       />
+
+      <AlertDialog open={confirmInheritOpen} onOpenChange={setConfirmInheritOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Volver a usar configuración general</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la configuración personalizada de esta sucursal y volverá a usar la configuración general.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={togglingMode}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmInherit} disabled={togglingMode}>
+              {togglingMode ? 'Aplicando…' : 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
