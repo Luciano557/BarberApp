@@ -57,6 +57,7 @@ export const SUCURSAL_ACTION_DEFAULT_REQUIRES_PIN: Record<SucursalActionKey, boo
 export const SUCURSAL_ACTION_DESCRIPTIONS: Record<SucursalActionKey, string> = {
   cerrar_caja: 'Solicita autorización antes de cerrar la caja del día.',
   anular_transaccion: 'Solicita autorización antes de anular un cobro.',
+  ver_gastos: 'Solicita PIN para ver el listado y resumen de gastos de la sucursal.',
   registrar_gasto: 'Solicita autorización antes de cargar un gasto nuevo.',
   editar_gasto: 'Solicita autorización antes de editar un gasto existente.',
   anular_gasto: 'Solicita autorización antes de anular un gasto.',
