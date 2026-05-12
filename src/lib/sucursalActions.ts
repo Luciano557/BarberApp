@@ -41,6 +41,7 @@ export const SUCURSAL_ACTION_LABELS: Record<SucursalActionKey, string> = {
 export const SUCURSAL_ACTION_DEFAULT_REQUIRES_PIN: Record<SucursalActionKey, boolean> = {
   cerrar_caja: true,
   anular_transaccion: true,
+  ver_gastos: true,
   registrar_gasto: false,
   editar_gasto: true,
   anular_gasto: true,
