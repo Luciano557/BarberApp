@@ -71,7 +71,7 @@ export function GastosPanel() {
   const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
   const requirePinForAction = useRequirePinForAction();
   const { currentSucursal } = useSucursal();
-  const { isSucursalAccount } = useAuth();
+  
   const [anularState, setAnularState] = useState<{ id: number; motivo: string } | null>(null);
   const [anulando, setAnulando] = useState(false);
   const { recurrentes, syncGastosRecurrentes, addRecurrente, toggleRecurrente, deleteRecurrente } = useGastosRecurrentes();
