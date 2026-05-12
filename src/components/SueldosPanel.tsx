@@ -338,6 +338,7 @@ function BarberDetailRow({
 export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
+  const { isSucursalAccount } = useAuth();
   const requirePinForAction = useRequirePinForAction();
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
