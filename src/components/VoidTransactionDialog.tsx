@@ -1,126 +1,100 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Lock, Loader2, AlertTriangle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { Transaction } from '@/types/barbershop';
-import { useSucursal } from '@/contexts/SucursalContext';
 
 interface VoidTransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
-  onVoidComplete: (transactionId: string, voidedBy: string, voidedById: string) => void;
+  /**
+   * Confirmación de motivo. El caller (DailySummary) gestiona la autorización
+   * por PIN vía `requirePinForAction('anular_transaccion', ...)` antes de ejecutar.
+   * El diálogo se mantiene como captura de motivo para evitar autorizaciones
+   * innecesarias si el usuario cancela.
+   */
+  onConfirm: (reason: string) => Promise<void> | void;
 }
 
-export function VoidTransactionDialog({ 
-  open, 
-  onOpenChange, 
+const REASON_MAX = 240;
+
+export function VoidTransactionDialog({
+  open,
+  onOpenChange,
   transaction,
-  onVoidComplete
+  onConfirm,
 }: VoidTransactionDialogProps) {
-  const { currentSucursal } = useSucursal();
-  const [pin, setPin] = useState('');
-  const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState('');
-
-  const handlePinComplete = async (value: string) => {
-    if (value.length < 4) return;
-    
-    setIsValidating(true);
-    setError('');
-
-    try {
-      const { data, error: validationError } = await supabase.functions.invoke('validate-pin', {
-        body: { pin: value, sucursal_id: currentSucursal?.id ?? null, action_key: 'anular_transaccion' }
-      });
-
-      if (validationError) throw validationError;
-
-      if (data.valid && transaction) {
-        // PIN válido - proceder con la anulación
-        onVoidComplete(transaction.id, data.user_name, data.barbero_id);
-        handleClose();
-        toast.success(`Transacción anulada por ${data.user_name}`);
-      } else {
-        setError(data?.error || 'PIN incorrecto');
-        setPin('');
-      }
-    } catch (err: any) {
-      console.error('Error validating PIN:', err);
-      setError('Error al validar el PIN');
-      setPin('');
-    } finally {
-      setIsValidating(false);
-    }
-  };
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleClose = () => {
-    setPin('');
-    setError('');
+    if (submitting) return;
+    setReason('');
     onOpenChange(false);
+  };
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onConfirm(reason.trim());
+      setReason('');
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!transaction) return null;
 
+  const reasonRequired = reason.trim().length === 0;
+
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            <DialogTitle>Anular Transacción</DialogTitle>
+            <DialogTitle>Anular transacción</DialogTitle>
           </div>
           <DialogDescription>
-            Estás por anular el servicio <strong>{transaction.serviceName}</strong> de <strong>{transaction.barberName}</strong> por <strong>${transaction.total.toLocaleString()}</strong>.
+            Estás por anular el servicio <strong>{transaction.serviceName}</strong> de{' '}
+            <strong>{transaction.barberName}</strong> por <strong>${transaction.total.toLocaleString()}</strong>.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="text-center space-y-2">
-            <Lock className="h-8 w-8 mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Ingresa tu PIN para confirmar la anulación
-            </p>
-          </div>
-
-          <div className="flex justify-center">
-            <InputOTP
-              maxLength={6}
-              value={pin}
-              onChange={setPin}
-              onComplete={handlePinComplete}
-              disabled={isValidating}
-              inputMode="numeric"
-            >
-              <InputOTPGroup>
-                <InputOTPSlot index={0} mask className="text-xl" />
-                <InputOTPSlot index={1} mask className="text-xl" />
-                <InputOTPSlot index={2} mask className="text-xl" />
-                <InputOTPSlot index={3} mask className="text-xl" />
-                <InputOTPSlot index={4} mask className="text-xl" />
-                <InputOTPSlot index={5} mask className="text-xl" />
-              </InputOTPGroup>
-            </InputOTP>
-          </div>
-
-          {error && (
-            <p className="text-center text-sm text-destructive">{error}</p>
-          )}
-
-          {isValidating && (
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Validando...</span>
-            </div>
-          )}
+        <div className="space-y-2 py-2">
+          <Label htmlFor="void-reason" className="text-sm">
+            Motivo de la anulación
+          </Label>
+          <Textarea
+            id="void-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX))}
+            placeholder="Indicá brevemente por qué se anula la transacción"
+            maxLength={REASON_MAX}
+            rows={3}
+            disabled={submitting}
+          />
+          <p className="text-xs text-muted-foreground text-right">
+            {reason.length}/{REASON_MAX}
+          </p>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={isValidating}>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose} disabled={submitting}>
             Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleSubmit}
+            disabled={submitting || reasonRequired}
+          >
+            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Confirmar anulación
           </Button>
         </DialogFooter>
       </DialogContent>
