@@ -22,6 +22,8 @@ import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
+import { useAuth } from '@/contexts/AuthContext';
+import { SucursalViewPinGate } from '@/components/SucursalViewPinGate';
 
 /**
  * Calcula el devengado de sueldo fijo usando meses calendario reales.
