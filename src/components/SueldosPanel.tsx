@@ -792,6 +792,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       return;
     }
 
+    const gate = await requirePinForAction('registrar_pago_sueldo', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+
     setIsSubmitting(true);
     try {
       // Normalize name to avoid spacing issues
