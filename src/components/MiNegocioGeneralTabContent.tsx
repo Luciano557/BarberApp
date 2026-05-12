@@ -9,6 +9,7 @@ import { DiscountsConfig } from './config/DiscountsConfig';
 import { LinesConfig } from './config/LinesConfig';
 import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
+import { CuentasSucursalConfig } from './config/CuentasSucursalConfig';
 import { toast } from 'sonner';
 
 interface MiNegocioGeneralTabContentProps {
