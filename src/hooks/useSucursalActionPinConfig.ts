@@ -124,5 +124,5 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
 
   const hasOverrides = scope === 'sucursal' && rows.length > 0;
 
-  return { valuesByAction, setRequiresPin, clearOverrides, hasOverrides, isLoading, saving, refetch: fetchRows };
+  return { valuesByAction, setRequiresPin, clearOverrides, seedOverrides, hasOverrides, isLoading, saving, refetch: fetchRows };
 }
