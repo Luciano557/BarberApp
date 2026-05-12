@@ -19,7 +19,7 @@ import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/Cus
 import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
 const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
