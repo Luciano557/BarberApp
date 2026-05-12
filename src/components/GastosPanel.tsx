@@ -334,7 +334,7 @@ export function GastosPanel() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteGasto(g.id)}
+                        onClick={() => setAnularState({ id: g.id, motivo: '' })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
