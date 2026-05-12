@@ -19,7 +19,7 @@ import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { BackfillWizard } from './BackfillWizard';
 import { MultiDayClosingSummary } from './MultiDayClosingSummary';
-import { PinGateDialog } from './PinGateDialog';
+
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
-import { usePinProtection } from '@/hooks/usePinProtection';
+
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
@@ -73,19 +73,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [isVoidingClosure, setIsVoidingClosure] = useState(false);
   const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
-  const [pinGateOpen, setPinGateOpen] = useState(false);
-  const [pinAction, setPinAction] = useState<'closing' | 'voidClosure' | 'pastDate' | 'history' | 'anulacionesHistory' | 'regularize' | null>(null);
-  const [pendingClosingBarber, setPendingClosingBarber] = useState<BarberSummary | null>(null);
-  const [pendingVoidClosure, setPendingVoidClosure] = useState<{ id: number; barberName: string } | null>(null);
-  const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
-  const [pendingRegularizeBarber, setPendingRegularizeBarber] = useState<BarberSummary | null>(null);
   const [isRegularizing, setIsRegularizing] = useState(false);
   const [openStalePopover, setOpenStalePopover] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
-  const { requiresPin, validatePin } = usePinProtection();
   const canVoidClosure = isOwner || isManager;
   const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
@@ -345,18 +338,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     [barbers, closedBarbers]
   );
 
-  // PIN-gated date navigation: require PIN for past dates
+  // Navegación libre entre fechas: el PIN ya no aplica a navegación.
+  // Acciones sensibles (cerrar caja, anular, ver historial) usan requirePinForAction localmente.
   const navigateToDate = useCallback((date: Date) => {
-    if (isToday(date)) {
-      onDateChange(date);
-    } else if (requiresPin) {
-      setPendingDate(date);
-      setPinAction('pastDate');
-      setPinGateOpen(true);
-    } else {
-      onDateChange(date);
-    }
-  }, [onDateChange, requiresPin]);
+    onDateChange(date);
+  }, [onDateChange]);
 
   const handlePreviousDay = () => navigateToDate(subDays(validDate, 1));
   const handleNextDay = () => {
@@ -369,84 +355,35 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   };
   const handleToday = () => onDateChange(new Date());
 
-  // PIN-gated cash closing
+  // Cerrar caja: el PIN se valida en el botón final del diálogo (cerrar_caja).
   const handleClosingClick = useCallback((barber: BarberSummary) => {
-    if (requiresPin) {
-      setPendingClosingBarber(barber);
-      setPinAction('closing');
-      setPinGateOpen(true);
-    } else {
-      setClosingBarber(barber);
-    }
-  }, [requiresPin]);
+    setClosingBarber(barber);
+  }, []);
 
-  // PIN-gated void closure
+  // Anular cierre: dialog de motivo abre directamente; al confirmar, la lógica
+  // de anulación valida lo que corresponda. Cuentas personales no ven PIN.
   const handleVoidClosureClick = useCallback((closureData: { id: number; barberName: string }) => {
-    if (requiresPin) {
-      setPendingVoidClosure(closureData);
-      setPinAction('voidClosure');
-      setPinGateOpen(true);
-    } else {
-      setVoidingClosure(closureData);
-    }
-  }, [requiresPin]);
+    setVoidingClosure(closureData);
+  }, []);
 
-  // PIN-gated regularizar cierre
+  // Regularizar cierre: abre el AlertDialog directamente.
   const handleRegularizeClick = useCallback((barber: BarberSummary) => {
-    if (requiresPin) {
-      setPendingRegularizeBarber(barber);
-      setPinAction('regularize');
-      setPinGateOpen(true);
-    } else {
-      setRegularizingBarber(barber);
-    }
-  }, [requiresPin]);
+    setRegularizingBarber(barber);
+  }, []);
 
-  // PIN-gated history views
-  const handleHistoryClick = useCallback(() => {
-    if (requiresPin) {
-      setPinAction('history');
-      setPinGateOpen(true);
-    } else {
-      setHistoryOpen(true);
-    }
-  }, [requiresPin]);
+  // Ver historial de cierres: PIN sólo si la acción ver_historial_caja lo requiere
+  // para Cuenta de sucursal. Cuentas personales pasan directo.
+  const handleHistoryClick = useCallback(async () => {
+    const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+    setHistoryOpen(true);
+  }, [requirePinForAction, currentSucursal?.id]);
 
-  const handleAnulacionesHistoryClick = useCallback(() => {
-    if (requiresPin) {
-      setPinAction('anulacionesHistory');
-      setPinGateOpen(true);
-    } else {
-      setAnulacionesHistoryOpen(true);
-    }
-  }, [requiresPin]);
-
-  // Handle PIN validation result
-  const handlePinValidate = useCallback(async (pin: string): Promise<{ success: boolean; userName?: string }> => {
-    const result = await validatePin(pin);
-    if (result.success) {
-      setPinGateOpen(false);
-      if (pinAction === 'closing' && pendingClosingBarber) {
-        setClosingBarber(pendingClosingBarber);
-        setPendingClosingBarber(null);
-      } else if (pinAction === 'voidClosure' && pendingVoidClosure) {
-        setVoidingClosure(pendingVoidClosure);
-        setPendingVoidClosure(null);
-      } else if (pinAction === 'pastDate' && pendingDate) {
-        onDateChange(pendingDate);
-        setPendingDate(null);
-      } else if (pinAction === 'history') {
-        setHistoryOpen(true);
-      } else if (pinAction === 'anulacionesHistory') {
-        setAnulacionesHistoryOpen(true);
-      } else if (pinAction === 'regularize' && pendingRegularizeBarber) {
-        setRegularizingBarber(pendingRegularizeBarber);
-        setPendingRegularizeBarber(null);
-      }
-      setPinAction(null);
-    }
-    return result;
-  }, [validatePin, pinAction, pendingClosingBarber, pendingVoidClosure, pendingDate, pendingRegularizeBarber, onDateChange]);
+  const handleAnulacionesHistoryClick = useCallback(async () => {
+    const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+    setAnulacionesHistoryOpen(true);
+  }, [requirePinForAction, currentSucursal?.id]);
 
   const VOID_REASONS = [
     'Servicios duplicados o faltantes',
@@ -1267,28 +1204,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* PIN Gate Dialog */}
-      <PinGateDialog
-        open={pinGateOpen}
-        onValidate={handlePinValidate}
-        onClose={() => {
-          setPinGateOpen(false);
-          setPinAction(null);
-          setPendingClosingBarber(null);
-          setPendingVoidClosure(null);
-          setPendingDate(null);
-          setPendingRegularizeBarber(null);
-        }}
-        sectionName={
-          pinAction === 'closing' ? 'el cierre de caja' :
-          pinAction === 'voidClosure' ? 'anular el cierre' :
-          pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
-          pinAction === 'history' ? 'el historial de cierres' :
-          pinAction === 'anulacionesHistory' ? 'el historial de anulaciones' :
-          pinAction === 'regularize' ? 'regularizar el cierre' :
-          'esta acción'
-        }
-      />
     </div>
   );
 }
