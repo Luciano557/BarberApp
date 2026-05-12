@@ -30,15 +30,18 @@ export function SucursalViewPinGate({
   const [pending, setPending] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const requestedRef = useRef(false);
-  const sucursalKeyRef = useRef<string | null>(null);
+  const gateKeyRef = useRef<string | null>(null);
+
+  const gateKey = `${actionKey}:${sucursalId ?? 'none'}`;
 
   const ask = useCallback(async () => {
     if (requestedRef.current) return;
+    if (sucursalId == null) return;
     requestedRef.current = true;
     setPending(true);
     setCancelled(false);
     try {
-      const res = await requirePinForAction(actionKey, sucursalId ?? null);
+      const res = await requirePinForAction(actionKey, sucursalId);
       if (res.ok) {
         setAuthorized(true);
       } else {
@@ -50,26 +53,37 @@ export function SucursalViewPinGate({
     }
   }, [actionKey, sucursalId, requirePinForAction]);
 
-  // Reiniciar al cambiar sucursal
+  // Reset cuando cambia actionKey o sucursalId (key compuesta)
   useEffect(() => {
-    const key = sucursalId ?? null;
-    if (sucursalKeyRef.current !== key) {
-      sucursalKeyRef.current = key;
+    if (gateKeyRef.current !== gateKey) {
+      gateKeyRef.current = gateKey;
       requestedRef.current = false;
       setAuthorized(false);
       setCancelled(false);
+      setPending(false);
     }
-  }, [sucursalId]);
+  }, [gateKey]);
 
-  // Disparar pedido inicial solo una vez por montaje
+  // Disparar pedido inicial solo una vez por gateKey
   useEffect(() => {
     if (!isSucursalAccount) return;
+    if (sucursalId == null) return;
     if (authorized || cancelled || pending) return;
     if (requestedRef.current) return;
     void ask();
-  }, [isSucursalAccount, authorized, cancelled, pending, ask]);
+  }, [isSucursalAccount, sucursalId, authorized, cancelled, pending, ask]);
 
   if (!isSucursalAccount) return <>{children}</>;
+
+  if (sucursalId == null) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin mb-3" />
+        <p className="text-sm">Cargando sucursal…</p>
+      </div>
+    );
+  }
+
   if (authorized) return <>{children}</>;
 
   if (pending) {
@@ -99,6 +113,7 @@ export function SucursalViewPinGate({
         variant="outline"
         onClick={() => {
           requestedRef.current = false;
+          setCancelled(false);
           void ask();
         }}
       >
