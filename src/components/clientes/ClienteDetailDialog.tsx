@@ -16,6 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useClientes, Cliente, ReservaCliente, ClienteUpdate } from '@/hooks/useClientes';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { toast } from 'sonner';
 import {
   Loader2, Pencil, Save, X, MessageCircle, MapPin, Calendar as CalendarLucide,
