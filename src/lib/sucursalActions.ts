@@ -6,6 +6,7 @@
 export type SucursalActionKey =
   | 'cerrar_caja'
   | 'anular_transaccion'
+  | 'ver_gastos'
   | 'registrar_gasto'
   | 'editar_gasto'
   | 'anular_gasto'
