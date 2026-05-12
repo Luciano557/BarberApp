@@ -75,6 +75,7 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
           { onConflict: 'organization_id,sucursal_id,action_key' },
         );
       if (error) throw error;
+      toast.success('Cambio guardado', { duration: 1500 });
     } catch (e: any) {
       console.error('setRequiresPin', e);
       toast.error('No se pudo guardar el cambio');
