@@ -380,6 +380,55 @@ export function GastosPanel() {
           setRepeatByweekday(days);
         }}
       />
+
+      <Dialog open={anularState !== null} onOpenChange={(o) => { if (!o) setAnularState(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Anular gasto</DialogTitle>
+            <DialogDescription>
+              El gasto se marcará como anulado y dejará de impactar en finanzas. Esta acción queda registrada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-anulacion">Motivo de anulación</Label>
+            <Textarea
+              id="motivo-anulacion"
+              maxLength={240}
+              value={anularState?.motivo ?? ''}
+              onChange={(e) => setAnularState((s) => s ? { ...s, motivo: e.target.value } : s)}
+              placeholder="Indicá brevemente por qué se anula"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {(anularState?.motivo.length ?? 0)}/240
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnularState(null)} disabled={anulando}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={anulando || !anularState?.motivo.trim()}
+              onClick={async () => {
+                if (!anularState) return;
+                setAnulando(true);
+                try {
+                  const gate = await requirePinForAction('anular_gasto', currentSucursal?.id ?? null);
+                  if (!gate.ok) return;
+                  const ok = await anularGasto(anularState.id, anularState.motivo, {
+                    validatedByUserId: gate.validatedByUserId ?? null,
+                  });
+                  if (ok) setAnularState(null);
+                } finally {
+                  setAnulando(false);
+                }
+              }}
+            >
+              {anulando ? 'Anulando…' : 'Anular gasto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
