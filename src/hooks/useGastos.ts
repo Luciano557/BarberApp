@@ -36,6 +36,7 @@ export function useGastos() {
         .from('Egresos')
         .select('*')
         .eq('organization_id', organization.id)
+        .eq('estado', 'activo')
         .gte('Fecha', `${start}T00:00:00`)
         .lte('Fecha', `${end}T23:59:59`)
         .order('Fecha', { ascending: false });
