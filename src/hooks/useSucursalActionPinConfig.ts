@@ -84,6 +84,27 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
     }
   }, [orgId, scope, targetSucursalId, fetchRows]);
 
+  const seedOverrides = useCallback(async (values: Record<SucursalActionKey, boolean>) => {
+    if (!orgId || scope !== 'sucursal' || !targetSucursalId) return;
+    const payload = (Object.keys(values) as SucursalActionKey[]).map(action => ({
+      organization_id: orgId,
+      sucursal_id: targetSucursalId,
+      action_key: action,
+      requires_pin: values[action],
+    }));
+    try {
+      const { error } = await supabase
+        .from('sucursal_action_pin_config')
+        .upsert(payload, { onConflict: 'organization_id,sucursal_id,action_key' });
+      if (error) throw error;
+      await fetchRows();
+      toast.success('Configuración personalizada activada');
+    } catch (e: any) {
+      console.error('seedOverrides', e);
+      toast.error('No se pudo activar la configuración personalizada');
+    }
+  }, [orgId, scope, targetSucursalId, fetchRows]);
+
   const clearOverrides = useCallback(async () => {
     if (!orgId || scope !== 'sucursal' || !targetSucursalId) return;
     try {
