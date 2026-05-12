@@ -6,6 +6,7 @@
 export type SucursalActionKey =
   | 'cerrar_caja'
   | 'anular_transaccion'
+  | 'ver_gastos'
   | 'registrar_gasto'
   | 'editar_gasto'
   | 'anular_gasto'
@@ -20,6 +21,7 @@ export type SucursalActionKey =
 export const SUCURSAL_ACTION_LABELS: Record<SucursalActionKey, string> = {
   cerrar_caja: 'Cierre de caja',
   anular_transaccion: 'Anulación de transacciones',
+  ver_gastos: 'Ver gastos',
   registrar_gasto: 'Registrar gastos',
   editar_gasto: 'Editar gastos',
   anular_gasto: 'Anular gastos',
@@ -39,6 +41,7 @@ export const SUCURSAL_ACTION_LABELS: Record<SucursalActionKey, string> = {
 export const SUCURSAL_ACTION_DEFAULT_REQUIRES_PIN: Record<SucursalActionKey, boolean> = {
   cerrar_caja: true,
   anular_transaccion: true,
+  ver_gastos: true,
   registrar_gasto: false,
   editar_gasto: true,
   anular_gasto: true,
@@ -54,6 +57,7 @@ export const SUCURSAL_ACTION_DEFAULT_REQUIRES_PIN: Record<SucursalActionKey, boo
 export const SUCURSAL_ACTION_DESCRIPTIONS: Record<SucursalActionKey, string> = {
   cerrar_caja: 'Solicita autorización antes de cerrar la caja del día.',
   anular_transaccion: 'Solicita autorización antes de anular un cobro.',
+  ver_gastos: 'Solicita PIN para ver el listado y resumen de gastos de la sucursal.',
   registrar_gasto: 'Solicita autorización antes de cargar un gasto nuevo.',
   editar_gasto: 'Solicita autorización antes de editar un gasto existente.',
   anular_gasto: 'Solicita autorización antes de anular un gasto.',
@@ -74,7 +78,7 @@ export interface SucursalActionGroup {
 
 export const SUCURSAL_ACTION_GROUPS: SucursalActionGroup[] = [
   { key: 'caja', title: 'Caja', actions: ['cerrar_caja', 'anular_transaccion', 'ver_historial_caja'] },
-  { key: 'gastos', title: 'Gastos', actions: ['registrar_gasto', 'editar_gasto', 'anular_gasto'] },
+  { key: 'gastos', title: 'Gastos', actions: ['ver_gastos', 'registrar_gasto', 'editar_gasto', 'anular_gasto'] },
   { key: 'sueldos', title: 'Sueldos', actions: ['ver_sueldos', 'registrar_pago_sueldo'] },
   { key: 'tareas', title: 'Tareas', actions: ['crear_tarea', 'editar_tarea', 'completar_tarea'] },
   { key: 'clientes', title: 'Clientes', actions: ['bloquear_cliente'] },

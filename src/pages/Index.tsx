@@ -19,7 +19,7 @@ import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, isSucursalAccount, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
@@ -138,9 +138,13 @@ const Index = () => {
           )}
 
           {activeTab === 'finanzas' && canViewFinanzas && (
-            <PinProtectedSection sectionName="Finanzas">
+            isSucursalAccount ? (
               <FinanzasPanel barbers={barbers} />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Finanzas">
+                <FinanzasPanel barbers={barbers} />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'tareas' && canViewTareas && (
@@ -176,9 +180,13 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <PinProtectedSection sectionName="Turnos">
+            isSucursalAccount ? (
               <TurnosAgendaPanel />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Turnos">
+                <TurnosAgendaPanel />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'clientes' && canViewClientes && (
@@ -186,9 +194,13 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            <PinProtectedSection sectionName="Mi Negocio">
+            isSucursalAccount ? (
               <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Mi Negocio">
+                <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'config' && canManageConfig && (
