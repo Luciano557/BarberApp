@@ -180,7 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canViewAllClosings = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewResumen = !hasNoAccess && roles.length > 0;
   const canViewTareas = !hasNoAccess && roles.length > 0;
-  const canViewMiNegocio = isOwner || isGeneralManager || isManager;
+  // Mi Negocio queda fuera de Cuenta de sucursal por diseño (gestión de sucursales/equipo).
+  const canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount;
   // Sucursal account uses Finanzas only for registering operational expenses & payments (RLS limits writes).
   const canViewFinanzas = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewTurnosAgenda = isOwner || isGeneralManager || isManager || isSucursalAccount;
