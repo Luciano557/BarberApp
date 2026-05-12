@@ -992,16 +992,21 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </CardContent>
       </Card>
 
-      {/* Void Transaction Dialog */}
+      {/* Void Transaction Dialog (captura motivo + autorización por PIN solo para sucursal_account) */}
       <VoidTransactionDialog
         open={!!voidingTransaction}
         onOpenChange={(open) => !open && setVoidingTransaction(null)}
         transaction={voidingTransaction}
-        onVoidComplete={async (transactionId, voidedBy, voidedById) => {
-          if (onVoidTransaction) {
-            await onVoidTransaction(transactionId, voidedBy, voidedById);
-            checkClosedBarbers(); // Refresh closed barbers
-          }
+        onConfirm={async (_reason) => {
+          if (!voidingTransaction || !onVoidTransaction) return;
+          const gate = await requirePinForAction('anular_transaccion', currentSucursal?.id ?? null);
+          if (gate.ok !== true) return;
+          const voidedBy = gate.userName ?? profile?.full_name ?? profile?.email ?? 'Usuario';
+          const voidedById = gate.validatedByUserId ?? profile?.barbero_id ?? user?.id ?? '';
+          await onVoidTransaction(voidingTransaction.id, voidedBy, voidedById);
+          toast.success(`Transacción anulada por ${voidedBy}`);
+          setVoidingTransaction(null);
+          checkClosedBarbers();
         }}
       />
 
