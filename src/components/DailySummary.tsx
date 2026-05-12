@@ -377,12 +377,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     setHistoryOpen(true);
   }, [requirePinForAction, currentSucursal?.id]);
 
-  const handleAnulacionesHistoryClick = useCallback(async () => {
-    const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-    setAnulacionesHistoryOpen(true);
-  }, [requirePinForAction, currentSucursal?.id]);
-
   const VOID_REASONS = [
     'Servicios duplicados o faltantes',
     'Se registraron ventas después del cierre',
