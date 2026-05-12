@@ -51,13 +51,17 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
   }, [authLoading]);
 
   const requirePinForAction = useCallback<RequireFn>(async (actionKey, sucursalId, organizationId) => {
-    // Esperar a que AuthContext esté inicializado (timeout de seguridad: 5s).
+    // Tiempo máximo de espera a que AuthContext termine de cargar antes de decidir
+    // si aplicar bypass o pedir PIN. NO es el tiempo del usuario para tipear el PIN.
+    const AUTH_READY_TIMEOUT_MS = 90_000;
+
+    // Esperar a que AuthContext esté inicializado (fail-safe).
     if (!authReadyRef.current) {
       await new Promise<void>((resolve) => {
         const start = Date.now();
         const check = () => {
           if (authReadyRef.current) return resolve();
-          if (Date.now() - start > 5000) return resolve();
+          if (Date.now() - start > AUTH_READY_TIMEOUT_MS) return resolve();
           setTimeout(check, 50);
         };
         check();
