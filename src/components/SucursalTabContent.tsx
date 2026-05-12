@@ -61,8 +61,14 @@ export function SucursalTabContent({
   onGoToGeneralConfig,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
-  const { isOwner, isGeneralManager } = useAuth();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const { sucursales: sucursalesAsignadas } = useSucursal();
   const canManageServiceStructure = isOwner || isGeneralManager;
+  const canManageCuentaSucursal =
+    isOwner ||
+    isGeneralManager ||
+    (isManager && sucursalesAsignadas.some((s) => s.id === sucursal.id));
+  const [cuentaOpen, setCuentaOpen] = useState(false);
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
