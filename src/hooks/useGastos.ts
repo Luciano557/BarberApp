@@ -228,7 +228,7 @@ export function useGastos() {
     selectedMonth,
     setSelectedMonth,
     addGasto,
-    deleteGasto,
+    anularGasto,
     totalPeriodo,
     refetch: fetchGastos,
     setSyncRecurrentes,
