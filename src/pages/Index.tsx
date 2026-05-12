@@ -19,14 +19,14 @@ import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
   const getDefaultTab = () => {
     if (!rolesLoaded) return 'welcome';
     if (hasNoAccess) return 'no-access';
-    if (canManagePayments) return 'registro';
+    if (canOperarCajaYGastos) return 'registro';
     if (canViewResumen) return 'resumen';
     return 'no-access';
   };
@@ -50,11 +50,11 @@ const Index = () => {
     }
     // Once roles load and we're still on welcome, navigate to correct default
     if (activeTab === 'welcome') {
-      if (canManagePayments) setActiveTab('registro');
+      if (canOperarCajaYGastos) setActiveTab('registro');
       else if (canViewResumen) setActiveTab('resumen');
       return;
     }
-    if (activeTab === 'registro' && !canManagePayments) {
+    if (activeTab === 'registro' && !canOperarCajaYGastos) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
     if (activeTab === 'config' && !canManageConfig) {
@@ -78,7 +78,7 @@ const Index = () => {
     if (activeTab === 'clientes' && !canViewClientes) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
+  }, [activeTab, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
 
   const {
     isLoading,
@@ -112,7 +112,7 @@ const Index = () => {
 
       <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
         <div className="max-w-4xl mx-auto p-6 md:p-8">
-          {activeTab === 'registro' && canManagePayments && (
+          {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}
               extras={extras}

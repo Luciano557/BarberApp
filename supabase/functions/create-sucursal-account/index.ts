@@ -26,20 +26,10 @@ serve(async (req) => {
     const { sucursalId }: Req = await req.json();
     if (!sucursalId) throw new Error("sucursalId requerido");
 
-    // Permission: owner / GM (full) or manager assigned to that sucursal
+    // Permission: owner / GM only. Manager does NOT create sucursal accounts.
     const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", requestingUser.id);
     const isOwnerOrGm = roles?.some((r) => r.role === "owner" || r.role === "general_manager");
-    let isManagerOfSucursal = false;
     if (!isOwnerOrGm) {
-      const { data: us } = await admin
-        .from("user_sucursales")
-        .select("sucursal_id")
-        .eq("user_id", requestingUser.id)
-        .eq("sucursal_id", sucursalId)
-        .maybeSingle();
-      isManagerOfSucursal = !!us && roles?.some((r) => r.role === "manager") === true;
-    }
-    if (!isOwnerOrGm && !isManagerOfSucursal) {
       throw new Error("Sin permiso para crear la cuenta de esta sucursal");
     }
 
