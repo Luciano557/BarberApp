@@ -10,3 +10,6 @@ verify_jwt = true
 
 [functions.backfill-sucursal-accounts]
 verify_jwt = true
+
+[functions.clear-sucursal-temp-password]
+verify_jwt = true
