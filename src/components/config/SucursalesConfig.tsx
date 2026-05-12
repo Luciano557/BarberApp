@@ -470,6 +470,17 @@ export function SucursalesConfig() {
           </div>
         </DialogContent>
       </Dialog>
+      <Sheet open={cuentaSucursal !== null} onOpenChange={(o) => { if (!o) setCuentaSucursal(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Cuenta de sucursal — {cuentaSucursal?.nombre}</SheetTitle>
+            <SheetDescription>
+              Acceso operativo y reglas de PIN específicas para esta sucursal.
+            </SheetDescription>
+          </SheetHeader>
+          {cuentaSucursal && <CuentaSucursalBlock sucursal={cuentaSucursal} />}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
