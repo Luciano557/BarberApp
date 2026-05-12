@@ -1204,28 +1204,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* PIN Gate Dialog */}
-      <PinGateDialog
-        open={pinGateOpen}
-        onValidate={handlePinValidate}
-        onClose={() => {
-          setPinGateOpen(false);
-          setPinAction(null);
-          setPendingClosingBarber(null);
-          setPendingVoidClosure(null);
-          setPendingDate(null);
-          setPendingRegularizeBarber(null);
-        }}
-        sectionName={
-          pinAction === 'closing' ? 'el cierre de caja' :
-          pinAction === 'voidClosure' ? 'anular el cierre' :
-          pinAction === 'pastDate' ? 'ver resúmenes anteriores' :
-          pinAction === 'history' ? 'el historial de cierres' :
-          pinAction === 'anulacionesHistory' ? 'el historial de anulaciones' :
-          pinAction === 'regularize' ? 'regularizar el cierre' :
-          'esta acción'
-        }
-      />
     </div>
   );
 }
