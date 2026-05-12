@@ -67,7 +67,11 @@ const TIPO_BADGE_VARIANT: Record<TipoCosto, 'default' | 'secondary' | 'outline'>
 };
 
 export function GastosPanel() {
-  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, deleteGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const requirePinForAction = useRequirePinForAction();
+  const { currentSucursal } = useSucursal();
+  const [anularState, setAnularState] = useState<{ id: number; motivo: string } | null>(null);
+  const [anulando, setAnulando] = useState(false);
   const { recurrentes, syncGastosRecurrentes, addRecurrente, toggleRecurrente, deleteRecurrente } = useGastosRecurrentes();
 
   // Wire up the recurrentes sync into useGastos
