@@ -1121,5 +1121,6 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         </CardContent>
       </Card>
     </div>
+    </SucursalViewPinGate>
   );
 }
