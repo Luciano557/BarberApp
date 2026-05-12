@@ -295,21 +295,30 @@ export function GastosPanel() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Historial</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium min-w-[120px] text-center capitalize">
-                {format(selectedMonth, 'MMMM yyyy', { locale: es })}
-              </span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {!shouldGateGastosView && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[120px] text-center capitalize">
+                  {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {shouldGateGastosView ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+              <p className="text-sm text-muted-foreground max-w-sm">
+                El detalle de gastos puede requerir autorización.
+              </p>
+              <Button onClick={handleUnlockGastosView}>Ver gastos</Button>
+            </div>
+          ) : isLoading ? (
             <p className="text-muted-foreground text-center py-4">Cargando...</p>
           ) : gastos.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No hay gastos en este período</p>
