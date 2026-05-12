@@ -1,104 +1,78 @@
-## Diagnóstico
+# Fase 3 — Confirmación de visibilidad + limpieza técnica en DailySummary
 
-Revisé `Login.tsx`, `handle_new_user`, `organizations`, `plan_features` y `OrganizationContext`.
+## Estado funcional verificado
 
-**Estado actual:**
-- En el form de registro, los planes se etiquetan como `Básico / Profesional / Premium` pero los IDs internos son `free / basic / premium`. Eso se manda a `raw_user_meta_data.business_plan` y queda guardado en `organizations.plan`.
-- `plan_features` y `OrganizationContext` tipan el plan como `'free' | 'basic' | 'premium'`.
-- El `handle_new_user` ya hace whitelist y cae a `free` si no coincide.
-- Precios actuales en UI: 30.000 / 50.000 / 100.000 (ya correctos).
+La parte funcional de Fase 3 ya está cubierta por código existente:
 
-**Bug de registro vinculando barbería de otro email:** sigue presente. Se aborda en este mismo plan.
+- `AuthContext`: `canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount`, y `canManageConfig = isOwner || isGeneralManager`. Cuenta de sucursal queda fuera de Mi Negocio y Configuración.
+- `AppSidebar` arma el menú a partir de esos flags, así que para `sucursal_account` solo aparecen Cobrar, Caja, Finanzas, Tareas, Turnos y Clientes. Mi Negocio y Configuración no se renderizan.
+- `FinanzasPanel` tiene rama dedicada para `isSucursalAccount` que solo muestra las tabs Gastos y Sueldos.
+- Caja, Finanzas y Turnos abren sin PIN. Las acciones sensibles siguen pasando por `requirePinForAction` con los actionKeys ya existentes.
 
-**Faltan:** renombrar los IDs internos a `basico/profesional/premium`, persistir explícitamente plan, fecha de registro, fecha de último pago y vencimiento de suscripción, y forzar `signOut` previo al registro.
+No hay cambios funcionales pendientes en estos archivos.
 
-## Cambios
+## Cambios a aplicar
 
-### 1. Migración SQL
+Archivo único: `src/components/DailySummary.tsx`.
 
-**Tabla `organizations`:**
-- Agregar columna `last_payment_at timestamptz NULL`.
-- Mantener `plan_expires_at` como vencimiento de la suscripción.
-- Mantener `created_at` como fecha de registro.
-- Migrar valores de `plan`: `free → basico`, `basic → profesional`, `premium → premium`.
-- Default de `plan` pasa a `'basico'`.
+### 1. Reemplazar `useMemo` por `useEffect`
 
-**Tabla `plan_features`:**
-- Reescribir filas con los tres nuevos planes y precios:
-  - `basico` → `price_monthly = 30000`
-  - `profesional` → `price_monthly = 50000`
-  - `premium` → `price_monthly = 100000`
-- Mantener columnas existentes (`max_barbers`, `max_services`, etc.).
+Líneas 150–152:
 
-**Backfill de fechas en orgs existentes:**
-```sql
-UPDATE public.organizations
-   SET plan_expires_at = COALESCE(plan_expires_at, created_at + interval '30 days'),
-       last_payment_at = COALESCE(last_payment_at, created_at);
+```ts
+useMemo(() => {
+  checkClosedBarbers();
+}, [checkClosedBarbers]);
 ```
 
-**Función `handle_new_user`:**
-- Whitelist nueva: `('basico','profesional','premium')`, fallback `'basico'`.
-- Al crear la organización, setear:
-  - `plan_expires_at = now() + interval '30 days'`
-  - `last_payment_at = now()`
+Pasa a:
 
-**Función `check_org_limit`:** sin cambios (sigue leyendo `plan_features` por nombre).
-
-### 2. `src/pages/Login.tsx`
-
-- `PLANS` pasa a:
-  ```ts
-  { id: 'basico', label: 'Básico', price: '$30.000' },
-  { id: 'profesional', label: 'Profesional', price: '$50.000' },
-  { id: 'premium', label: 'Premium', price: '$100.000' },
-  ```
-- Default `plan` inicial = `'basico'`.
-- En `handleRegister`, antes de `signUp`: `await supabase.auth.signOut()` para evitar arrastrar la sesión previa (causa del bug "Y queda en barbería de X").
-- Resto del flujo intacto (verify-email / auth-callback).
-
-### 3. `src/pages/AuthCallback.tsx`
-
-- Tras `refreshSession`, si `pending_verification_email` en localStorage no coincide con `user.email`, forzar `signOut` y redirigir a `/verify-email`. Blindaje extra del bug.
-
-### 4. `src/contexts/OrganizationContext.tsx` y types
-
-- Cambiar tipo `plan: 'free' | 'basic' | 'premium'` → `'basico' | 'profesional' | 'premium'`.
-- Buscar usos del literal de plan en el resto del código y actualizar (probable: `Plans Rules` memory y validaciones de límite).
-
-### 5. Memoria de proyecto
-
-- Actualizar `mem://features/config/plans-and-corrections` con los nuevos IDs y precios.
-
-## Detalles técnicos
-
-```sql
-ALTER TABLE public.organizations
-  ADD COLUMN IF NOT EXISTS last_payment_at timestamptz;
-
-UPDATE public.organizations SET plan = 'basico'      WHERE plan = 'free';
-UPDATE public.organizations SET plan = 'profesional' WHERE plan = 'basic';
-
-ALTER TABLE public.organizations ALTER COLUMN plan SET DEFAULT 'basico';
-
-DELETE FROM public.plan_features;
-INSERT INTO public.plan_features (plan, max_barbers, max_services, can_export_reports, can_view_analytics, price_monthly)
-VALUES
-  ('basico',      <valores actuales>, 30000),
-  ('profesional', <valores actuales>, 50000),
-  ('premium',     <valores actuales>, 100000);
-
-UPDATE public.organizations
-   SET plan_expires_at = COALESCE(plan_expires_at, created_at + interval '30 days'),
-       last_payment_at = COALESCE(last_payment_at, created_at);
+```ts
+useEffect(() => {
+  checkClosedBarbers();
+}, [checkClosedBarbers]);
 ```
 
-(Los valores `max_barbers` / `max_services` se respetan según los registros actuales para no romper límites.)
+`useEffect` ya está importado. `checkClosedBarbers` consulta Supabase y actualiza estado, así que corresponde un efecto, no un memo.
 
-## QA
+### 2. Eliminar código muerto del historial de anulaciones
 
-- Registrar email Y → org nueva con `plan = 'basico'|'profesional'|'premium'` según selección, `created_at`, `last_payment_at` y `plan_expires_at` poblados.
-- Registrar Y estando logueado como X → entra a la org de Y (o `/verify-email`), nunca a la de X.
-- UI muestra "Básico / Profesional / Premium" con precios 30.000 / 50.000 / 100.000.
-- Login con cuenta vieja sigue funcionando, planes migrados correctamente.
-- `check_org_limit` sigue evaluando bien contra `plan_features`.
+Verificado en el archivo:
+
+- Línea 79: `const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);` — declarado y nunca leído por el JSX.
+- Línea 381: `handleAnulacionesHistoryClick` (useCallback con `requirePinForAction('ver_historial_caja', …)` que setea `setAnulacionesHistoryOpen(true)`) — nunca se enlaza a ningún botón.
+- Línea 538: `<AnulacionesCierreHistory barbers={barbers} />` — se renderiza directamente, no controlado por ese estado.
+
+Eliminar:
+
+- La declaración del `useState` (línea 79).
+- El `useCallback` completo de `handleAnulacionesHistoryClick`.
+
+No tocar:
+
+- El render `<AnulacionesCierreHistory barbers={barbers} />`.
+- El import de `AnulacionesCierreHistory`.
+
+### 3. No reintroducir imports muertos
+
+Mantener limpio: no deben volver a aparecer `PaymentMethod`, `Alert`, `AlertDescription`, `AlertTitle`.
+
+## Lo que NO se toca
+
+`AuthContext`, `AppSidebar`, `FinanzasPanel`, `ActionPinGate`, `requirePinForAction`, `validate-pin`, `set-pin`, `user_pins`, RLS, edge functions, modelo de roles, métodos de pago, `sucursalActions.ts`, actionKeys existentes, auditoría, inserts a `anulaciones_cierre`, ni el componente `AnulacionesCierreHistory`.
+
+No se agregan actionKeys nuevos. No se agrega `regularizar_dia_caja`. No se modifica el flujo de Regularizar día.
+
+ActionKeys de Caja en `DailySummary` se mantienen tal cual: `cerrar_caja`, `anular_transaccion`, `anular_cierre_caja`, `regularizar_cierre_caja`, `ver_historial_caja`.
+
+## Confirmaciones a entregar
+
+1. Cuenta de sucursal ve solo Cobrar, Caja, Finanzas, Tareas, Turnos y Clientes (sin Mi Negocio ni Configuración).
+2. Finanzas para Cuenta de sucursal muestra solo Gastos y Sueldos.
+3. Turnos y Finanzas no piden PIN al entrar; el PIN solo se evalúa por acción/vista sensible vía `requirePinForAction`.
+4. `DailySummary.tsx` usa `useEffect` para `checkClosedBarbers`, sin `anulacionesHistoryOpen` ni `handleAnulacionesHistoryClick`, y sin imports muertos.
+5. Auditoría intacta: `anulaciones_cierre` y `AnulacionesCierreHistory` siguen funcionando igual.
+
+## Riesgo
+
+Bajo. Cambio acotado a limpieza técnica en un único archivo, sin tocar lógica de PIN, Caja, Finanzas ni auditoría.

@@ -76,7 +76,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [isRegularizing, setIsRegularizing] = useState(false);
   const [openStalePopover, setOpenStalePopover] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [anulacionesHistoryOpen, setAnulacionesHistoryOpen] = useState(false);
   const { user, profile, isOwner, isManager } = useAuth();
   const canVoidClosure = isOwner || isManager;
   const canBackfill = isOwner || isManager;
@@ -147,7 +146,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   }, [validDate, organization?.timezone, currentSucursal]);
 
   // Check closed barbers on date change
-  useMemo(() => {
+  useEffect(() => {
     checkClosedBarbers();
   }, [checkClosedBarbers]);
 
@@ -376,12 +375,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
     if (!gate.ok) return;
     setHistoryOpen(true);
-  }, [requirePinForAction, currentSucursal?.id]);
-
-  const handleAnulacionesHistoryClick = useCallback(async () => {
-    const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-    setAnulacionesHistoryOpen(true);
   }, [requirePinForAction, currentSucursal?.id]);
 
   const VOID_REASONS = [
