@@ -143,7 +143,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
         pendingRef.current = null;
         setPending(null);
         cur.resolve(result);
-        toast.success(`Autorizado por ${result.userName ?? 'responsable'}`);
+        toast.success('PIN autorizado');
         return { success: true, userName: result.userName ?? undefined };
       }
       return { success: false, error: data?.error || 'PIN incorrecto' } as any;
