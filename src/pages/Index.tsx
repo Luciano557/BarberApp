@@ -19,7 +19,7 @@ import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, isSucursalAccount, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
