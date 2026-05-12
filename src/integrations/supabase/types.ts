@@ -3215,7 +3215,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "owner" | "manager" | "barber" | "general_manager" | "otros"
+      app_role:
+        | "owner"
+        | "manager"
+        | "barber"
+        | "general_manager"
+        | "otros"
+        | "sucursal_account"
       caja_mov_tipo: "ingreso" | "egreso"
       metodo_pago: "efectivo" | "mercado_pago"
     }
@@ -3345,7 +3351,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "manager", "barber", "general_manager", "otros"],
+      app_role: [
+        "owner",
+        "manager",
+        "barber",
+        "general_manager",
+        "otros",
+        "sucursal_account",
+      ],
       caja_mov_tipo: ["ingreso", "egreso"],
       metodo_pago: ["efectivo", "mercado_pago"],
     },
