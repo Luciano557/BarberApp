@@ -38,13 +38,37 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
 
   // Bypass: el PIN solo aplica a cuentas de sucursal. El resto de cuentas personales
   // (owner, general_manager, manager, barber) nunca pasa por el flujo de PIN.
-  const { isSucursalAccount } = useAuth();
+  // Importante: esperar a que AuthContext termine de cargar antes de evaluar el bypass,
+  // para evitar un "bypass fantasma" mientras roles=[] e isSucursalAccount=false por defecto.
+  const { isSucursalAccount, isLoading: authLoading } = useAuth();
   const isSucursalAccountRef = useRef(isSucursalAccount);
+  const authReadyRef = useRef(!authLoading);
   useEffect(() => {
     isSucursalAccountRef.current = isSucursalAccount;
   }, [isSucursalAccount]);
+  useEffect(() => {
+    authReadyRef.current = !authLoading;
+  }, [authLoading]);
 
   const requirePinForAction = useCallback<RequireFn>(async (actionKey, sucursalId, organizationId) => {
+    // Esperar a que AuthContext esté inicializado (timeout de seguridad: 5s).
+    if (!authReadyRef.current) {
+      await new Promise<void>((resolve) => {
+        const start = Date.now();
+        const check = () => {
+          if (authReadyRef.current) return resolve();
+          if (Date.now() - start > 5000) return resolve();
+          setTimeout(check, 50);
+        };
+        check();
+      });
+    }
+
+    // Si auth sigue sin estar listo, fail-safe: no autorizar.
+    if (!authReadyRef.current) {
+      return { ok: false, cancelled: true };
+    }
+
     // Cuentas personales: ejecutan la acción directamente, sin PIN.
     if (!isSucursalAccountRef.current) {
       return { ok: true, validatedByRole: null, validatedByUserId: null, userName: null };
@@ -119,7 +143,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
         pendingRef.current = null;
         setPending(null);
         cur.resolve(result);
-        toast.success(`Autorizado por ${result.userName ?? 'responsable'}`);
+        toast.success('PIN autorizado');
         return { success: true, userName: result.userName ?? undefined };
       }
       return { success: false, error: data?.error || 'PIN incorrecto' } as any;
