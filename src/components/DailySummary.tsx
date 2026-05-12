@@ -395,7 +395,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   // Handle voiding a cash closing
   const handleVoidClosure = async () => {
     if (!voidingClosure || !user || !organization || !voidReason) return;
-    
+
+    const gate = await requirePinForAction('anular_cierre_caja', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+
     setIsVoidingClosure(true);
     try {
       // Update ingreso status to 'eliminado'
@@ -444,6 +447,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       toast.error('No se encontró el cierre actual');
       return;
     }
+
+    const gate = await requirePinForAction('regularizar_cierre_caja', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
 
     setIsRegularizing(true);
     try {
