@@ -6,7 +6,7 @@ interface Organization {
   id: string;
   name: string;
   slug: string;
-  plan: 'free' | 'basic' | 'premium';
+  plan: 'basico' | 'profesional' | 'premium';
   plan_expires_at: string | null;
   logo_url: string | null;
   phone: string | null;

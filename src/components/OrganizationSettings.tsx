@@ -71,7 +71,7 @@ export function OrganizationSettings() {
   const getPlanIcon = () => {
     switch (organization.plan) {
       case 'premium': return <Crown className="w-4 h-4" />;
-      case 'basic': return <Sparkles className="w-4 h-4" />;
+      case 'profesional': return <Sparkles className="w-4 h-4" />;
       default: return <Zap className="w-4 h-4" />;
     }
   };
@@ -79,7 +79,7 @@ export function OrganizationSettings() {
   const getPlanColor = () => {
     switch (organization.plan) {
       case 'premium': return 'bg-status-warning-bg text-status-warning-foreground border-status-warning';
-      case 'basic': return 'bg-status-info-bg text-status-info-foreground border-status-info';
+      case 'profesional': return 'bg-status-info-bg text-status-info-foreground border-status-info';
       default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -239,11 +239,11 @@ export function OrganizationSettings() {
               </div>
             </div>
           )}
-          {organization.plan === 'free' && (
+          {organization.plan === 'basico' && (
             <div className="mt-4 p-4 rounded-lg bg-primary/5 border border-primary/20">
               <p className="text-sm font-medium text-primary">¿Necesitás más?</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Actualizá a Basic o Premium para desbloquear más funciones.
+                Actualizá a Profesional o Premium para desbloquear más funciones.
               </p>
               <Button size="sm" className="mt-3">
                 Ver planes
