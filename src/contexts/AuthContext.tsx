@@ -25,6 +25,7 @@ interface AuthContextType {
   hasNoAccess: boolean;
   mustChangePassword: boolean;
   canManagePayments: boolean;
+  canOperarCajaYGastos: boolean;
   canManageConfig: boolean;
   canManageBarbers: boolean;
   canManageUsers: boolean;
@@ -169,8 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const mustChangePassword = (user?.user_metadata?.must_change_password === true)
     || (isSucursalAccount && user?.user_metadata?.temp_password_pending === true);
 
-  // Sucursal accounts get operational access only — never admin sections.
-  const canManagePayments = isOwner || isGeneralManager || isManager || isSucursalAccount;
+  // Administración de métodos de pago / configuración → NO incluye sucursal_account
+  const canManagePayments = isOwner || isGeneralManager || isManager;
+  // Operación diaria: Cobrar, Caja, Gastos → SÍ incluye sucursal_account
+  const canOperarCajaYGastos = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canManageConfig = isOwner || isGeneralManager;
   const canManageBarbers = isOwner || isGeneralManager;
   const canManageUsers = isOwner || isGeneralManager;
@@ -199,6 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasNoAccess,
         mustChangePassword,
         canManagePayments,
+        canOperarCajaYGastos,
         canManageConfig,
         canManageBarbers,
         canManageUsers,
