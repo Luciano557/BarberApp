@@ -366,6 +366,7 @@ export function GastosPanel() {
           )}
         </CardContent>
       </Card>
+      </SucursalViewPinGate>
 
       {/* Repeat picker sheets */}
       <RepeatPicker
