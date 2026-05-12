@@ -48,6 +48,8 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     blockCliente, unblockCliente, deleteCliente,
   } = useClientes();
   const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
+  const requirePinForAction = useRequirePinForAction();
 
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [sucursalesAsociadas, setSucursalesAsociadas] = useState<Array<{ sucursal_id: string; nombre: string }>>([]);
@@ -218,6 +220,8 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     if (!cliente) return;
     const motivo = motivoInput.trim();
     if (!motivo) { toast.error('El motivo es obligatorio'); return; }
+    const gate = await requirePinForAction('bloquear_cliente', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
     setActionBusy(true);
     const { error } = await blockCliente(cliente.id, motivo);
     setActionBusy(false);
