@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
+import { ActionPinGateProvider } from "@/components/ActionPinGate";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Homepage from "./pages/Homepage";
 import Index from "./pages/Index";
