@@ -9,7 +9,7 @@ import { MiNegocioPanel } from '@/components/MiNegocioPanel';
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
-import { PinProtectedSection } from '@/components/PinProtectedSection';
+// PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -138,13 +138,7 @@ const Index = () => {
           )}
 
           {activeTab === 'finanzas' && canViewFinanzas && (
-            isSucursalAccount ? (
-              <FinanzasPanel barbers={barbers} />
-            ) : (
-              <PinProtectedSection sectionName="Finanzas">
-                <FinanzasPanel barbers={barbers} />
-              </PinProtectedSection>
-            )
+            <FinanzasPanel barbers={barbers} />
           )}
 
           {activeTab === 'tareas' && canViewTareas && (
@@ -180,13 +174,7 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            isSucursalAccount ? (
-              <TurnosAgendaPanel />
-            ) : (
-              <PinProtectedSection sectionName="Turnos">
-                <TurnosAgendaPanel />
-              </PinProtectedSection>
-            )
+            <TurnosAgendaPanel />
           )}
 
           {activeTab === 'clientes' && canViewClientes && (
@@ -194,22 +182,14 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            isSucursalAccount ? (
-              <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
-            ) : (
-              <PinProtectedSection sectionName="Mi Negocio">
-                <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
-              </PinProtectedSection>
-            )
+            <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
           )}
 
           {activeTab === 'config' && canManageConfig && (
-            <PinProtectedSection sectionName="Configuración">
-              <ConfigurationPanel
-                initialSection={configInitialSection}
-                onSectionChange={setConfigInitialSection}
-              />
-            </PinProtectedSection>
+            <ConfigurationPanel
+              initialSection={configInitialSection}
+              onSectionChange={setConfigInitialSection}
+            />
           )}
         </div>
       </main>
