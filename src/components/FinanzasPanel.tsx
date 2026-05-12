@@ -5,6 +5,7 @@ import { DeudasPanel } from '@/components/DeudasPanel';
 import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { SueldosPanel } from '@/components/SueldosPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Barber } from '@/types/barbershop';
 
 interface FinanzasPanelProps {
@@ -12,6 +13,36 @@ interface FinanzasPanelProps {
 }
 
 export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
+  const { isSucursalAccount } = useAuth();
+
+  // Cuenta de sucursal: solo Gastos y Sueldos.
+  if (isSucursalAccount) {
+    return (
+      <div>
+        <h2 className="text-xl font-semibold text-foreground mb-6">Finanzas</h2>
+        <Tabs defaultValue="gastos">
+          <TabsList className="mb-6 flex-wrap h-auto gap-1">
+            <TabsTrigger value="gastos" className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Gastos
+            </TabsTrigger>
+            <TabsTrigger value="sueldos" className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Sueldos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="gastos">
+            <GastosPanel />
+          </TabsContent>
+          <TabsContent value="sueldos">
+            <SueldosPanel barbers={barbers} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h2 className="text-xl font-semibold text-foreground mb-6">Finanzas</h2>
