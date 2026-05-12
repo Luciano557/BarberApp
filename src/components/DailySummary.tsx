@@ -26,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { usePinProtection } from '@/hooks/usePinProtection';
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
