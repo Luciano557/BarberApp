@@ -16,8 +16,7 @@ import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
-import { PinGateDialog } from './PinGateDialog';
-import { supabase } from '@/integrations/supabase/client';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
 
@@ -53,6 +52,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
   const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
+  const requirePinForAction = useRequirePinForAction();
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
 
@@ -64,10 +64,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);
 
-  const [showPinDialog, setShowPinDialog] = useState(false);
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
-  const [showActionPinDialog, setShowActionPinDialog] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ tareaId: string; action: string } | null>(null);
 
   const isTareasTab = activeTab === 'tareas';
   const showSucursalFilter = !currentSucursal && sucursales.length > 1;
@@ -154,40 +151,25 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     }
   };
 
-  // PIN flows
-  const handleNuevaPeticion = () => setShowPinDialog(true);
+  // PIN flows: delegados a requirePinForAction (bypass automático para cuentas personales).
   const handleNuevaTarea = () => { setPeticionCreador(null); setShowForm(true); };
 
-  const handlePinValidate = async (pin: string) => {
-    const { data, error } = await supabase.functions.invoke('validate-pin', {
-      body: { pin, sucursal_id: currentSucursal?.id ?? null },
-    });
-    if (error || !data?.valid) return { success: false };
-    setPeticionCreador({ nombre: data.user_name, barberoId: data.barbero_id });
-    setShowPinDialog(false);
+  const handleNuevaPeticion = async () => {
+    const gate = await requirePinForAction('crear_tarea', currentSucursal?.id ?? null);
+    if (gate.ok !== true) return;
+    const nombre = gate.userName ?? profile?.full_name ?? profile?.email ?? '';
+    const barberoId = gate.validatedByUserId ?? profile?.barbero_id ?? '';
+    setPeticionCreador({ nombre, barberoId });
     setShowForm(true);
-    return { success: true, userName: data.user_name };
   };
 
-  const requestPeticionAction = (tareaId: string, action: string) => {
-    setPendingAction({ tareaId, action });
-    setShowActionPinDialog(true);
-  };
-
-  const handleActionPinValidate = async (pin: string) => {
-    const { data, error } = await supabase.functions.invoke('validate-pin', {
-      body: { pin, sucursal_id: currentSucursal?.id ?? null },
-    });
-    if (error || !data?.valid) return { success: false };
-    setShowActionPinDialog(false);
-    if (pendingAction) {
-      const { tareaId, action } = pendingAction;
-      if (action === 'delete') deleteTarea.mutate(tareaId);
-      else updateTarea.mutate({ id: tareaId, estado: action });
-      toast.success(`Acción realizada por ${data.user_name}`);
-      setPendingAction(null);
-    }
-    return { success: true, userName: data.user_name };
+  const requestPeticionAction = async (tareaId: string, action: string) => {
+    const actionKey = action === 'completada' ? 'completar_tarea' : 'editar_tarea';
+    const gate = await requirePinForAction(actionKey, currentSucursal?.id ?? null);
+    if (gate.ok !== true) return;
+    if (action === 'delete') deleteTarea.mutate(tareaId);
+    else updateTarea.mutate({ id: tareaId, estado: action });
+    if (gate.userName) toast.success(`Acción realizada por ${gate.userName}`);
   };
 
   // Card renderers
@@ -444,19 +426,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         isPending={addTarea.isPending}
         tipo={isTareasTab ? 'tarea' : 'peticion'}
         creadorNombre={peticionCreador?.nombre}
-      />
-
-      <PinGateDialog
-        open={showPinDialog}
-        onValidate={handlePinValidate}
-        onClose={() => setShowPinDialog(false)}
-        sectionName="crear una petición"
-      />
-      <PinGateDialog
-        open={showActionPinDialog}
-        onValidate={handleActionPinValidate}
-        onClose={() => { setShowActionPinDialog(false); setPendingAction(null); }}
-        sectionName="gestionar esta petición"
       />
 
       {/* Tabs */}
