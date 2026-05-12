@@ -872,6 +872,12 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   }
 
   return (
+    <SucursalViewPinGate
+      actionKey="ver_sueldos"
+      sucursalId={currentSucursal?.id ?? null}
+      isSucursalAccount={isSucursalAccount}
+      viewLabel="los sueldos"
+    >
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
