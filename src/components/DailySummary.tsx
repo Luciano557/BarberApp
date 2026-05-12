@@ -26,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { usePinProtection } from '@/hooks/usePinProtection';
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
@@ -64,6 +65,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [closingBarber, setClosingBarber] = useState<BarberSummary | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { saveCashClosing } = useCashClosing();
+  const requirePinForAction = useRequirePinForAction();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
@@ -1122,6 +1124,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               disabled={isSaving}
               onClick={async () => {
                 if (!closingBarber) return;
+                const gate = await requirePinForAction('cerrar_caja', currentSucursal?.id ?? null);
+                if (!gate.ok) return;
                 setIsSaving(true);
                 const success = await saveCashClosing({
                   barber: closingBarber,

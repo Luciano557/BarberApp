@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth, addDays, addWeeks, addYears } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 
 /**
  * Calcula el devengado de sueldo fijo usando meses calendario reales.
@@ -335,6 +336,7 @@ function BarberDetailRow({
 export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
+  const requirePinForAction = useRequirePinForAction();
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -789,6 +791,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       toast.error('Barbero no encontrado');
       return;
     }
+
+    const gate = await requirePinForAction('registrar_pago_sueldo', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
 
     setIsSubmitting(true);
     try {

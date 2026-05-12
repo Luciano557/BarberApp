@@ -34,7 +34,7 @@ export function VoidTransactionDialog({
 
     try {
       const { data, error: validationError } = await supabase.functions.invoke('validate-pin', {
-        body: { pin: value, sucursal_id: currentSucursal?.id ?? null }
+        body: { pin: value, sucursal_id: currentSucursal?.id ?? null, action_key: 'anular_transaccion' }
       });
 
       if (validationError) throw validationError;
