@@ -187,15 +187,36 @@ export function useGastos() {
     }
   };
 
-  const deleteGasto = async (id: number) => {
+  const anularGasto = async (
+    id: number,
+    motivo: string,
+    audit?: { validatedByUserId?: string | null }
+  ) => {
+    const motivoLimpio = (motivo || '').trim().slice(0, 240);
+    if (!motivoLimpio) {
+      toast.error('Indicá un motivo de anulación');
+      return false;
+    }
     try {
-      const { error } = await supabase.from('Egresos').delete().eq('id', id);
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('Egresos')
+        .update({
+          estado: 'anulado',
+          anulado_at: new Date().toISOString(),
+          anulado_por: user?.id ?? null,
+          anulado_por_pin_user_id: audit?.validatedByUserId ?? null,
+          anulado_motivo: motivoLimpio,
+        })
+        .eq('id', id);
       if (error) throw error;
-      toast.success('Gasto eliminado');
+      toast.success('Gasto anulado');
       await fetchGastos();
+      return true;
     } catch (error: any) {
-      console.error('Error deleting gasto:', error);
-      toast.error('Error al eliminar gasto');
+      console.error('Error anulando gasto:', error);
+      toast.error('Error al anular gasto');
+      return false;
     }
   };
 
