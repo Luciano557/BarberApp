@@ -20,7 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
+import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PinActionsToggleList } from './PinActionsToggleList';
 import { RegenerarPasswordDialog } from './RegenerarPasswordDialog';
