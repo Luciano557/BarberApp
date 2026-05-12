@@ -869,8 +869,13 @@ export type Database = {
       }
       Egresos: {
         Row: {
+          anulado_at: string | null
+          anulado_motivo: string | null
+          anulado_por: string | null
+          anulado_por_pin_user_id: string | null
           Categoria: string | null
           Descripcion: string | null
+          estado: string
           Fecha: string | null
           gasto_recurrente_id: string | null
           id: number
@@ -881,8 +886,13 @@ export type Database = {
           tipo_costo: string | null
         }
         Insert: {
+          anulado_at?: string | null
+          anulado_motivo?: string | null
+          anulado_por?: string | null
+          anulado_por_pin_user_id?: string | null
           Categoria?: string | null
           Descripcion?: string | null
+          estado?: string
           Fecha?: string | null
           gasto_recurrente_id?: string | null
           id?: number
@@ -893,8 +903,13 @@ export type Database = {
           tipo_costo?: string | null
         }
         Update: {
+          anulado_at?: string | null
+          anulado_motivo?: string | null
+          anulado_por?: string | null
+          anulado_por_pin_user_id?: string | null
           Categoria?: string | null
           Descripcion?: string | null
+          estado?: string
           Fecha?: string | null
           gasto_recurrente_id?: string | null
           id?: number
@@ -2222,6 +2237,75 @@ export type Database = {
           },
         ]
       }
+      sucursal_accounts: {
+        Row: {
+          created_at: string
+          email: string
+          estado: string
+          id: string
+          last_password_reset_at: string | null
+          organization_id: string
+          sucursal_id: string
+          temp_password_pending: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          estado?: string
+          id?: string
+          last_password_reset_at?: string | null
+          organization_id: string
+          sucursal_id: string
+          temp_password_pending?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          estado?: string
+          id?: string
+          last_password_reset_at?: string | null
+          organization_id?: string
+          sucursal_id?: string
+          temp_password_pending?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sucursal_action_pin_config: {
+        Row: {
+          action_key: string
+          created_at: string
+          id: string
+          organization_id: string
+          requires_pin: boolean
+          sucursal_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_key: string
+          created_at?: string
+          id?: string
+          organization_id: string
+          requires_pin?: boolean
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_key?: string
+          created_at?: string
+          id?: string
+          organization_id?: string
+          requires_pin?: boolean
+          sucursal_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sucursal_payment_settings: {
         Row: {
           created_at: string
@@ -3099,6 +3183,7 @@ export type Database = {
         Args: { _clientes: Json; _sucursal_id: string }
         Returns: Json
       }
+      is_sucursal_account: { Args: { _user_id: string }; Returns: boolean }
       org_has_any_pin: { Args: never; Returns: boolean }
       registrar_movimiento_stock: {
         Args: {
@@ -3209,6 +3294,14 @@ export type Database = {
         }
       }
       soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
+      sucursal_action_requires_pin: {
+        Args: {
+          _action_key: string
+          _organization_id: string
+          _sucursal_id: string
+        }
+        Returns: boolean
+      }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
