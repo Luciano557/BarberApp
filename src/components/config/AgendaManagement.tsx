@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgendaConfigSection } from './AgendaConfigSection';
 import { BloqueosSection } from './BloqueosSection';
 import { HorariosTrabajoSection } from './HorariosTrabajoSection';
+import { PortalPublicoSection } from './PortalPublicoSection';
 import { AgendaPanel } from '@/components/agenda/AgendaPanel';
 import { Barber } from '@/types/barbershop';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -33,6 +34,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers }: Agenda
       </TabsContent>
 
       <TabsContent value="config" className="mt-4 space-y-6">
+        <PortalPublicoSection />
         <AgendaConfigSection sucursalId={sucursalId} organizationId={organizationId} />
         <HorariosTrabajoSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
         <BloqueosSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />

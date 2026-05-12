@@ -1858,6 +1858,44 @@ export type Database = {
         }
         Relationships: []
       }
+      portal_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          links: Json
+          logo_path: string | null
+          organization_id: string
+          primary_color: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          links?: Json
+          logo_path?: string | null
+          organization_id: string
+          primary_color?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          links?: Json
+          logo_path?: string | null
+          organization_id?: string
+          primary_color?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           activo: boolean
@@ -3310,6 +3348,7 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      validate_portal_links: { Args: { p_links: Json }; Returns: boolean }
     }
     Enums: {
       app_role:
