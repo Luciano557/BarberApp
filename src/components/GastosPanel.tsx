@@ -17,6 +17,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { RepeatPicker, getRepeatLabel } from '@/components/tareas/RepeatPicker';
 import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/CustomRepeatSheet';
 import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
 const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
   fijo: [
