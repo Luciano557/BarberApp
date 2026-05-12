@@ -22,6 +22,7 @@ import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
+import { useAuth } from '@/contexts/AuthContext';
 
 
 
@@ -340,6 +341,15 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const { currentSucursal } = useSucursal();
   
   const requirePinForAction = useRequirePinForAction();
+  const { isSucursalAccount } = useAuth();
+  const [sueldosViewUnlocked, setSueldosViewUnlocked] = useState(false);
+  const shouldGateSueldosView = isSucursalAccount && !sueldosViewUnlocked;
+
+  const handleUnlockSueldosView = async () => {
+    const gate = await requirePinForAction('ver_sueldos', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+    setSueldosViewUnlocked(true);
+  };
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
