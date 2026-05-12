@@ -140,6 +140,11 @@ export function SucursalTabContent({
               <CardTitle className="text-base">Información de la sucursal</CardTitle>
             </div>
             <div className="flex items-center gap-2">
+              {canManageCuentaSucursal && (
+                <Button variant="outline" size="sm" onClick={() => setCuentaOpen(true)}>
+                  <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
+                </Button>
+              )}
               {!isEditingInfo && (
                 <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)}>
                   <Edit2 className="h-4 w-4 mr-1" /> Editar
