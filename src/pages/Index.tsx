@@ -180,9 +180,13 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <PinProtectedSection sectionName="Turnos">
+            isSucursalAccount ? (
               <TurnosAgendaPanel />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Turnos">
+                <TurnosAgendaPanel />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'clientes' && canViewClientes && (
@@ -190,9 +194,13 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            <PinProtectedSection sectionName="Mi Negocio">
+            isSucursalAccount ? (
               <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Mi Negocio">
+                <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'config' && canManageConfig && (
