@@ -20,7 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck } from 'lucide-react';
+import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PinActionsToggleList } from './PinActionsToggleList';
 import { RegenerarPasswordDialog } from './RegenerarPasswordDialog';
@@ -155,19 +156,67 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
                 </div>
               </div>
 
-              {estado && (
-                <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3">
-                  <Badge variant={estado.variant}>{estado.label}</Badge>
-                  {estado.help && <p className="text-xs text-muted-foreground flex-1">{estado.help}</p>}
-                </div>
-              )}
+              {account.temp_password_pending ? (
+                <>
+                  {account.temp_password_visible ? (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Contraseña temporal</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={account.temp_password_visible}
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(account.temp_password_visible!);
+                            toast.success('Contraseña copiada');
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex gap-2 text-xs text-foreground">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <span>La contraseña temporal anterior ya no está disponible. Regenerala para obtener una nueva.</span>
+                    </div>
+                  )}
 
-              <div className="flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => setRegenOpen(true)}>
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                  Regenerar contraseña
-                </Button>
-              </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">Contraseña temporal pendiente</Badge>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Esta contraseña es temporal. Compartila con la persona a cargo. Al iniciar sesión deberá cambiarla y dejará de mostrarse acá.
+                  </p>
+
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setRegenOpen(true)}>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Regenerar contraseña
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Badge>Activa</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Si no recordás la contraseña, podés regenerarla. Esto cerrará las sesiones activas y creará una nueva contraseña temporal.
+                  </p>
+                  <div className="flex justify-end">
+                    <Button variant="outline" size="sm" onClick={() => setRegenOpen(true)}>
+                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      Regenerar contraseña
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </CardContent>

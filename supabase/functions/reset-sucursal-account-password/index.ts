@@ -67,6 +67,7 @@ serve(async (req) => {
       .update({
         estado: "Contraseña temporal",
         temp_password_pending: true,
+        temp_password_visible: tempPassword,
         last_password_reset_at: new Date().toISOString(),
       })
       .eq("id", sa.id);

@@ -78,6 +78,7 @@ serve(async (req) => {
           user_id: uid, email,
           estado: "Contraseña temporal",
           temp_password_pending: true,
+          temp_password_visible: tempPassword,
         });
 
         created.push({ sucursalId: suc.id, nombre: suc.nombre, email, tempPassword });

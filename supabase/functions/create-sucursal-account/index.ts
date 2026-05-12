@@ -101,6 +101,7 @@ serve(async (req) => {
       email,
       estado: "Contraseña temporal",
       temp_password_pending: true,
+      temp_password_visible: tempPassword,
     });
     if (saErr) {
       await admin.auth.admin.deleteUser(userId);

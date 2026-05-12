@@ -2247,6 +2247,7 @@ export type Database = {
           organization_id: string
           sucursal_id: string
           temp_password_pending: boolean
+          temp_password_visible: string | null
           updated_at: string
           user_id: string
         }
@@ -2259,6 +2260,7 @@ export type Database = {
           organization_id: string
           sucursal_id: string
           temp_password_pending?: boolean
+          temp_password_visible?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2271,6 +2273,7 @@ export type Database = {
           organization_id?: string
           sucursal_id?: string
           temp_password_pending?: boolean
+          temp_password_visible?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -3150,6 +3153,10 @@ export type Database = {
       check_org_limit: {
         Args: { _org_id: string; _resource: string }
         Returns: boolean
+      }
+      clear_sucursal_temp_password: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       create_cliente_with_sucursal: {
         Args: {

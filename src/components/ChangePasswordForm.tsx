@@ -53,10 +53,21 @@ export function ChangePasswordForm({ onSuccess }: ChangePasswordFormProps) {
       // Update password
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
-        data: { must_change_password: false },
+        data: { must_change_password: false, temp_password_pending: false },
       });
 
       if (updateError) throw updateError;
+
+      // If this is a sucursal_account, clear the visible temp password server-side
+      const { data: { user } } = await supabase.auth.getUser();
+      const isSucursalAccount = user?.user_metadata?.sucursal_account === true;
+      if (isSucursalAccount) {
+        try {
+          await supabase.functions.invoke('clear-sucursal-temp-password');
+        } catch (clearErr) {
+          console.error('clear-sucursal-temp-password failed', clearErr);
+        }
+      }
 
       toast.success('¡Contraseña actualizada!', {
         description: 'Ya podés usar tu nueva contraseña para ingresar',
