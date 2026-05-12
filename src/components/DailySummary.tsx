@@ -76,8 +76,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [isRegularizing, setIsRegularizing] = useState(false);
   const [openStalePopover, setOpenStalePopover] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { user, profile, isOwner, isManager } = useAuth();
-  const canVoidClosure = isOwner || isManager;
+  const { user, profile, isOwner, isManager, isSucursalAccount } = useAuth();
+  const canVoidClosure = isOwner || isManager || isSucursalAccount;
   const canBackfill = isOwner || isManager;
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
