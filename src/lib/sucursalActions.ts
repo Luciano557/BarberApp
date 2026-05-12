@@ -21,6 +21,7 @@ export type SucursalActionKey =
 export const SUCURSAL_ACTION_LABELS: Record<SucursalActionKey, string> = {
   cerrar_caja: 'Cierre de caja',
   anular_transaccion: 'Anulación de transacciones',
+  ver_gastos: 'Ver gastos',
   registrar_gasto: 'Registrar gastos',
   editar_gasto: 'Editar gastos',
   anular_gasto: 'Anular gastos',
