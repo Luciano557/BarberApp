@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Copy, KeyRound, RefreshCw, Loader2, ShieldCheck, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { PinActionsToggleList } from './PinActionsToggleList';
@@ -158,41 +158,17 @@ export function CuentaSucursalBlock({ sucursal }: Props) {
 
               {account.temp_password_pending ? (
                 <>
-                  {account.temp_password_visible ? (
-                    <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Contraseña temporal</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          readOnly
-                          value={account.temp_password_visible}
-                          className="font-mono text-sm"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            navigator.clipboard.writeText(account.temp_password_visible!);
-                            toast.success('Contraseña copiada');
-                          }}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex gap-2 text-xs text-foreground">
-                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                      <span>La contraseña temporal anterior ya no está disponible. Regenerala para obtener una nueva.</span>
-                    </div>
-                  )}
-
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">Contraseña temporal pendiente</Badge>
                   </div>
 
-                  <p className="text-xs text-muted-foreground">
-                    Esta contraseña es temporal. Compartila con la persona a cargo. Al iniciar sesión deberá cambiarla y dejará de mostrarse acá.
-                  </p>
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 flex gap-2 text-xs text-muted-foreground">
+                    <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <span>
+                      Por seguridad, la contraseña temporal solo se muestra una vez al generarla.
+                      Si no la copiaste, regenerala para obtener una nueva.
+                    </span>
+                  </div>
 
                   <div className="flex justify-end">
                     <Button variant="outline" size="sm" onClick={() => setRegenOpen(true)}>

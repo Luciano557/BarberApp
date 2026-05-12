@@ -2247,7 +2247,6 @@ export type Database = {
           organization_id: string
           sucursal_id: string
           temp_password_pending: boolean
-          temp_password_visible: string | null
           updated_at: string
           user_id: string
         }
@@ -2260,7 +2259,6 @@ export type Database = {
           organization_id: string
           sucursal_id: string
           temp_password_pending?: boolean
-          temp_password_visible?: string | null
           updated_at?: string
           user_id: string
         }
@@ -2273,7 +2271,6 @@ export type Database = {
           organization_id?: string
           sucursal_id?: string
           temp_password_pending?: boolean
-          temp_password_visible?: string | null
           updated_at?: string
           user_id?: string
         }

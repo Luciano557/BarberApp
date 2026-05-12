@@ -6,7 +6,6 @@ export interface SucursalAccountRow {
   email: string;
   estado: string;
   temp_password_pending: boolean;
-  temp_password_visible: string | null;
   last_password_reset_at: string | null;
   sucursal_id: string;
   organization_id: string;
@@ -22,11 +21,11 @@ export function useSucursalAccount(sucursalId: string | null | undefined) {
     try {
       const { data, error } = await supabase
         .from('sucursal_accounts')
-        .select('id, email, estado, temp_password_pending, temp_password_visible, last_password_reset_at, sucursal_id, organization_id')
+        .select('id, email, estado, temp_password_pending, last_password_reset_at, sucursal_id, organization_id')
         .eq('sucursal_id', sucursalId)
         .maybeSingle();
       if (error) throw error;
-      setAccount(data as SucursalAccountRow | null);
+      setAccount((data as unknown as SucursalAccountRow | null) ?? null);
     } catch (e) {
       console.error('useSucursalAccount fetch', e);
       setAccount(null);
