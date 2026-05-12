@@ -135,6 +135,8 @@ export function GastosPanel() {
       }
     } else {
       // Normal single gasto
+      const gate = await requirePinForAction('registrar_gasto', currentSucursal?.id ?? null);
+      if (!gate.ok) { setSubmitting(false); return; }
       const success = await addGasto({
         categoria,
         monto: parseFloat(monto),
