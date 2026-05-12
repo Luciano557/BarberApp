@@ -78,7 +78,7 @@ export interface SucursalActionGroup {
 
 export const SUCURSAL_ACTION_GROUPS: SucursalActionGroup[] = [
   { key: 'caja', title: 'Caja', actions: ['cerrar_caja', 'anular_transaccion', 'ver_historial_caja'] },
-  { key: 'gastos', title: 'Gastos', actions: ['registrar_gasto', 'editar_gasto', 'anular_gasto'] },
+  { key: 'gastos', title: 'Gastos', actions: ['ver_gastos', 'registrar_gasto', 'editar_gasto', 'anular_gasto'] },
   { key: 'sueldos', title: 'Sueldos', actions: ['ver_sueldos', 'registrar_pago_sueldo'] },
   { key: 'tareas', title: 'Tareas', actions: ['crear_tarea', 'editar_tarea', 'completar_tarea'] },
   { key: 'clientes', title: 'Clientes', actions: ['bloquear_cliente'] },
