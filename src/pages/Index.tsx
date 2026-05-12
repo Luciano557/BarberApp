@@ -138,9 +138,13 @@ const Index = () => {
           )}
 
           {activeTab === 'finanzas' && canViewFinanzas && (
-            <PinProtectedSection sectionName="Finanzas">
+            isSucursalAccount ? (
               <FinanzasPanel barbers={barbers} />
-            </PinProtectedSection>
+            ) : (
+              <PinProtectedSection sectionName="Finanzas">
+                <FinanzasPanel barbers={barbers} />
+              </PinProtectedSection>
+            )
           )}
 
           {activeTab === 'tareas' && canViewTareas && (
