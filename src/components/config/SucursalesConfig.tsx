@@ -305,6 +305,12 @@ export function SucursalesConfig() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
+                  {(isOwner || isGeneralManager || (isManager && sucursales.some(s => s.id === suc.id))) && (
+                    <Button variant="outline" size="sm" onClick={() => setCuentaSucursal(suc)} className="px-3 py-1.5 text-xs font-medium">
+                      <KeyRound className="h-3.5 w-3.5 mr-1.5" />
+                      Cuenta de sucursal
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" onClick={() => handleOpenAssign(suc)} className="px-3 py-1.5 text-xs font-medium">
                     <Users className="h-3.5 w-3.5 mr-1.5" />
                     Ver/Editar Equipo
