@@ -42,6 +42,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       general_manager: { label: 'Enc. General', icon: Shield, variant: 'default' },
       manager: { label: 'Enc. Sucursal', icon: UserCheck, variant: 'secondary' },
       barber: { label: 'Barbero', icon: Scissors, variant: 'outline' },
+      sucursal_account: { label: 'Cuenta de sucursal', icon: Building2, variant: 'secondary' },
     };
     return roles
       .filter(r => r !== 'otros')

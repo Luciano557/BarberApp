@@ -152,11 +152,18 @@ export function SucursalesConfig() {
         if (error) throw error;
         toast.success('Sucursal actualizada');
       } else {
-        const { error } = await supabase
+        const { data: insData, error } = await supabase
           .from('sucursales')
-          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null, timezone: organization.timezone });
+          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null, timezone: organization.timezone })
+          .select('id')
+          .single();
         if (error) throw error;
         toast.success('Sucursal creada');
+        // Auto-create the Cuenta de sucursal for this new branch (best-effort).
+        if (insData?.id) {
+          supabase.functions.invoke('create-sucursal-account', { body: { sucursalId: insData.id } })
+            .catch((e) => console.warn('create-sucursal-account failed:', e));
+        }
       }
       setShowDialog(false);
       await fetchAllSucursales();
