@@ -64,6 +64,8 @@ const getRoleIcon = (role: AppRole) => {
 export function SucursalesConfig() {
   const { organization } = useOrganization();
   const { sucursales, refreshSucursales } = useSucursal();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const [cuentaSucursal, setCuentaSucursal] = useState<Sucursal | null>(null);
   const { allBarbers } = useSupabaseData();
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
