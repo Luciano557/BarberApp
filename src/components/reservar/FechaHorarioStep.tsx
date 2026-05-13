@@ -162,10 +162,10 @@ export const FechaHorarioStep = ({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-foreground">Elegí fecha y horario</h2>
-
-      {/* Month label */}
-      <p className="text-sm font-medium text-muted-foreground capitalize">{monthLabel}</p>
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-foreground">Elegí fecha y horario</h2>
+        <p className="text-xs text-muted-foreground capitalize">{monthLabel}</p>
+      </div>
 
       {/* Date ribbon */}
       <div
