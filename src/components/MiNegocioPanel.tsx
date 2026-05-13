@@ -264,17 +264,22 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const handleSaveSucursal = async () => {
     if (!organization?.id || !formData.nombre.trim()) return;
     setIsSaving(true);
-    const { error } = await supabase.from('sucursales').insert({
+    const { data: insData, error } = await supabase.from('sucursales').insert({
       organization_id: organization.id,
       nombre: formData.nombre.trim(),
       direccion: formData.direccion || null,
       telefono: formData.telefono || null,
       timezone: organization.timezone,
-    });
+    }).select('id').single();
     if (error) {
       toast.error(error.message || 'Error al crear');
     } else {
       toast.success('Sucursal creada');
+      // Auto-create the Cuenta de sucursal for this branch (best-effort).
+      if (insData?.id) {
+        supabase.functions.invoke('create-sucursal-account', { body: { sucursalId: insData.id } })
+          .catch((e) => console.warn('create-sucursal-account failed:', e));
+      }
       setShowDialog(false);
       await fetchAllSucursales();
       await refreshSucursales();

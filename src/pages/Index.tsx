@@ -9,7 +9,7 @@ import { MiNegocioPanel } from '@/components/MiNegocioPanel';
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
-import { PinProtectedSection } from '@/components/PinProtectedSection';
+// PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,14 +19,14 @@ import { useSucursal } from '@/contexts/SucursalContext';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   
   const rolesLoaded = roles.length > 0;
 
   const getDefaultTab = () => {
     if (!rolesLoaded) return 'welcome';
     if (hasNoAccess) return 'no-access';
-    if (canManagePayments) return 'registro';
+    if (canOperarCajaYGastos) return 'registro';
     if (canViewResumen) return 'resumen';
     return 'no-access';
   };
@@ -50,11 +50,11 @@ const Index = () => {
     }
     // Once roles load and we're still on welcome, navigate to correct default
     if (activeTab === 'welcome') {
-      if (canManagePayments) setActiveTab('registro');
+      if (canOperarCajaYGastos) setActiveTab('registro');
       else if (canViewResumen) setActiveTab('resumen');
       return;
     }
-    if (activeTab === 'registro' && !canManagePayments) {
+    if (activeTab === 'registro' && !canOperarCajaYGastos) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
     if (activeTab === 'config' && !canManageConfig) {
@@ -78,7 +78,7 @@ const Index = () => {
     if (activeTab === 'clientes' && !canViewClientes) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-  }, [activeTab, canManagePayments, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
+  }, [activeTab, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
 
   const {
     isLoading,
@@ -112,7 +112,7 @@ const Index = () => {
 
       <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
         <div className="max-w-4xl mx-auto p-6 md:p-8">
-          {activeTab === 'registro' && canManagePayments && (
+          {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}
               extras={extras}
@@ -138,9 +138,7 @@ const Index = () => {
           )}
 
           {activeTab === 'finanzas' && canViewFinanzas && (
-            <PinProtectedSection sectionName="Finanzas">
-              <FinanzasPanel barbers={barbers} />
-            </PinProtectedSection>
+            <FinanzasPanel barbers={barbers} />
           )}
 
           {activeTab === 'tareas' && canViewTareas && (
@@ -176,9 +174,7 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <PinProtectedSection sectionName="Turnos">
-              <TurnosAgendaPanel />
-            </PinProtectedSection>
+            <TurnosAgendaPanel />
           )}
 
           {activeTab === 'clientes' && canViewClientes && (
@@ -186,18 +182,14 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            <PinProtectedSection sectionName="Mi Negocio">
-              <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
-            </PinProtectedSection>
+            <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
           )}
 
           {activeTab === 'config' && canManageConfig && (
-            <PinProtectedSection sectionName="Configuración">
-              <ConfigurationPanel
-                initialSection={configInitialSection}
-                onSectionChange={setConfigInitialSection}
-              />
-            </PinProtectedSection>
+            <ConfigurationPanel
+              initialSection={configInitialSection}
+              onSectionChange={setConfigInitialSection}
+            />
           )}
         </div>
       </main>

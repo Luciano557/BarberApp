@@ -1,3 +1,15 @@
 project_id = "azqpyfoobpovqosbayvz"
 [functions.update-team-member-access]
 verify_jwt = false
+
+[functions.create-sucursal-account]
+verify_jwt = true
+
+[functions.reset-sucursal-account-password]
+verify_jwt = true
+
+[functions.backfill-sucursal-accounts]
+verify_jwt = true
+
+[functions.clear-sucursal-temp-password]
+verify_jwt = true

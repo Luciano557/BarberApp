@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle } from 'lucide-react';
+import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle, KeyRound } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { CuentaSucursalBlock } from '@/components/config/CuentaSucursalBlock';
+import { useSucursal } from '@/contexts/SucursalContext';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -58,8 +61,14 @@ export function SucursalTabContent({
   onGoToGeneralConfig,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
-  const { isOwner, isGeneralManager } = useAuth();
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const { sucursales: sucursalesAsignadas } = useSucursal();
   const canManageServiceStructure = isOwner || isGeneralManager;
+  const canManageCuentaSucursal =
+    isOwner ||
+    isGeneralManager ||
+    (isManager && sucursalesAsignadas.some((s) => s.id === sucursal.id));
+  const [cuentaOpen, setCuentaOpen] = useState(false);
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -131,6 +140,11 @@ export function SucursalTabContent({
               <CardTitle className="text-base">Información de la sucursal</CardTitle>
             </div>
             <div className="flex items-center gap-2">
+              {canManageCuentaSucursal && (
+                <Button variant="outline" size="sm" onClick={() => setCuentaOpen(true)}>
+                  <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
+                </Button>
+              )}
               {!isEditingInfo && (
                 <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)}>
                   <Edit2 className="h-4 w-4 mr-1" /> Editar
@@ -264,6 +278,18 @@ export function SucursalTabContent({
         </div>
 
       </div>
+
+      <Sheet open={cuentaOpen} onOpenChange={setCuentaOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle>Cuenta de sucursal — {sucursal.nombre}</SheetTitle>
+            <SheetDescription>
+              Acceso operativo y reglas de PIN específicas para esta sucursal.
+            </SheetDescription>
+          </SheetHeader>
+          <CuentaSucursalBlock sucursal={sucursal} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

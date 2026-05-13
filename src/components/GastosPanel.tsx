@@ -17,6 +17,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { RepeatPicker, getRepeatLabel } from '@/components/tareas/RepeatPicker';
 import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/CustomRepeatSheet';
 import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { useAuth } from '@/contexts/AuthContext';
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
 const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
   fijo: [
@@ -64,8 +69,22 @@ const TIPO_BADGE_VARIANT: Record<TipoCosto, 'default' | 'secondary' | 'outline'>
 };
 
 export function GastosPanel() {
-  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, deleteGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const requirePinForAction = useRequirePinForAction();
+  const { currentSucursal } = useSucursal();
+  const { isSucursalAccount } = useAuth();
+  
+  const [anularState, setAnularState] = useState<{ id: number; motivo: string } | null>(null);
+  const [anulando, setAnulando] = useState(false);
+  const [gastosViewUnlocked, setGastosViewUnlocked] = useState(false);
+  const shouldGateGastosView = isSucursalAccount && !gastosViewUnlocked;
   const { recurrentes, syncGastosRecurrentes, addRecurrente, toggleRecurrente, deleteRecurrente } = useGastosRecurrentes();
+
+  const handleUnlockGastosView = async () => {
+    const gate = await requirePinForAction('ver_gastos', currentSucursal?.id ?? null);
+    if (!gate.ok) return;
+    setGastosViewUnlocked(true);
+  };
 
   // Wire up the recurrentes sync into useGastos
   useEffect(() => {
@@ -128,6 +147,8 @@ export function GastosPanel() {
       }
     } else {
       // Normal single gasto
+      const gate = await requirePinForAction('registrar_gasto', currentSucursal?.id ?? null);
+      if (!gate.ok) { setSubmitting(false); return; }
       const success = await addGasto({
         categoria,
         monto: parseFloat(monto),
@@ -274,21 +295,30 @@ export function GastosPanel() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Historial</CardTitle>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium min-w-[120px] text-center capitalize">
-                {format(selectedMonth, 'MMMM yyyy', { locale: es })}
-              </span>
-              <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            {!shouldGateGastosView && (
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-medium min-w-[120px] text-center capitalize">
+                  {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+                </span>
+                <Button variant="outline" size="icon" onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {shouldGateGastosView ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
+              <p className="text-sm text-muted-foreground max-w-sm">
+                El detalle de gastos puede requerir autorización.
+              </p>
+              <Button onClick={handleUnlockGastosView}>Ver gastos</Button>
+            </div>
+          ) : isLoading ? (
             <p className="text-muted-foreground text-center py-4">Cargando...</p>
           ) : gastos.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No hay gastos en este período</p>
@@ -327,7 +357,7 @@ export function GastosPanel() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteGasto(g.id)}
+                        onClick={() => setAnularState({ id: g.id, motivo: '' })}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -371,6 +401,55 @@ export function GastosPanel() {
           setRepeatByweekday(days);
         }}
       />
+
+      <Dialog open={anularState !== null} onOpenChange={(o) => { if (!o) setAnularState(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Anular gasto</DialogTitle>
+            <DialogDescription>
+              El gasto se marcará como anulado y dejará de impactar en finanzas. Esta acción queda registrada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-anulacion">Motivo de anulación</Label>
+            <Textarea
+              id="motivo-anulacion"
+              maxLength={240}
+              value={anularState?.motivo ?? ''}
+              onChange={(e) => setAnularState((s) => s ? { ...s, motivo: e.target.value } : s)}
+              placeholder="Indicá brevemente por qué se anula"
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {(anularState?.motivo.length ?? 0)}/240
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAnularState(null)} disabled={anulando}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={anulando || !anularState?.motivo.trim()}
+              onClick={async () => {
+                if (!anularState) return;
+                setAnulando(true);
+                try {
+                  const gate = await requirePinForAction('anular_gasto', currentSucursal?.id ?? null);
+                  if (!gate.ok) return;
+                  const ok = await anularGasto(anularState.id, anularState.motivo, {
+                    validatedByUserId: gate.validatedByUserId ?? null,
+                  });
+                  if (ok) setAnularState(null);
+                } finally {
+                  setAnulando(false);
+                }
+              }}
+            >
+              {anulando ? 'Anulando…' : 'Anular gasto'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

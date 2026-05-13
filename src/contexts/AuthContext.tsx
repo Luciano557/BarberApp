@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-export type AppRole = 'owner' | 'general_manager' | 'manager' | 'barber' | 'otros';
+export type AppRole = 'owner' | 'general_manager' | 'manager' | 'barber' | 'sucursal_account' | 'otros';
 
 interface Profile {
   id: string;
@@ -21,8 +21,11 @@ interface AuthContextType {
   isGeneralManager: boolean;
   isManager: boolean;
   isBarber: boolean;
+  isSucursalAccount: boolean;
   hasNoAccess: boolean;
+  mustChangePassword: boolean;
   canManagePayments: boolean;
+  canOperarCajaYGastos: boolean;
   canManageConfig: boolean;
   canManageBarbers: boolean;
   canManageUsers: boolean;
@@ -159,19 +162,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isGeneralManager = roles.includes('general_manager');
   const isManager = roles.includes('manager');
   const isBarber = roles.includes('barber');
+  const isSucursalAccount = roles.includes('sucursal_account');
 
   const hasNoAccess = roles.length > 0 && roles.every(r => r === 'otros');
+
+  // Forced password change (invited users + sucursal accounts on first login / after reset)
+  const mustChangePassword = (user?.user_metadata?.must_change_password === true)
+    || (isSucursalAccount && user?.user_metadata?.temp_password_pending === true);
+
+  // Administración de métodos de pago / configuración → NO incluye sucursal_account
   const canManagePayments = isOwner || isGeneralManager || isManager;
+  // Operación diaria: Cobrar, Caja, Gastos → SÍ incluye sucursal_account
+  const canOperarCajaYGastos = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canManageConfig = isOwner || isGeneralManager;
   const canManageBarbers = isOwner || isGeneralManager;
   const canManageUsers = isOwner || isGeneralManager;
-  const canViewAllClosings = isOwner || isGeneralManager || isManager;
+  const canViewAllClosings = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewResumen = !hasNoAccess && roles.length > 0;
   const canViewTareas = !hasNoAccess && roles.length > 0;
-  const canViewMiNegocio = isOwner || isGeneralManager || isManager;
-  const canViewFinanzas = isOwner || isGeneralManager || isManager;
-  const canViewTurnosAgenda = isOwner || isGeneralManager || isManager;
-  const canViewClientes = !hasNoAccess && (isOwner || isGeneralManager || isManager || isBarber);
+  // Mi Negocio queda fuera de Cuenta de sucursal por diseño (gestión de sucursales/equipo).
+  const canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount;
+  // Sucursal account uses Finanzas only for registering operational expenses & payments (RLS limits writes).
+  const canViewFinanzas = isOwner || isGeneralManager || isManager || isSucursalAccount;
+  const canViewTurnosAgenda = isOwner || isGeneralManager || isManager || isSucursalAccount;
+  const canViewClientes = !hasNoAccess && (isOwner || isGeneralManager || isManager || isBarber || isSucursalAccount);
 
   return (
     <AuthContext.Provider
@@ -185,8 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGeneralManager,
         isManager,
         isBarber,
+        isSucursalAccount,
         hasNoAccess,
+        mustChangePassword,
         canManagePayments,
+        canOperarCajaYGastos,
         canManageConfig,
         canManageBarbers,
         canManageUsers,

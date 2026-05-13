@@ -14,6 +14,8 @@ async function hashPin(pin: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+const ALLOWED_ROLES_FOR_ACTIONS = new Set(['owner', 'general_manager', 'manager']);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -42,7 +44,7 @@ serve(async (req) => {
       );
     }
 
-    const { pin, sucursal_id } = await req.json();
+    const { pin, sucursal_id, action_key } = await req.json();
 
     if (!pin) {
       return new Response(
@@ -53,7 +55,6 @@ serve(async (req) => {
 
     const pinHash = await hashPin(pin);
 
-    // Get user's profile to get organization_id
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('organization_id, full_name, email')
@@ -72,8 +73,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Find barbero with matching PIN in the same organization
-    // Use limit(1) instead of maybeSingle to avoid PGRST116 if multiple rows match
     const { data: barberos, error: barberoError } = await serviceClient
       .from('barberos')
       .select('id, nombre, apellido, sucursal_id')
@@ -81,87 +80,142 @@ serve(async (req) => {
       .eq('pin_hash', pinHash)
       .eq('activo', true)
       .limit(1);
+    if (barberoError) throw barberoError;
     const barbero = barberos && barberos.length > 0 ? barberos[0] : null;
 
-    if (barberoError) {
-      throw barberoError;
+    if (!barbero) {
+      return new Response(
+        JSON.stringify({ valid: false, error: 'PIN incorrecto' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    if (barbero) {
-      const barberoName = `${barbero.nombre} ${barbero.apellido}`;
+    const barberoName = `${barbero.nombre} ${barbero.apellido}`;
 
-      // Check if the barbero's linked user has a global role (owner/general_manager)
-      // by finding the profile linked to this barbero_id
-      const { data: linkedProfiles } = await serviceClient
-        .from('profiles')
-        .select('id')
-        .eq('organization_id', profile.organization_id)
-        .eq('barbero_id', barbero.id)
-        .limit(1);
-      const linkedProfile = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles[0] : null;
+    // Resolve linked profile + roles
+    const { data: linkedProfiles } = await serviceClient
+      .from('profiles')
+      .select('id')
+      .eq('organization_id', profile.organization_id)
+      .eq('barbero_id', barbero.id)
+      .limit(1);
+    const linkedProfile = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles[0] : null;
 
-      let hasGlobalRole = false;
+    let roles: string[] = [];
+    if (linkedProfile) {
+      const { data: rolesData } = await serviceClient
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', linkedProfile.id);
+      roles = (rolesData || []).map((r: any) => r.role);
+    }
 
-      if (linkedProfile) {
-        const { data: roles } = await serviceClient
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', linkedProfile.id);
+    const isOwner = roles.includes('owner');
+    const isGeneralManager = roles.includes('general_manager');
+    const isManager = roles.includes('manager');
 
-        if (roles) {
-          hasGlobalRole = roles.some(r => r.role === 'owner' || r.role === 'general_manager');
-        }
+    // ===== STRICT MODE: action_key present =====
+    if (action_key) {
+      // Only owner/general_manager/manager are allowed to authorize sensitive actions.
+      // sucursal_account, barber and any other role are rejected.
+      const allowedRole = roles.find(r => ALLOWED_ROLES_FOR_ACTIONS.has(r));
+      if (!allowedRole) {
+        return new Response(
+          JSON.stringify({
+            valid: false,
+            error: 'Este PIN no tiene permisos para autorizar esta acción',
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      // Enforce sucursal restriction for non-global roles
-      if (!hasGlobalRole && sucursal_id) {
-        // Manager or barber: PIN only works in their assigned sucursal
-        if (barbero.sucursal_id !== sucursal_id) {
+      // Manager: limitado a sus sucursales asignadas en user_sucursales
+      if (allowedRole === 'manager' && !isOwner && !isGeneralManager) {
+        if (!sucursal_id) {
           return new Response(
-            JSON.stringify({ 
-              valid: false, 
-              error: 'Este PIN no tiene acceso a esta sucursal',
-              barbero_sucursal_id: barbero.sucursal_id
-            }),
+            JSON.stringify({ valid: false, error: 'Sucursal requerida para autorizar' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (!linkedProfile) {
+          return new Response(
+            JSON.stringify({ valid: false, error: 'PIN no autorizado' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const { data: us } = await serviceClient
+          .from('user_sucursales')
+          .select('sucursal_id')
+          .eq('user_id', linkedProfile.id)
+          .eq('sucursal_id', sucursal_id)
+          .limit(1);
+        if (!us || us.length === 0) {
+          return new Response(
+            JSON.stringify({ valid: false, error: 'Manager no autorizado en esta sucursal' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
       }
 
-      // If no sucursal_id sent (mode "Todas") and not global role,
-      // fallback to barbero's own sucursal instead of rejecting
-      if (!hasGlobalRole && !sucursal_id) {
-        // Use barbero's assigned sucursal as implicit context
-        // This handles the case where user_sucursales hasn't loaded yet
-        console.log('No sucursal_id sent, using barbero sucursal fallback:', barbero.sucursal_id);
-      }
+      const validatedByRole = isOwner
+        ? 'owner'
+        : isGeneralManager
+        ? 'general_manager'
+        : 'manager';
 
-      // Log access
+      // Audit log
       await serviceClient.from('access_logs').insert({
         user_id: user.id,
         user_email: user.email || profile.email || '',
         user_name: barberoName,
-        section: 'protected',
-        organization_id: profile.organization_id
+        section: `action:${action_key}`,
+        organization_id: profile.organization_id,
       });
 
       return new Response(
-        JSON.stringify({ 
-          valid: true, 
+        JSON.stringify({
+          valid: true,
+          userName: barberoName,
           user_name: barberoName,
+          validatedByUserId: linkedProfile?.id ?? null,
+          validatedByRole,
           barbero_id: barbero.id,
-          barbero_sucursal_id: barbero.sucursal_id
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // PIN doesn't match any barbero
+    // ===== LEGACY MODE: no action_key (back-compat) =====
+    const hasGlobalRole = isOwner || isGeneralManager;
+
+    if (!hasGlobalRole && sucursal_id && barbero.sucursal_id !== sucursal_id) {
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          error: 'Este PIN no tiene acceso a esta sucursal',
+          barbero_sucursal_id: barbero.sucursal_id,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    await serviceClient.from('access_logs').insert({
+      user_id: user.id,
+      user_email: user.email || profile.email || '',
+      user_name: barberoName,
+      section: 'protected',
+      organization_id: profile.organization_id,
+    });
+
     return new Response(
-      JSON.stringify({ valid: false, error: 'PIN incorrecto' }),
+      JSON.stringify({
+        valid: true,
+        user_name: barberoName,
+        barbero_id: barbero.id,
+        barbero_sucursal_id: barbero.sucursal_id,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error('Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

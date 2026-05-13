@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { user, roles, isLoading } = useAuth();
+  const { user, roles, isLoading, mustChangePassword } = useAuth();
   const { organization, isLoading: orgLoading } = useOrganization();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
@@ -36,9 +36,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     return <Navigate to="/verify-email" replace />;
   }
 
-  // Check if user needs to change password (invited users)
-  const mustChangePassword = user.user_metadata?.must_change_password === true;
-  
+  // Force password change for invited users + sucursal accounts on first login / after reset
   if (mustChangePassword && !passwordChanged) {
     return <ChangePasswordForm onSuccess={() => setPasswordChanged(true)} />;
   }

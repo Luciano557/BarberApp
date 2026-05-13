@@ -10,8 +10,8 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { usePinProtection } from '@/hooks/usePinProtection';
-import { PinGateDialog } from './PinGateDialog';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { toast } from 'sonner';
 import { getStartOfDayLocal, getEndOfDayLocal } from '@/lib/dateUtils';
 
@@ -31,26 +31,15 @@ export function MultiDayClosingSummary() {
   const [hasta, setHasta] = useState<Date | undefined>();
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<BarberRangeSummary[] | null>(null);
-  const [pinGateOpen, setPinGateOpen] = useState(false);
   const { organization } = useOrganization();
-  const { requiresPin, validatePin } = usePinProtection();
+  const { currentSucursal } = useSucursal();
+  const requirePinForAction = useRequirePinForAction();
 
-  const handleOpen = useCallback(() => {
-    if (requiresPin) {
-      setPinGateOpen(true);
-    } else {
-      setOpen(true);
-    }
-  }, [requiresPin]);
-
-  const handlePinValidate = useCallback(async (pin: string) => {
-    const result = await validatePin(pin);
-    if (result.success) {
-      setPinGateOpen(false);
-      setOpen(true);
-    }
-    return result;
-  }, [validatePin]);
+  const handleOpen = useCallback(async () => {
+    const gate = await requirePinForAction('ver_historial_caja', currentSucursal?.id ?? null);
+    if (gate.ok !== true) return;
+    setOpen(true);
+  }, [requirePinForAction, currentSucursal?.id]);
 
   const handleConsultar = useCallback(async () => {
     if (!desde || !hasta || !organization) return;
@@ -127,13 +116,6 @@ export function MultiDayClosingSummary() {
         <CalendarRange className="h-4 w-4 mr-2" />
         Resumen por rango
       </Button>
-
-      <PinGateDialog
-        open={pinGateOpen}
-        onValidate={handlePinValidate}
-        onClose={() => setPinGateOpen(false)}
-        sectionName="resumen por rango"
-      />
 
       <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
