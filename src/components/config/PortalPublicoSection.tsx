@@ -230,10 +230,13 @@ export function PortalPublicoSection() {
               <Label className="text-xs">Foto de portada</Label>
               <PortalCoverUploader
                 coverUrl={coverUrl}
+                coverPositionX={coverPosX}
+                coverPositionY={coverPosY}
                 uploading={uploadingCover}
                 disabled={saving}
                 onUpload={handleCoverFile}
                 onRemove={handleRemoveCover}
+                onAdjust={() => setAdjustOpen(true)}
               />
             </div>
 
