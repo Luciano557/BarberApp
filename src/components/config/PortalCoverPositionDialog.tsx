@@ -210,9 +210,8 @@ export function PortalCoverPositionDialog({
                 onLoad={() => setImgLoaded(true)}
                 className="absolute inset-0 h-full w-full object-cover opacity-30 pointer-events-none"
                 style={{
-                  objectPosition: `${x}% ${y}%`,
-                  transform: `scale(${zoom})`,
-                  transformOrigin: `${x}% ${y}%`,
+                  transform: `translate(${50 - x}%, ${50 - y}%) scale(${zoom})`,
+                  transformOrigin: 'center',
                 }}
                 draggable={false}
               />
