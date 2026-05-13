@@ -60,7 +60,7 @@ export function CuentasSucursalConfig() {
   if (!canSee) return null;
 
   return (
-    <Card>
+    <Card data-onboarding-id="cuentas-sucursal-section">
       <CardHeader>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
