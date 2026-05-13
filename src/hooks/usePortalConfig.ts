@@ -45,6 +45,12 @@ const clampPos = (n: any): number => {
   return Math.max(0, Math.min(100, Math.round(v)));
 };
 
+const clampZoom = (n: any): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(1, Math.min(3, v));
+};
+
 export function usePortalConfig(organizationId: string | undefined) {
   const [config, setConfig] = useState<PortalConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +72,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         cover_path: d.cover_path ?? null,
         cover_position_x: clampPos(d.cover_position_x ?? 50),
         cover_position_y: clampPos(d.cover_position_y ?? 50),
+        cover_zoom: clampZoom(d.cover_zoom ?? 1),
         description: d.description,
         primary_color: d.primary_color,
         links: Array.isArray(d.links) ? (d.links as unknown as PortalLink[]) : [],
@@ -77,6 +84,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         cover_path: null,
         cover_position_x: 50,
         cover_position_y: 50,
+        cover_zoom: 1,
         description: null,
         primary_color: null,
         links: [],
@@ -100,6 +108,9 @@ export function usePortalConfig(organizationId: string | undefined) {
       cover_position_y: updates.cover_position_y !== undefined
         ? clampPos(updates.cover_position_y)
         : clampPos(config?.cover_position_y ?? 50),
+      cover_zoom: updates.cover_zoom !== undefined
+        ? clampZoom(updates.cover_zoom)
+        : clampZoom(config?.cover_zoom ?? 1),
       description: updates.description !== undefined ? updates.description : config?.description ?? null,
       primary_color: updates.primary_color !== undefined ? updates.primary_color : config?.primary_color ?? null,
       links: (updates.links ?? config?.links ?? []) as any,
