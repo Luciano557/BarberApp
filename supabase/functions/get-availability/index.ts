@@ -21,6 +21,31 @@ interface Interval {
   end: number;
 }
 
+function getZonedDateStr(d: Date, tz: string): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function slotInstantMs(fecha: string, hora: string, tz: string): number {
+  const [Y, M, D] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const utcGuess = Date.UTC(Y, M - 1, D, h, m);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]));
+  let hh = +parts.hour;
+  if (hh === 24) hh = 0;
+  const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
+  const offset = asTzMs - utcGuess;
+  return utcGuess - offset;
+}
+
 function subtractIntervals(base: Interval[], blocks: Interval[]): Interval[] {
   let result = [...base];
   for (const block of blocks) {
