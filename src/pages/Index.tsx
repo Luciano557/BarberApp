@@ -128,8 +128,8 @@ const Index = () => {
       <OnboardingOverlay />
       <OnboardingTooltip />
 
-      <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
-        <div className="max-w-4xl mx-auto p-6 md:p-8">
+      <main className={cn("min-h-screen min-w-0 flex-1 overflow-auto")}>
+        <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-6 md:px-8 md:py-8">
           {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}

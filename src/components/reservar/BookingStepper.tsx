@@ -97,7 +97,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     if (!manageAuthDone) {
       return (
         <div className="space-y-4">
-          <Button variant="ghost" size="sm" onClick={onBackToLanding} className="gap-1">
+          <Button variant="ghost" size="sm" onClick={onBackToLanding} className="w-full justify-start gap-1 sm:w-auto">
             <ChevronLeft className="h-4 w-4" /> Volver
           </Button>
           <AuthStep onAuthenticated={() => setManageAuthDone(true)} />
@@ -107,7 +107,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={onBackToLanding} className="gap-1">
+        <Button variant="ghost" size="sm" onClick={onBackToLanding} className="w-full justify-start gap-1 sm:w-auto">
           <ChevronLeft className="h-4 w-4" /> Volver
         </Button>
         <MisTurnosStep
@@ -244,7 +244,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         {booking.horaInicio && step > 3 && <Badge variant="secondary">{booking.horaInicio}</Badge>}
       </div>
 
-      <Button variant="ghost" size="sm" onClick={goBack} className="gap-1">
+      <Button variant="ghost" size="sm" onClick={goBack} className="w-full justify-start gap-1 sm:w-auto">
         <ChevronLeft className="h-4 w-4" /> Volver
       </Button>
 

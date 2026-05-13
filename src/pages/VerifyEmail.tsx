@@ -115,7 +115,7 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(10px); }
@@ -188,8 +188,8 @@ export default function VerifyEmail() {
       </div>
 
       {/* Right panel — content */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm animate-in text-center">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:p-6">
+        <div className="w-full max-w-sm animate-in text-center sm:max-w-md">
           <div className="icon-circle">
             <MailCheck size={28} style={{ color: '#1e2a4a' }} />
           </div>
@@ -246,7 +246,7 @@ export default function VerifyEmail() {
             <p className="text-xs text-slate-400 mb-3">
               Revisá tu carpeta de spam o promociones, o abrí tu correo directo:
             </p>
-            <div className="flex gap-2 mb-4">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row">
               <a
                 href="https://mail.google.com"
                 target="_blank"

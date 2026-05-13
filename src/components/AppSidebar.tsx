@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock, Users } from 'lucide-react';
+import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock, Users, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,15 +72,41 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   };
 
   return (
-    <aside
-      className={cn(
-        "h-screen bg-sidebar border-r border-sidebar-border flex flex-col z-10",
-        isMobile ? "fixed top-0 left-0" : "sticky top-0",
-        collapsed ? "w-16" : "w-56"
+    <>
+      {isMobile && collapsed && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCollapsed(false)}
+          className="fixed left-4 top-4 z-40 h-11 w-11 rounded-full border bg-background/95 shadow-sm backdrop-blur"
+          aria-label="Abrir navegación"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
       )}
-    >
+
+      {isMobile && !collapsed && (
+        <button
+          type="button"
+          aria-label="Cerrar navegación"
+          className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
+          onClick={() => setCollapsed(true)}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "border-r border-sidebar-border bg-sidebar flex flex-col",
+          isMobile
+            ? "fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200"
+            : "sticky top-0 h-screen z-10",
+          isMobile
+            ? (collapsed ? "-translate-x-full" : "translate-x-0")
+            : (collapsed ? "w-16" : "w-56")
+        )}
+      >
       {/* Logo & Organization */}
-      <div className="h-14 flex items-center justify-between px-3 border-b border-sidebar-border">
+      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
         {!collapsed && (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
@@ -102,6 +128,17 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
+        )}
+        {isMobile && !collapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(true)}
+            className="h-8 w-8 shrink-0"
+            aria-label="Cerrar navegación"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
         )}
       </div>
 
@@ -194,11 +231,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           ) : (
             <>
               <ChevronLeft className="h-4 w-4 mr-2" />
-              <span className="text-xs">Colapsar</span>
+              <span className="text-xs">{isMobile ? 'Cerrar menú' : 'Colapsar'}</span>
             </>
           )}
         </Button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

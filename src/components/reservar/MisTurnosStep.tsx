@@ -92,39 +92,39 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
         {turnos.map((turno) => (
           <Card key={turno.id}>
             <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <Badge variant={turno.estado === "confirmado" ? "default" : "secondary"}>
                   {turno.estado === "confirmado" ? "Confirmado" : "Pendiente"}
                 </Badge>
               </div>
 
               <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{turno.sucursal_nombre}</span>
+                  <span className="break-words text-foreground">{turno.sucursal_nombre}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{turno.servicio_nombre} — ${turno.servicio_precio?.toLocaleString()}</span>
+                  <span className="break-words text-foreground">{turno.servicio_nombre} — ${turno.servicio_precio?.toLocaleString()}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{turno.barbero_nombre}</span>
+                  <span className="break-words text-foreground">{turno.barbero_nombre}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{formatFechaLegible(turno.fecha)}</span>
+                  <span className="break-words text-foreground">{formatFechaLegible(turno.fecha)}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-start gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{turno.hora_inicio} - {turno.hora_fin}</span>
+                  <span className="break-words text-foreground">{turno.hora_inicio} - {turno.hora_fin}</span>
                 </div>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex flex-col gap-2 pt-2 sm:flex-row">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="flex-1">
+                    <span className="w-full sm:flex-1">
                       <Button
                         variant="outline"
                         size="sm"
@@ -146,7 +146,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="flex-1">
+                    <span className="w-full sm:flex-1">
                       <Button
                         variant="destructive"
                         size="sm"

@@ -65,7 +65,7 @@ const Reservar = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-lg mx-auto px-4 py-8">
+      <div className="mx-auto max-w-lg px-4 py-6 sm:px-6 sm:py-8">
         {mode === "landing" ? (
           <BookingLanding
             orgName={orgData.organization.name}
@@ -76,7 +76,7 @@ const Reservar = () => {
           />
         ) : (
           <>
-            <div className="text-center mb-6">
+            <div className="mb-6 text-center">
               <h1 className="text-2xl font-bold text-foreground">{orgData.organization.name}</h1>
               <p className="text-sm text-muted-foreground mt-1">Reserva tu turno</p>
             </div>

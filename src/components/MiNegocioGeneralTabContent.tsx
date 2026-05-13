@@ -63,15 +63,15 @@ export function MiNegocioGeneralTabContent({
   }, [isReady]);
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="mt-4 space-y-6 sm:mt-6">
       {/* Header */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <Settings2 className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base">Configuración general del negocio</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 Datos globales que aplican a todas las sucursales. Cada sucursal puede activar y configurar precios por su cuenta.
@@ -96,15 +96,15 @@ export function MiNegocioGeneralTabContent({
         <div className="space-y-4 mt-8">
           <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
           <Tabs defaultValue="services" className="w-full">
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
-              <TabsTrigger value="services" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Servicios</TabsTrigger>
-              <TabsTrigger value="lines" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Líneas de servicio</TabsTrigger>
-              <TabsTrigger value="extras" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Extras</TabsTrigger>
-              <TabsTrigger value="productos" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Productos</TabsTrigger>
-              <TabsTrigger value="discounts" className="flex-1 text-sm data-[state=active]:bg-card rounded-md">Descuentos</TabsTrigger>
+            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
+              <TabsTrigger value="services" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Servicios</TabsTrigger>
+              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Líneas de servicio</TabsTrigger>
+              <TabsTrigger value="extras" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Extras</TabsTrigger>
+              <TabsTrigger value="productos" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Productos</TabsTrigger>
+              <TabsTrigger value="discounts" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Descuentos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="services" className="mt-6 space-y-6">
+            <TabsContent value="services" className="mt-4 space-y-6 sm:mt-6">
               <ServicesConfig
                 mode="global"
                 services={services}
@@ -118,7 +118,7 @@ export function MiNegocioGeneralTabContent({
               />
             </TabsContent>
 
-            <TabsContent value="lines" className="mt-6">
+            <TabsContent value="lines" className="mt-4 sm:mt-6">
               <LinesConfig
                 lines={lines}
                 onAdd={onAddLine}
@@ -127,7 +127,7 @@ export function MiNegocioGeneralTabContent({
               />
             </TabsContent>
 
-            <TabsContent value="extras" className="mt-6">
+            <TabsContent value="extras" className="mt-4 sm:mt-6">
               <ExtrasConfig
                 mode="global"
                 extras={extras}
@@ -137,11 +137,11 @@ export function MiNegocioGeneralTabContent({
               />
             </TabsContent>
 
-            <TabsContent value="productos" className="mt-6">
+            <TabsContent value="productos" className="mt-4 sm:mt-6">
               <ProductosGlobalConfig />
             </TabsContent>
 
-            <TabsContent value="discounts" className="mt-6">
+            <TabsContent value="discounts" className="mt-4 sm:mt-6">
               <DiscountsConfig
                 mode="global"
                 discounts={discounts}
