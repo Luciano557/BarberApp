@@ -16,6 +16,23 @@ function minutesToTime(m: number): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
+function slotInstantMs(fecha: string, hora: string, tz: string): number {
+  const [Y, M, D] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const utcGuess = Date.UTC(Y, M - 1, D, h, m);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]));
+  let hh = +parts.hour;
+  if (hh === 24) hh = 0;
+  const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
+  const offset = asTzMs - utcGuess;
+  return utcGuess - offset;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
