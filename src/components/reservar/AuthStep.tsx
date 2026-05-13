@@ -32,7 +32,6 @@ const COUNTRIES = [
 export const AuthStep = ({ onAuthenticated }: Props) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [waitingForSession, setWaitingForSession] = useState(false);
   const [countryCode, setCountryCode] = useState("AR");
   const [form, setForm] = useState({
     nombre: "",
@@ -49,18 +48,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     [countryCode],
   );
 
-  useEffect(() => {
-    if (!waitingForSession) return;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setWaitingForSession(false);
-        setLoading(false);
-        onAuthenticated();
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [waitingForSession, onAuthenticated]);
-
   const update = (field: keyof typeof form, value: string) =>
     setForm((f) => ({ ...f, [field]: value }));
 
@@ -71,45 +58,63 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
-    try {
-      if (isLogin) {
+    if (isLogin) {
+      const emailLogin = form.email.trim();
+      if (!emailLogin) {
+        toast.error("Ingresá tu email");
+        return;
+      }
+      if (!form.password) {
+        toast.error("Ingresá tu contraseña");
+        return;
+      }
+      setLoading(true);
+      try {
         const { error } = await supabase.auth.signInWithPassword({
-          email: form.email.trim(),
+          email: emailLogin,
           password: form.password,
         });
         if (error) {
           toast.error(error.message);
-          setLoading(false);
           return;
         }
         onAuthenticated();
-        return;
+      } catch {
+        toast.error("Ocurrió un problema. Probá nuevamente.");
+      } finally {
+        setLoading(false);
       }
+      return;
+    }
 
-      const nombre = form.nombre.trim();
-      const apellido = form.apellido.trim();
-      const phoneDigits = form.phoneLocal.replace(/[\s-]/g, "");
-      const email = form.email.trim();
-      const instagram = form.instagram.trim().replace(/^@+/, "");
+    // === REGISTER ===
+    const nombre = form.nombre.trim();
+    const apellido = form.apellido.trim();
+    const phoneDigits = form.phoneLocal.replace(/[\s-]/g, "");
+    const email = form.email.trim();
+    const instagram = form.instagram.trim().replace(/^@+/, "");
 
-      if (!nombre) return fail("Ingresá tu nombre");
-      if (!apellido) return fail("Ingresá tu apellido");
-      if (!phoneDigits || phoneDigits.length < 6) return fail("Ingresá un teléfono válido");
-      if (!form.birthDate) return fail("Ingresá tu fecha de nacimiento");
-      if (!email) return fail("Ingresá tu email");
-      if (!form.password || form.password.length < 6)
-        return fail("La contraseña debe tener al menos 6 caracteres");
+    // Validate BEFORE setting loading
+    if (!nombre) return toast.error("Ingresá tu nombre");
+    if (!apellido) return toast.error("Ingresá tu apellido");
+    if (!phoneDigits || phoneDigits.length < 6) return toast.error("Ingresá un teléfono válido");
+    if (!form.birthDate) return toast.error("Ingresá tu fecha de nacimiento");
+    if (!email) return toast.error("Ingresá tu email");
+    if (!form.password || form.password.length < 6)
+      return toast.error("La contraseña debe tener al menos 6 caracteres");
 
-      const phone = `${country.dial}${phoneDigits}`;
-      const fullName = `${nombre} ${apellido}`.trim();
+    const phone = `${country.dial}${phoneDigits}`;
+    const fullName = `${nombre} ${apellido}`.trim();
 
+    setLoading(true);
+    try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: form.password,
         options: {
           data: {
+            account_type: "customer",
             nombre,
             apellido,
             full_name: fullName,
@@ -121,25 +126,26 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
           emailRedirectTo: window.location.href,
         },
       });
+
       if (error) {
-        toast.error(error.message);
-        setLoading(false);
+        toast.error(error.message || "Error al crear la cuenta. Intentá de nuevo.");
         return;
       }
-
+      if (!data.user) {
+        toast.error("No pudimos crear tu cuenta. Intentá nuevamente.");
+        return;
+      }
       if (data.session) {
         onAuthenticated();
         return;
       }
-      setWaitingForSession(true);
-      toast.success("¡Cuenta creada! Revisá tu email para verificar.");
-    } catch {
-      toast.error("Ocurrió un problema. Probá nuevamente.");
-      setLoading(false);
-    }
-
-    function fail(msg: string) {
-      toast.error(msg);
+      // User created but no session: email confirmation pending
+      toast.info("Cuenta creada. Revisá tu email para confirmar el acceso antes de continuar.");
+      setIsLogin(true);
+    } catch (err) {
+      console.error("Signup error:", err);
+      toast.error("Ocurrió un error inesperado. Probá nuevamente.");
+    } finally {
       setLoading(false);
     }
   };
@@ -275,9 +281,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
 
         <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
           {loading
-            ? waitingForSession
-              ? "Verificando..."
-              : "Procesando..."
+            ? "Procesando..."
             : isLogin
               ? "Iniciar sesión"
               : "Crear cuenta y continuar"}
