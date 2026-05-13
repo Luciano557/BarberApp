@@ -101,50 +101,79 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
 
   if (loading) return <div className="text-sm text-muted-foreground py-4">Cargando configuración...</div>;
 
-  const fields: { key: keyof ConfigData; label: string; suffix: string; description: string }[] = [
+  type FieldDef = { key: keyof ConfigData; label: string; suffix: string; description: string };
+
+  const reglas: FieldDef[] = [
     { key: 'duracion_base_min', label: 'Duración base', suffix: 'min', description: 'Unidad mínima de tiempo para turnos' },
     { key: 'buffer_despues_min', label: 'Tiempo de espera', suffix: 'min', description: 'Tiempo libre después de cada turno' },
-    { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
-    { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
+    { key: 'anticipacion_minima_reserva_min', label: 'Anticipación mínima', suffix: 'min', description: 'Tiempo mínimo entre ahora y el primer turno disponible' },
     { key: 'dias_anticipacion', label: 'Días de anticipación', suffix: 'días', description: 'Cuántos días hacia adelante se puede reservar' },
-    { key: 'anticipacion_minima_reserva_min', label: 'Anticipación mínima para reservar', suffix: 'min', description: 'Tiempo mínimo entre el momento actual y el primer turno disponible para clientes' },
   ];
 
+  const limites: FieldDef[] = [
+    { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
+    { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
+  ];
+
+  const renderField = (f: FieldDef) => (
+    <div key={f.key} className="space-y-1.5">
+      <Label className="text-xs font-medium">{f.label}</Label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={config[f.key]}
+          onChange={e => updateField(f.key, e.target.value)}
+          className="w-24 h-8 text-sm"
+        />
+        <span className="text-xs text-muted-foreground">{f.suffix}</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{f.description}</p>
+    </div>
+  );
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Settings className="w-4 h-4 text-primary" />
-          </div>
-          <CardTitle className="text-sm">Configuración general</CardTitle>
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Settings className="w-4 h-4 text-primary" />
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {fields.map(f => (
-            <div key={f.key} className="space-y-1.5">
-              <Label className="text-xs font-medium">{f.label}</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={0}
-                  value={config[f.key]}
-                  onChange={e => updateField(f.key, e.target.value)}
-                  className="w-24 h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground">{f.suffix}</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">{f.description}</p>
+        <div>
+          <h2 className="text-sm font-semibold">Configuración general</h2>
+          <p className="text-xs text-muted-foreground">Reglas y límites de las reservas online</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Reglas de reserva</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {reglas.map(renderField)}
             </div>
-          ))}
-        </div>
-        <div className="flex justify-end mt-4">
-          <Button size="sm" onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Límites y cancelaciones</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {limites.map(renderField)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end">
+        <Button size="sm" onClick={handleSave} disabled={saving}>
+          <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
+        </Button>
+      </div>
+    </div>
   );
 }
