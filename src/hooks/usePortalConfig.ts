@@ -15,6 +15,7 @@ export interface PortalConfig {
   cover_path: string | null;
   cover_position_x: number;
   cover_position_y: number;
+  cover_zoom: number;
   description: string | null;
   primary_color: string | null;
   links: PortalLink[];
