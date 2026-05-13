@@ -40,7 +40,21 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { organization_id, sucursal_id, barbero_id, servicio_id, fecha, hora_inicio, cliente_nombre, cliente_telefono, user_id, cliente_email } = body;
+    const {
+      organization_id,
+      sucursal_id,
+      barbero_id,
+      servicio_id,
+      fecha,
+      hora_inicio,
+      cliente_nombre,
+      cliente_telefono,
+      cliente_email: bodyClienteEmail,
+      cliente_nombre_simple,
+      cliente_apellido,
+      cliente_fecha_nacimiento,
+      cliente_instagram,
+    } = body;
 
     // Validate required fields
     if (!organization_id || !sucursal_id || !barbero_id || !servicio_id || !fecha || !hora_inicio) {
@@ -61,6 +75,23 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // ===== Verify authenticated user (source of truth for user_id / email) =====
+    let verifiedUserId: string | null = null;
+    let verifiedEmail: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      try {
+        const { data: userData } = await supabase.auth.getUser(token);
+        if (userData?.user) {
+          verifiedUserId = userData.user.id;
+          verifiedEmail = userData.user.email ?? null;
+        }
+      } catch (e) {
+        console.warn("validate-turno: token verification failed", e);
+      }
+    }
 
     // Get service duration
     const { data: servicio } = await supabase
@@ -140,6 +171,129 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ===== Resolve final identity / snapshot fields =====
+    const finalUserId = verifiedUserId; // never trust body.user_id
+    const finalEmailRaw =
+      verifiedEmail ||
+      (typeof bodyClienteEmail === "string" ? bodyClienteEmail.trim() : null);
+    const finalEmail = finalEmailRaw ? finalEmailRaw.toLowerCase() : null;
+    const finalTelefono =
+      typeof cliente_telefono === "string" ? cliente_telefono.trim() || null : null;
+    const finalNombreSimple =
+      typeof cliente_nombre_simple === "string" ? cliente_nombre_simple.trim() || null : null;
+    const finalApellido =
+      typeof cliente_apellido === "string" ? cliente_apellido.trim() || null : null;
+    const finalFechaNac =
+      typeof cliente_fecha_nacimiento === "string" && cliente_fecha_nacimiento.trim()
+        ? cliente_fecha_nacimiento.trim()
+        : null;
+    const finalInstagram =
+      typeof cliente_instagram === "string"
+        ? cliente_instagram.trim().replace(/^@+/, "") || null
+        : null;
+
+    // ===== CRM sync (non-blocking) =====
+    let clienteId: string | null = null;
+    try {
+      let cliente: any = null;
+
+      if (finalEmail) {
+        const { data } = await supabase
+          .from("clientes")
+          .select("*")
+          .eq("organization_id", organization_id)
+          .eq("eliminado", false)
+          .ilike("email", finalEmail)
+          .limit(1)
+          .maybeSingle();
+        cliente = data;
+      }
+      if (!cliente && finalTelefono) {
+        const { data } = await supabase
+          .from("clientes")
+          .select("*")
+          .eq("organization_id", organization_id)
+          .eq("eliminado", false)
+          .eq("telefono", finalTelefono)
+          .limit(1)
+          .maybeSingle();
+        cliente = data;
+      }
+
+      if (!cliente) {
+        const baseNombre = finalNombreSimple || cliente_nombre.trim();
+        if (baseNombre) {
+          const { data: nuevo, error: insertCliErr } = await supabase
+            .from("clientes")
+            .insert({
+              organization_id,
+              nombre: baseNombre,
+              apellido: finalApellido,
+              telefono: finalTelefono,
+              email: finalEmail,
+              fecha_nacimiento: finalFechaNac,
+              instagram: finalInstagram,
+              origen: "portal_publico",
+              eliminado: false,
+            })
+            .select()
+            .single();
+          if (insertCliErr) {
+            console.error("CRM: insert cliente failed", insertCliErr);
+          } else {
+            cliente = nuevo;
+          }
+        }
+      } else {
+        // soft patch: only fill empty fields
+        const patch: Record<string, any> = {};
+        const fillIfEmpty = (col: string, val: any) => {
+          const cur = (cliente as any)[col];
+          if (val && (cur == null || String(cur).trim() === "")) {
+            patch[col] = val;
+          }
+        };
+        fillIfEmpty("nombre", finalNombreSimple || cliente_nombre.trim());
+        fillIfEmpty("apellido", finalApellido);
+        fillIfEmpty("telefono", finalTelefono);
+        fillIfEmpty("email", finalEmail);
+        fillIfEmpty("fecha_nacimiento", finalFechaNac);
+        fillIfEmpty("instagram", finalInstagram);
+        if (Object.keys(patch).length > 0) {
+          const { error: updErr } = await supabase
+            .from("clientes")
+            .update(patch)
+            .eq("id", cliente.id)
+            .eq("organization_id", organization_id);
+          if (updErr) console.error("CRM: update cliente failed", updErr);
+        }
+      }
+
+      if (cliente) {
+        clienteId = cliente.id;
+        const { data: rel } = await supabase
+          .from("clientes_sucursales")
+          .select("id")
+          .eq("organization_id", organization_id)
+          .eq("cliente_id", cliente.id)
+          .eq("sucursal_id", sucursal_id)
+          .maybeSingle();
+        if (!rel) {
+          const { error: relErr } = await supabase
+            .from("clientes_sucursales")
+            .insert({
+              organization_id,
+              cliente_id: cliente.id,
+              sucursal_id,
+              origen_relacion: "portal_publico",
+            });
+          if (relErr) console.error("CRM: insert clientes_sucursales failed", relErr);
+        }
+      }
+    } catch (crmErr) {
+      console.error("CRM sync error (non-blocking):", crmErr);
+    }
+
     // Insert turno
     const { data: turno, error: insertError } = await supabase
       .from("turnos")
@@ -152,9 +306,10 @@ Deno.serve(async (req) => {
         hora_inicio,
         hora_fin,
         cliente_nombre: cliente_nombre.trim(),
-        cliente_telefono: cliente_telefono?.trim() || null,
-        cliente_email: cliente_email?.trim() || null,
-        user_id: user_id || null,
+        cliente_telefono: finalTelefono,
+        cliente_email: finalEmail,
+        cliente_id: clienteId,
+        user_id: finalUserId,
         estado: "pendiente",
         timezone,
       })
@@ -163,7 +318,6 @@ Deno.serve(async (req) => {
 
     if (insertError) {
       console.error("Insert error:", insertError);
-      // Check if exclusion constraint violation
       if (insertError.code === "23P01") {
         return new Response(
           JSON.stringify({
