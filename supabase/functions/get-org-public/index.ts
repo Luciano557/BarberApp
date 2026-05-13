@@ -69,9 +69,17 @@ Deno.serve(async (req) => {
         .maybeSingle(),
     ]);
 
+    const clampPos = (n: any): number => {
+      const v = typeof n === 'number' ? n : Number(n);
+      if (!Number.isFinite(v)) return 50;
+      return Math.max(0, Math.min(100, Math.round(v)));
+    };
+
     let portal: {
       logo_url: string | null;
       cover_url: string | null;
+      cover_position_x: number;
+      cover_position_y: number;
       description: string | null;
       primary_color: string | null;
       links: { label: string; url: string; icon: string | null }[];
