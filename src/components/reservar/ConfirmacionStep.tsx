@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { BookingState } from "./BookingStepper";
 import type { OrgPublicData } from "@/pages/Reservar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
 import { formatFechaLegible } from "@/lib/dateUtils";
