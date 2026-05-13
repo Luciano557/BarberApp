@@ -245,7 +245,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    const slots = Array.from(allSlots.values()).sort(
+    const filtered = isPast
+      ? []
+      : Array.from(allSlots.values()).filter(
+          (s) => slotInstantMs(fecha, s.hora_inicio, tz) >= cutoffMs
+        );
+    const slots = filtered.sort(
       (a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
     );
 
