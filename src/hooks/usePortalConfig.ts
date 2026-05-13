@@ -168,7 +168,7 @@ export function usePortalConfig(organizationId: string | undefined) {
   const removeCover = useCallback(async () => {
     if (!config?.cover_path) return { error: null };
     await supabase.storage.from('portal-logos').remove([config.cover_path]);
-    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50 });
+    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
   }, [config, save]);
 
   return {
