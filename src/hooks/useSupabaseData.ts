@@ -236,8 +236,10 @@ export function useSupabaseData() {
         }
       }
       setDiscounts(builtDiscounts);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      console.info('[Data] phase=fetch:success');
+    } catch (err) {
+      console.error('[Data] phase=fetch:error', err);
+      setError('No pudimos cargar los datos. Reintentá en unos segundos.');
       toast.error('Error al cargar datos');
     } finally {
       setIsLoading(false);
