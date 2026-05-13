@@ -25,10 +25,12 @@ export function PortalCoverPositionDialog({
   const [x, setX] = useState(initialX);
   const [y, setY] = useState(initialY);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
-  const [canvasW, setCanvasW] = useState(0);
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
+  const [isDragging, setIsDragging] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
+    pointerId: number;
     startPx: number; startPy: number;
     startX: number; startY: number;
     overflowX: number; overflowY: number;
@@ -51,9 +53,11 @@ export function PortalCoverPositionDialog({
     if (!open) return;
     const el = canvasRef.current;
     if (!el) return;
-    setCanvasW(el.clientWidth);
+    setCanvasSize({ w: el.clientWidth, h: el.clientHeight });
     const ro = new ResizeObserver((entries) => {
-      for (const e of entries) setCanvasW(e.contentRect.width);
+      for (const e of entries) {
+        setCanvasSize({ w: e.contentRect.width, h: e.contentRect.height });
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -64,11 +68,18 @@ export function PortalCoverPositionDialog({
     .map((w) => w[0]?.toUpperCase()).join('') || 'V';
 
   // Canvas + frame geometry
-  const canvasH = canvasW > 0 ? Math.round(canvasW * 0.6) : 0; // ~h-72-ish, scales with width
-  const frameW = canvasW > 0 ? Math.round(canvasW * 0.85) : 0;
+  const canvasW = canvasSize.w;
+  const canvasH = canvasSize.h;
+  const frameW = canvasW > 0 && canvasH > 0
+    ? Math.round(Math.min(canvasW * 0.85, Math.max(0, canvasH - 24) * 16 / 9))
+    : 0;
   const frameH = Math.round(frameW * 9 / 16);
   const frameLeft = Math.round((canvasW - frameW) / 2);
   const frameTop = Math.round((canvasH - frameH) / 2);
+  const frameMeasured = frameW > 0 && frameH > 0;
+  const frameStyle = frameMeasured
+    ? { left: frameLeft, top: frameTop, width: frameW, height: frameH }
+    : { left: '7.5%', top: '50%', width: '85%', aspectRatio: '16 / 9', transform: 'translateY(-50%)' };
 
   // Compute overflow (px) inside the frame in cover mode
   let overflowX = 0;
@@ -81,9 +92,12 @@ export function PortalCoverPositionDialog({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!coverUrl || !imgSize) return;
-    if (overflowX === 0 && overflowY === 0) return;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* noop */ }
+    setIsDragging(true);
     dragRef.current = {
+      pointerId: e.pointerId,
       startPx: e.clientX,
       startPy: e.clientY,
       startX: x,
@@ -95,7 +109,8 @@ export function PortalCoverPositionDialog({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current;
-    if (!d) return;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (e.cancelable) e.preventDefault();
     const dx = e.clientX - d.startPx;
     const dy = e.clientY - d.startPy;
     let nx = d.startX;
@@ -107,8 +122,11 @@ export function PortalCoverPositionDialog({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    const d = dragRef.current;
+    if (d && d.pointerId !== e.pointerId) return;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
     dragRef.current = null;
+    setIsDragging(false);
   };
 
   const handleSave = async () => {
@@ -116,7 +134,7 @@ export function PortalCoverPositionDialog({
     onOpenChange(false);
   };
 
-  const dragEnabled = !!coverUrl && !!imgSize && (overflowX > 0 || overflowY > 0);
+  const dragEnabled = !!coverUrl && !!imgSize;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -131,11 +149,10 @@ export function PortalCoverPositionDialog({
         {/* Editor */}
         <div
           ref={canvasRef}
-          className="relative w-full overflow-hidden rounded-xl border border-border bg-muted/30 select-none"
+          className="relative w-full h-64 sm:h-72 overflow-hidden rounded-xl border border-border bg-muted/30 select-none"
           style={{
-            height: canvasH || undefined,
             touchAction: 'none',
-            cursor: dragEnabled ? (dragRef.current ? 'grabbing' : 'grab') : 'default',
+            cursor: dragEnabled ? (isDragging ? 'grabbing' : 'grab') : 'default',
           }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -158,33 +175,28 @@ export function PortalCoverPositionDialog({
               />
 
               {/* Dark overlays around the frame (4 divs) */}
-              {canvasW > 0 && (
-                <>
-                  <div
-                    className="absolute left-0 right-0 top-0 bg-foreground/50 pointer-events-none"
-                    style={{ height: frameTop }}
-                  />
-                  <div
-                    className="absolute left-0 right-0 bottom-0 bg-foreground/50 pointer-events-none"
-                    style={{ height: canvasH - frameTop - frameH }}
-                  />
-                  <div
-                    className="absolute left-0 bg-foreground/50 pointer-events-none"
-                    style={{ top: frameTop, height: frameH, width: frameLeft }}
-                  />
-                  <div
-                    className="absolute right-0 bg-foreground/50 pointer-events-none"
-                    style={{ top: frameTop, height: frameH, width: frameLeft }}
-                  />
-                </>
-              )}
+              <div
+                className="absolute left-0 right-0 top-0 bg-foreground/50 pointer-events-none"
+                style={{ height: frameMeasured ? Math.max(0, frameTop) : '12%' }}
+              />
+              <div
+                className="absolute left-0 right-0 bottom-0 bg-foreground/50 pointer-events-none"
+                style={{ height: frameMeasured ? Math.max(0, canvasH - frameTop - frameH) : '12%' }}
+              />
+              <div
+                className="absolute left-0 bg-foreground/50 pointer-events-none"
+                style={{ top: frameMeasured ? frameTop : '12%', height: frameMeasured ? frameH : '76%', width: frameMeasured ? Math.max(0, frameLeft) : '7.5%' }}
+              />
+              <div
+                className="absolute right-0 bg-foreground/50 pointer-events-none"
+                style={{ top: frameMeasured ? frameTop : '12%', height: frameMeasured ? frameH : '76%', width: frameMeasured ? Math.max(0, frameLeft) : '7.5%' }}
+              />
 
               {/* Frame: real preview of what will render in portal */}
-              {canvasW > 0 && (
-                <div
-                  className="absolute overflow-hidden ring-2 ring-card shadow-lg pointer-events-none"
-                  style={{ left: frameLeft, top: frameTop, width: frameW, height: frameH }}
-                >
+              <div
+                className="absolute overflow-hidden ring-2 ring-card shadow-lg pointer-events-none"
+                style={frameStyle}
+              >
                   {/* z-0 image cover */}
                   <img
                     src={coverUrl}
@@ -207,8 +219,7 @@ export function PortalCoverPositionDialog({
                       )}
                     </div>
                   </div>
-                </div>
-              )}
+              </div>
             </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
@@ -230,7 +241,7 @@ export function PortalCoverPositionDialog({
               max={100}
               step={1}
               onValueChange={(v) => setX(v[0])}
-              disabled={!coverUrl || overflowX === 0}
+              disabled={!coverUrl}
             />
           </div>
           <div className="space-y-2">
@@ -244,14 +255,9 @@ export function PortalCoverPositionDialog({
               max={100}
               step={1}
               onValueChange={(v) => setY(v[0])}
-              disabled={!coverUrl || overflowY === 0}
+              disabled={!coverUrl}
             />
           </div>
-          {coverUrl && imgSize && overflowX === 0 && overflowY === 0 && (
-            <p className="text-xs text-muted-foreground">
-              La imagen ya entra exacta en el marco, no necesita reencuadre.
-            </p>
-          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
