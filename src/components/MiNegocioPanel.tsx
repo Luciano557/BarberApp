@@ -357,8 +357,13 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                   General
                 </TabsTrigger>
               )}
-              {visibleSucursales.map(s => (
-                <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+              {visibleSucursales.map((s, idx) => (
+                <TabsTrigger
+                  key={s.id}
+                  value={s.id}
+                  className="flex-1 text-sm data-[state=active]:bg-card rounded-md"
+                  data-onboarding-id={idx === 0 ? 'sucursal-tab' : undefined}
+                >
                   {s.nombre}
                 </TabsTrigger>
               ))}
