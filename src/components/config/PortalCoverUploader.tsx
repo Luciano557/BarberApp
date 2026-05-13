@@ -36,9 +36,8 @@ export function PortalCoverUploader({
             alt=""
             className="absolute inset-0 h-full w-full object-cover select-none pointer-events-none"
             style={{
-              objectPosition: `${coverPositionX}% ${coverPositionY}%`,
-              transform: `scale(${coverZoom})`,
-              transformOrigin: `${coverPositionX}% ${coverPositionY}%`,
+              transform: `translate(${50 - coverPositionX}%, ${50 - coverPositionY}%) scale(${coverZoom})`,
+              transformOrigin: 'center',
             }}
             draggable={false}
           />
