@@ -1,8 +1,9 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Barber } from '@/types/barbershop';
 import { Turno, Bloqueo, Servicio, Horario } from './hooks/useAgendaData';
 import { useBarberColors } from './hooks/useBarberColors';
+import { usePointerDragDrop, usePointerTap } from './hooks/usePointerDragDrop';
 import { timeToMinutes, minutesToTime, formatHHMM, PX_PER_MIN } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 
