@@ -39,6 +39,9 @@ export function PortalPublicoSection() {
   const [links, setLinks] = useState<PortalLink[]>([]);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [coverPath, setCoverPath] = useState<string | null>(null);
+  const [coverPosX, setCoverPosX] = useState<number>(50);
+  const [coverPosY, setCoverPosY] = useState<number>(50);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
