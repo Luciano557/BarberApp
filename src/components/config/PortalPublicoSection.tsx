@@ -435,6 +435,18 @@ export function PortalPublicoSection() {
           </p>
         </div>
       </div>
+
+      <PortalCoverPositionDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        coverUrl={coverUrl}
+        logoUrl={logoUrl || organization?.logo_url || null}
+        orgName={orgName}
+        initialX={coverPosX}
+        initialY={coverPosY}
+        saving={saving}
+        onSave={handleSaveCoverPosition}
+      />
     </div>
   );
 }
