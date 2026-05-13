@@ -15,6 +15,7 @@ import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
 import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
+import { useOnboarding } from './onboarding/OnboardingProvider';
 
 interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
@@ -204,16 +205,32 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   }, [activeTab, isValidTab, visibleSucursales, showGeneralTab]);
 
   // Handler único: cambia tab + persiste localStorage. NO escribe null en currentSucursal al entrar a General.
+  const onb = useOnboarding();
+
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
     if (storageKey) {
       try { localStorage.setItem(storageKey, value); } catch { /* ignore */ }
     }
-    if (value === GENERAL_TAB) return;
-    if (currentSucursal?.id !== value) {
-      setCurrentSucursal(value);
+    if (value !== GENERAL_TAB) {
+      if (currentSucursal?.id !== value) {
+        setCurrentSucursal(value);
+      }
+      onb.notifyEvent('mi-negocio:sucursal-selected');
     }
-  }, [storageKey, currentSucursal?.id, setCurrentSucursal]);
+  }, [storageKey, currentSucursal?.id, setCurrentSucursal, onb]);
+
+  // Registrar sub-tab setter para el onboarding
+  useEffect(() => {
+    onb.registerSubTabSetter((kind) => {
+      if (kind === 'general' && showGeneralTab) {
+        handleTabChange(GENERAL_TAB);
+      } else if (kind === 'first-sucursal' && visibleSucursales[0]) {
+        handleTabChange(visibleSucursales[0].id);
+      }
+    });
+    return () => onb.registerSubTabSetter(null);
+  }, [onb, handleTabChange, showGeneralTab, visibleSucursales]);
 
   const generalIsReady = activeTab === GENERAL_TAB;
 
@@ -340,8 +357,13 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                   General
                 </TabsTrigger>
               )}
-              {visibleSucursales.map(s => (
-                <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+              {visibleSucursales.map((s, idx) => (
+                <TabsTrigger
+                  key={s.id}
+                  value={s.id}
+                  className="flex-1 text-sm data-[state=active]:bg-card rounded-md"
+                  data-onboarding-id={idx === 0 ? 'sucursal-tab' : undefined}
+                >
                   {s.nombre}
                 </TabsTrigger>
               ))}

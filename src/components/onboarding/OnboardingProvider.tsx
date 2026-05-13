@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { ONBOARDING_STEPS, OnboardingStep } from './steps';
+import { ONBOARDING_STEPS, OnboardingStep, OnboardingSubTab, OnboardingEvent } from './steps';
 import { useOnboardingState } from '@/hooks/useOnboardingState';
 
 interface OnboardingContextValue {
@@ -13,6 +13,8 @@ interface OnboardingContextValue {
   restart: () => void;
   isAllowedTab: (tabId: string) => boolean;
   registerTabSetter: (fn: ((tab: string) => void) | null) => void;
+  registerSubTabSetter: (fn: ((kind: OnboardingSubTab) => void) | null) => void;
+  notifyEvent: (event: OnboardingEvent) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -26,6 +28,7 @@ export function useOnboarding() {
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { row, isLoading, isOwner, upsert } = useOnboardingState();
   const tabSetterRef = useRef<((tab: string) => void) | null>(null);
+  const subTabSetterRef = useRef<((kind: OnboardingSubTab) => void) | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
@@ -46,11 +49,18 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoading, isOwner, row, currentIndex, upsert]);
 
-  // Apply requiredTab on step change
+  // Apply requiredTab + sub-tab on step change
   useEffect(() => {
     if (!currentStep) return;
     if (currentStep.requiredTab && tabSetterRef.current) {
       tabSetterRef.current(currentStep.requiredTab);
+    }
+    if (currentStep.miNegocioSubTab && subTabSetterRef.current) {
+      // Pequeño delay para esperar que el panel se monte si recién se cambió la tab principal
+      const t = setTimeout(() => {
+        subTabSetterRef.current?.(currentStep.miNegocioSubTab!);
+      }, 60);
+      return () => clearTimeout(t);
     }
   }, [currentStep]);
 
@@ -78,7 +88,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     setTimeout(() => {
       const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    }, 200);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', update);
@@ -131,7 +141,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (!currentStep) return true;
     if (currentStep.requiredTab && tabId === currentStep.requiredTab) return true;
     if (currentStep.allowedTabs?.includes(tabId)) return true;
-    // Step 1 (sidebar) only allows mi-negocio
     if (currentStep.id === 's1_sidebar' && tabId === 'mi-negocio') return true;
     return false;
   }, [currentStep]);
@@ -139,6 +148,16 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const registerTabSetter = useCallback((fn: ((tab: string) => void) | null) => {
     tabSetterRef.current = fn;
   }, []);
+
+  const registerSubTabSetter = useCallback((fn: ((kind: OnboardingSubTab) => void) | null) => {
+    subTabSetterRef.current = fn;
+  }, []);
+
+  const notifyEvent = useCallback((event: OnboardingEvent) => {
+    if (currentStep?.advanceOnEvent === event) {
+      next();
+    }
+  }, [currentStep, next]);
 
   const value = useMemo<OnboardingContextValue>(() => ({
     isActive,
@@ -151,7 +170,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     restart,
     isAllowedTab,
     registerTabSetter,
-  }), [isActive, currentStep, currentIndex, targetRect, next, skip, restart, isAllowedTab, registerTabSetter]);
+    registerSubTabSetter,
+    notifyEvent,
+  }), [isActive, currentStep, currentIndex, targetRect, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, notifyEvent]);
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 }

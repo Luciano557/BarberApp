@@ -1,96 +1,61 @@
-## Onboarding guiado para owners (Paso 1 — Configurar Mi Negocio)
+## Problema
 
-### Decisiones
-- **Persistencia**: tabla nueva `user_onboarding` (un registro por usuario). Más robusto y extensible que un campo en `profiles`. Guarda progreso por paso para tolerar cierres inesperados: el onboarding se reanuda exactamente donde quedó.
-- **Sucursales**: ya existe siempre "Casa Central" auto-generada → no hace falta sub-paso de creación. Pasos 1.3+ entran directo a esa sucursal.
-- **Relanzable**: botón "Ver tutorial otra vez" en Configuración → resetea el progreso y arranca de nuevo.
+Del paso 2 al 8 no se ilumina nada porque los `data-onboarding-id` apuntados por `steps.ts` o no existen, o están en una tab no activa (la sub-tab "General" vs sucursal de Mi Negocio nunca se conmuta), y no hay un paso intermedio para "elegir sucursal".
 
-### Esquema DB
-```sql
-create table public.user_onboarding (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  current_step text,                -- id del paso actual, null = no iniciado
-  completed_steps text[] default '{}',
-  status text not null default 'pending', -- 'pending' | 'in_progress' | 'completed' | 'skipped'
-  started_at timestamptz,
-  completed_at timestamptz,
-  updated_at timestamptz default now()
-);
--- RLS: cada usuario lee/escribe su propio registro
-```
-- Cada `next()` hace upsert con `current_step` y push a `completed_steps`. Si el usuario cierra la app a mitad, al volver a entrar reanuda desde `current_step`.
-- `skip()` → `status='skipped'`. `finish()` → `status='completed'`.
-- "Ver tutorial otra vez" → reset (`status='pending'`, `current_step=null`, `completed_steps='{}'`).
+## Cambios
 
-### Arquitectura frontend
+### 1. `src/components/onboarding/steps.ts` — reescribir secuencia (8 pasos)
 
-```text
-src/components/onboarding/
-  OnboardingProvider.tsx     ← contexto global: estado, next/skip/finish/restart
-  OnboardingOverlay.tsx      ← overlay oscuro + spotlight recortado al target
-  OnboardingTooltip.tsx      ← tooltip moderno con flecha + acciones
-  steps.ts                   ← definición declarativa de los 7 pasos
-  useOnboardingTarget.ts     ← helper para registrar/buscar targets por id
-src/hooks/useOnboardingState.ts ← lectura/escritura de user_onboarding
-```
+| # | id | targetId | sub-tab Mi Negocio | Tooltip |
+|---|---|---|---|---|
+| 1 | `s1_sidebar` | `mi-negocio-nav` | — | (sin cambios) |
+| 2 | `s2_cuenta_intro` | `cuentas-sucursal-section` | `__general__` | "¿Para qué sirve la cuenta de sucursal?" + descripción |
+| 3 | `s3_cuenta_bullets` | `cuentas-sucursal-bullets` | `__general__` | "¿Para qué sirve la cuenta de sucursal?" + 3 bullets |
+| 4 | `s4_select_sucursal` | `sucursal-tab` | `__general__` (no fuerza nada) | "Accede a tu sucursal principal". Avanza al hacer click en una tab de sucursal (no botón "Continuar") |
+| 5 | `s5_info` | `info-sucursal-card` | primera sucursal | "Información de la sucursal. Acá podés configurar y gestionar toda la información principal de esta sucursal." |
+| 6 | `s6_equipo` | `equipo-section` | primera sucursal | "Gestioná tu equipo. Acá podés agregar barberos, encargados, cajeros y miembros del equipo." |
+| 7 | `s7_catalogo` | `catalogo-section` | primera sucursal | "Servicios, Extras y productos. Acá podés configurar los servicios, extras, productos y descuentos particulares de la sucursal." |
+| 8 | `s8_pagos` | `metodos-pago-section` | primera sucursal | "Métodos de pago. Configurá los medios de pago disponibles para esta sucursal." |
 
-#### Provider
-- Al login (owner only): consulta `user_onboarding`. Si `status` ∈ {pending, in_progress} → activa overlay en `current_step` o paso inicial.
-- API: `next()`, `skip()`, `restart()`, `goTo(id)`.
-- Mientras `isActive`: intercepta `AppSidebar.onTabChange` para permitir solo los tabs habilitados por el paso vigente.
+Agregar a `OnboardingStep` los campos opcionales:
+- `miNegocioSubTab?: 'general' | 'first-sucursal'`
+- `advanceOnEvent?: 'mi-negocio:sucursal-selected'`
+- `hideContinueButton?: boolean` (true para s4)
 
-#### Overlay + spotlight
-- Fixed full-screen, `z-[60]`, `bg-foreground/60` con `backdrop-blur-[1px]`.
-- Spotlight: 4 divs perimetrales calculados desde `getBoundingClientRect()` del target (con `pointer-events-auto` para bloquear el resto). El target queda interactivo.
-- Recalcula con `ResizeObserver` + `MutationObserver` + listeners scroll/resize.
-- Padding 8px y `border-radius` heredado. Transición CSS suave (`transition-all duration-300`).
-- Ring sutil alrededor del recorte (`ring-1 ring-primary/30`).
+Todos los pasos 2–8 mantienen `requiredTab: 'mi-negocio'`.
 
-#### Tooltip
-- Anclado al target con shadcn `Popover` + `PopoverArrow`. z por encima del overlay.
-- Contenido: título (`text-base font-semibold`), descripción (`text-sm text-muted-foreground`), indicador "n / 7", botón primario "Continuar", link discreto "Omitir tutorial".
-- Animación: `animate-fade-in` + `scale-in` ya disponibles.
+### 2. `src/components/onboarding/OnboardingProvider.tsx`
 
-#### Targets (atributo `data-onboarding-id`)
-| id | Componente |
-|---|---|
-| `mi-negocio-nav` | item del sidebar (`AppSidebar.tsx`) |
-| `cuentas-sucursal-section` | bloque `CuentaSucursalBlock` |
-| `cuentas-sucursal-bullets` | wrapper con los 3 textos clave (1.2 sub-estado) |
-| `info-sucursal-section` | card "Información de la sucursal" |
-| `equipo-section` | bloque `EquipoUnificado` |
-| `servicios-section` | catálogo Servicios |
-| `extras-productos-section` | extras / productos / descuentos |
-| `metodos-pago-section` | `PaymentMethodsConfig` |
+- Nuevo registro: `registerSubTabSetter(fn)` y `notifySubTabChange(value)` (paralelo a `tabSetterRef`).
+- En cada cambio de paso, si `currentStep.miNegocioSubTab` está definido, llamar al sub-tab setter:
+  - `'general'` → `__general__`
+  - `'first-sucursal'` → id de la primera sucursal visible (lo resuelve `MiNegocioPanel` registrando un setter ya parametrizado).
+- Nuevo método `notifyEvent(name)`: si `currentStep.advanceOnEvent === name`, llama `next()`.
+- Exponer ambos en el contexto.
 
-#### Pasos (`steps.ts`)
-Lineal, cada uno con `{ id, targetId, title, description, requiredTab?, beforeEnter?() }`.
-- 1.1 sidebar Mi Negocio → 1.2 Cuentas de sucursal (intro) → 1.2b textos destacados → 1.3 Info sucursal → 1.4 Equipo → 1.5 Servicios → 1.6 Extras/productos/descuentos → 1.7 Métodos de pago.
-- `beforeEnter` puede forzar tab `mi-negocio` o abrir tab de Casa Central.
+### 3. `src/components/MiNegocioPanel.tsx`
 
-### Cambios por archivo
-- **Migración DB**: tabla `user_onboarding` + RLS.
-- **`src/App.tsx`**: envolver con `<OnboardingProvider>` dentro de `AuthProvider`.
-- **`src/pages/Index.tsx`**: render de `<OnboardingOverlay />` y `<OnboardingTooltip />` a nivel de `main`. Exponer setter de tab al provider.
-- **`src/components/AppSidebar.tsx`**: `data-onboarding-id="mi-negocio-nav"`; bloquear tabs no permitidos durante onboarding.
-- **`src/components/MiNegocioPanel.tsx`** + **`SucursalTabContent.tsx`** + **`CuentaSucursalBlock.tsx`** + **`EquipoUnificado.tsx`** + **`PaymentMethodsConfig.tsx`**: agregar atributos `data-onboarding-id` en las cards correspondientes.
-- **`src/components/ConfigurationPanel.tsx`** (o `ConfigMenu.tsx`): botón "Ver tutorial otra vez" que llama a `restart()`.
-- Nuevos archivos en `src/components/onboarding/` y `src/hooks/useOnboardingState.ts`.
+- `useOnboarding()` para registrar:
+  - `registerSubTabSetter((kind) => { if (kind==='general') handleTabChange(GENERAL_TAB); else if (kind==='first-sucursal' && visibleSucursales[0]) handleTabChange(visibleSucursales[0].id); })`
+- En `handleTabChange`, después de cambiar la tab, llamar `onb.notifyEvent('mi-negocio:sucursal-selected')` cuando `value !== GENERAL_TAB`.
+- Añadir `data-onboarding-id="sucursal-tab"` al primer `TabsTrigger` de sucursal (la "Casa Central").
 
-### UX / estilo
-- Tokens semánticos (`bg-popover`, `text-foreground`, `border-border`, `primary`). Sin colores directos.
-- Tooltip: `rounded-xl border bg-popover shadow-lg p-4 max-w-sm`.
-- Sin emojis. Copy breve, claro, en línea con la voz Vittro.
-- Animaciones suaves (200–300ms), inspiración Notion/Linear.
+### 4. `src/components/config/CuentasSucursalConfig.tsx`
 
-### Edge cases
-- Target no montado: `MutationObserver` espera hasta 3s, luego salta paso.
-- Resize/scroll/cambio de DOM: recálculo automático.
-- Cierre de la app a mitad: al volver, reanuda en `current_step` (gracias a la persistencia por paso).
-- "Omitir": confirma con AlertDialog breve, marca `skipped`.
-- No-owner: provider no se activa.
+- `data-onboarding-id="cuentas-sucursal-section"` en el `<Card>` raíz.
+- `data-onboarding-id="cuentas-sucursal-bullets"` en el `<div className="space-y-2.5">` que envuelve los 3 `InfoRow`.
 
-### No incluye
-- Cambios funcionales en módulos existentes.
-- Onboarding para roles distintos a owner.
-- Pasos posteriores al 1.7.
+### 5. `src/components/onboarding/OnboardingTooltip.tsx`
+
+- Renderizar `step.bullets` como lista debajo de la descripción (ya soportado en steps.ts pero hay que confirmar el render).
+- Si `step.hideContinueButton`, ocultar el botón "Continuar" y mostrar texto sutil "Elegí una sucursal para continuar".
+
+### 6. Edge cases
+
+- Si no hay sucursales visibles cuando llega el paso 4, igual se muestra el target sobre la primera; si no existe, el overlay queda con fallback de pantalla completa hasta que aparezca (ya implementado).
+- Cierre y reapertura: `current_step` ya persiste por id; los nuevos ids reemplazan los viejos. Usuarios con un onboarding a medio camino sobre ids viejos caerán al paso 0 si el id no se encuentra (comportamiento de `findIndex` ya existente).
+
+## Fuera de alcance
+
+- No se toca DB ni `useOnboardingState`.
+- No se modifican los componentes de Equipo, Servicios o Métodos de pago: ya tienen los `data-onboarding-id` correctos en `SucursalTabContent.tsx`.
