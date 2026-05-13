@@ -336,6 +336,58 @@ export function AgendaDayView({
           )}
         </div>
       </div>
+
+      {/* Drag ghost */}
+      {ghost && (
+        <div
+          className="fixed z-[100] pointer-events-none rounded-md border bg-card px-2 py-1 text-xs shadow-md"
+          style={{
+            left: 0,
+            top: 0,
+            transform: `translate(${ghost.x + 12}px, ${ghost.y + 12}px)`,
+          }}
+        >
+          <span className="font-medium text-foreground">{ghost.label}</span>
+        </div>
+      )}
     </div>
   );
 }
+
+interface BarberColumnProps {
+  barberId: string;
+  width: number;
+  works: boolean;
+  children: React.ReactNode;
+}
+
+function BarberColumn({ barberId, width, works, children }: BarberColumnProps) {
+  return (
+    <div
+      data-col-root="true"
+      data-barbero-id={barberId}
+      className={cn("shrink-0 border-r relative", !works && "bg-muted/40")}
+      style={{ width, touchAction: 'pan-y' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface SlotTapAreaProps {
+  top: number;
+  height: number;
+  onTap: (e: React.PointerEvent<HTMLDivElement>) => void;
+}
+
+function SlotTapArea({ top, height, onTap }: SlotTapAreaProps) {
+  const handlers = usePointerTap((e) => onTap(e as React.PointerEvent<HTMLDivElement>));
+  return (
+    <div
+      className="absolute left-0 right-0 bg-background"
+      style={{ top, height, touchAction: 'pan-y' }}
+      {...handlers}
+    />
+  );
+}
+
