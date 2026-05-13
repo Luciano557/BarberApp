@@ -36,40 +36,71 @@ export default function Login() {
   const [country, setCountry] = useState('AR');
   const [plan, setPlan] = useState<PlanId>('basico');
 
+  // Helper aislado: resuelve el slug de la organización con timeout local.
+  // No interfiere con AuthContext; si falla, devuelve null y el caller decide.
+  const resolveOrgSlug = async (userId: string): Promise<string | null> => {
+    const timeoutMs = 6000;
+    const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs));
+    const query = (async (): Promise<string | null> => {
+      try {
+        const { data: profileRow, error: pErr } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', userId)
+          .maybeSingle();
+        if (pErr || !profileRow?.organization_id) return null;
+        const { data: orgRow, error: oErr } = await supabase
+          .from('organizations')
+          .select('slug')
+          .eq('id', profileRow.organization_id)
+          .maybeSingle();
+        if (oErr) return null;
+        return orgRow?.slug ?? null;
+      } catch (err) {
+        console.error('[Login] resolveOrgSlug:error', err);
+        return null;
+      }
+    })();
+    return Promise.race([query, timeout]);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
-    if (error) {
-      toast.error('Error al iniciar sesión', {
-        description: error.message === 'Invalid login credentials'
-          ? 'Email o contraseña incorrectos'
-          : error.message,
-      });
-      setIsLoading(false);
-    } else {
-      toast.success('¡Bienvenido!');
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
-        if (profile?.organization_id) {
-          const { data: org } = await supabase
-            .from('organizations')
-            .select('slug')
-            .eq('id', profile.organization_id)
-            .single();
-          if (org?.slug) {
-            navigate(`/app/${org.slug}`);
-            setIsLoading(false);
-            return;
-          }
-        }
+    try {
+      const { error } = await signIn(loginEmail, loginPassword);
+      if (error) {
+        toast.error('Error al iniciar sesión', {
+          description: error.message === 'Invalid login credentials'
+            ? 'Email o contraseña incorrectos'
+            : error.message,
+        });
+        return;
       }
-      navigate('/');
+
+      toast.success('¡Bienvenido!');
+
+      // No re-consultamos getUser: AuthContext ya está hidratando la sesión.
+      // Solo necesitamos el slug para navegar; si no lo conseguimos, vamos a "/"
+      // y ProtectedRoute terminará de resolver el destino.
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id ?? null;
+
+      let slug: string | null = null;
+      if (userId) {
+        slug = await resolveOrgSlug(userId);
+      }
+
+      if (slug) {
+        navigate(`/app/${slug}`);
+      } else {
+        toast.info('Te llevamos al inicio mientras terminamos de cargar tu cuenta.');
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('[Login] handleLogin:error', err);
+      toast.error('Ocurrió un error al ingresar. Probá de nuevo.');
+    } finally {
       setIsLoading(false);
     }
   };
