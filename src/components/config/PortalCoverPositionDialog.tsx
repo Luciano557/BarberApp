@@ -76,6 +76,10 @@ export function PortalCoverPositionDialog({
   const frameH = Math.round(frameW * 9 / 16);
   const frameLeft = Math.round((canvasW - frameW) / 2);
   const frameTop = Math.round((canvasH - frameH) / 2);
+  const frameMeasured = frameW > 0 && frameH > 0;
+  const frameStyle = frameMeasured
+    ? { left: frameLeft, top: frameTop, width: frameW, height: frameH }
+    : { left: '7.5%', top: '50%', width: '85%', aspectRatio: '16 / 9', transform: 'translateY(-50%)' };
 
   // Compute overflow (px) inside the frame in cover mode
   let overflowX = 0;
@@ -171,33 +175,28 @@ export function PortalCoverPositionDialog({
               />
 
               {/* Dark overlays around the frame (4 divs) */}
-              {canvasW > 0 && (
-                <>
-                  <div
-                    className="absolute left-0 right-0 top-0 bg-foreground/50 pointer-events-none"
-                    style={{ height: frameTop }}
-                  />
-                  <div
-                    className="absolute left-0 right-0 bottom-0 bg-foreground/50 pointer-events-none"
-                    style={{ height: canvasH - frameTop - frameH }}
-                  />
-                  <div
-                    className="absolute left-0 bg-foreground/50 pointer-events-none"
-                    style={{ top: frameTop, height: frameH, width: frameLeft }}
-                  />
-                  <div
-                    className="absolute right-0 bg-foreground/50 pointer-events-none"
-                    style={{ top: frameTop, height: frameH, width: frameLeft }}
-                  />
-                </>
-              )}
+              <div
+                className="absolute left-0 right-0 top-0 bg-foreground/50 pointer-events-none"
+                style={{ height: frameMeasured ? Math.max(0, frameTop) : '12%' }}
+              />
+              <div
+                className="absolute left-0 right-0 bottom-0 bg-foreground/50 pointer-events-none"
+                style={{ height: frameMeasured ? Math.max(0, canvasH - frameTop - frameH) : '12%' }}
+              />
+              <div
+                className="absolute left-0 bg-foreground/50 pointer-events-none"
+                style={{ top: frameMeasured ? frameTop : '12%', height: frameMeasured ? frameH : '76%', width: frameMeasured ? Math.max(0, frameLeft) : '7.5%' }}
+              />
+              <div
+                className="absolute right-0 bg-foreground/50 pointer-events-none"
+                style={{ top: frameMeasured ? frameTop : '12%', height: frameMeasured ? frameH : '76%', width: frameMeasured ? Math.max(0, frameLeft) : '7.5%' }}
+              />
 
               {/* Frame: real preview of what will render in portal */}
-              {canvasW > 0 && (
-                <div
-                  className="absolute overflow-hidden ring-2 ring-card shadow-lg pointer-events-none"
-                  style={{ left: frameLeft, top: frameTop, width: frameW, height: frameH }}
-                >
+              <div
+                className="absolute overflow-hidden ring-2 ring-card shadow-lg pointer-events-none"
+                style={frameStyle}
+              >
                   {/* z-0 image cover */}
                   <img
                     src={coverUrl}
@@ -220,8 +219,7 @@ export function PortalCoverPositionDialog({
                       )}
                     </div>
                   </div>
-                </div>
-              )}
+              </div>
             </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
