@@ -5,6 +5,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ICON_WHITELIST = new Set([
+  'instagram', 'whatsapp', 'facebook', 'tiktok', 'youtube',
+  'map', 'web', 'phone', 'mail', 'link',
+]);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -59,33 +64,44 @@ Deno.serve(async (req) => {
         .eq("eliminado", false),
       supabase
         .from("portal_config")
-        .select("logo_path, description, primary_color, links")
+        .select("logo_path, cover_path, description, primary_color, links")
         .eq("organization_id", org.id)
         .maybeSingle(),
     ]);
 
     let portal: {
       logo_url: string | null;
+      cover_url: string | null;
       description: string | null;
       primary_color: string | null;
-      links: { label: string; url: string }[];
+      links: { label: string; url: string; icon: string | null }[];
     } | null = null;
 
-    const pc = portalRes.data;
+    const pc: any = portalRes.data;
     if (pc) {
       let logo_url: string | null = null;
       if (pc.logo_path) {
         const { data: pub } = supabase.storage.from("portal-logos").getPublicUrl(pc.logo_path);
         logo_url = pub?.publicUrl ?? null;
       }
+      let cover_url: string | null = null;
+      if (pc.cover_path) {
+        const { data: pub } = supabase.storage.from("portal-logos").getPublicUrl(pc.cover_path);
+        cover_url = pub?.publicUrl ?? null;
+      }
       const rawLinks = Array.isArray(pc.links) ? pc.links : [];
       const links = rawLinks
         .filter((l: any) => l && l.active === true && typeof l.label === "string" && typeof l.url === "string")
         .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-        .map((l: any) => ({ label: l.label, url: l.url }));
+        .map((l: any) => ({
+          label: l.label,
+          url: l.url,
+          icon: typeof l.icon === 'string' && ICON_WHITELIST.has(l.icon) ? l.icon : null,
+        }));
 
       portal = {
         logo_url: logo_url ?? org.logo_url ?? null,
+        cover_url,
         description: pc.description ?? null,
         primary_color: typeof pc.primary_color === "string" && /^#[0-9A-Fa-f]{6}$/.test(pc.primary_color)
           ? pc.primary_color
@@ -95,6 +111,7 @@ Deno.serve(async (req) => {
     } else {
       portal = {
         logo_url: org.logo_url ?? null,
+        cover_url: null,
         description: null,
         primary_color: null,
         links: [],
