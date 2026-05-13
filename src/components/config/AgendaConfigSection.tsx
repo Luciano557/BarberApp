@@ -18,6 +18,7 @@ interface ConfigData {
   cancelacion_limite_hs: number;
   modificacion_limite_hs: number;
   dias_anticipacion: number;
+  anticipacion_minima_reserva_min: number;
 }
 
 const DEFAULTS: ConfigData = {
@@ -26,6 +27,7 @@ const DEFAULTS: ConfigData = {
   cancelacion_limite_hs: 2,
   modificacion_limite_hs: 2,
   dias_anticipacion: 30,
+  anticipacion_minima_reserva_min: 30,
 };
 
 export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfigSectionProps) {
