@@ -48,6 +48,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
         cancelacion_limite_hs: data.cancelacion_limite_hs,
         modificacion_limite_hs: data.modificacion_limite_hs,
         dias_anticipacion: data.dias_anticipacion,
+        anticipacion_minima_reserva_min: (data as any).anticipacion_minima_reserva_min ?? 30,
       });
     }
     setLoading(false);
