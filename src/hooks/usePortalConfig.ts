@@ -15,6 +15,7 @@ export interface PortalConfig {
   cover_path: string | null;
   cover_position_x: number;
   cover_position_y: number;
+  cover_zoom: number;
   description: string | null;
   primary_color: string | null;
   links: PortalLink[];
@@ -44,6 +45,12 @@ const clampPos = (n: any): number => {
   return Math.max(0, Math.min(100, Math.round(v)));
 };
 
+const clampZoom = (n: any): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(1, Math.min(3, v));
+};
+
 export function usePortalConfig(organizationId: string | undefined) {
   const [config, setConfig] = useState<PortalConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +72,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         cover_path: d.cover_path ?? null,
         cover_position_x: clampPos(d.cover_position_x ?? 50),
         cover_position_y: clampPos(d.cover_position_y ?? 50),
+        cover_zoom: clampZoom(d.cover_zoom ?? 1),
         description: d.description,
         primary_color: d.primary_color,
         links: Array.isArray(d.links) ? (d.links as unknown as PortalLink[]) : [],
@@ -76,6 +84,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         cover_path: null,
         cover_position_x: 50,
         cover_position_y: 50,
+        cover_zoom: 1,
         description: null,
         primary_color: null,
         links: [],
@@ -99,6 +108,9 @@ export function usePortalConfig(organizationId: string | undefined) {
       cover_position_y: updates.cover_position_y !== undefined
         ? clampPos(updates.cover_position_y)
         : clampPos(config?.cover_position_y ?? 50),
+      cover_zoom: updates.cover_zoom !== undefined
+        ? clampZoom(updates.cover_zoom)
+        : clampZoom(config?.cover_zoom ?? 1),
       description: updates.description !== undefined ? updates.description : config?.description ?? null,
       primary_color: updates.primary_color !== undefined ? updates.primary_color : config?.primary_color ?? null,
       links: (updates.links ?? config?.links ?? []) as any,
@@ -156,7 +168,7 @@ export function usePortalConfig(organizationId: string | undefined) {
   const removeCover = useCallback(async () => {
     if (!config?.cover_path) return { error: null };
     await supabase.storage.from('portal-logos').remove([config.cover_path]);
-    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50 });
+    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
   }, [config, save]);
 
   return {

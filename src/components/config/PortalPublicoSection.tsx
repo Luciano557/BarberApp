@@ -41,6 +41,7 @@ export function PortalPublicoSection() {
   const [coverPath, setCoverPath] = useState<string | null>(null);
   const [coverPosX, setCoverPosX] = useState<number>(50);
   const [coverPosY, setCoverPosY] = useState<number>(50);
+  const [coverZoom, setCoverZoom] = useState<number>(1);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -56,6 +57,7 @@ export function PortalPublicoSection() {
       setCoverPath(config.cover_path);
       setCoverPosX(config.cover_position_x ?? 50);
       setCoverPosY(config.cover_position_y ?? 50);
+      setCoverZoom(config.cover_zoom ?? 1);
     }
   }, [config]);
 
@@ -72,13 +74,14 @@ export function PortalPublicoSection() {
     cover_url: coverUrl || null,
     cover_position_x: coverPosX,
     cover_position_y: coverPosY,
+    cover_zoom: coverZoom,
     description: description.trim() || null,
     primary_color: isValidHex(primaryColor) ? primaryColor : null,
     links: links
       .filter((l) => l.active && l.label.trim() && URL_RE.test(l.url))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
-  }), [logoUrl, coverUrl, coverPosX, coverPosY, organization?.logo_url, description, primaryColor, links]);
+  }), [logoUrl, coverUrl, coverPosX, coverPosY, coverZoom, organization?.logo_url, description, primaryColor, links]);
 
   const handleCopy = async () => {
     if (!publicUrl) return;
@@ -124,7 +127,8 @@ export function PortalPublicoSection() {
       setCoverPath(path);
       setCoverPosX(50);
       setCoverPosY(50);
-      const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50 });
+      setCoverZoom(1);
+      const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
       if (e) toast.error('No se pudo guardar la portada');
       else toast.success('Portada actualizada');
     }
@@ -134,15 +138,17 @@ export function PortalPublicoSection() {
     setCoverPath(null);
     setCoverPosX(50);
     setCoverPosY(50);
+    setCoverZoom(1);
     const { error } = await removeCover();
     if (error) toast.error('No se pudo quitar la portada');
     else toast.success('Portada quitada');
   };
 
-  const handleSaveCoverPosition = async (x: number, y: number) => {
+  const handleSaveCoverPosition = async (x: number, y: number, zoom: number) => {
     setCoverPosX(x);
     setCoverPosY(y);
-    const { error } = await save({ cover_position_x: x, cover_position_y: y });
+    setCoverZoom(zoom);
+    const { error } = await save({ cover_position_x: x, cover_position_y: y, cover_zoom: zoom });
     if (error) toast.error('No se pudo guardar el encuadre');
     else toast.success('Encuadre guardado');
   };
@@ -232,6 +238,7 @@ export function PortalPublicoSection() {
                 coverUrl={coverUrl}
                 coverPositionX={coverPosX}
                 coverPositionY={coverPosY}
+                coverZoom={coverZoom}
                 uploading={uploadingCover}
                 disabled={saving}
                 onUpload={handleCoverFile}
@@ -444,6 +451,7 @@ export function PortalPublicoSection() {
         orgName={orgName}
         initialX={coverPosX}
         initialY={coverPosY}
+        initialZoom={coverZoom}
         saving={saving}
         onSave={handleSaveCoverPosition}
       />

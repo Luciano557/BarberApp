@@ -6,6 +6,7 @@ interface Props {
   coverUrl: string | null;
   coverPositionX?: number;
   coverPositionY?: number;
+  coverZoom?: number;
   uploading?: boolean;
   disabled?: boolean;
   onUpload: (file: File) => void;
@@ -17,6 +18,7 @@ export function PortalCoverUploader({
   coverUrl,
   coverPositionX = 50,
   coverPositionY = 50,
+  coverZoom = 1,
   uploading,
   disabled,
   onUpload,
@@ -27,19 +29,20 @@ export function PortalCoverUploader({
 
   return (
     <div className="space-y-2">
-      <div
-        className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center"
-        style={
-          coverUrl
-            ? {
-                backgroundImage: `url(${coverUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: `${coverPositionX}% ${coverPositionY}%`,
-              }
-            : undefined
-        }
-      >
-        {!coverUrl && (
+      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center">
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover select-none pointer-events-none"
+            style={{
+              objectPosition: `${coverPositionX}% ${coverPositionY}%`,
+              transform: `scale(${coverZoom})`,
+              transformOrigin: `${coverPositionX}% ${coverPositionY}%`,
+            }}
+            draggable={false}
+          />
+        ) : (
           <div className="flex flex-col items-center gap-1 text-muted-foreground">
             <ImageIcon className="h-6 w-6" />
             <span className="text-xs">Sin foto de portada</span>

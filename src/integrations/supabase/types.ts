@@ -1866,6 +1866,7 @@ export type Database = {
           cover_path: string | null
           cover_position_x: number
           cover_position_y: number
+          cover_zoom: number
           created_at: string
           description: string | null
           links: Json
@@ -1878,6 +1879,7 @@ export type Database = {
           cover_path?: string | null
           cover_position_x?: number
           cover_position_y?: number
+          cover_zoom?: number
           created_at?: string
           description?: string | null
           links?: Json
@@ -1890,6 +1892,7 @@ export type Database = {
           cover_path?: string | null
           cover_position_x?: number
           cover_position_y?: number
+          cover_zoom?: number
           created_at?: string
           description?: string | null
           links?: Json

@@ -14,6 +14,7 @@ export interface PortalDataView {
   cover_url?: string | null;
   cover_position_x?: number | null;
   cover_position_y?: number | null;
+  cover_zoom?: number | null;
   description: string | null;
   primary_color: string | null;
   links: PortalLandingLink[];
@@ -35,6 +36,11 @@ const clampPos = (n: number | null | undefined) => {
   return Math.max(0, Math.min(100, n));
 };
 
+const clampZoom = (n: number | null | undefined) => {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(3, n));
+};
+
 export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage }: Props) => {
   const logo = portal?.logo_url || fallbackLogo || null;
   const cover = portal?.cover_url || null;
@@ -42,6 +48,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
   const links = (portal?.links ?? []).slice(0, 4);
   const posX = clampPos(portal?.cover_position_x);
   const posY = clampPos(portal?.cover_position_y);
+  const zoom = clampZoom(portal?.cover_zoom);
 
   const primary = isValidHex(portal?.primary_color) ? portal!.primary_color! : null;
   const containerStyle = primary
@@ -57,7 +64,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
 
   const Avatar = ({ className = '' }: { className?: string }) => (
     <div
-      className={`h-24 w-24 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card shadow-md ${className}`}
+      className={`h-24 w-24 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card border border-border/50 shadow-xl ${className}`}
     >
       {logo ? (
         <img src={logo} alt={`Logo de ${orgName}`} className="h-full w-full object-cover" />
@@ -74,14 +81,18 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
       {cover ? (
         <>
           {/* Cover header — capa con portada y degradado */}
-          <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 h-[140px]">
+          <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 h-[140px] overflow-hidden">
             {/* z-0: foto */}
-            <div
-              className="absolute inset-0 z-0 bg-cover"
+            <img
+              src={cover}
+              alt=""
+              className="absolute inset-0 z-0 h-full w-full object-cover select-none pointer-events-none"
               style={{
-                backgroundImage: `url(${cover})`,
-                backgroundPosition: `${posX}% ${posY}%`,
+                objectPosition: `${posX}% ${posY}%`,
+                transform: `scale(${zoom})`,
+                transformOrigin: `${posX}% ${posY}%`,
               }}
+              draggable={false}
             />
             {/* z-10: degradado inferior */}
             <div className="absolute inset-x-0 bottom-0 z-10 h-2/3 bg-gradient-to-b from-transparent to-card" />
