@@ -222,47 +222,39 @@ export function AgendaDayView({
             const blocks = bloqueosByBarber[b.id] || [];
 
             return (
-              <div
+              <BarberColumn
                 key={b.id}
-                className={cn(
-                  "shrink-0 border-r relative",
-                  !works && "bg-muted/40",
-                )}
-                style={{ width: COL_WIDTH }}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, b.id)}
+                barberId={b.id}
+                width={COL_WIDTH}
+                works={works}
               >
                 {/* Hour grid lines */}
                 {hourRails.slice(0, -1).map(m => (
                   <div
                     key={m}
-                    className="absolute left-0 right-0 border-t border-border/40"
+                    className="absolute left-0 right-0 border-t border-border/40 pointer-events-none"
                     style={{ top: (m - rangeStart) * PX_PER_MIN }}
                   />
                 ))}
-                {/* Working hours overlay (subtle) */}
-                {works && barberHorarios.map(h => {
-                  const top = (timeToMinutes(h.hora_inicio) - rangeStart) * PX_PER_MIN;
-                  const height = (timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * PX_PER_MIN;
-                  return (
-                    <div
-                      key={h.id}
-                      className="absolute left-0 right-0 bg-background"
-                      style={{ top, height }}
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const offY = e.clientY - rect.top;
-                        const min = Math.round(offY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
-                        onSlotClick(b.id, minutesToTime(min));
-                      }}
-                    />
-                  );
-                })}
+                {/* Working hours overlay (subtle) - tappable for new appointment */}
+                {works && barberHorarios.map(h => (
+                  <SlotTapArea
+                    key={h.id}
+                    top={(timeToMinutes(h.hora_inicio) - rangeStart) * PX_PER_MIN}
+                    height={(timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * PX_PER_MIN}
+                    onTap={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const offY = e.clientY - rect.top;
+                      const min = Math.round(offY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
+                      onSlotClick(b.id, minutesToTime(min));
+                    }}
+                  />
+                ))}
                 {/* Bloqueos del barbero */}
                 {blocks.map(bl => {
                   if (bl.todo_el_dia) {
                     return (
-                      <div key={bl.id} className="absolute inset-0 bg-muted/60 backdrop-blur-[1px] flex items-center justify-center">
+                      <div key={bl.id} className="absolute inset-0 bg-muted/60 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
                         <span className="text-[10px] text-muted-foreground rotate-90">No disponible</span>
                       </div>
                     );
@@ -273,7 +265,7 @@ export function AgendaDayView({
                   return (
                     <div
                       key={bl.id}
-                      className="absolute left-0 right-0 bg-muted/70 border-l-2 border-muted-foreground/40"
+                      className="absolute left-0 right-0 bg-muted/70 border-l-2 border-muted-foreground/40 pointer-events-none"
                       style={{ top, height, backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 6px, hsl(var(--muted-foreground)/0.15) 6px, hsl(var(--muted-foreground)/0.15) 7px)' }}
                       title={bl.motivo || 'No disponible'}
                     />
@@ -288,17 +280,13 @@ export function AgendaDayView({
                   const leftPct = widthPct * layout.idx;
                   const servicio = servicios.find(s => s.id === t.servicio_id);
                   const isPending = t.estado === 'pendiente';
+                  const turnoHandlers = getTurnoHandlers(t);
                   return (
                     <div
                       key={t.id}
-                      draggable={canDrag && ['pendiente', 'confirmado'].includes(t.estado)}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/turno-id', t.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onClick={(e) => { e.stopPropagation(); onTurnoClick(t); }}
+                      {...turnoHandlers}
                       className={cn(
-                        "absolute rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card",
+                        "absolute rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none",
                         isPending ? "border border-dashed" : "border",
                       )}
                       style={{
@@ -306,6 +294,9 @@ export function AgendaDayView({
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
                         borderLeft: `3px solid ${colors[b.id]}`,
+                        touchAction: 'pan-y',
+                        WebkitUserSelect: 'none',
+                        WebkitTouchCallout: 'none',
                       }}
                     >
                       <div className="text-[10px] font-mono text-muted-foreground">
@@ -320,7 +311,7 @@ export function AgendaDayView({
                     </div>
                   );
                 })}
-              </div>
+              </BarberColumn>
             );
           })}
 
