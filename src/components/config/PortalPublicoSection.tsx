@@ -20,6 +20,7 @@ import { PortalLinksEditor } from './PortalLinksEditor';
 import { PortalPreview } from './PortalPreview';
 import { PortalColorPalette } from './PortalColorPalette';
 import { PortalCoverUploader } from './PortalCoverUploader';
+import { PortalCoverPositionDialog } from './PortalCoverPositionDialog';
 import { isValidIconKey } from '@/components/reservar/lib/portalIcons';
 
 const URL_RE = /^https?:\/\//i;
