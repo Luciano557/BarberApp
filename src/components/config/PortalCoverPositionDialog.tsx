@@ -25,7 +25,8 @@ export function PortalCoverPositionDialog({
   const [x, setX] = useState(initialX);
   const [y, setY] = useState(initialY);
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
-  const [canvasW, setCanvasW] = useState(0);
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
+  const [isDragging, setIsDragging] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
@@ -51,9 +52,11 @@ export function PortalCoverPositionDialog({
     if (!open) return;
     const el = canvasRef.current;
     if (!el) return;
-    setCanvasW(el.clientWidth);
+    setCanvasSize({ w: el.clientWidth, h: el.clientHeight });
     const ro = new ResizeObserver((entries) => {
-      for (const e of entries) setCanvasW(e.contentRect.width);
+      for (const e of entries) {
+        setCanvasSize({ w: e.contentRect.width, h: e.contentRect.height });
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -64,8 +67,11 @@ export function PortalCoverPositionDialog({
     .map((w) => w[0]?.toUpperCase()).join('') || 'V';
 
   // Canvas + frame geometry
-  const canvasH = canvasW > 0 ? Math.round(canvasW * 0.6) : 0; // ~h-72-ish, scales with width
-  const frameW = canvasW > 0 ? Math.round(canvasW * 0.85) : 0;
+  const canvasW = canvasSize.w;
+  const canvasH = canvasSize.h;
+  const frameW = canvasW > 0 && canvasH > 0
+    ? Math.round(Math.min(canvasW * 0.85, Math.max(0, canvasH - 24) * 16 / 9))
+    : 0;
   const frameH = Math.round(frameW * 9 / 16);
   const frameLeft = Math.round((canvasW - frameW) / 2);
   const frameTop = Math.round((canvasH - frameH) / 2);
@@ -81,8 +87,8 @@ export function PortalCoverPositionDialog({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!coverUrl || !imgSize) return;
-    if (overflowX === 0 && overflowY === 0) return;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    setIsDragging(true);
     dragRef.current = {
       startPx: e.clientX,
       startPy: e.clientY,
@@ -109,6 +115,7 @@ export function PortalCoverPositionDialog({
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     dragRef.current = null;
+    setIsDragging(false);
   };
 
   const handleSave = async () => {
@@ -116,7 +123,7 @@ export function PortalCoverPositionDialog({
     onOpenChange(false);
   };
 
-  const dragEnabled = !!coverUrl && !!imgSize && (overflowX > 0 || overflowY > 0);
+  const dragEnabled = !!coverUrl && !!imgSize;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
