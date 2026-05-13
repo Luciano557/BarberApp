@@ -23,7 +23,8 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 const Index = () => {
   const isMobile = useIsMobile();
   const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
-  
+  const onboarding = useOnboarding();
+
   const rolesLoaded = roles.length > 0;
 
   const getDefaultTab = () => {
@@ -36,6 +37,18 @@ const Index = () => {
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
   const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas'>('menu');
+
+  // Register tab setter so onboarding can drive navigation
+  useEffect(() => {
+    onboarding.registerTabSetter((t) => setActiveTab(t));
+    return () => onboarding.registerTabSetter(null);
+  }, [onboarding]);
+
+  // Intercepted tab change: blocks navigation outside of allowed tabs during onboarding
+  const handleTabChange = (tab: string) => {
+    if (onboarding.isActive && !onboarding.isAllowedTab(tab)) return;
+    setActiveTab(tab);
+  };
 
   const goToGeneralConfig = () => {
     setConfigInitialSection('payments');
