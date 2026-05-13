@@ -114,7 +114,7 @@ Deno.serve(async (req) => {
     const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, barberosRes] = await Promise.all([
       supabase
         .from("agenda_config")
-        .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion")
+        .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion, anticipacion_minima_reserva_min")
         .eq("organization_id", organization_id)
         .eq("sucursal_id", sucursal_id)
         .single(),
