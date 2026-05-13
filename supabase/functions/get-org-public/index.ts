@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
         .eq("eliminado", false),
       supabase
         .from("portal_config")
-        .select("logo_path, cover_path, description, primary_color, links")
+        .select("logo_path, cover_path, cover_position_x, cover_position_y, description, primary_color, links")
         .eq("organization_id", org.id)
         .maybeSingle(),
     ]);
