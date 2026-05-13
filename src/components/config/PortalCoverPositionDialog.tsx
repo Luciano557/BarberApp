@@ -236,15 +236,14 @@ export function PortalCoverPositionDialog({
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
                   style={{
-                    objectPosition: `${x}% ${y}%`,
-                    transform: `scale(${zoom})`,
-                    transformOrigin: `${x}% ${y}%`,
+                    transform: `translate(${50 - x}%, ${50 - y}%) scale(${zoom})`,
+                    transformOrigin: 'center',
                   }}
                   draggable={false}
                 />
                 <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-card" />
                 <div className="absolute left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 z-10">
-                  <div className="h-14 w-14 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card border border-border/50 shadow-xl">
+                  <div className="h-14 w-14 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card shadow-md">
                     {logoUrl ? (
                       <img src={logoUrl} alt="" className="h-full w-full object-cover" draggable={false} />
                     ) : (
