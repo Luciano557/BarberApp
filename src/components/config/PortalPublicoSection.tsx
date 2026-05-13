@@ -41,6 +41,7 @@ export function PortalPublicoSection() {
   const [coverPath, setCoverPath] = useState<string | null>(null);
   const [coverPosX, setCoverPosX] = useState<number>(50);
   const [coverPosY, setCoverPosY] = useState<number>(50);
+  const [coverZoom, setCoverZoom] = useState<number>(1);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -56,6 +57,7 @@ export function PortalPublicoSection() {
       setCoverPath(config.cover_path);
       setCoverPosX(config.cover_position_x ?? 50);
       setCoverPosY(config.cover_position_y ?? 50);
+      setCoverZoom(config.cover_zoom ?? 1);
     }
   }, [config]);
 
