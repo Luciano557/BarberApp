@@ -133,10 +133,13 @@ export function useSupabaseData() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
+    console.info('[Data] phase=fetch:start');
     try {
       // Lines first (services depend on them)
       const linesRes = await supabase.from('lineas').select('*').eq('eliminado', false).order('nombre');
