@@ -54,6 +54,8 @@ export function PortalPublicoSection() {
       setLinks(config.links ?? []);
       setLogoPath(config.logo_path);
       setCoverPath(config.cover_path);
+      setCoverPosX(config.cover_position_x ?? 50);
+      setCoverPosY(config.cover_position_y ?? 50);
     }
   }, [config]);
 
