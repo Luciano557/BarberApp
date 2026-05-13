@@ -30,6 +30,7 @@ export function PortalCoverPositionDialog({
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
+    pointerId: number;
     startPx: number; startPy: number;
     startX: number; startY: number;
     overflowX: number; overflowY: number;
@@ -87,9 +88,12 @@ export function PortalCoverPositionDialog({
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!coverUrl || !imgSize) return;
-    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.cancelable) e.preventDefault();
+    try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* noop */ }
     setIsDragging(true);
     dragRef.current = {
+      pointerId: e.pointerId,
       startPx: e.clientX,
       startPy: e.clientY,
       startX: x,
@@ -101,7 +105,8 @@ export function PortalCoverPositionDialog({
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current;
-    if (!d) return;
+    if (!d || d.pointerId !== e.pointerId) return;
+    if (e.cancelable) e.preventDefault();
     const dx = e.clientX - d.startPx;
     const dy = e.clientY - d.startPy;
     let nx = d.startX;
@@ -113,7 +118,9 @@ export function PortalCoverPositionDialog({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    const d = dragRef.current;
+    if (d && d.pointerId !== e.pointerId) return;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* noop */ }
     dragRef.current = null;
     setIsDragging(false);
   };
