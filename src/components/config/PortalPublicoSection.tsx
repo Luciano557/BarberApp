@@ -238,6 +238,7 @@ export function PortalPublicoSection() {
                 coverUrl={coverUrl}
                 coverPositionX={coverPosX}
                 coverPositionY={coverPosY}
+                coverZoom={coverZoom}
                 uploading={uploadingCover}
                 disabled={saving}
                 onUpload={handleCoverFile}
