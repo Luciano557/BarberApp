@@ -77,7 +77,7 @@ export function CuentasSucursalConfig() {
 
       <CardContent className="space-y-4">
         {/* 3 mini filas con ícono */}
-        <div className="space-y-2.5">
+        <div className="space-y-2.5" data-onboarding-id="cuentas-sucursal-bullets">
           <InfoRow icon={Sparkles}>
             Cada sucursal tiene una cuenta propia generada automáticamente por Vittro.
           </InfoRow>
