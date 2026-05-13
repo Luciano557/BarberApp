@@ -4,26 +4,42 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, Palette, QrCode } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Image as ImageIcon, Palette, Type, Settings2 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { usePortalConfig, isValidHex, getLogoPublicUrl, type PortalLink } from '@/hooks/usePortalConfig';
+import {
+  usePortalConfig,
+  isValidHex,
+  getLogoPublicUrl,
+  getCoverPublicUrl,
+  type PortalLink,
+} from '@/hooks/usePortalConfig';
 import { PortalLinksEditor } from './PortalLinksEditor';
 import { PortalPreview } from './PortalPreview';
+import { PortalColorPalette } from './PortalColorPalette';
+import { PortalCoverUploader } from './PortalCoverUploader';
+import { isValidIconKey } from '@/components/reservar/lib/portalIcons';
 
 const URL_RE = /^https?:\/\//i;
 
 export function PortalPublicoSection() {
   const { organization } = useOrganization();
   const orgId = organization?.id;
-  const { config, loading, saving, save, uploadLogo, removeLogo } = usePortalConfig(orgId);
+  const {
+    config, loading, saving, save,
+    uploadLogo, removeLogo,
+    uploadCover, removeCover,
+  } = usePortalConfig(orgId);
 
   const [description, setDescription] = useState('');
   const [primaryColor, setPrimaryColor] = useState('');
   const [links, setLinks] = useState<PortalLink[]>([]);
   const [logoPath, setLogoPath] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [coverPath, setCoverPath] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +49,7 @@ export function PortalPublicoSection() {
       setPrimaryColor(config.primary_color ?? '');
       setLinks(config.links ?? []);
       setLogoPath(config.logo_path);
+      setCoverPath(config.cover_path);
     }
   }, [config]);
 
@@ -42,16 +59,18 @@ export function PortalPublicoSection() {
   }, [organization?.slug]);
 
   const logoUrl = useMemo(() => getLogoPublicUrl(logoPath), [logoPath]);
+  const coverUrl = useMemo(() => getCoverPublicUrl(coverPath), [coverPath]);
 
   const previewPortal = useMemo(() => ({
     logo_url: logoUrl || organization?.logo_url || null,
+    cover_url: coverUrl || null,
     description: description.trim() || null,
     primary_color: isValidHex(primaryColor) ? primaryColor : null,
     links: links
       .filter((l) => l.active && l.label.trim() && URL_RE.test(l.url))
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map((l) => ({ label: l.label, url: l.url })),
-  }), [logoUrl, organization?.logo_url, description, primaryColor, links]);
+      .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
+  }), [logoUrl, coverUrl, organization?.logo_url, description, primaryColor, links]);
 
   const handleCopy = async () => {
     if (!publicUrl) return;
@@ -68,21 +87,15 @@ export function PortalPublicoSection() {
     link.click();
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setUploading(true);
+  const handleLogoFile = async (file: File) => {
+    setUploadingLogo(true);
     const { error, path } = await uploadLogo(file);
-    setUploading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
+    setUploadingLogo(false);
+    if (error) return toast.error(error.message);
     if (path) {
       setLogoPath(path);
-      const { error: saveErr } = await save({ logo_path: path });
-      if (saveErr) toast.error('No se pudo guardar el logo');
+      const { error: e } = await save({ logo_path: path });
+      if (e) toast.error('No se pudo guardar el logo');
       else toast.success('Logo actualizado');
     }
   };
@@ -94,31 +107,47 @@ export function PortalPublicoSection() {
     else toast.success('Logo quitado');
   };
 
+  const handleCoverFile = async (file: File) => {
+    setUploadingCover(true);
+    const { error, path } = await uploadCover(file);
+    setUploadingCover(false);
+    if (error) return toast.error(error.message);
+    if (path) {
+      setCoverPath(path);
+      const { error: e } = await save({ cover_path: path });
+      if (e) toast.error('No se pudo guardar la portada');
+      else toast.success('Portada actualizada');
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    setCoverPath(null);
+    const { error } = await removeCover();
+    if (error) toast.error('No se pudo quitar la portada');
+    else toast.success('Portada quitada');
+  };
+
+  const handleColorPreset = async (hex: string) => {
+    setPrimaryColor(hex);
+  };
+
   const handleSave = async () => {
-    // Validations mirror DB
-    if (description.length > 240) {
-      toast.error('La descripción supera 240 caracteres');
-      return;
-    }
-    if (primaryColor && !isValidHex(primaryColor)) {
-      toast.error('El color debe tener formato #RRGGBB');
-      return;
-    }
-    if (links.length > 4) {
-      toast.error('Máximo 4 links');
-      return;
-    }
+    if (description.length > 240) return toast.error('La descripción supera 240 caracteres');
+    if (primaryColor && !isValidHex(primaryColor)) return toast.error('El color debe tener formato #RRGGBB');
+    if (links.length > 4) return toast.error('Máximo 4 links');
     for (const l of links) {
-      if (!l.label.trim() || l.label.length > 80) {
-        toast.error('Cada link necesita una etiqueta de 1 a 80 caracteres');
-        return;
+      if (!l.label.trim() || l.label.length > 80) return toast.error('Cada link necesita una etiqueta de 1 a 80 caracteres');
+      if (l.active) {
+        if (!URL_RE.test(l.url) || l.url.length > 500) return toast.error('Cada link activo necesita una URL http/https válida');
       }
-      if (!URL_RE.test(l.url) || l.url.length > 500) {
-        toast.error('Cada link necesita una URL http/https válida');
-        return;
-      }
+      if (l.icon && !isValidIconKey(l.icon)) return toast.error('Ícono inválido en algún link');
     }
-    const normalized = links.map((l, i) => ({ ...l, label: l.label.trim(), sort_order: i }));
+    const normalized = links.map((l, i) => ({
+      ...l,
+      label: l.label.trim(),
+      sort_order: i,
+      icon: isValidIconKey(l.icon) ? l.icon : null,
+    }));
     const { error } = await save({
       description: description.trim() || null,
       primary_color: primaryColor || null,
@@ -130,165 +159,259 @@ export function PortalPublicoSection() {
 
   if (!orgId) return null;
 
+  const orgName = organization?.name || 'Mi Barbería';
+  const descPlaceholder = `Bienvenido al portal de reservas de ${orgName}. Reservá tu turno o gestioná tu cita de forma simple.`;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <LinkIcon className="h-4 w-4" />
-          Portal público de reservas
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Convertí tu link de reservas en una mini-landing con tu logo, color y links destacados.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-8">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      {/* === Columna config === */}
+      <div className="space-y-6 min-w-0">
         {/* A — Link público */}
-        <section className="space-y-3">
-          <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-            <QrCode className="h-4 w-4" /> Link público
-          </h3>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input value={publicUrl} readOnly className="font-mono text-xs" />
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy}>
-                <Copy className="h-4 w-4 mr-1" /> Copiar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
-              >
-                <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
-              </Button>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
-              {publicUrl && <QRCodeCanvas value={publicUrl} size={160} includeMargin={false} />}
-            </div>
-            <div className="space-y-2 flex-1">
-              <p className="text-sm text-muted-foreground">
-                Compartí este link o QR para que tus clientes puedan reservar, modificar su cita y acceder a tus links personalizados.
-              </p>
-              <Button variant="outline" size="sm" onClick={handleDownloadQR}>
-                <Download className="h-4 w-4 mr-1" /> Descargar QR
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* B — Personalización */}
-        <section className="space-y-4">
-          <h3 className="text-sm font-medium text-foreground flex items-center gap-2">
-            <Palette className="h-4 w-4" /> Personalización
-          </h3>
-
-          {/* Logo */}
-          <div className="space-y-2">
-            <Label className="text-xs">Logo del portal</Label>
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-xs text-muted-foreground">Sin logo</span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LinkIcon className="h-4 w-4" />
+              Link público del portal
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Compartilo con tus clientes para que reserven o gestionen su cita.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input value={publicUrl} readOnly className="font-mono text-xs" />
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleCopy}>
+                  <Copy className="h-4 w-4 mr-1" /> Copiar
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading || saving}
+                  onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
                 >
-                  <Upload className="h-4 w-4 mr-1" />
-                  {uploading ? 'Subiendo...' : 'Subir logo'}
+                  <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
                 </Button>
-                {logoPath && (
-                  <Button variant="outline" size="sm" onClick={handleRemoveLogo} disabled={saving}>
-                    <Trash2 className="h-4 w-4 mr-1" /> Quitar
-                  </Button>
-                )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Color */}
-          <div className="space-y-2">
-            <Label className="text-xs">Color principal</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={isValidHex(primaryColor) ? primaryColor : '#000000'}
-                onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
-                className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
+        {/* B — Identidad visual */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" /> Identidad visual
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">Foto de portada, logo y nombre del negocio.</p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Cover */}
+            <div className="space-y-2">
+              <Label className="text-xs">Foto de portada</Label>
+              <PortalCoverUploader
+                coverUrl={coverUrl}
+                uploading={uploadingCover}
+                disabled={saving}
+                onUpload={handleCoverFile}
+                onRemove={handleRemoveCover}
               />
-              <Input
-                value={primaryColor}
-                onChange={(e) => setPrimaryColor(e.target.value)}
-                placeholder="#000000"
-                maxLength={7}
-                className="font-mono w-32"
-              />
-              {primaryColor && (
-                <Button variant="ghost" size="sm" onClick={() => setPrimaryColor('')}>
-                  Quitar
-                </Button>
-              )}
             </div>
-            {primaryColor && !isValidHex(primaryColor) && (
-              <p className="text-xs text-destructive">Formato inválido. Usá #RRGGBB.</p>
-            )}
-          </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label className="text-xs">Descripción corta</Label>
+            {/* Logo */}
+            <div className="space-y-2">
+              <Label className="text-xs">Logo</Label>
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {orgName.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) handleLogoFile(f);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploadingLogo || saving}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {uploadingLogo ? 'Subiendo...' : logoPath ? 'Cambiar logo' : 'Subir logo'}
+                  </Button>
+                  {logoPath && (
+                    <Button variant="outline" size="sm" onClick={handleRemoveLogo} disabled={saving}>
+                      <Trash2 className="h-4 w-4 mr-1" /> Quitar
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+            </div>
+
+            {/* Nombre */}
+            <div className="space-y-2">
+              <Label className="text-xs">Nombre del negocio</Label>
+              <Input value={orgName} readOnly className="bg-muted/40" />
+              <p className="text-xs text-muted-foreground">
+                Se muestra en el portal público. Editalo desde la configuración del negocio.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* C — Color principal */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Palette className="h-4 w-4" /> Color principal
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Elegí un color de la paleta. Se aplica a botones y elementos destacados del portal.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <PortalColorPalette value={primaryColor} onChange={handleColorPreset} />
+          </CardContent>
+        </Card>
+
+        {/* D — Descripción */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Type className="h-4 w-4" /> Descripción corta
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Si la dejás vacía, mostramos un mensaje de bienvenida automático.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={240}
               rows={3}
-              placeholder="Bienvenido a nuestra barbería. Reservá tu turno o gestioná tu cita."
+              placeholder={descPlaceholder}
             />
             <p className="text-xs text-muted-foreground text-right">{description.length}/240</p>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Links */}
-          <div className="space-y-2">
-            <Label className="text-xs">Links personalizados</Label>
+        {/* E — Links */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <LinkIcon className="h-4 w-4" /> Links personalizados
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
+            </p>
+          </CardHeader>
+          <CardContent>
             <PortalLinksEditor links={links} onChange={setLinks} />
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex justify-end pt-2">
-            <Button onClick={handleSave} disabled={saving || loading}>
-              <Save className="h-4 w-4 mr-1" />
-              {saving ? 'Guardando...' : 'Guardar cambios'}
-            </Button>
-          </div>
-        </section>
+        {/* F — Avanzado */}
+        <Card>
+          <CardContent className="pt-4">
+            <Accordion type="single" collapsible>
+              <AccordionItem value="advanced" className="border-none">
+                <AccordionTrigger className="py-2 hover:no-underline">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <Settings2 className="h-4 w-4" /> Configuración avanzada
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pt-4 space-y-6">
+                  {/* QR */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <QrCode className="h-4 w-4" /> QR de reserva
+                    </h4>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start">
+                      <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
+                        {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
+                      </div>
+                      <div className="space-y-2 flex-1">
+                        <p className="text-sm text-muted-foreground">
+                          Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
+                        </p>
+                        <Button variant="outline" size="sm" onClick={handleDownloadQR}>
+                          <Download className="h-4 w-4 mr-1" /> Descargar QR
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
 
-        {/* C — Vista previa */}
-        <section className="space-y-3">
+                  {/* HEX */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <Palette className="h-4 w-4" /> Color por código HEX
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={isValidHex(primaryColor) ? primaryColor : '#000000'}
+                        onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+                        className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
+                      />
+                      <Input
+                        value={primaryColor}
+                        onChange={(e) => setPrimaryColor(e.target.value)}
+                        placeholder="#000000"
+                        maxLength={7}
+                        className="font-mono w-32"
+                      />
+                      {primaryColor && (
+                        <Button variant="ghost" size="sm" onClick={() => setPrimaryColor('')}>
+                          Quitar
+                        </Button>
+                      )}
+                    </div>
+                    {primaryColor && !isValidHex(primaryColor) && (
+                      <p className="text-xs text-destructive">Formato inválido. Usá #RRGGBB.</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving || loading} size="lg">
+            <Save className="h-4 w-4 mr-1" />
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        </div>
+      </div>
+
+      {/* === Columna preview === */}
+      <div className="lg:sticky lg:top-20 lg:self-start">
+        <div className="space-y-3">
           <h3 className="text-sm font-medium text-foreground">Vista previa</h3>
           <PortalPreview
-            orgName={organization?.name || 'Mi Barbería'}
+            orgName={orgName}
             fallbackLogo={organization?.logo_url || null}
             portal={previewPortal}
           />
           <p className="text-xs text-muted-foreground text-center">
-            La vista previa se actualiza en tiempo real. Los cambios se aplican al portal público al guardar.
+            Se actualiza en vivo. Los cambios se aplican al portal público al guardar.
           </p>
-        </section>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </div>
   );
 }
