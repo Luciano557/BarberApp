@@ -16,6 +16,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
+import { OnboardingOverlay } from '@/components/onboarding/OnboardingOverlay';
+import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
