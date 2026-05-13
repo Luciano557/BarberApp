@@ -1,4 +1,6 @@
-import { Shield, ChevronRight, ClipboardList, Crown, Wallet } from 'lucide-react';
+import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 
 type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments';
 
@@ -14,6 +16,9 @@ interface ConfigMenuProps {
 }
 
 export function ConfigMenu({ onSelect }: ConfigMenuProps) {
+  const { isOwner } = useAuth();
+  const { restart } = useOnboarding();
+
   const items: ConfigMenuItem[] = [
     {
       id: 'plan',
@@ -59,6 +64,22 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
           <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
         </button>
       ))}
+
+      {isOwner && (
+        <button
+          onClick={restart}
+          className="w-full flex items-center gap-4 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left"
+        >
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-foreground">Ver tutorial otra vez</p>
+            <p className="text-sm text-muted-foreground">Volvé a recorrer el onboarding inicial paso a paso</p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+        </button>
+      )}
     </div>
   );
 }
