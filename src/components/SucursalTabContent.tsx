@@ -128,25 +128,36 @@ export function SucursalTabContent({
   const isInactive = !sucursal.activa;
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="mt-4 space-y-6 sm:mt-6">
       {/* Información de la sucursal */}
       <Card data-onboarding-id="info-sucursal-card">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                 <Building2 className="w-5 h-5 text-primary" />
               </div>
-              <CardTitle className="text-base">Información de la sucursal</CardTitle>
+              <CardTitle className="min-w-0 text-base leading-tight">Información de la sucursal</CardTitle>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
               {canManageCuentaSucursal && (
-                <Button variant="outline" size="sm" onClick={() => setCuentaOpen(true)} data-onboarding-id="cuenta-sucursal-button">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCuentaOpen(true)}
+                  data-onboarding-id="cuenta-sucursal-button"
+                  className="w-full justify-center sm:w-auto"
+                >
                   <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
                 </Button>
               )}
               {!isEditingInfo && (
-                <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsEditingInfo(true)}
+                  className="w-full justify-center sm:w-auto"
+                >
                   <Edit2 className="h-4 w-4 mr-1" /> Editar
                 </Button>
               )}
@@ -155,7 +166,7 @@ export function SucursalTabContent({
                   <Button
                     variant="outline"
                     size="sm"
-                    className={isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}
+                    className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
                     disabled={isTogglingActive}
                   >
                     <Power className="h-4 w-4 mr-1" />
@@ -200,31 +211,31 @@ export function SucursalTabContent({
                 <Label>Teléfono</Label>
                 <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
               </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }} disabled={isSavingInfo}>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }} disabled={isSavingInfo}>
                   <X className="h-4 w-4 mr-1" /> Cancelar
                 </Button>
-                <Button size="sm" onClick={handleSaveInfo} disabled={isSavingInfo || !infoForm.nombre.trim()}>
+                <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveInfo} disabled={isSavingInfo || !infoForm.nombre.trim()}>
                   <Save className="h-4 w-4 mr-1" /> {isSavingInfo ? 'Guardando...' : 'Guardar'}
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">{sucursal.nombre}</span>
-                <Badge variant={sucursal.activa ? 'default' : 'secondary'} className="ml-2">
+              <div className="flex flex-wrap items-start gap-2">
+                <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 break-words font-medium">{sucursal.nombre}</span>
+                <Badge variant={sucursal.activa ? 'default' : 'secondary'} className="sm:ml-2">
                   {sucursal.activa ? 'Activa' : 'Inactiva'}
                 </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
+              <div className="flex items-start gap-2">
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
               </div>
             </div>
           )}
@@ -233,8 +244,8 @@ export function SucursalTabContent({
 
       {/* Banner de sucursal inactiva */}
       {isInactive && (
-        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-          <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
           <p className="text-sm text-destructive">
             Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones.
           </p>

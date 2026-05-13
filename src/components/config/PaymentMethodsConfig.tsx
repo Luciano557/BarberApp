@@ -148,19 +148,19 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <Wallet className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <CardTitle className="text-base">Métodos de pago y recargos</CardTitle>
               <CardDescription>{subtitle}</CardDescription>
             </div>
           </div>
           {sucursalId !== null && (
-            <div className="flex flex-col items-end gap-1">
-              <div className="flex items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+              <div className="flex items-center justify-between gap-3 sm:justify-end">
                 <Label htmlFor="use-general" className="text-sm">
                   Usar configuración general
                 </Label>
@@ -171,7 +171,7 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
                   disabled={saving || loading}
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground text-right max-w-[220px]">
+              <p className="max-w-full text-[11px] text-muted-foreground sm:max-w-[220px] sm:text-right">
                 Activado: hereda de Mi Negocio.<br />
                 Desactivado: configuración propia.
               </p>
@@ -241,41 +241,45 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
               return (
                 <div
                   key={m}
-                  className="flex items-center gap-3 py-2 border-b border-border last:border-0"
+                  className="flex flex-col gap-3 border-b border-border py-3 last:border-0 sm:flex-row sm:items-center"
                 >
-                  <Switch
-                    checked={s.activo}
-                    onCheckedChange={(v) => updateMethod(m, { activo: v })}
-                    disabled={!canEdit || saving}
-                  />
-                  <span className="font-medium flex-1">{getMethodLabel(m)}</span>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                      value={s.recargoPct}
-                      onChange={(e) =>
-                        updateMethod(m, { recargoPct: e.target.value })
-                      }
-                      onBlur={() => canEdit && saveMethod(m)}
-                      disabled={!canEdit || saving || !s.activo}
-                      className="w-20 h-8 text-right"
+                  <div className="flex items-center gap-3 sm:flex-1">
+                    <Switch
+                      checked={s.activo}
+                      onCheckedChange={(v) => updateMethod(m, { activo: v })}
+                      disabled={!canEdit || saving}
                     />
-                    <span className="text-sm text-muted-foreground">%</span>
+                    <span className="font-medium">{getMethodLabel(m)}</span>
                   </div>
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => saveMethod(m)}
-                      disabled={saving}
-                      className="text-xs px-2 py-1 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                    >
-                      Guardar
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-1 sm:justify-end">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        max={100}
+                        step="0.01"
+                        value={s.recargoPct}
+                        onChange={(e) =>
+                          updateMethod(m, { recargoPct: e.target.value })
+                        }
+                        onBlur={() => canEdit && saveMethod(m)}
+                        disabled={!canEdit || saving || !s.activo}
+                        className="h-8 w-full text-right sm:w-20"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => saveMethod(m)}
+                        disabled={saving}
+                        className="w-full rounded border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground sm:w-auto"
+                      >
+                        Guardar
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

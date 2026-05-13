@@ -120,18 +120,18 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-base font-medium">Productos</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
               Gestioná tu catálogo de productos, precios y stock por sucursal.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setMarcasDialog(true)}>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setMarcasDialog(true)}>
               <Tag className="h-4 w-4 mr-1" /> Marcas
             </Button>
-            <Button size="sm" onClick={() => setProductoDialog({ open: true, producto: null })}>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => setProductoDialog({ open: true, producto: null })}>
               <Plus className="h-4 w-4 mr-1" /> Nuevo producto
             </Button>
           </div>
@@ -149,11 +149,11 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
           </div>
 
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
                 Activos en sucursal ({activeCount})
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
                 Inactivos / no configurados ({inactiveCount})
               </TabsTrigger>
             </TabsList>

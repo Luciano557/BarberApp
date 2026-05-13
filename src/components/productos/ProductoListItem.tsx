@@ -38,10 +38,10 @@ export function ProductoListItem({
   const sinMovimientoInicial = ps && stock === 0 && (ps.precio_venta || 0) === 0;
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+    <div className="flex flex-col gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:border-border hover:bg-muted/50 sm:flex-row sm:items-center">
       {/* Color de marca */}
       <div
-        className="w-1 h-10 rounded-full shrink-0"
+        className="h-1 w-full shrink-0 rounded-full sm:h-10 sm:w-1"
         style={{ backgroundColor: item.marca?.color || 'hsl(var(--muted-foreground))' }}
         aria-hidden
       />
@@ -84,60 +84,62 @@ export function ProductoListItem({
         </div>
       </div>
 
-      {ps && (
-        <Button variant="ghost" size="sm" onClick={onEdit} className="h-8">
-          <Edit2 className="h-4 w-4 mr-1" /> Editar
-        </Button>
-      )}
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
+      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+        {ps && (
+          <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 flex-1 sm:flex-none">
+            <Edit2 className="h-4 w-4 mr-1" /> Editar
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          {!ps && (
-            <>
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit2 className="h-4 w-4 mr-2" /> Configurar en sucursal
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {!ps && (
+              <>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit2 className="h-4 w-4 mr-2" /> Configurar en sucursal
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {ps && sinMovimientoInicial && (
+              <>
+                <DropdownMenuItem onClick={onStockInicial}>
+                  <PackagePlus className="h-4 w-4 mr-2" /> Cargar stock inicial
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {ps && (
+              <>
+                <DropdownMenuItem onClick={onAgregarStock}>
+                  <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onAjustarStock}>
+                  <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onVerHistorial}>
+                  <History className="h-4 w-4 mr-2" /> Historial de movimientos
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {activeInSucursal ? (
+              <DropdownMenuItem onClick={() => onToggleActive(false)}>
+                <PowerOff className="h-4 w-4 mr-2 text-destructive" /> Desactivar en sucursal
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {ps && sinMovimientoInicial && (
-            <>
-              <DropdownMenuItem onClick={onStockInicial}>
-                <PackagePlus className="h-4 w-4 mr-2" /> Cargar stock inicial
+            ) : (
+              <DropdownMenuItem onClick={() => onToggleActive(true)}>
+                <Power className="h-4 w-4 mr-2 text-success" /> Activar en sucursal
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {ps && (
-            <>
-              <DropdownMenuItem onClick={onAgregarStock}>
-                <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onAjustarStock}>
-                <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onVerHistorial}>
-                <History className="h-4 w-4 mr-2" /> Historial de movimientos
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {activeInSucursal ? (
-            <DropdownMenuItem onClick={() => onToggleActive(false)}>
-              <PowerOff className="h-4 w-4 mr-2 text-destructive" /> Desactivar en sucursal
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={() => onToggleActive(true)}>
-              <Power className="h-4 w-4 mr-2 text-success" /> Activar en sucursal
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }

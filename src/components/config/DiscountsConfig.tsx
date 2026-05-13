@@ -257,15 +257,16 @@ export function DiscountsConfig({
           </Select>
         </div>
       </div>
-      <div className="flex gap-2 justify-end pt-2">
+      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
         <Button
           variant="ghost"
           size="sm"
+          className="w-full sm:w-auto"
           onClick={() => { if (isEdit) setEditingId(null); else setIsAdding(false); resetForm(); }}
         >
           <X className="h-4 w-4 mr-1" /> Cancelar
         </Button>
-        <Button size="sm" onClick={() => isEdit ? handleUpdate(id) : handleAdd()} className="bg-success hover:bg-success/90">
+        <Button size="sm" onClick={() => isEdit ? handleUpdate(id) : handleAdd()} className="w-full bg-success hover:bg-success/90 sm:w-auto">
           <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
         </Button>
       </div>
@@ -277,7 +278,7 @@ export function DiscountsConfig({
       {editingId === d.id ? (
         <Form isEdit id={d.id} />
       ) : (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+        <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted sm:flex-row sm:items-center">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-foreground">{d.label}</span>
@@ -304,7 +305,7 @@ export function DiscountsConfig({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-end gap-1 sm:justify-start">
             <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8" title="Editar">
               <Edit2 className="h-4 w-4" />
             </Button>
@@ -348,7 +349,7 @@ export function DiscountsConfig({
 
   return (
     <Card className="border border-border bg-card">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle className="text-base font-medium">Descuentos</CardTitle>
           <p className="text-xs text-muted-foreground mt-1">
@@ -356,14 +357,14 @@ export function DiscountsConfig({
           </p>
         </div>
         {!isAdding && !editingId && (
-          <Button variant="outline" size="sm" onClick={startAdd}>
+          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
             <Plus className="h-4 w-4 mr-1" /> Agregar
           </Button>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filtro simple por tipo */}
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full sm:w-fit">
+        <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
           {([
             { v: 'todos' as TypeFilter, label: 'Todos' },
             { v: 'servicios' as TypeFilter, label: 'Servicios' },
@@ -372,7 +373,7 @@ export function DiscountsConfig({
             <button
               key={opt.v}
               onClick={() => setTypeFilter(opt.v)}
-              className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors sm:flex-none ${
                 typeFilter === opt.v
                   ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -390,7 +391,7 @@ export function DiscountsConfig({
             <p className="text-sm text-muted-foreground">
               No hay descuentos para mostrar.
             </p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={startAdd}>
+            <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={startAdd}>
               <Plus className="h-4 w-4 mr-1" /> Crear el primero
             </Button>
           </div>
