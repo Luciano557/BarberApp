@@ -1,61 +1,110 @@
-## Problema
+# Plan: Refinar el portal público de reservas y propagar el color de marca
 
-Del paso 2 al 8 no se ilumina nada porque los `data-onboarding-id` apuntados por `steps.ts` o no existen, o están en una tab no activa (la sub-tab "General" vs sucursal de Mi Negocio nunca se conmuta), y no hay un paso intermedio para "elegir sucursal".
+## Objetivos
+- Más profundidad visual: fondo gris muy suave, cards blancas, subcards gris claro, bordes sutiles y sombras mínimas.
+- Mejor jerarquía tipográfica entre títulos, subtítulos, labels y texto secundario.
+- En desktop dejar de tener pantalla vacía: agregar columna lateral con resumen persistente de la reserva.
+- Propagar el color principal configurado (`portal_config.primary_color`) a TODO el flujo público — no solo a la landing.
 
-## Cambios
+## Cambios estructurales (sin tocar lógica)
 
-### 1. `src/components/onboarding/steps.ts` — reescribir secuencia (8 pasos)
+### 1. Tema del portal — `src/pages/Reservar.tsx`
 
-| # | id | targetId | sub-tab Mi Negocio | Tooltip |
-|---|---|---|---|---|
-| 1 | `s1_sidebar` | `mi-negocio-nav` | — | (sin cambios) |
-| 2 | `s2_cuenta_intro` | `cuentas-sucursal-section` | `__general__` | "¿Para qué sirve la cuenta de sucursal?" + descripción |
-| 3 | `s3_cuenta_bullets` | `cuentas-sucursal-bullets` | `__general__` | "¿Para qué sirve la cuenta de sucursal?" + 3 bullets |
-| 4 | `s4_select_sucursal` | `sucursal-tab` | `__general__` (no fuerza nada) | "Accede a tu sucursal principal". Avanza al hacer click en una tab de sucursal (no botón "Continuar") |
-| 5 | `s5_info` | `info-sucursal-card` | primera sucursal | "Información de la sucursal. Acá podés configurar y gestionar toda la información principal de esta sucursal." |
-| 6 | `s6_equipo` | `equipo-section` | primera sucursal | "Gestioná tu equipo. Acá podés agregar barberos, encargados, cajeros y miembros del equipo." |
-| 7 | `s7_catalogo` | `catalogo-section` | primera sucursal | "Servicios, Extras y productos. Acá podés configurar los servicios, extras, productos y descuentos particulares de la sucursal." |
-| 8 | `s8_pagos` | `metodos-pago-section` | primera sucursal | "Métodos de pago. Configurá los medios de pago disponibles para esta sucursal." |
+Envolver todo el portal en un contenedor que defina variables CSS locales según `orgData.portal.primary_color`. Este contenedor:
 
-Agregar a `OnboardingStep` los campos opcionales:
-- `miNegocioSubTab?: 'general' | 'first-sucursal'`
-- `advanceOnEvent?: 'mi-negocio:sucursal-selected'`
-- `hideContinueButton?: boolean` (true para s4)
+- Sobrescribe los tokens HSL `--primary`, `--ring`, y agrega `--portal-primary` (HEX directo, para usos puntuales) y `--portal-primary-soft` (color con alpha bajo para fondos de selección).
+- Define `--portal-bg` (gris muy suave) y `--portal-subcard` (gris claro) para no depender de `bg-muted` global.
 
-Todos los pasos 2–8 mantienen `requiredTab: 'mi-negocio'`.
+Helper nuevo `src/components/reservar/lib/portalTheme.ts`:
+- `hexToHsl(hex)` → retorna `"H S% L%"` (string, formato que Tailwind/shadcn ya usa).
+- `getPortalThemeStyle(primaryHex | null)` → devuelve un `React.CSSProperties` con todas las variables. Si no hay color válido, no setea overrides (queda el tema por defecto).
 
-### 2. `src/components/onboarding/OnboardingProvider.tsx`
+Aplicar el style al wrapper más externo del portal (no al `<body>`, para no contaminar el resto de la app cuando se vuelve a otras rutas).
 
-- Nuevo registro: `registerSubTabSetter(fn)` y `notifySubTabChange(value)` (paralelo a `tabSetterRef`).
-- En cada cambio de paso, si `currentStep.miNegocioSubTab` está definido, llamar al sub-tab setter:
-  - `'general'` → `__general__`
-  - `'first-sucursal'` → id de la primera sucursal visible (lo resuelve `MiNegocioPanel` registrando un setter ya parametrizado).
-- Nuevo método `notifyEvent(name)`: si `currentStep.advanceOnEvent === name`, llama `next()`.
-- Exponer ambos en el contexto.
+### 2. Layout nuevo — `Reservar.tsx`
 
-### 3. `src/components/MiNegocioPanel.tsx`
+```text
+┌──────────────────────────────────────────────────────┐
+│  bg: gris suave (var(--portal-bg))                   │
+│  ┌──────────── Card principal ─────────┬──────────┐  │
+│  │  Header: logo + nombre              │ Sidebar  │  │
+│  │  Stepper / contenido del paso       │ resumen  │  │
+│  │  bg-card · sombra sutil · radius    │ (lg+)    │  │
+│  └─────────────────────────────────────┴──────────┘  │
+│  Powered by Vittro                                   │
+└──────────────────────────────────────────────────────┘
+```
 
-- `useOnboarding()` para registrar:
-  - `registerSubTabSetter((kind) => { if (kind==='general') handleTabChange(GENERAL_TAB); else if (kind==='first-sucursal' && visibleSucursales[0]) handleTabChange(visibleSucursales[0].id); })`
-- En `handleTabChange`, después de cambiar la tab, llamar `onb.notifyEvent('mi-negocio:sucursal-selected')` cuando `value !== GENERAL_TAB`.
-- Añadir `data-onboarding-id="sucursal-tab"` al primer `TabsTrigger` de sucursal (la "Casa Central").
+- En mobile, sidebar resumen colapsa a una franja superior debajo del progress (chips actuales).
+- En `lg+` (>=1024px), grid de 2 columnas: contenido (col-span-2) + `BookingSummarySidebar` sticky.
 
-### 4. `src/components/config/CuentasSucursalConfig.tsx`
+### 3. Sidebar de resumen — nuevo componente `src/components/reservar/BookingSummary.tsx`
 
-- `data-onboarding-id="cuentas-sucursal-section"` en el `<Card>` raíz.
-- `data-onboarding-id="cuentas-sucursal-bullets"` en el `<div className="space-y-2.5">` que envuelve los 3 `InfoRow`.
+Recibe el `BookingState` y muestra:
+- Sucursal · Servicio · Barbero · Fecha · Hora · Precio (cuando estén definidos).
+- Items vacíos en estado "—" con `text-muted-foreground` para que la tarjeta no parezca vacía aún antes de elegir.
+- Encabezado "Tu reserva" + chip de paso actual.
+- Estilo: subcard `bg-muted/50` con borde sutil; cada item con icono `lucide` mono.
 
-### 5. `src/components/onboarding/OnboardingTooltip.tsx`
+En mobile el mismo componente se renderiza como bloque compacto colapsable o, más simple, como la tira de chips actual ya existente en `BookingStepper`.
 
-- Renderizar `step.bullets` como lista debajo de la descripción (ya soportado en steps.ts pero hay que confirmar el render).
-- Si `step.hideContinueButton`, ocultar el botón "Continuar" y mostrar texto sutil "Elegí una sucursal para continuar".
+### 4. Restyling visual de los steps
 
-### 6. Edge cases
+Sin tocar handlers ni props. Solo clases:
 
-- Si no hay sucursales visibles cuando llega el paso 4, igual se muestra el target sobre la primera; si no existe, el overlay queda con fallback de pantalla completa hasta que aparezca (ya implementado).
-- Cierre y reapertura: `current_step` ya persiste por id; los nuevos ids reemplazan los viejos. Usuarios con un onboarding a medio camino sobre ids viejos caerán al paso 0 si el id no se encuentra (comportamiento de `findIndex` ya existente).
+- Tarjetas seleccionables (`SucursalStep`, `ServicioStep`, `BarberoStep`):
+  - Reemplazar tarjetas planas por cards con `bg-card`, `border border-border`, `rounded-xl`, `hover:bg-muted/40`, `transition-colors`.
+  - Estado seleccionado: `border-primary`, `ring-1 ring-primary/30`, `bg-primary/5`.
+- Botones primarios (`Reservar`, `Continuar`, `Confirmar`, etc.): siguen usando `bg-primary` — heredarán el color configurado vía override.
+- Slots de hora (`HorarioStep`, `FechaHorarioStep`): seleccionado → `bg-primary text-primary-foreground`; libre → `bg-card border-border`; hover → `bg-muted`.
+- `Progress` ya usa `bg-primary`; queda automático.
+- Badges de paso del stepper: variante `secondary` con texto `text-foreground` y borde sutil. Cuando representan paso activo → `border-primary text-primary bg-primary/5`.
+- Confirmación final: ícono check con `bg-primary/10 text-primary` (ya hereda).
+
+### 5. Tipografía y jerarquía
+
+- H1 del portal: `text-2xl font-semibold tracking-tight`.
+- Subtítulos de paso: `text-sm font-medium text-foreground` con `text-xs text-muted-foreground` debajo como ayuda.
+- Labels de formulario: `text-xs font-medium text-muted-foreground uppercase tracking-wide` para diferenciar de valores.
+- Spacing: pasar a `space-y-5`/`gap-4` consistente, padding interno de cards `p-5 sm:p-6`.
+
+### 6. Tokens / superficies
+
+Aplicados solo dentro del wrapper del portal (no globales) vía CSS-in-JS o clases utilitarias condicionales:
+
+- `--portal-bg`: `bg-muted` (fondo gris suave) — base de la página.
+- Card principal: `bg-card`, `border border-border/60`, `shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)]`, `rounded-2xl`.
+- Subcards (resumen, slots, etc.): `bg-muted/50`, `border border-border/50`, `rounded-xl`.
+
+## Detalles técnicos
+
+- **Conversión HEX→HSL**: parseo simple a `r,g,b` en [0,1] y fórmula HSL estándar; retorna `"222 84% 58%"` etc. Esto permite que **todas** las clases shadcn (`bg-primary`, `text-primary`, `border-primary`, `ring-primary`) reflejen el color configurado, en cualquier paso. Eso resuelve el bug actual donde solo la landing usaba el color.
+- También se setea `--ring` al mismo HSL para focus states.
+- Se mantiene `--portal-primary` (hex puro) para usos donde el `Button` tiene `style={{ backgroundColor: 'var(--portal-primary)' }}` ya existente en `BookingLanding`.
+- Si `primary_color` es `null` o inválido, el wrapper no aplica overrides → se usa el `--primary` por defecto del theme.
+- El wrapper define los overrides también para dark mode si llegara a aplicarse (no obligatorio: el portal no toggle theme).
+
+## Archivos afectados
+
+- `src/pages/Reservar.tsx` — layout (grid + sidebar), wrapper de tema, fondo gris.
+- `src/components/reservar/lib/portalTheme.ts` — nuevo (hex→hsl, build de style).
+- `src/components/reservar/BookingSummary.tsx` — nuevo (sidebar de resumen).
+- `src/components/reservar/BookingStepper.tsx` — clases visuales (tira de chips, progress, confirmación). Sin cambios de lógica de estados.
+- `src/components/reservar/SucursalStep.tsx`, `ServicioStep.tsx`, `BarberoStep.tsx`, `FechaHorarioStep.tsx`, `HorarioStep.tsx`, `AuthStep.tsx`, `ConfirmacionStep.tsx`, `MisTurnosStep.tsx`, `RescheduleFlow.tsx`, `FechaStep.tsx` — solo ajustes de clases (cards, subcards, estados activos, jerarquía).
+- `src/components/reservar/BookingLanding.tsx` — alinear con el nuevo layout (la card principal y el fondo ahora vienen del wrapper). Se mantiene la lógica existente de `--portal-primary`.
 
 ## Fuera de alcance
 
-- No se toca DB ni `useOnboardingState`.
-- No se modifican los componentes de Equipo, Servicios o Métodos de pago: ya tienen los `data-onboarding-id` correctos en `SucursalTabContent.tsx`.
+- No se modifica `usePortalConfig`, ni la edición del color en el panel admin, ni `get-org-public`, ni la auth de clientes, ni la lógica de disponibilidad/turnos.
+- No se cambia el tema global de la app (la sobrescritura vive solo dentro del portal público).
+- No se introducen librerías nuevas.
+
+## QA
+
+1. Organización sin `primary_color` → portal usa el primary por defecto, layout nuevo, sidebar de resumen visible en `lg+`.
+2. Organización con `primary_color = #FF5722` → landing, progress, botones principales, slot seleccionado, badges activos, ícono de confirmación final, focus rings: todos en naranja.
+3. Cambiar de paso: el sidebar de resumen se actualiza con cada selección.
+4. Mobile (<1024px): sidebar oculto, chips de resumen en la parte superior, todo legible y sin overflow.
+5. Modo "Manage": misma capa visual; auth + lista de turnos heredan tokens.
+6. Volver a otras rutas (`/login`, `/app/...`): el theme override del portal NO contamina el resto.
+7. Confirmación final: card de detalle con la nueva estética y check con color de marca.
