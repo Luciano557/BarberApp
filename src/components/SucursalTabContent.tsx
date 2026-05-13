@@ -130,7 +130,7 @@ export function SucursalTabContent({
   return (
     <div className="space-y-6 mt-6">
       {/* Información de la sucursal */}
-      <Card>
+      <Card data-onboarding-id="info-sucursal-card">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -141,7 +141,7 @@ export function SucursalTabContent({
             </div>
             <div className="flex items-center gap-2">
               {canManageCuentaSucursal && (
-                <Button variant="outline" size="sm" onClick={() => setCuentaOpen(true)}>
+                <Button variant="outline" size="sm" onClick={() => setCuentaOpen(true)} data-onboarding-id="cuenta-sucursal-button">
                   <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
                 </Button>
               )}
@@ -244,19 +244,21 @@ export function SucursalTabContent({
       {/* Secciones inhabilitadas si la sucursal está inactiva */}
       <div className={isInactive ? 'opacity-50 pointer-events-none select-none' : ''}>
         {/* Equipo unificado */}
-        <EquipoUnificado
-          sucursalId={sucursal.id}
-          organizationId={organization?.id || ''}
-          barbers={barbers}
-          allBarbers={allBarbers}
-          sucursales={allSucursales}
-          onAddBarber={onAddBarber}
-          onUpdateBarber={onUpdateBarber}
-          onRefreshBarbers={onRefreshBarbers}
-        />
+        <div data-onboarding-id="equipo-section">
+          <EquipoUnificado
+            sucursalId={sucursal.id}
+            organizationId={organization?.id || ''}
+            barbers={barbers}
+            allBarbers={allBarbers}
+            sucursales={allSucursales}
+            onAddBarber={onAddBarber}
+            onUpdateBarber={onUpdateBarber}
+            onRefreshBarbers={onRefreshBarbers}
+          />
+        </div>
 
         {/* Catálogo de Servicios */}
-        <div className="space-y-4 mt-6">
+        <div className="space-y-4 mt-6" data-onboarding-id="catalogo-section">
           <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
           <CobrarConfig
             sucursalId={sucursal.id}
@@ -273,7 +275,7 @@ export function SucursalTabContent({
         </div>
 
         {/* Métodos de pago y recargos (override por sucursal) */}
-        <div className="mt-6">
+        <div className="mt-6" data-onboarding-id="metodos-pago-section">
           <PaymentMethodsConfig sucursalId={sucursal.id} onGoToGeneral={onGoToGeneralConfig} />
         </div>
 
