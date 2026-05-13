@@ -138,23 +138,43 @@ export function AgendaDayView({
   const COL_WIDTH = 160;
   const TIME_RAIL_WIDTH = 56;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!canDrag || dayOff) return;
-    e.preventDefault();
-  };
+  // Resolve drop target via DOM hit-test on data-col-root columns.
+  const resolveDrop = useCallback((x: number, y: number): { barberoId: string; horaInicio: string } | null => {
+    if (dayOff) return null;
+    const stack = (typeof document !== 'undefined' ? document.elementsFromPoint(x, y) : []) as HTMLElement[];
+    const col = stack.find((el) => el?.dataset?.colRoot === 'true') as HTMLElement | undefined;
+    if (!col) return null;
+    const barberoId = col.dataset.barberoId;
+    if (!barberoId) return null;
+    const rect = col.getBoundingClientRect();
+    const offY = y - rect.top;
+    const minRaw = offY / PX_PER_MIN + rangeStart;
+    const snapped = Math.round(minRaw / SLOT_MIN) * SLOT_MIN;
+    const clamped = Math.max(rangeStart, Math.min(rangeEnd - SLOT_MIN, snapped));
+    return { barberoId, horaInicio: minutesToTime(clamped) };
+  }, [dayOff, rangeStart, rangeEnd]);
 
-  const handleDrop = (e: React.DragEvent, barberoId: string) => {
-    if (!canDrag || dayOff) return;
-    e.preventDefault();
-    const turnoId = e.dataTransfer.getData('text/turno-id');
-    const turno = dayTurnos.find(t => t.id === turnoId) || turnos.find(t => t.id === turnoId);
-    if (!turno) return;
-    // Compute drop minute relative to column
-    const colRect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const offsetY = e.clientY - colRect.top;
-    const droppedMin = Math.round(offsetY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + rangeStart;
-    onMoveTurno(turno, barberoId, minutesToTime(Math.max(rangeStart, droppedMin)), dateStr);
-  };
+  const handleTurnoTap = useCallback((t: Turno) => onTurnoClick(t), [onTurnoClick]);
+  const handleTurnoDrop = useCallback((t: Turno, x: number, y: number) => {
+    const target = resolveDrop(x, y);
+    if (!target) return;
+    onMoveTurno(t, target.barberoId, target.horaInicio, dateStr);
+  }, [resolveDrop, onMoveTurno, dateStr]);
+
+  const ghostLabel = useCallback((t: Turno, x: number, y: number) => {
+    const target = resolveDrop(x, y);
+    const hora = target?.horaInicio ?? formatHHMM(t.hora_inicio);
+    const name = t.cliente_nombre || 'Sin nombre';
+    return `${hora} · ${name}`;
+  }, [resolveDrop]);
+
+  const { getHandlers: getTurnoHandlers, ghost } = usePointerDragDrop<Turno>({
+    enabled: canDrag && !dayOff,
+    canDragItem: (t) => ['pendiente', 'confirmado'].includes(t.estado),
+    onTap: handleTurnoTap,
+    onDrop: handleTurnoDrop,
+    buildGhostLabel: ghostLabel,
+  });
 
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
