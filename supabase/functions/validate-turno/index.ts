@@ -102,6 +102,17 @@ Deno.serve(async (req) => {
 
     const timezone = sucursal?.timezone || org?.timezone || "America/Argentina/Buenos_Aires";
 
+    // Enforce minimum booking lead time
+    const antMin = Number((config as any)?.anticipacion_minima_reserva_min ?? 30);
+    const slotMs = slotInstantMs(fecha, hora_inicio, timezone);
+    const cutoffMs = Date.now() + antMin * 60000;
+    if (slotMs < cutoffMs) {
+      return new Response(JSON.stringify({
+        error: "slot_too_soon",
+        message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // Check for conflicts - existing turnos in that time range for that barbero
     const bufferBefore = config?.buffer_antes_min || 0;
     const bufferAfter = config?.buffer_despues_min || 0;
