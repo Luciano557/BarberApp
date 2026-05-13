@@ -91,10 +91,14 @@ export function OnboardingTooltip() {
           >
             Omitir tutorial
           </button>
-          <Button size="sm" onClick={next} className="gap-1.5">
-            Continuar
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Button>
+          {currentStep.hideContinueButton ? (
+            <span className="text-xs text-muted-foreground italic">Elegí una sucursal para continuar</span>
+          ) : (
+            <Button size="sm" onClick={next} className="gap-1.5">
+              Continuar
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
     </div>
