@@ -143,14 +143,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Also validate new slot is in the future
-    const newDateTime = new Date(`${nueva_fecha}T${nueva_hora_inicio}`);
-    const hoursUntilNew = (newDateTime.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
-    if (hoursUntilNew <= 0) {
-      return new Response(JSON.stringify({ error: "New slot must be in the future" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Also validate new slot meets minimum lead time
+    const antMin = Number((configRes.data as any)?.anticipacion_minima_reserva_min ?? 30);
+    const newSlotMs = slotInstantMs(nueva_fecha, nueva_hora_inicio, timezone);
+    const cutoffMs = Date.now() + antMin * 60000;
+    if (newSlotMs < cutoffMs) {
+      return new Response(JSON.stringify({
+        error: "slot_too_soon",
+        message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Calculate new hora_fin
