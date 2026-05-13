@@ -281,9 +281,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
 
         <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
           {loading
-            ? waitingForSession
-              ? "Verificando..."
-              : "Procesando..."
+            ? "Procesando..."
             : isLogin
               ? "Iniciar sesión"
               : "Crear cuenta y continuar"}
