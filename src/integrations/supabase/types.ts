@@ -1863,6 +1863,7 @@ export type Database = {
       }
       portal_config: {
         Row: {
+          cover_path: string | null
           created_at: string
           description: string | null
           links: Json
@@ -1872,6 +1873,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cover_path?: string | null
           created_at?: string
           description?: string | null
           links?: Json
@@ -1881,6 +1883,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cover_path?: string | null
           created_at?: string
           description?: string | null
           links?: Json

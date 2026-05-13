@@ -1,0 +1,1 @@
+ALTER TABLE public.portal_config ADD COLUMN IF NOT EXISTS cover_path TEXT;

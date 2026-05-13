@@ -2,8 +2,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Plus, Trash2, ArrowUp, ArrowDown, ChevronDown } from 'lucide-react';
 import type { PortalLink } from '@/hooks/usePortalConfig';
+import { PORTAL_ICONS, getPortalIcon } from '@/components/reservar/lib/portalIcons';
+import { cn } from '@/lib/utils';
 
 interface Props {
   links: PortalLink[];
@@ -14,13 +17,11 @@ const URL_RE = /^https?:\/\//i;
 
 export function PortalLinksEditor({ links, onChange }: Props) {
   const update = (idx: number, patch: Partial<PortalLink>) => {
-    const next = links.map((l, i) => (i === idx ? { ...l, ...patch } : l));
-    onChange(next);
+    onChange(links.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
   };
 
   const remove = (idx: number) => {
-    const next = links.filter((_, i) => i !== idx).map((l, i) => ({ ...l, sort_order: i }));
-    onChange(next);
+    onChange(links.filter((_, i) => i !== idx).map((l, i) => ({ ...l, sort_order: i })));
   };
 
   const move = (idx: number, dir: -1 | 1) => {
@@ -35,7 +36,7 @@ export function PortalLinksEditor({ links, onChange }: Props) {
     if (links.length >= 4) return;
     onChange([
       ...links,
-      { label: '', url: '', active: true, sort_order: links.length },
+      { label: '', url: '', active: true, sort_order: links.length, icon: 'link' },
     ]);
   };
 
@@ -49,8 +50,54 @@ export function PortalLinksEditor({ links, onChange }: Props) {
 
       {links.map((link, idx) => {
         const urlInvalid = link.url.length > 0 && !URL_RE.test(link.url);
+        const Icon = getPortalIcon(link.icon);
         return (
-          <div key={idx} className="rounded-lg border border-border p-3 space-y-3 bg-card">
+          <div key={idx} className="rounded-xl border border-border p-3 space-y-3 bg-card">
+            {/* Header: ícono + etiqueta preview */}
+            <div className="flex items-center gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-2 gap-1.5"
+                    type="button"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+                      <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-2" align="start">
+                  <div className="grid grid-cols-5 gap-1">
+                    {PORTAL_ICONS.map((opt) => {
+                      const selected = (link.icon ?? 'link') === opt.key;
+                      const OptIcon = opt.Icon;
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => update(idx, { icon: opt.key })}
+                          title={opt.label}
+                          aria-label={opt.label}
+                          className={cn(
+                            'flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-foreground hover:bg-accent',
+                            selected && 'border-border bg-muted'
+                          )}
+                        >
+                          <OptIcon className="h-4 w-4" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <span className="text-sm font-medium text-foreground truncate flex-1">
+                {link.label.trim() || 'Nuevo link'}
+              </span>
+            </div>
+
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Etiqueta</Label>
@@ -75,6 +122,7 @@ export function PortalLinksEditor({ links, onChange }: Props) {
                 )}
               </div>
             </div>
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Switch
