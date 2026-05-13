@@ -490,50 +490,54 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in sm:space-y-8">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Cierre de Caja</h1>
           <p className="text-muted-foreground text-sm mt-1 capitalize">
             {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePreviousDay}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[140px]">
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(validDate, 'dd/MM/yyyy')}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={validDate}
-                onSelect={(date) => date && navigateToDate(date)}
-                locale={es}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-          <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(validDate)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {!isToday(validDate) && (
-            <Button variant="secondary" size="sm" onClick={handleToday}>
-              Hoy
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Button variant="outline" size="icon" onClick={handlePreviousDay}>
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          )}
-          <MultiDayClosingSummary />
-          <AnulacionesCierreHistory barbers={barbers} />
-          <Button variant="outline" size="sm" onClick={handleHistoryClick}>
-            <Clock className="h-4 w-4 mr-2" />
-            Historial
-          </Button>
-          <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex-1 sm:min-w-[140px] sm:flex-none">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(validDate, 'dd/MM/yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={validDate}
+                  onSelect={(date) => date && navigateToDate(date)}
+                  locale={es}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(validDate)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {!isToday(validDate) && (
+              <Button variant="secondary" size="sm" className="sm:w-auto" onClick={handleToday}>
+                Hoy
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <MultiDayClosingSummary />
+            <AnulacionesCierreHistory barbers={barbers} />
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleHistoryClick}>
+              <Clock className="h-4 w-4 mr-2" />
+              Historial
+            </Button>
+            <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
+          </div>
         </div>
       </div>
 
@@ -774,8 +778,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       {isPastDate && canBackfill && barbersWithoutClosing.length > 0 && (
         <Card className="border border-dashed border-primary/40 bg-primary/5">
           <CardContent className="py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
                 <CalendarClock className="h-6 w-6 text-primary" />
                 <div>
                   <p className="font-medium text-foreground">
@@ -786,7 +790,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   </p>
                 </div>
               </div>
-              <Button onClick={() => setBackfillOpen(true)}>
+              <Button className="w-full sm:w-auto" onClick={() => setBackfillOpen(true)}>
                 <CalendarClock className="h-4 w-4 mr-2" />
                 Regularizar día
                 <Badge variant="secondary" className="ml-2 text-xs">Diferido</Badge>
@@ -827,7 +831,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   return (
                     <div
                       key={tx.id}
-                      className={`flex items-center gap-4 p-4 rounded-lg transition-colors ${
+                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center ${
                         isVoided 
                           ? 'bg-destructive/10 border border-destructive/20' 
                           : 'bg-muted/50 hover:bg-muted'
@@ -886,7 +890,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           )}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
                         <div className="text-right">
                           <p className={`font-semibold ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                             ${tx.total.toLocaleString()}
@@ -960,7 +964,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
           <div className="space-y-6 py-4">
             {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               <div className="p-4 rounded-lg bg-success/10 border border-success/20">
                 <p className="text-sm text-muted-foreground">Efectivo</p>
                 <p className="text-xl font-bold text-success">${closingBarber?.totalEfectivo.toLocaleString()}</p>
@@ -992,7 +996,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     const amt = pagos.filter(p => p.method === 'efectivo').reduce((s, p) => s + p.amount, 0);
                     const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
                     return (
-                      <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div key={tx.id} className="flex flex-col gap-2 border-b border-border py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
@@ -1028,7 +1032,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     const amt = pagos.filter(p => isDigitalMethod(p.method)).reduce((s, p) => s + p.amount, 0);
                     const isMixed = pagos.length > 1 && pagos.every(p => p.amount > 0);
                     return (
-                      <div key={tx.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div key={tx.id} className="flex flex-col gap-2 border-b border-border py-2 last:border-0 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <span className="font-medium text-sm">{tx.serviceName || (tx.productos && tx.productos.length > 0 ? "Venta de productos" : "—")}</span>
                           {tx.extras.length > 0 && (
@@ -1050,9 +1054,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             )}
 
             {/* Total Summary */}
-            <div className="flex items-center justify-between p-4 rounded-lg bg-muted border border-border">
+            <div className="flex flex-col gap-1 rounded-lg border border-border bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
               <span className="font-medium">Total General</span>
-              <span className="text-2xl font-bold">${closingBarber?.total.toLocaleString()}</span>
+              <span className="self-end text-2xl font-bold sm:self-auto">${closingBarber?.total.toLocaleString()}</span>
             </div>
           </div>
 

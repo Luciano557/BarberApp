@@ -334,13 +334,13 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Gestionar Mi Negocio</h1>
-        <div className="flex items-center justify-between mt-4">
+        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-lg font-medium text-foreground">Sucursales</h2>
             <p className="text-sm text-muted-foreground">Gestiona las sucursales de tu negocio</p>
           </div>
           {canCreateSucursal && (
-            <Button size="sm" onClick={handleOpenCreate}>
+            <Button size="sm" className="w-full sm:w-auto" onClick={handleOpenCreate}>
               <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
             </Button>
           )}
@@ -351,9 +351,9 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           {(showGeneralTab || visibleSucursales.length > 1) && (
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg flex-wrap">
+            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               {showGeneralTab && (
-                <TabsTrigger value={GENERAL_TAB} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                <TabsTrigger value={GENERAL_TAB} className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
                   General
                 </TabsTrigger>
               )}
@@ -361,7 +361,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 <TabsTrigger
                   key={s.id}
                   value={s.id}
-                  className="flex-1 text-sm data-[state=active]:bg-card rounded-md"
+                  className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm"
                   data-onboarding-id={idx === 0 ? 'sucursal-tab' : undefined}
                 >
                   {s.nombre}

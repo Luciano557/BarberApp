@@ -37,7 +37,7 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {activeSection !== 'menu' && (
           <Button variant="ghost" size="icon" onClick={() => handleSelect('menu')} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />

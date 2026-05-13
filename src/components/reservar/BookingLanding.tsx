@@ -35,7 +35,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
     .join('') || 'V';
 
   return (
-    <div style={containerStyle} className="flex flex-col items-center text-center gap-6 py-2">
+    <div style={containerStyle} className="flex flex-col items-center gap-6 py-2 text-center">
       <div
         className="h-28 w-28 rounded-full bg-muted overflow-hidden flex items-center justify-center border border-border shadow-sm"
         style={primary ? { borderColor: 'var(--portal-primary)' } : undefined}
@@ -56,7 +56,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
         )}
       </div>
 
-      <div className="w-full space-y-3 max-w-sm">
+      <div className="w-full max-w-sm space-y-3">
         <Button
           onClick={onStart}
           className="w-full h-12 text-base font-medium"
@@ -84,9 +84,9 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
                 href={l.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full h-11 rounded-md border border-border bg-card hover:bg-accent transition-colors text-sm font-medium text-foreground"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
               >
-                <span className="truncate max-w-[80%]">{l.label}</span>
+                <span className="max-w-[80%] truncate">{l.label}</span>
                 <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
             ))}

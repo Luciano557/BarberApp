@@ -128,7 +128,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
 
       <style>{`
         @keyframes fadeIn {
@@ -239,15 +239,22 @@ export default function Login() {
       </div>
 
       {/* ── Right panel — form ───────────────────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm animate-in">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:p-6">
+        <div className="w-full max-w-sm animate-in sm:max-w-md">
 
           {/* Mobile logo */}
-          <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
+          <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
             <div className="w-8 h-8 bg-[#1e2a4a] rounded-lg flex items-center justify-center">
               <Scissors size={14} className="text-white" />
             </div>
             <span className="font-semibold text-base">Vittro</span>
+          </div>
+
+          <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 lg:hidden">
+            <p className="text-sm font-medium text-slate-900">Cobros, caja, agenda y estadísticas en un solo lugar.</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Empezá desde el celular sin que el acceso quede apretado o pierda contexto.
+            </p>
           </div>
 
           {/* Heading */}
@@ -371,7 +378,7 @@ export default function Login() {
                       {(() => {
                         const p = PLANS.find(p => p.id === plan)!;
                         return (
-                          <span className="flex items-center gap-2 min-w-0">
+                          <span className="flex min-w-0 flex-wrap items-center gap-2">
                             <span className="font-medium">{p.label}</span>
                             <span
                               className="text-white text-[11px] font-semibold px-1.5 py-0.5 rounded"
@@ -379,7 +386,7 @@ export default function Login() {
                             >
                               Gratis
                             </span>
-                            <span className="text-slate-400 text-xs truncate">
+                            <span className="text-slate-400 text-xs break-words">
                               <span className="line-through">{p.price}</span> después del primer mes
                             </span>
                           </span>

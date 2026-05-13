@@ -589,7 +589,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const StepIcon = STEP_INFO[currentStep].icon;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-6 animate-fade-in sm:space-y-8">
 
       {/* Header */}
       <div>
@@ -621,15 +621,15 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </div>
 
       {/* Step Header */}
-      <div className="flex items-center gap-4 pb-4 border-b border-border">
-        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+      <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
           <StepIcon className="h-5 w-5 text-foreground" />
         </div>
         <div className="flex-1">
           <h2 className="text-lg font-medium text-foreground">{STEP_INFO[currentStep].title}</h2>
           <p className="text-sm text-muted-foreground">{STEP_INFO[currentStep].subtitle}</p>
         </div>
-        <div className="text-sm text-muted-foreground">
+        <div className="self-start text-xs text-muted-foreground sm:self-auto sm:text-sm">
           {currentStepIndex + 1}/{STEPS.length}
         </div>
       </div>
@@ -639,7 +639,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Barber Step */}
         {currentStep === 'barber' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
               {barbers.map((barber, index) => {
                 const isSelected =
                   selectedBarber === barber.uid ||
@@ -690,8 +690,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
             {/* Bloque productos: solo en paso inicial */}
             <div className="rounded-lg border border-border bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                   <Package className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium text-foreground">Productos</span>
                   {cart.length > 0 && (
@@ -731,9 +731,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   {cart.map((it) => (
                     <div
                       key={it.producto_sucursal_id}
-                      className="flex items-center gap-3 p-2.5 rounded-md border border-border bg-background"
+                      className="flex flex-col gap-3 rounded-md border border-border bg-background p-2.5 sm:flex-row sm:items-center"
                     >
-                      <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
                         <Package className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -743,28 +743,30 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                           {it.cantidad} × ${it.precio_unitario.toLocaleString('es-AR')}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-foreground">
-                        ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
-                      </p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          setCart(prev => {
-                            const next = prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id);
-                            if (next.length === 0) {
-                              setProductSaleAssignment('pending');
-                              setCartBarberId(null);
-                              setCartBarberName(null);
-                            }
-                            return next;
-                          });
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                        <p className="text-sm font-semibold text-foreground">
+                          ${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            setCart(prev => {
+                              const next = prev.filter(x => x.producto_sucursal_id !== it.producto_sucursal_id);
+                              if (next.length === 0) {
+                                setProductSaleAssignment('pending');
+                                setCartBarberId(null);
+                                setCartBarberName(null);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   <Button
@@ -841,7 +843,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                           <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                             {idx}
                           </span>
-                          <div className="flex justify-between items-center pl-6 gap-2">
+                          <div className="flex flex-col items-start gap-1.5 pl-6 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                             <span className="font-medium text-foreground">{service.name}</span>
                             {blocked ? (
                               <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
@@ -879,7 +881,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Extras Step */}
         {currentStep === 'extras' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
               {extras.map((extra, index) => {
                 const blocked = isPriceMissing(extra.price);
                 return (
@@ -923,7 +925,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
         {/* Resumen compacto del carrito en pasos posteriores a 'barber' (solo lectura) */}
         {cart.length > 0 && (currentStep === 'service' || currentStep === 'extras' || currentStep === 'discount') && (
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-xs">
+          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-xs sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span className="text-muted-foreground truncate">
@@ -939,7 +941,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         {/* Discount Step */}
         {currentStep === 'discount' && (
           <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
             <button
               key="none"
               onClick={() => handleSelectDiscount('none')}
@@ -1035,7 +1037,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               </div>
             ) : !splitMode ? (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
                   {activeMethods.map((m, idx) => {
                     const isEfectivo = m.method === 'efectivo';
                     const isSelected = paymentMethod === m.method;
@@ -1078,13 +1080,13 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 </button>
               </>
             ) : (
-              <div className="rounded-lg border border-border bg-card p-6 space-y-4">
-                <div className="flex items-center justify-between">
+              <div className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <Split className="h-4 w-4 text-foreground" />
                     <span className="font-medium text-foreground">Pago combinado</span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={cancelSplitMode}>
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={cancelSplitMode}>
                     <X className="h-4 w-4 mr-1" /> Cancelar
                   </Button>
                 </div>
@@ -1150,7 +1152,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   </div>
                 </div>
 
-                <div className={`flex items-center justify-between p-3 rounded-lg text-sm ${
+                <div className={`flex flex-col gap-2 rounded-lg p-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
                   splitValid ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
                 }`}>
                   <span>Suma: ${splitSum.toLocaleString()} / Total: ${total.toLocaleString()}</span>
@@ -1160,7 +1162,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             )}
 
             {/* Summary */}
-            <div className="rounded-lg border border-border bg-card p-6">
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
               <div className="space-y-3 text-sm">
                 {(() => {
                   let displayBarberName: string | null = null;
@@ -1175,60 +1177,60 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   }
                   if (!displayBarberName) return null;
                   return (
-                    <div className="flex justify-between">
+                    <div className="flex items-start justify-between gap-4">
                       <span className="text-muted-foreground">Barbero</span>
-                      <span className="font-medium">{displayBarberName}</span>
+                      <span className="shrink-0 text-right font-medium">{displayBarberName}</span>
                     </div>
                   );
                 })()}
                 {service && (
-                  <div className="flex justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <span className="text-muted-foreground">Servicio</span>
-                    <span className="font-medium">{service.name}</span>
+                    <span className="shrink-0 text-right font-medium">{service.name}</span>
                   </div>
                 )}
                 {selectedExtrasData.length > 0 && (
-                  <div className="flex justify-between">
+                  <div className="flex items-start justify-between gap-4">
                     <span className="text-muted-foreground">Extras</span>
-                    <span className="font-medium">{selectedExtrasData.map(e => e.name).join(', ')}</span>
+                    <span className="max-w-[65%] text-right font-medium">{selectedExtrasData.map(e => e.name).join(', ')}</span>
                   </div>
                 )}
                 {cart.length > 0 && (
                   <div className="space-y-1.5">
-                    <div className="flex justify-between">
+                    <div className="flex items-start justify-between gap-4">
                       <span className="text-muted-foreground">Productos</span>
-                      <span className="font-medium">${subtotalProductos.toLocaleString('es-AR')}</span>
+                      <span className="shrink-0 text-right font-medium">${subtotalProductos.toLocaleString('es-AR')}</span>
                     </div>
                     <div className="text-xs text-muted-foreground pl-2 space-y-0.5">
                       {cart.map(it => (
-                        <div key={it.producto_sucursal_id} className="flex justify-between">
+                        <div key={it.producto_sucursal_id} className="flex items-start justify-between gap-4">
                           <span className="truncate pr-2">{it.cantidad}× {it.nombre}</span>
-                          <span>${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}</span>
+                          <span className="shrink-0 text-right">${(it.precio_unitario * it.cantidad).toLocaleString('es-AR')}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
                 {subtotalServicios > 0 && (
-                  <div className="flex justify-between pt-3 border-t border-border">
+                  <div className="flex items-start justify-between gap-4 border-t border-border pt-3">
                     <span className="text-muted-foreground">Subtotal servicios</span>
-                    <span className="font-medium">${subtotalServicios.toLocaleString('es-AR')}</span>
+                    <span className="shrink-0 text-right font-medium">${subtotalServicios.toLocaleString('es-AR')}</span>
                   </div>
                 )}
-                <div className={`flex justify-between ${subtotalServicios > 0 ? '' : 'pt-3 border-t border-border'}`}>
+                <div className={`flex items-start justify-between gap-4 ${subtotalServicios > 0 ? '' : 'pt-3 border-t border-border'}`}>
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">${subtotal.toLocaleString('es-AR')}</span>
+                  <span className="shrink-0 text-right font-medium">${subtotal.toLocaleString('es-AR')}</span>
                 </div>
                 {selectedDiscountData && selectedDiscountData.value > 0 && (
                   isDiscountValidForPayment ? (
-                    <div className="flex justify-between text-success">
+                    <div className="flex items-start justify-between gap-4 text-success">
                       <span>Descuento ({selectedDiscountData.type === 'fixed' ? `$${selectedDiscountData.value.toLocaleString()}` : `${selectedDiscountData.value}%`})</span>
-                      <span className="font-medium">-${discountAmount.toLocaleString()}</span>
+                      <span className="shrink-0 text-right font-medium">-${discountAmount.toLocaleString()}</span>
                     </div>
                   ) : (
-                    <div className="flex justify-between text-destructive">
+                    <div className="flex items-start justify-between gap-4 text-destructive">
                       <span className="text-xs">Descuento no aplica a este método</span>
-                      <span className="font-medium line-through text-muted-foreground">-${
+                      <span className="shrink-0 text-right font-medium line-through text-muted-foreground">-${
                         selectedDiscountData.type === 'fixed' 
                           ? selectedDiscountData.value.toLocaleString()
                           : (selectedDiscountData.rounding === 'cliente' 
@@ -1240,16 +1242,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   )
                 )}
                 {recargoTotal > 0 && (
-                  <div className="flex justify-between text-foreground">
+                  <div className="flex items-start justify-between gap-4 text-foreground">
                     <span className="text-muted-foreground">{recargoLabel}</span>
-                    <span className="font-medium">+${recargoTotal.toLocaleString()}</span>
+                    <span className="shrink-0 text-right font-medium">+${recargoTotal.toLocaleString()}</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
+              <div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-lg font-medium">Total a cobrar</span>
-                <span className="text-3xl font-bold text-foreground">${totalACobrar.toLocaleString()}</span>
+                <span className="self-end text-3xl font-bold text-foreground sm:self-auto">${totalACobrar.toLocaleString()}</span>
               </div>
 
               <Button
@@ -1270,9 +1272,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
       {/* Navigation */}
       {(currentStepIndex > 0 || cart.length > 0 || !!selectedBarber || !!selectedService) && (
-        <div className="flex items-center justify-between gap-2 pt-4 border-t border-border">
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
           {currentStepIndex > 0 ? (
-            <Button variant="ghost" onClick={goToPrevStep} className="gap-2 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" onClick={goToPrevStep} className="w-full gap-2 text-muted-foreground hover:text-foreground sm:w-auto">
               <ArrowLeft className="h-4 w-4" /> Volver
             </Button>
           ) : <span />}
@@ -1281,7 +1283,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               type="button"
               variant="ghost"
               onClick={() => setCancelOpen(true)}
-              className="gap-2 text-muted-foreground hover:text-destructive"
+              className="w-full gap-2 text-muted-foreground hover:text-destructive sm:w-auto"
             >
               <X className="h-4 w-4" /> Cancelar venta
             </Button>

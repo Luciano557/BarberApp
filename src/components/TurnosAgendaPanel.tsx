@@ -88,8 +88,8 @@ export function TurnosAgendaPanel() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <CalendarClock className="w-5 h-5 text-primary" />
           </div>
           <div>
@@ -102,16 +102,16 @@ export function TurnosAgendaPanel() {
       {visibleSucursales.length > 0 && (
         <Tabs defaultValue={defaultTabId} className="w-full">
           {visibleSucursales.length > 1 && (
-            <TabsList className="w-full h-10 bg-muted p-1 rounded-lg">
+            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               {visibleSucursales.map(s => (
-                <TabsTrigger key={s.id} value={s.id} className="flex-1 text-sm data-[state=active]:bg-card rounded-md">
+                <TabsTrigger key={s.id} value={s.id} className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
                   {s.nombre}
                 </TabsTrigger>
               ))}
             </TabsList>
           )}
           {visibleSucursales.map(s => (
-            <TabsContent key={s.id} value={s.id}>
+            <TabsContent key={s.id} value={s.id} className="mt-4 sm:mt-6">
               <AgendaManagement
                 sucursalId={s.id}
                 organizationId={organization?.id || ''}

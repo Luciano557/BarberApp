@@ -16,9 +16,9 @@ export const SucursalStep = ({ sucursales, onSelect }: Props) => {
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => onSelect(s.id, s.nombre)}
         >
-          <CardContent className="flex items-center gap-3 p-4">
+          <CardContent className="flex items-start gap-3 p-4">
             <MapPin className="h-5 w-5 text-primary shrink-0" />
-            <span className="font-medium text-foreground">{s.nombre}</span>
+            <span className="break-words font-medium text-foreground">{s.nombre}</span>
           </CardContent>
         </Card>
       ))}
