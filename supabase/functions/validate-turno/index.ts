@@ -16,6 +16,23 @@ function minutesToTime(m: number): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
+function slotInstantMs(fecha: string, hora: string, tz: string): number {
+  const [Y, M, D] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const utcGuess = Date.UTC(Y, M - 1, D, h, m);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]));
+  let hh = +parts.hour;
+  if (hh === 24) hh = 0;
+  const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
+  const offset = asTzMs - utcGuess;
+  return utcGuess - offset;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -62,7 +79,7 @@ Deno.serve(async (req) => {
     // Get config for buffers
     const { data: config } = await supabase
       .from("agenda_config")
-      .select("duracion_base_min, buffer_antes_min, buffer_despues_min")
+      .select("duracion_base_min, buffer_antes_min, buffer_despues_min, anticipacion_minima_reserva_min")
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
       .single();
@@ -84,6 +101,17 @@ Deno.serve(async (req) => {
       .single();
 
     const timezone = sucursal?.timezone || org?.timezone || "America/Argentina/Buenos_Aires";
+
+    // Enforce minimum booking lead time
+    const antMin = Number((config as any)?.anticipacion_minima_reserva_min ?? 30);
+    const slotMs = slotInstantMs(fecha, hora_inicio, timezone);
+    const cutoffMs = Date.now() + antMin * 60000;
+    if (slotMs < cutoffMs) {
+      return new Response(JSON.stringify({
+        error: "slot_too_soon",
+        message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Check for conflicts - existing turnos in that time range for that barbero
     const bufferBefore = config?.buffer_antes_min || 0;

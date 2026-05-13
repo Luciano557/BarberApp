@@ -54,6 +54,7 @@ export type Database = {
       }
       agenda_config: {
         Row: {
+          anticipacion_minima_reserva_min: number
           buffer_antes_min: number
           buffer_despues_min: number
           cancelacion_limite_hs: number
@@ -67,6 +68,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anticipacion_minima_reserva_min?: number
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number
@@ -80,6 +82,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anticipacion_minima_reserva_min?: number
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number

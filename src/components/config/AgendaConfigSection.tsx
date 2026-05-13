@@ -18,6 +18,7 @@ interface ConfigData {
   cancelacion_limite_hs: number;
   modificacion_limite_hs: number;
   dias_anticipacion: number;
+  anticipacion_minima_reserva_min: number;
 }
 
 const DEFAULTS: ConfigData = {
@@ -26,6 +27,7 @@ const DEFAULTS: ConfigData = {
   cancelacion_limite_hs: 2,
   modificacion_limite_hs: 2,
   dias_anticipacion: 30,
+  anticipacion_minima_reserva_min: 30,
 };
 
 export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfigSectionProps) {
@@ -46,6 +48,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
         cancelacion_limite_hs: data.cancelacion_limite_hs,
         modificacion_limite_hs: data.modificacion_limite_hs,
         dias_anticipacion: data.dias_anticipacion,
+        anticipacion_minima_reserva_min: (data as any).anticipacion_minima_reserva_min ?? 30,
       });
     }
     setLoading(false);
@@ -104,6 +107,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
     { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
     { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
     { key: 'dias_anticipacion', label: 'Días de anticipación', suffix: 'días', description: 'Cuántos días hacia adelante se puede reservar' },
+    { key: 'anticipacion_minima_reserva_min', label: 'Anticipación mínima para reservar', suffix: 'min', description: 'Tiempo mínimo entre el momento actual y el primer turno disponible para clientes' },
   ];
 
   return (

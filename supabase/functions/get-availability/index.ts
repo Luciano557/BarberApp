@@ -21,6 +21,31 @@ interface Interval {
   end: number;
 }
 
+function getZonedDateStr(d: Date, tz: string): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function slotInstantMs(fecha: string, hora: string, tz: string): number {
+  const [Y, M, D] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const utcGuess = Date.UTC(Y, M - 1, D, h, m);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]));
+  let hh = +parts.hour;
+  if (hh === 24) hh = 0;
+  const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
+  const offset = asTzMs - utcGuess;
+  return utcGuess - offset;
+}
+
 function subtractIntervals(base: Interval[], blocks: Interval[]): Interval[] {
   let result = [...base];
   for (const block of blocks) {
@@ -89,7 +114,7 @@ Deno.serve(async (req) => {
     const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, barberosRes] = await Promise.all([
       supabase
         .from("agenda_config")
-        .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion")
+        .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion, anticipacion_minima_reserva_min")
         .eq("organization_id", organization_id)
         .eq("sucursal_id", sucursal_id)
         .single(),
@@ -120,7 +145,25 @@ Deno.serve(async (req) => {
       barberosQuery,
     ]);
 
-    const config = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30 };
+    const config: any = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30, anticipacion_minima_reserva_min: 30 };
+    const antMin = Number(config.anticipacion_minima_reserva_min ?? 30);
+
+    // Resolve sucursal timezone (fallback to org, then default)
+    const sucTzRes = await supabase
+      .from("sucursales")
+      .select("timezone, organization_id")
+      .eq("id", sucursal_id)
+      .single();
+    let tz: string = sucTzRes.data?.timezone || "";
+    if (!tz) {
+      const orgTzRes = await supabase.from("organizations").select("timezone").eq("id", organization_id).single();
+      tz = orgTzRes.data?.timezone || "America/Argentina/Buenos_Aires";
+    }
+    const nowMs = Date.now();
+    const cutoffMs = nowMs + antMin * 60000;
+    const todayInTz = getZonedDateStr(new Date(nowMs), tz);
+    const isPast = fecha < todayInTz;
+
     const servicio = servicioRes.data;
     if (!servicio) {
       return new Response(JSON.stringify({ error: "Service not found" }), {
@@ -202,7 +245,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    const slots = Array.from(allSlots.values()).sort(
+    const filtered = isPast
+      ? []
+      : Array.from(allSlots.values()).filter(
+          (s) => slotInstantMs(fecha, s.hora_inicio, tz) >= cutoffMs
+        );
+    const slots = filtered.sort(
       (a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio)
     );
 
