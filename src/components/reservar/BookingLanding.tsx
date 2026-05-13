@@ -14,6 +14,7 @@ export interface PortalDataView {
   cover_url?: string | null;
   cover_position_x?: number | null;
   cover_position_y?: number | null;
+  cover_zoom?: number | null;
   description: string | null;
   primary_color: string | null;
   links: PortalLandingLink[];
