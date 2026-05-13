@@ -28,6 +28,7 @@ interface OrganizationContextType {
   organization: Organization | null;
   planFeatures: PlanFeatures | null;
   isLoading: boolean;
+  error: string | null;
   refreshOrganization: () => Promise<void>;
   updateOrganization: (updates: Partial<Organization>) => Promise<{ error: Error | null }>;
 }
@@ -39,8 +40,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [planFeatures, setPlanFeatures] = useState<PlanFeatures | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchOrganization = async () => {
+    setError(null);
+
     if (!user) {
       setOrganization(null);
       setPlanFeatures(null);
@@ -48,35 +52,63 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    try {
-      // Fetch organization from the user's profile
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('*')
-        .single();
+    setIsLoading(true);
+    console.info('[Org] phase=fetch:start');
 
-      if (orgError) {
-        console.error('Error fetching organization:', orgError);
-        setIsLoading(false);
+    try {
+      // 1. Resolver organization_id de forma determinística desde el profile.
+      const { data: profileRow, error: profileErr } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileErr) throw profileErr;
+
+      const orgId = profileRow?.organization_id;
+      if (!orgId) {
+        setOrganization(null);
+        setPlanFeatures(null);
+        setError('Tu cuenta no tiene una organización asignada.');
+        console.info('[Org] phase=fetch:no-org');
         return;
       }
 
-      if (orgData) {
-        setOrganization(orgData as Organization);
+      // 2. Cargar organización por id explícito.
+      const { data: orgData, error: orgErr } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', orgId)
+        .maybeSingle();
 
-        // Fetch plan features
+      if (orgErr) throw orgErr;
+      if (!orgData) {
+        setOrganization(null);
+        setPlanFeatures(null);
+        setError('No pudimos cargar tu organización.');
+        return;
+      }
+
+      setOrganization(orgData as Organization);
+
+      // 3. Plan features: si falla, no rompe el flujo principal.
+      try {
         const { data: featuresData } = await supabase
           .from('plan_features')
           .select('*')
-          .eq('plan', orgData.plan)
-          .single();
-
-        if (featuresData) {
-          setPlanFeatures(featuresData as PlanFeatures);
-        }
+          .eq('plan', (orgData as Organization).plan)
+          .maybeSingle();
+        if (featuresData) setPlanFeatures(featuresData as PlanFeatures);
+      } catch (planErr) {
+        console.warn('[Org] phase=plan_features:error', planErr);
       }
-    } catch (error) {
-      console.error('Error in fetchOrganization:', error);
+
+      console.info('[Org] phase=fetch:success');
+    } catch (err) {
+      console.error('[Org] phase=fetch:error', err);
+      setOrganization(null);
+      setPlanFeatures(null);
+      setError('No pudimos cargar tu organización. Reintentá en unos segundos.');
     } finally {
       setIsLoading(false);
     }
@@ -92,19 +124,19 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { error } = await supabase
+      const { error: updErr } = await supabase
         .from('organizations')
         .update(updates)
         .eq('id', organization.id);
 
-      if (error) {
-        return { error };
+      if (updErr) {
+        return { error: updErr };
       }
 
       setOrganization(prev => prev ? { ...prev, ...updates } : null);
       return { error: null };
-    } catch (error) {
-      return { error: error as Error };
+    } catch (err) {
+      return { error: err as Error };
     }
   };
 
@@ -112,7 +144,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     if (!authLoading) {
       fetchOrganization();
     }
-  }, [user, authLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading]);
 
   return (
     <OrganizationContext.Provider
@@ -120,6 +153,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         organization,
         planFeatures,
         isLoading: isLoading || authLoading,
+        error,
         refreshOrganization,
         updateOrganization,
       }}

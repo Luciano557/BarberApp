@@ -133,10 +133,13 @@ export function useSupabaseData() {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch all data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
+    console.info('[Data] phase=fetch:start');
     try {
       // Lines first (services depend on them)
       const linesRes = await supabase.from('lineas').select('*').eq('eliminado', false).order('nombre');
@@ -233,8 +236,10 @@ export function useSupabaseData() {
         }
       }
       setDiscounts(builtDiscounts);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      console.info('[Data] phase=fetch:success');
+    } catch (err) {
+      console.error('[Data] phase=fetch:error', err);
+      setError('No pudimos cargar los datos. Reintentá en unos segundos.');
       toast.error('Error al cargar datos');
     } finally {
       setIsLoading(false);
@@ -1189,6 +1194,8 @@ export function useSupabaseData() {
 
   return {
     isLoading,
+    error,
+    refetch: fetchData,
     services: services.filter(s => s.active),
     allServices: services,
     extras: extras.filter(e => e.active),
