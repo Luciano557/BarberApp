@@ -1194,6 +1194,8 @@ export function useSupabaseData() {
 
   return {
     isLoading,
+    error,
+    refetch: fetchData,
     services: services.filter(s => s.active),
     allServices: services,
     extras: extras.filter(e => e.active),
