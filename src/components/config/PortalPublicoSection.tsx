@@ -74,13 +74,14 @@ export function PortalPublicoSection() {
     cover_url: coverUrl || null,
     cover_position_x: coverPosX,
     cover_position_y: coverPosY,
+    cover_zoom: coverZoom,
     description: description.trim() || null,
     primary_color: isValidHex(primaryColor) ? primaryColor : null,
     links: links
       .filter((l) => l.active && l.label.trim() && URL_RE.test(l.url))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
-  }), [logoUrl, coverUrl, coverPosX, coverPosY, organization?.logo_url, description, primaryColor, links]);
+  }), [logoUrl, coverUrl, coverPosX, coverPosY, coverZoom, organization?.logo_url, description, primaryColor, links]);
 
   const handleCopy = async () => {
     if (!publicUrl) return;
