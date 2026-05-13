@@ -743,7 +743,7 @@ export function EquipoUnificado({
         ) : (
           <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
             {/* Header: Name + Role + Commission */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-foreground">{barber.firstName} {barber.lastName}</span>
                 {displayRoles.length > 0 ? (
@@ -768,25 +768,25 @@ export function EquipoUnificado({
             {/* Contact info */}
             <div className="text-xs text-muted-foreground space-y-1 mb-3">
               {linkedUser && (
-                <div className="flex items-center gap-1.5">
-                  <Mail className="w-3 h-3" />
-                  <span>{linkedUser.email}</span>
+                <div className="flex items-start gap-1.5">
+                  <Mail className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span className="break-all">{linkedUser.email}</span>
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 flex items-center justify-center text-[10px]">Tel</span>
-                <span>{barber.phone}</span>
+              <div className="flex items-start gap-1.5">
+                <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
+                <span className="break-words">{barber.phone}</span>
               </div>
               {barber.address && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 flex items-center justify-center text-[10px]">Dir</span>
-                  <span>{barber.address}</span>
+                <div className="flex items-start gap-1.5">
+                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Dir</span>
+                  <span className="break-words">{barber.address}</span>
                 </div>
               )}
               {barber.dni && (
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 flex items-center justify-center text-[10px]">DNI</span>
-                  <span>{barber.dni}</span>
+                <div className="flex items-start gap-1.5">
+                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">DNI</span>
+                  <span className="break-words">{barber.dni}</span>
                 </div>
               )}
             </div>
@@ -839,7 +839,7 @@ export function EquipoUnificado({
 
               return (
                 <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-2">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                       <KeyRound className="h-3.5 w-3.5" /> Acceso al sistema
                     </span>
@@ -855,13 +855,13 @@ export function EquipoUnificado({
                       className="h-8 text-xs flex-1"
                       autoComplete="off"
                     />
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="h-8 text-xs"
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button size="sm" variant="outline" className="h-8 w-full text-xs sm:w-auto"
                         disabled={saving || !isDirty}
                         onClick={() => handleSaveAccessEmail(barber.id)}>
                         Guardar email
                       </Button>
-                      <Button size="sm" className="h-8 text-xs"
+                      <Button size="sm" className="h-8 w-full text-xs sm:w-auto"
                         disabled={saving || (!hasPersistedEmail && !(draft && draft.trim()))}
                         onClick={() => {
                           const email = (draft !== undefined ? draft : persistedEmail) || '';
@@ -874,12 +874,12 @@ export function EquipoUnificado({
                   {code && (
                     <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/30 space-y-1">
                       <p className="text-[11px] text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="text-xs">
                           <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{code.email}</span></div>
                           <div><span className="text-muted-foreground">Contraseña temporal:</span> <span className="font-mono font-semibold">{code.password}</span></div>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex self-end gap-1 sm:self-auto">
                           <Button size="sm" variant="ghost" className="h-7 px-2"
                             onClick={() => { navigator.clipboard.writeText(`${code.email} / ${code.password}`); toast.success('Copiado'); }}>
                             <Copy className="h-3.5 w-3.5" />
@@ -944,19 +944,19 @@ export function EquipoUnificado({
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-medium">Equipo</CardTitle>
           {!isAdding && !editingId && activeSubTab === 'active' && (
-            <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivos ({inactiveBarbers.length})</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveBarbers.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
@@ -1189,15 +1189,15 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
 
   return (
     <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-lg animate-scale-in">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
         <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
         <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
       </div>
       <div className="space-y-1.5">
@@ -1313,9 +1313,9 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
           </div>
         );
       })()}
-      <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
-        <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
+        <Button size="sm" onClick={handleSubmit} className="w-full bg-success hover:bg-success/90 sm:w-auto"
           disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
           <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
         </Button>

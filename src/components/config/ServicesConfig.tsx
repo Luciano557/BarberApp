@@ -190,7 +190,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
     <div key={service.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === service.id ? (
         <div className="p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
             <div className="space-y-1.5 sm:col-span-4">
               <label className="text-xs font-medium text-muted-foreground">Nombre</label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} disabled={structureLocked} />
@@ -210,7 +210,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             </div>
             <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-4' : 'sm:col-span-3'}`}>
               <label className="text-xs font-medium text-muted-foreground">Línea</label>
-              <div className="flex items-center gap-1">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select value={editLineId || 'none'} onValueChange={setEditLineId} disabled={structureLocked}>
                   <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
                   <SelectContent>
@@ -231,19 +231,19 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:col-span-1 justify-end">
+            <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-1 sm:justify-end">
               <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3 p-3">
-          <div className="flex-1 flex items-center gap-2 min-w-0">
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             {linkedLine?.color && (
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: linkedLine.color }} />
             )}
-            <span className="font-medium text-foreground truncate">{service.name}</span>
+            <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
             {linkedLine && (
               <span
                 className="text-xs px-2 py-0.5 rounded"
@@ -255,41 +255,45 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
               </span>
             )}
           </div>
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />{service.durationMin || 30} min
-          </span>
-          {!isGlobal && (
-            <span className="text-muted-foreground tabular-nums">${service.price.toLocaleString('es-AR')}</span>
-          )}
-          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
-            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-          </Button>
-          {onDelete && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={itemActive}
-                      onClick={() => !itemActive && setDeleteConfirm(service)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      title={itemActive ? undefined : 'Eliminar'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {itemActive && (
-                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />{service.durationMin || 30} min
+            </span>
+            {!isGlobal && (
+              <span className="text-muted-foreground tabular-nums">${service.price.toLocaleString('es-AR')}</span>
+            )}
+          </div>
+          <div className="flex items-center justify-end gap-1 sm:justify-start">
+            <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+              {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+            </Button>
+            {onDelete && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={itemActive}
+                        onClick={() => !itemActive && setDeleteConfirm(service)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                        title={itemActive ? undefined : 'Eliminar'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {itemActive && (
+                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -299,10 +303,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-medium">Servicios</CardTitle>
           {!isAdding && activeSubTab === 'active' && canCreate && (
-            <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           )}
@@ -319,14 +323,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             </p>
           )}
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activos ({activeServices.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivos ({inactiveServices.length})</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeServices.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveServices.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
                     <div className="space-y-1.5 sm:col-span-4">
                       <label className="text-xs font-medium text-muted-foreground">Nombre</label>
                       <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
@@ -346,7 +350,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     </div>
                     <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-4' : 'sm:col-span-3'}`}>
                       <label className="text-xs font-medium text-muted-foreground">Línea</label>
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
                           <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
                           <SelectContent>
@@ -365,7 +369,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                         <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:col-span-1 justify-end">
+                    <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-1 sm:justify-end">
                       <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                     </div>

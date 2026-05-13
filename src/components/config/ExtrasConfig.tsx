@@ -113,7 +113,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
     <div key={extra.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       {editingId === extra.id ? (
         <div className="p-3">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
             <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-10' : 'sm:col-span-7'}`}>
               <label className="text-xs font-medium text-muted-foreground">Nombre</label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} />
@@ -124,47 +124,49 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                 <CurrencyInput value={newPrice} onChange={setNewPrice} />
               </div>
             )}
-            <div className="flex items-center gap-2 sm:col-span-2 justify-end">
+            <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-2 sm:justify-end">
               <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
               <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3 p-3">
-          <span className="flex-1 font-medium text-foreground truncate">{extra.name}</span>
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+          <span className="min-w-0 flex-1 break-words font-medium text-foreground sm:truncate">{extra.name}</span>
           {!isGlobal && (
             <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
           )}
-          <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
-            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-          </Button>
-          {onDelete && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={itemActive}
-                      onClick={() => !itemActive && setDeleteConfirm(extra)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      title={itemActive ? undefined : 'Eliminar'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {itemActive && (
-                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <div className="flex items-center justify-end gap-1 sm:justify-start">
+            <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+              {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+            </Button>
+            {onDelete && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={itemActive}
+                        onClick={() => !itemActive && setDeleteConfirm(extra)}
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                        title={itemActive ? undefined : 'Eliminar'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {itemActive && (
+                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -174,10 +176,10 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="text-base font-medium">Extras</CardTitle>
           {!isAdding && activeSubTab === 'active' && (
-            <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           )}
@@ -189,14 +191,14 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
             </p>
           )}
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activos ({activeExtras.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivos ({inactiveExtras.length})</TabsTrigger>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeExtras.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveExtras.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {isAdding && (
                 <div className="p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
                     <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-10' : 'sm:col-span-7'}`}>
                       <label className="text-xs font-medium text-muted-foreground">Nombre</label>
                       <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Barba" />
@@ -207,7 +209,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                         <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
                       </div>
                     )}
-                    <div className="flex items-center gap-2 sm:col-span-2 justify-end">
+                    <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-2 sm:justify-end">
                       <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
                       <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
                     </div>
