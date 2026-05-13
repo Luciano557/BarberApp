@@ -107,6 +107,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
     { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
     { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
     { key: 'dias_anticipacion', label: 'Días de anticipación', suffix: 'días', description: 'Cuántos días hacia adelante se puede reservar' },
+    { key: 'anticipacion_minima_reserva_min', label: 'Anticipación mínima para reservar', suffix: 'min', description: 'Tiempo mínimo entre el momento actual y el primer turno disponible para clientes' },
   ];
 
   return (
