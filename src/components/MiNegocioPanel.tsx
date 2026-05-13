@@ -15,6 +15,7 @@ import type { AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SucursalTabContent } from './SucursalTabContent';
 import { MiNegocioGeneralTabContent } from './MiNegocioGeneralTabContent';
+import { useOnboarding } from './onboarding/OnboardingProvider';
 
 interface BarberWithSucursal extends Barber {
   sucursalId: string | null;
