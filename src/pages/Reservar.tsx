@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BookingLanding, PortalDataView } from "@/components/reservar/BookingLanding";
 import { BookingStepper } from "@/components/reservar/BookingStepper";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getPortalThemeStyle } from "@/components/reservar/lib/portalTheme";
 
 export interface OrgPublicData {
   organization: { id: string; name: string; logo_url: string | null; timezone: string | null };
@@ -42,7 +43,7 @@ const Reservar = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40">
         <div className="space-y-4 w-full max-w-md px-4">
           <Skeleton className="h-8 w-48 mx-auto" />
           <Skeleton className="h-32 w-full" />
@@ -54,7 +55,7 @@ const Reservar = () => {
 
   if (error || !orgData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
         <div className="text-center space-y-2">
           <h1 className="text-xl font-semibold text-foreground">No encontrado</h1>
           <p className="text-muted-foreground">{error || "No se pudo cargar la información"}</p>
@@ -63,29 +64,30 @@ const Reservar = () => {
     );
   }
 
+  const themeStyle = getPortalThemeStyle(orgData.portal?.primary_color);
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-lg px-4 py-6 sm:px-6 sm:py-8">
+    <div style={themeStyle} className="min-h-screen bg-muted/40">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         {mode === "landing" ? (
-          <BookingLanding
-            orgName={orgData.organization.name}
-            fallbackLogo={orgData.organization.logo_url}
-            portal={orgData.portal}
-            onStart={() => setMode("book")}
-            onManage={() => setMode("manage")}
-          />
-        ) : (
-          <>
-            <div className="mb-6 text-center">
-              <h1 className="text-2xl font-bold text-foreground">{orgData.organization.name}</h1>
-              <p className="text-sm text-muted-foreground mt-1">Reserva tu turno</p>
+          <div className="mx-auto max-w-md">
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)] sm:p-8">
+              <BookingLanding
+                orgName={orgData.organization.name}
+                fallbackLogo={orgData.organization.logo_url}
+                portal={orgData.portal}
+                onStart={() => setMode("book")}
+                onManage={() => setMode("manage")}
+              />
             </div>
-            <BookingStepper
-              orgData={orgData}
-              mode={mode}
-              onBackToLanding={() => setMode("landing")}
-            />
-          </>
+            <p className="mt-4 text-center text-xs text-muted-foreground">Powered by Vittro</p>
+          </div>
+        ) : (
+          <BookingStepper
+            orgData={orgData}
+            mode={mode}
+            onBackToLanding={() => setMode("landing")}
+          />
         )}
       </div>
     </div>
