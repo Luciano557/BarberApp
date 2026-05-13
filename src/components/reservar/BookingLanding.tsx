@@ -64,7 +64,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
 
   const Avatar = ({ className = '' }: { className?: string }) => (
     <div
-      className={`h-24 w-24 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card shadow-md ${className}`}
+      className={`h-24 w-24 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card border border-border/50 shadow-xl ${className}`}
     >
       {logo ? (
         <img src={logo} alt={`Logo de ${orgName}`} className="h-full w-full object-cover" />
@@ -80,24 +80,23 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
     <div style={containerStyle} className="flex flex-col">
       {cover ? (
         <>
-          {/* Cover header — wrapper sin overflow para que el avatar pueda sobresalir */}
-          <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 h-[140px]">
-            {/* z-0: capa que clipea solo la imagen con zoom/pan */}
-            <div className="absolute inset-0 z-0 overflow-hidden">
-              <img
-                src={cover}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover select-none pointer-events-none"
-                style={{
-                  transform: `translate(${50 - posX}%, ${50 - posY}%) scale(${zoom})`,
-                  transformOrigin: 'center',
-                }}
-                draggable={false}
-              />
-            </div>
+          {/* Cover header — capa con portada y degradado */}
+          <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 h-[140px] overflow-hidden">
+            {/* z-0: foto */}
+            <img
+              src={cover}
+              alt=""
+              className="absolute inset-0 z-0 h-full w-full object-cover select-none pointer-events-none"
+              style={{
+                objectPosition: `${posX}% ${posY}%`,
+                transform: `scale(${zoom})`,
+                transformOrigin: `${posX}% ${posY}%`,
+              }}
+              draggable={false}
+            />
             {/* z-10: degradado inferior */}
             <div className="absolute inset-x-0 bottom-0 z-10 h-2/3 bg-gradient-to-b from-transparent to-card" />
-            {/* z-20: avatar superpuesto, anclado al borde inferior, fuera del clip */}
+            {/* z-20: avatar superpuesto, anclado al borde inferior */}
             <div className="absolute left-1/2 bottom-0 z-20 -translate-x-1/2 translate-y-1/2">
               <Avatar />
             </div>
