@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     // Get config for buffers
     const { data: config } = await supabase
       .from("agenda_config")
-      .select("duracion_base_min, buffer_antes_min, buffer_despues_min")
+      .select("duracion_base_min, buffer_antes_min, buffer_despues_min, anticipacion_minima_reserva_min")
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
       .single();
