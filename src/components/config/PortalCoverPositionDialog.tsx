@@ -138,11 +138,10 @@ export function PortalCoverPositionDialog({
         {/* Editor */}
         <div
           ref={canvasRef}
-          className="relative w-full overflow-hidden rounded-xl border border-border bg-muted/30 select-none"
+          className="relative w-full h-64 sm:h-72 overflow-hidden rounded-xl border border-border bg-muted/30 select-none"
           style={{
-            height: canvasH || undefined,
             touchAction: 'none',
-            cursor: dragEnabled ? (dragRef.current ? 'grabbing' : 'grab') : 'default',
+            cursor: dragEnabled ? (isDragging ? 'grabbing' : 'grab') : 'default',
           }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -237,7 +236,7 @@ export function PortalCoverPositionDialog({
               max={100}
               step={1}
               onValueChange={(v) => setX(v[0])}
-              disabled={!coverUrl || overflowX === 0}
+              disabled={!coverUrl}
             />
           </div>
           <div className="space-y-2">
@@ -251,14 +250,9 @@ export function PortalCoverPositionDialog({
               max={100}
               step={1}
               onValueChange={(v) => setY(v[0])}
-              disabled={!coverUrl || overflowY === 0}
+              disabled={!coverUrl}
             />
           </div>
-          {coverUrl && imgSize && overflowX === 0 && overflowY === 0 && (
-            <p className="text-xs text-muted-foreground">
-              La imagen ya entra exacta en el marco, no necesita reencuadre.
-            </p>
-          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
