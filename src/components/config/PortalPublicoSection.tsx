@@ -451,6 +451,7 @@ export function PortalPublicoSection() {
         orgName={orgName}
         initialX={coverPosX}
         initialY={coverPosY}
+        initialZoom={coverZoom}
         saving={saving}
         onSave={handleSaveCoverPosition}
       />
