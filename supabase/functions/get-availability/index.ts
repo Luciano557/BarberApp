@@ -145,7 +145,25 @@ Deno.serve(async (req) => {
       barberosQuery,
     ]);
 
-    const config = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30 };
+    const config: any = configRes.data || { duracion_base_min: 30, buffer_antes_min: 0, buffer_despues_min: 0, dias_anticipacion: 30, anticipacion_minima_reserva_min: 30 };
+    const antMin = Number(config.anticipacion_minima_reserva_min ?? 30);
+
+    // Resolve sucursal timezone (fallback to org, then default)
+    const sucTzRes = await supabase
+      .from("sucursales")
+      .select("timezone, organization_id")
+      .eq("id", sucursal_id)
+      .single();
+    let tz: string = sucTzRes.data?.timezone || "";
+    if (!tz) {
+      const orgTzRes = await supabase.from("organizations").select("timezone").eq("id", organization_id).single();
+      tz = orgTzRes.data?.timezone || "America/Argentina/Buenos_Aires";
+    }
+    const nowMs = Date.now();
+    const cutoffMs = nowMs + antMin * 60000;
+    const todayInTz = getZonedDateStr(new Date(nowMs), tz);
+    const isPast = fecha < todayInTz;
+
     const servicio = servicioRes.data;
     if (!servicio) {
       return new Response(JSON.stringify({ error: "Service not found" }), {
