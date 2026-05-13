@@ -32,7 +32,6 @@ const COUNTRIES = [
 export const AuthStep = ({ onAuthenticated }: Props) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [waitingForSession, setWaitingForSession] = useState(false);
   const [countryCode, setCountryCode] = useState("AR");
   const [form, setForm] = useState({
     nombre: "",
