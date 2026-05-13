@@ -74,12 +74,18 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(v)) return 50;
       return Math.max(0, Math.min(100, Math.round(v)));
     };
+    const clampZoom = (n: any): number => {
+      const v = typeof n === 'number' ? n : Number(n);
+      if (!Number.isFinite(v)) return 1;
+      return Math.max(1, Math.min(3, v));
+    };
 
     let portal: {
       logo_url: string | null;
       cover_url: string | null;
       cover_position_x: number;
       cover_position_y: number;
+      cover_zoom: number;
       description: string | null;
       primary_color: string | null;
       links: { label: string; url: string; icon: string | null }[];
@@ -112,6 +118,7 @@ Deno.serve(async (req) => {
         cover_url,
         cover_position_x: clampPos(pc.cover_position_x ?? 50),
         cover_position_y: clampPos(pc.cover_position_y ?? 50),
+        cover_zoom: clampZoom(pc.cover_zoom ?? 1),
         description: pc.description ?? null,
         primary_color: typeof pc.primary_color === "string" && /^#[0-9A-Fa-f]{6}$/.test(pc.primary_color)
           ? pc.primary_color
@@ -124,6 +131,7 @@ Deno.serve(async (req) => {
         cover_url: null,
         cover_position_x: 50,
         cover_position_y: 50,
+        cover_zoom: 1,
         description: null,
         primary_color: null,
         links: [],
