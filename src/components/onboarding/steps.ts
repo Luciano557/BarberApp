@@ -1,3 +1,6 @@
+export type OnboardingSubTab = 'general' | 'first-sucursal';
+export type OnboardingEvent = 'mi-negocio:sucursal-selected';
+
 export interface OnboardingStep {
   id: string;
   targetId: string;
@@ -8,6 +11,12 @@ export interface OnboardingStep {
   requiredTab?: string;
   /** Tabs permitidos durante este paso (además del requiredTab) */
   allowedTabs?: string[];
+  /** Sub-tab dentro de Mi Negocio (general o primera sucursal) */
+  miNegocioSubTab?: OnboardingSubTab;
+  /** Si está definido, este paso avanza al recibir el evento (no botón Continuar) */
+  advanceOnEvent?: OnboardingEvent;
+  /** Oculta el botón "Continuar" (cuando se avanza por evento) */
+  hideContinueButton?: boolean;
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
@@ -19,14 +28,15 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   },
   {
     id: 's2_cuenta_intro',
-    targetId: 'cuenta-sucursal-button',
+    targetId: 'cuentas-sucursal-section',
     title: '¿Para qué sirve la cuenta de sucursal?',
-    description: 'La cuenta de sucursal está pensada para el trabajo diario de la barbería sin necesidad de utilizar cuentas personales.',
+    description: 'La cuenta de sucursal está pensada para el trabajo diario de la barbería, sin necesidad de utilizar cuentas personales.',
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
   },
   {
-    id: 's2_cuenta_bullets',
-    targetId: 'cuenta-sucursal-button',
+    id: 's3_cuenta_bullets',
+    targetId: 'cuentas-sucursal-bullets',
     title: '¿Para qué sirve la cuenta de sucursal?',
     description: 'Tres ideas clave para tener en cuenta:',
     bullets: [
@@ -35,40 +45,48 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
       'No accede a configuraciones, estadísticas, comisiones ni gestión del negocio.',
     ],
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
   },
   {
-    id: 's3_info',
+    id: 's4_select_sucursal',
+    targetId: 'sucursal-tab',
+    title: 'Accede a tu sucursal principal',
+    description: 'Hacé clic en la pestaña de tu sucursal para continuar configurándola.',
+    requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
+    advanceOnEvent: 'mi-negocio:sucursal-selected',
+    hideContinueButton: true,
+  },
+  {
+    id: 's5_info',
     targetId: 'info-sucursal-card',
     title: 'Información de la sucursal',
     description: 'Acá podés configurar y gestionar toda la información principal de esta sucursal.',
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'first-sucursal',
   },
   {
-    id: 's4_equipo',
+    id: 's6_equipo',
     targetId: 'equipo-section',
     title: 'Gestioná tu equipo',
     description: 'Acá podés agregar barberos, encargados, cajeros y miembros del equipo.',
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'first-sucursal',
   },
   {
-    id: 's5_servicios',
+    id: 's7_catalogo',
     targetId: 'catalogo-section',
-    title: 'Servicios',
-    description: 'Acá podés agregar los servicios disponibles en tu barbería.',
+    title: 'Servicios, extras y productos',
+    description: 'Acá podés configurar los servicios, extras, productos y descuentos particulares de la sucursal.',
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'first-sucursal',
   },
   {
-    id: 's6_extras',
-    targetId: 'catalogo-section',
-    title: 'Extras y productos',
-    description: 'Acá también podés configurar servicios extras, productos y descuentos.',
-    requiredTab: 'mi-negocio',
-  },
-  {
-    id: 's7_pagos',
+    id: 's8_pagos',
     targetId: 'metodos-pago-section',
     title: 'Métodos de pago',
     description: 'Configurá los medios de pago disponibles para esta sucursal.',
     requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'first-sucursal',
   },
 ];
