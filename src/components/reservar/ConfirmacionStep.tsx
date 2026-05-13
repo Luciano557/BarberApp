@@ -72,34 +72,37 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-foreground">Confirmá tu turno</h2>
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold text-foreground">Confirmá tu turno</h2>
+        <p className="text-xs text-muted-foreground">Revisá los datos antes de reservar.</p>
+      </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{booking.sucursalNombre}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{booking.servicioNombre} — ${booking.servicioPrecio.toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{booking.barberoNombre}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{formatFechaLegible(booking.fecha)}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-foreground">{booking.horaInicio} - {booking.horaFin}</span>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border/60 bg-muted/40 p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-foreground">{booking.sucursalNombre}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-foreground">
+            {booking.servicioNombre} — <span className="font-medium text-primary">${booking.servicioPrecio.toLocaleString("es-AR")}</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <User className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-foreground">{booking.barberoNombre}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-foreground">{formatFechaLegible(booking.fecha)}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-foreground">{booking.horaInicio} - {booking.horaFin}</span>
+        </div>
+      </div>
 
-      <Button className="w-full h-14 text-lg font-semibold" onClick={handleConfirm} disabled={loading}>
+      <Button className="w-full h-12 text-base font-semibold" onClick={handleConfirm} disabled={loading}>
         {loading ? "Confirmando..." : "Confirmar turno"}
       </Button>
     </div>
