@@ -110,6 +110,8 @@ Deno.serve(async (req) => {
       portal = {
         logo_url: logo_url ?? org.logo_url ?? null,
         cover_url,
+        cover_position_x: clampPos(pc.cover_position_x ?? 50),
+        cover_position_y: clampPos(pc.cover_position_y ?? 50),
         description: pc.description ?? null,
         primary_color: typeof pc.primary_color === "string" && /^#[0-9A-Fa-f]{6}$/.test(pc.primary_color)
           ? pc.primary_color
@@ -120,6 +122,8 @@ Deno.serve(async (req) => {
       portal = {
         logo_url: org.logo_url ?? null,
         cover_url: null,
+        cover_position_x: 50,
+        cover_position_y: 50,
         description: null,
         primary_color: null,
         links: [],
