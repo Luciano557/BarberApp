@@ -1864,6 +1864,8 @@ export type Database = {
       portal_config: {
         Row: {
           cover_path: string | null
+          cover_position_x: number
+          cover_position_y: number
           created_at: string
           description: string | null
           links: Json
@@ -1874,6 +1876,8 @@ export type Database = {
         }
         Insert: {
           cover_path?: string | null
+          cover_position_x?: number
+          cover_position_y?: number
           created_at?: string
           description?: string | null
           links?: Json
@@ -1884,6 +1888,8 @@ export type Database = {
         }
         Update: {
           cover_path?: string | null
+          cover_position_x?: number
+          cover_position_y?: number
           created_at?: string
           description?: string | null
           links?: Json

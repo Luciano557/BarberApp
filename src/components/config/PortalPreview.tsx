@@ -6,6 +6,7 @@ interface Props {
   portal: PortalDataView;
 }
 
+
 export function PortalPreview({ orgName, fallbackLogo, portal }: Props) {
   return (
     <div className="flex justify-center">

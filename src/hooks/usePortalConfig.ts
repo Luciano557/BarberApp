@@ -13,6 +13,8 @@ export interface PortalConfig {
   organization_id: string;
   logo_path: string | null;
   cover_path: string | null;
+  cover_position_x: number;
+  cover_position_y: number;
   description: string | null;
   primary_color: string | null;
   links: PortalLink[];
@@ -36,6 +38,12 @@ export function getCoverPublicUrl(coverPath: string | null): string | null {
   return data?.publicUrl ?? null;
 }
 
+const clampPos = (n: any): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 50;
+  return Math.max(0, Math.min(100, Math.round(v)));
+};
+
 export function usePortalConfig(organizationId: string | undefined) {
   const [config, setConfig] = useState<PortalConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,19 +58,24 @@ export function usePortalConfig(organizationId: string | undefined) {
       .eq('organization_id', organizationId)
       .maybeSingle();
     if (data) {
+      const d: any = data;
       setConfig({
-        organization_id: data.organization_id,
-        logo_path: data.logo_path,
-        cover_path: (data as any).cover_path ?? null,
-        description: data.description,
-        primary_color: data.primary_color,
-        links: Array.isArray(data.links) ? (data.links as unknown as PortalLink[]) : [],
+        organization_id: d.organization_id,
+        logo_path: d.logo_path,
+        cover_path: d.cover_path ?? null,
+        cover_position_x: clampPos(d.cover_position_x ?? 50),
+        cover_position_y: clampPos(d.cover_position_y ?? 50),
+        description: d.description,
+        primary_color: d.primary_color,
+        links: Array.isArray(d.links) ? (d.links as unknown as PortalLink[]) : [],
       });
     } else {
       setConfig({
         organization_id: organizationId,
         logo_path: null,
         cover_path: null,
+        cover_position_x: 50,
+        cover_position_y: 50,
         description: null,
         primary_color: null,
         links: [],
@@ -80,6 +93,12 @@ export function usePortalConfig(organizationId: string | undefined) {
       organization_id: organizationId,
       logo_path: updates.logo_path !== undefined ? updates.logo_path : config?.logo_path ?? null,
       cover_path: updates.cover_path !== undefined ? updates.cover_path : config?.cover_path ?? null,
+      cover_position_x: updates.cover_position_x !== undefined
+        ? clampPos(updates.cover_position_x)
+        : clampPos(config?.cover_position_x ?? 50),
+      cover_position_y: updates.cover_position_y !== undefined
+        ? clampPos(updates.cover_position_y)
+        : clampPos(config?.cover_position_y ?? 50),
       description: updates.description !== undefined ? updates.description : config?.description ?? null,
       primary_color: updates.primary_color !== undefined ? updates.primary_color : config?.primary_color ?? null,
       links: (updates.links ?? config?.links ?? []) as any,
@@ -137,7 +156,7 @@ export function usePortalConfig(organizationId: string | undefined) {
   const removeCover = useCallback(async () => {
     if (!config?.cover_path) return { error: null };
     await supabase.storage.from('portal-logos').remove([config.cover_path]);
-    return await save({ cover_path: null });
+    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50 });
   }, [config, save]);
 
   return {

@@ -1,16 +1,28 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, Trash2, ImageIcon } from 'lucide-react';
+import { Upload, Trash2, ImageIcon, Move } from 'lucide-react';
 
 interface Props {
   coverUrl: string | null;
+  coverPositionX?: number;
+  coverPositionY?: number;
   uploading?: boolean;
   disabled?: boolean;
   onUpload: (file: File) => void;
   onRemove: () => void;
+  onAdjust?: () => void;
 }
 
-export function PortalCoverUploader({ coverUrl, uploading, disabled, onUpload, onRemove }: Props) {
+export function PortalCoverUploader({
+  coverUrl,
+  coverPositionX = 50,
+  coverPositionY = 50,
+  uploading,
+  disabled,
+  onUpload,
+  onRemove,
+  onAdjust,
+}: Props) {
   const ref = useRef<HTMLInputElement>(null);
 
   return (
@@ -19,7 +31,11 @@ export function PortalCoverUploader({ coverUrl, uploading, disabled, onUpload, o
         className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-dashed border-border bg-muted/30 flex items-center justify-center"
         style={
           coverUrl
-            ? { backgroundImage: `url(${coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+            ? {
+                backgroundImage: `url(${coverUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: `${coverPositionX}% ${coverPositionY}%`,
+              }
             : undefined
         }
       >
@@ -51,6 +67,11 @@ export function PortalCoverUploader({ coverUrl, uploading, disabled, onUpload, o
           <Upload className="h-4 w-4 mr-1" />
           {uploading ? 'Subiendo...' : coverUrl ? 'Cambiar portada' : 'Subir portada'}
         </Button>
+        {coverUrl && onAdjust && (
+          <Button variant="outline" size="sm" onClick={onAdjust} disabled={disabled}>
+            <Move className="h-4 w-4 mr-1" /> Ajustar portada
+          </Button>
+        )}
         {coverUrl && (
           <Button variant="outline" size="sm" onClick={onRemove} disabled={disabled}>
             <Trash2 className="h-4 w-4 mr-1" /> Quitar

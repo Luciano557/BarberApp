@@ -20,6 +20,7 @@ import { PortalLinksEditor } from './PortalLinksEditor';
 import { PortalPreview } from './PortalPreview';
 import { PortalColorPalette } from './PortalColorPalette';
 import { PortalCoverUploader } from './PortalCoverUploader';
+import { PortalCoverPositionDialog } from './PortalCoverPositionDialog';
 import { isValidIconKey } from '@/components/reservar/lib/portalIcons';
 
 const URL_RE = /^https?:\/\//i;
@@ -38,6 +39,9 @@ export function PortalPublicoSection() {
   const [links, setLinks] = useState<PortalLink[]>([]);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [coverPath, setCoverPath] = useState<string | null>(null);
+  const [coverPosX, setCoverPosX] = useState<number>(50);
+  const [coverPosY, setCoverPosY] = useState<number>(50);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -50,6 +54,8 @@ export function PortalPublicoSection() {
       setLinks(config.links ?? []);
       setLogoPath(config.logo_path);
       setCoverPath(config.cover_path);
+      setCoverPosX(config.cover_position_x ?? 50);
+      setCoverPosY(config.cover_position_y ?? 50);
     }
   }, [config]);
 
@@ -64,13 +70,15 @@ export function PortalPublicoSection() {
   const previewPortal = useMemo(() => ({
     logo_url: logoUrl || organization?.logo_url || null,
     cover_url: coverUrl || null,
+    cover_position_x: coverPosX,
+    cover_position_y: coverPosY,
     description: description.trim() || null,
     primary_color: isValidHex(primaryColor) ? primaryColor : null,
     links: links
       .filter((l) => l.active && l.label.trim() && URL_RE.test(l.url))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
-  }), [logoUrl, coverUrl, organization?.logo_url, description, primaryColor, links]);
+  }), [logoUrl, coverUrl, coverPosX, coverPosY, organization?.logo_url, description, primaryColor, links]);
 
   const handleCopy = async () => {
     if (!publicUrl) return;
@@ -114,7 +122,9 @@ export function PortalPublicoSection() {
     if (error) return toast.error(error.message);
     if (path) {
       setCoverPath(path);
-      const { error: e } = await save({ cover_path: path });
+      setCoverPosX(50);
+      setCoverPosY(50);
+      const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50 });
       if (e) toast.error('No se pudo guardar la portada');
       else toast.success('Portada actualizada');
     }
@@ -122,9 +132,19 @@ export function PortalPublicoSection() {
 
   const handleRemoveCover = async () => {
     setCoverPath(null);
+    setCoverPosX(50);
+    setCoverPosY(50);
     const { error } = await removeCover();
     if (error) toast.error('No se pudo quitar la portada');
     else toast.success('Portada quitada');
+  };
+
+  const handleSaveCoverPosition = async (x: number, y: number) => {
+    setCoverPosX(x);
+    setCoverPosY(y);
+    const { error } = await save({ cover_position_x: x, cover_position_y: y });
+    if (error) toast.error('No se pudo guardar el encuadre');
+    else toast.success('Encuadre guardado');
   };
 
   const handleColorPreset = async (hex: string) => {
@@ -210,10 +230,13 @@ export function PortalPublicoSection() {
               <Label className="text-xs">Foto de portada</Label>
               <PortalCoverUploader
                 coverUrl={coverUrl}
+                coverPositionX={coverPosX}
+                coverPositionY={coverPosY}
                 uploading={uploadingCover}
                 disabled={saving}
                 onUpload={handleCoverFile}
                 onRemove={handleRemoveCover}
+                onAdjust={() => setAdjustOpen(true)}
               />
             </div>
 
@@ -412,6 +435,18 @@ export function PortalPublicoSection() {
           </p>
         </div>
       </div>
+
+      <PortalCoverPositionDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        coverUrl={coverUrl}
+        logoUrl={logoUrl || organization?.logo_url || null}
+        orgName={orgName}
+        initialX={coverPosX}
+        initialY={coverPosY}
+        saving={saving}
+        onSave={handleSaveCoverPosition}
+      />
     </div>
   );
 }

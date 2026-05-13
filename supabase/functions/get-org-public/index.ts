@@ -64,14 +64,22 @@ Deno.serve(async (req) => {
         .eq("eliminado", false),
       supabase
         .from("portal_config")
-        .select("logo_path, cover_path, description, primary_color, links")
+        .select("logo_path, cover_path, cover_position_x, cover_position_y, description, primary_color, links")
         .eq("organization_id", org.id)
         .maybeSingle(),
     ]);
 
+    const clampPos = (n: any): number => {
+      const v = typeof n === 'number' ? n : Number(n);
+      if (!Number.isFinite(v)) return 50;
+      return Math.max(0, Math.min(100, Math.round(v)));
+    };
+
     let portal: {
       logo_url: string | null;
       cover_url: string | null;
+      cover_position_x: number;
+      cover_position_y: number;
       description: string | null;
       primary_color: string | null;
       links: { label: string; url: string; icon: string | null }[];
@@ -102,6 +110,8 @@ Deno.serve(async (req) => {
       portal = {
         logo_url: logo_url ?? org.logo_url ?? null,
         cover_url,
+        cover_position_x: clampPos(pc.cover_position_x ?? 50),
+        cover_position_y: clampPos(pc.cover_position_y ?? 50),
         description: pc.description ?? null,
         primary_color: typeof pc.primary_color === "string" && /^#[0-9A-Fa-f]{6}$/.test(pc.primary_color)
           ? pc.primary_color
@@ -112,6 +122,8 @@ Deno.serve(async (req) => {
       portal = {
         logo_url: org.logo_url ?? null,
         cover_url: null,
+        cover_position_x: 50,
+        cover_position_y: 50,
         description: null,
         primary_color: null,
         links: [],
