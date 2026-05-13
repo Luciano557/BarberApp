@@ -108,14 +108,15 @@ Deno.serve(async (req) => {
     }
 
     // Get config, service, timezone
-    const [configRes, servicioRes, orgRes] = await Promise.all([
-      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min")
+    const [configRes, servicioRes, orgRes, sucRes] = await Promise.all([
+      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
       supabase.from("servicios").select("duracion_min").eq("id", turno.servicio_id).single(),
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
+      supabase.from("sucursales").select("timezone").eq("id", turno.sucursal_id).single(),
     ]);
 
-    const timezone = orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
+    const timezone = sucRes.data?.timezone || orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
     const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
     const duracion = servicioRes.data?.duracion_min || configRes.data?.duracion_base_min || 30;
 
