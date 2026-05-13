@@ -1,30 +1,56 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface Props {
   onAuthenticated: () => void;
 }
 
+const COUNTRIES = [
+  { code: "AR", name: "Argentina", dial: "+54", placeholder: "11 5555 5555" },
+  { code: "UY", name: "Uruguay", dial: "+598", placeholder: "9 123 4567" },
+  { code: "CL", name: "Chile", dial: "+56", placeholder: "9 1234 5678" },
+  { code: "PY", name: "Paraguay", dial: "+595", placeholder: "961 123456" },
+  { code: "BR", name: "Brasil", dial: "+55", placeholder: "11 91234 5678" },
+  { code: "MX", name: "México", dial: "+52", placeholder: "55 1234 5678" },
+  { code: "CO", name: "Colombia", dial: "+57", placeholder: "300 1234567" },
+  { code: "PE", name: "Perú", dial: "+51", placeholder: "987 654 321" },
+  { code: "ES", name: "España", dial: "+34", placeholder: "612 34 56 78" },
+  { code: "US", name: "Estados Unidos", dial: "+1", placeholder: "555 123 4567" },
+];
+
 export const AuthStep = ({ onAuthenticated }: Props) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [waitingForSession, setWaitingForSession] = useState(false);
+  const [countryCode, setCountryCode] = useState("AR");
   const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
+    nombre: "",
+    apellido: "",
+    phoneLocal: "",
     birthDate: "",
+    instagram: "",
+    email: "",
     password: "",
   });
 
-  // Listen for auth state changes to detect session after signUp
+  const country = useMemo(
+    () => COUNTRIES.find((c) => c.code === countryCode) ?? COUNTRIES[0],
+    [countryCode],
+  );
+
   useEffect(() => {
     if (!waitingForSession) return;
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setWaitingForSession(false);
@@ -32,9 +58,16 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         onAuthenticated();
       }
     });
-
     return () => subscription.unsubscribe();
   }, [waitingForSession, onAuthenticated]);
+
+  const update = (field: keyof typeof form, value: string) =>
+    setForm((f) => ({ ...f, [field]: value }));
+
+  const handlePhoneChange = (value: string) => {
+    const cleaned = value.replace(/[^\d\s-]/g, "");
+    update("phoneLocal", cleaned);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +76,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
-          email: form.email,
+          email: form.email.trim(),
           password: form.password,
         });
         if (error) {
@@ -52,48 +85,64 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
           return;
         }
         onAuthenticated();
-      } else {
-        if (!form.fullName || !form.email || !form.password) {
-          toast.error("Completá todos los campos obligatorios");
-          setLoading(false);
-          return;
-        }
-        const { data, error } = await supabase.auth.signUp({
-          email: form.email,
-          password: form.password,
-          options: {
-            data: {
-              full_name: form.fullName,
-              phone: form.phone,
-              birth_date: form.birthDate,
-            },
-            emailRedirectTo: window.location.href,
-          },
-        });
-        if (error) {
-          toast.error(error.message);
-          setLoading(false);
-          return;
-        }
-
-        // If session is returned immediately (email confirmation disabled), proceed
-        if (data.session) {
-          onAuthenticated();
-          return;
-        }
-
-        // Otherwise wait for the auth state change to fire with a session
-        setWaitingForSession(true);
-        toast.success("¡Cuenta creada! Revisá tu email para verificar.");
+        return;
       }
+
+      const nombre = form.nombre.trim();
+      const apellido = form.apellido.trim();
+      const phoneDigits = form.phoneLocal.replace(/[\s-]/g, "");
+      const email = form.email.trim();
+      const instagram = form.instagram.trim().replace(/^@+/, "");
+
+      if (!nombre) return fail("Ingresá tu nombre");
+      if (!apellido) return fail("Ingresá tu apellido");
+      if (!phoneDigits || phoneDigits.length < 6) return fail("Ingresá un teléfono válido");
+      if (!form.birthDate) return fail("Ingresá tu fecha de nacimiento");
+      if (!email) return fail("Ingresá tu email");
+      if (!form.password || form.password.length < 6)
+        return fail("La contraseña debe tener al menos 6 caracteres");
+
+      const phone = `${country.dial}${phoneDigits}`;
+      const fullName = `${nombre} ${apellido}`.trim();
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: form.password,
+        options: {
+          data: {
+            nombre,
+            apellido,
+            full_name: fullName,
+            phone,
+            phone_country: country.code,
+            birth_date: form.birthDate,
+            instagram: instagram || null,
+          },
+          emailRedirectTo: window.location.href,
+        },
+      });
+      if (error) {
+        toast.error(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.session) {
+        onAuthenticated();
+        return;
+      }
+      setWaitingForSession(true);
+      toast.success("¡Cuenta creada! Revisá tu email para verificar.");
     } catch {
       toast.error("Ocurrió un problema. Probá nuevamente.");
       setLoading(false);
     }
-  };
 
-  const update = (field: string, value: string) =>
-    setForm((f) => ({ ...f, [field]: value }));
+    function fail(msg: string) {
+      toast.error(msg);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -110,32 +159,65 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         {!isLogin && (
           <>
             <div className="space-y-1">
-              <Label htmlFor="fullName">Nombre completo *</Label>
+              <Label htmlFor="nombre">Nombre *</Label>
               <Input
-                id="fullName"
+                id="nombre"
                 className="h-12 text-base"
-                value={form.fullName}
-                onChange={(e) => update("fullName", e.target.value)}
+                value={form.nombre}
+                onChange={(e) => update("nombre", e.target.value)}
                 placeholder="Tu nombre"
-                autoComplete="name"
+                autoComplete="given-name"
+                maxLength={80}
                 required
               />
             </div>
+
             <div className="space-y-1">
-              <Label htmlFor="phone">Teléfono</Label>
+              <Label htmlFor="apellido">Apellido *</Label>
               <Input
-                id="phone"
-                type="tel"
-                inputMode="tel"
+                id="apellido"
                 className="h-12 text-base"
-                value={form.phone}
-                onChange={(e) => update("phone", e.target.value)}
-                placeholder="+54 11 1234-5678"
-                autoComplete="tel"
+                value={form.apellido}
+                onChange={(e) => update("apellido", e.target.value)}
+                placeholder="Tu apellido"
+                autoComplete="family-name"
+                maxLength={80}
+                required
               />
             </div>
+
             <div className="space-y-1">
-              <Label htmlFor="birthDate">Fecha de nacimiento</Label>
+              <Label htmlFor="phone">Teléfono *</Label>
+              <div className="flex gap-2">
+                <Select value={countryCode} onValueChange={setCountryCode}>
+                  <SelectTrigger className="h-12 w-[110px] text-base">
+                    <SelectValue>{country.dial}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.name} ({c.dial})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  className="h-12 text-base flex-1"
+                  value={form.phoneLocal}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  placeholder={country.placeholder}
+                  autoComplete="tel-national"
+                  maxLength={20}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="birthDate">Fecha de nacimiento *</Label>
               <Input
                 id="birthDate"
                 type="date"
@@ -143,6 +225,19 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
                 value={form.birthDate}
                 onChange={(e) => update("birthDate", e.target.value)}
                 autoComplete="bday"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="instagram">Instagram</Label>
+              <Input
+                id="instagram"
+                className="h-12 text-base"
+                value={form.instagram}
+                onChange={(e) => update("instagram", e.target.value)}
+                placeholder="@tuusuario"
+                maxLength={80}
               />
             </div>
           </>
@@ -184,8 +279,8 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               ? "Verificando..."
               : "Procesando..."
             : isLogin
-            ? "Iniciar sesión"
-            : "Crear cuenta y continuar"}
+              ? "Iniciar sesión"
+              : "Crear cuenta y continuar"}
         </Button>
       </form>
 
