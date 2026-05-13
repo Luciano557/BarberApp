@@ -16,11 +16,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
+import { OnboardingOverlay } from '@/components/onboarding/OnboardingOverlay';
+import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
   const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
-  
+  const onboarding = useOnboarding();
+
   const rolesLoaded = roles.length > 0;
 
   const getDefaultTab = () => {
@@ -33,6 +37,18 @@ const Index = () => {
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
   const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas'>('menu');
+
+  // Register tab setter so onboarding can drive navigation
+  useEffect(() => {
+    onboarding.registerTabSetter((t) => setActiveTab(t));
+    return () => onboarding.registerTabSetter(null);
+  }, [onboarding]);
+
+  // Intercepted tab change: blocks navigation outside of allowed tabs during onboarding
+  const handleTabChange = (tab: string) => {
+    if (onboarding.isActive && !onboarding.isAllowedTab(tab)) return;
+    setActiveTab(tab);
+  };
 
   const goToGeneralConfig = () => {
     setConfigInitialSection('payments');
@@ -108,7 +124,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex w-full">
-      <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
+      <OnboardingOverlay />
+      <OnboardingTooltip />
 
       <main className={cn("flex-1 min-h-screen overflow-auto", isMobile && "ml-16")}>
         <div className="max-w-4xl mx-auto p-6 md:p-8">
