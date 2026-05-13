@@ -130,6 +130,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             <li key={item.id}>
               <button
                 onClick={() => handleTabChange(item.id)}
+                data-onboarding-id={item.id === 'mi-negocio' ? 'mi-negocio-nav' : undefined}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
                   collapsed && "justify-center px-2",
