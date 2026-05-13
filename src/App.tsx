@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
 import { ActionPinGateProvider } from "@/components/ActionPinGate";
+import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Homepage from "./pages/Homepage";
 import Index from "./pages/Index";
@@ -26,6 +27,7 @@ const App = () => (
         <OrganizationProvider>
           <SucursalProvider>
             <ActionPinGateProvider>
+              <OnboardingProvider>
               <Toaster />
               <Sonner />
               <BrowserRouter>
