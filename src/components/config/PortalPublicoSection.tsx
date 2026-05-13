@@ -127,7 +127,8 @@ export function PortalPublicoSection() {
       setCoverPath(path);
       setCoverPosX(50);
       setCoverPosY(50);
-      const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50 });
+      setCoverZoom(1);
+      const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
       if (e) toast.error('No se pudo guardar la portada');
       else toast.success('Portada actualizada');
     }
@@ -137,15 +138,17 @@ export function PortalPublicoSection() {
     setCoverPath(null);
     setCoverPosX(50);
     setCoverPosY(50);
+    setCoverZoom(1);
     const { error } = await removeCover();
     if (error) toast.error('No se pudo quitar la portada');
     else toast.success('Portada quitada');
   };
 
-  const handleSaveCoverPosition = async (x: number, y: number) => {
+  const handleSaveCoverPosition = async (x: number, y: number, zoom: number) => {
     setCoverPosX(x);
     setCoverPosY(y);
-    const { error } = await save({ cover_position_x: x, cover_position_y: y });
+    setCoverZoom(zoom);
+    const { error } = await save({ cover_position_x: x, cover_position_y: y, cover_zoom: zoom });
     if (error) toast.error('No se pudo guardar el encuadre');
     else toast.success('Encuadre guardado');
   };
