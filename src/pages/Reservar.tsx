@@ -80,7 +80,6 @@ const Reservar = () => {
                 onManage={() => setMode("manage")}
               />
             </div>
-            <p className="mt-4 text-center text-xs text-muted-foreground">Powered by Vittro</p>
           </div>
         ) : (
           <BookingStepper
