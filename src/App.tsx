@@ -50,6 +50,7 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </BrowserRouter>
+              </OnboardingProvider>
             </ActionPinGateProvider>
           </SucursalProvider>
         </OrganizationProvider>
