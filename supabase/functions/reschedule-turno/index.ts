@@ -16,6 +16,23 @@ function minutesToTime(m: number): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
+function slotInstantMs(fecha: string, hora: string, tz: string): number {
+  const [Y, M, D] = fecha.split("-").map(Number);
+  const [h, m] = hora.split(":").map(Number);
+  const utcGuess = Date.UTC(Y, M - 1, D, h, m);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(new Date(utcGuess)).map((p) => [p.type, p.value]));
+  let hh = +parts.hour;
+  if (hh === 24) hh = 0;
+  const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
+  const offset = asTzMs - utcGuess;
+  return utcGuess - offset;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -91,14 +108,15 @@ Deno.serve(async (req) => {
     }
 
     // Get config, service, timezone
-    const [configRes, servicioRes, orgRes] = await Promise.all([
-      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min")
+    const [configRes, servicioRes, orgRes, sucRes] = await Promise.all([
+      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
       supabase.from("servicios").select("duracion_min").eq("id", turno.servicio_id).single(),
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
+      supabase.from("sucursales").select("timezone").eq("id", turno.sucursal_id).single(),
     ]);
 
-    const timezone = orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
+    const timezone = sucRes.data?.timezone || orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
     const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
     const duracion = servicioRes.data?.duracion_min || configRes.data?.duracion_base_min || 30;
 
@@ -125,14 +143,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Also validate new slot is in the future
-    const newDateTime = new Date(`${nueva_fecha}T${nueva_hora_inicio}`);
-    const hoursUntilNew = (newDateTime.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
-    if (hoursUntilNew <= 0) {
-      return new Response(JSON.stringify({ error: "New slot must be in the future" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Also validate new slot meets minimum lead time
+    const antMin = Number((configRes.data as any)?.anticipacion_minima_reserva_min ?? 30);
+    const newSlotMs = slotInstantMs(nueva_fecha, nueva_hora_inicio, timezone);
+    const cutoffMs = Date.now() + antMin * 60000;
+    if (newSlotMs < cutoffMs) {
+      return new Response(JSON.stringify({
+        error: "slot_too_soon",
+        message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Calculate new hora_fin

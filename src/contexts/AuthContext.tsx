@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -51,80 +51,123 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  // Race-guard: tracks the user.id whose hydration is in flight so duplicate
+  // events for the same session don't pile up and pisar estados.
+  const hydratingForRef = useRef<string | null>(null);
+  // Track last fully-hydrated user id; lets us skip redundant rehydrations.
+  const hydratedForRef = useRef<string | null>(null);
 
-    if (profileData) {
-      setProfile(profileData as Profile);
-    }
+  const fetchProfileAndRoles = async (userId: string) => {
+    const [profileRes, rolesRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('user_roles').select('role').eq('user_id', userId),
+    ]);
+    if (profileRes.error) throw profileRes.error;
+    if (rolesRes.error) throw rolesRes.error;
+    return {
+      profile: (profileRes.data as Profile | null) ?? null,
+      roles: (rolesRes.data ?? []).map(r => r.role as AppRole),
+    };
   };
 
-  const fetchRoles = async (userId: string) => {
-    const { data: rolesData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
+  // Idempotent session hydration. Used by both getSession() and onAuthStateChange.
+  const hydrateSession = async (nextSession: Session | null) => {
+    // No session → clear everything synchronously.
+    if (!nextSession) {
+      hydratingForRef.current = null;
+      hydratedForRef.current = null;
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsLoading(false);
+      console.info('[Auth] phase=hydrate:cleared');
+      return;
+    }
 
-    if (rolesData) {
-      setRoles(rolesData.map(r => r.role as AppRole));
+    const nextUserId = nextSession.user.id;
+
+    // Same user already hydrated AND not currently hydrating → just refresh session token state.
+    if (hydratedForRef.current === nextUserId && hydratingForRef.current === null) {
+      setSession(nextSession);
+      setUser(nextSession.user);
+      setIsLoading(false);
+      return;
+    }
+
+    // Same user already hydrating → ignore duplicate.
+    if (hydratingForRef.current === nextUserId) {
+      return;
+    }
+
+    hydratingForRef.current = nextUserId;
+    setSession(nextSession);
+    setUser(nextSession.user);
+    console.info('[Auth] phase=hydrate:start');
+
+    try {
+      const { profile: nextProfile, roles: nextRoles } = await fetchProfileAndRoles(nextUserId);
+      // Only commit if still the active hydration target (avoid stale writes after fast switch).
+      if (hydratingForRef.current === nextUserId) {
+        setProfile(nextProfile);
+        setRoles(nextRoles);
+        hydratedForRef.current = nextUserId;
+        console.info('[Auth] phase=hydrate:success');
+      }
+    } catch (err) {
+      console.error('[Auth] phase=hydrate:error', err);
+      if (hydratingForRef.current === nextUserId) {
+        // Keep user/session, clear derived data to avoid false permissions.
+        setProfile(null);
+        setRoles([]);
+        hydratedForRef.current = null;
+      }
+    } finally {
+      if (hydratingForRef.current === nextUserId) {
+        hydratingForRef.current = null;
+      }
+      setIsLoading(false);
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
-      await Promise.all([fetchProfile(user.id), fetchRoles(user.id)]);
+      // Force rehydrate by clearing the cache key.
+      hydratedForRef.current = null;
+      await hydrateSession(session);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Listener FIRST (Supabase recommendation). Defer with setTimeout(0) to avoid
+    // blocking the auth callback and prevent deadlocks.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      console.info('[Auth] phase=onAuthStateChange event=', event);
 
-        // Limpieza de localStorage cuando el usuario queda verificado
-        if (session?.user?.email_confirmed_at) {
-          localStorage.removeItem('pending_verification_email');
-        }
-
-        if (session?.user) {
-          // Use setTimeout to avoid potential race conditions with Supabase
-          setTimeout(async () => {
-            await Promise.all([
-              fetchProfile(session.user.id),
-              fetchRoles(session.user.id)
-            ]);
-            setIsLoading(false);
-          }, 0);
-        } else {
-          setProfile(null);
-          setRoles([]);
-          setIsLoading(false);
-        }
+      // Clear localStorage hint when verified.
+      if (nextSession?.user?.email_confirmed_at) {
+        localStorage.removeItem('pending_verification_email');
       }
-    );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        Promise.all([
-          fetchProfile(session.user.id),
-          fetchRoles(session.user.id)
-        ]).finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false);
-      }
+      setTimeout(() => {
+        hydrateSession(nextSession);
+      }, 0);
     });
 
+    // Then check existing session.
+    console.info('[Auth] phase=getSession:start');
+    supabase.auth.getSession()
+      .then(({ data: { session: existing } }) => {
+        console.info('[Auth] phase=getSession:done hasSession=', !!existing);
+        hydrateSession(existing);
+      })
+      .catch(err => {
+        console.error('[Auth] phase=getSession:error', err);
+        setIsLoading(false);
+      });
+
     return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -151,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    hydratingForRef.current = null;
+    hydratedForRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -166,13 +211,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasNoAccess = roles.length > 0 && roles.every(r => r === 'otros');
 
-  // Forced password change (invited users + sucursal accounts on first login / after reset)
   const mustChangePassword = (user?.user_metadata?.must_change_password === true)
     || (isSucursalAccount && user?.user_metadata?.temp_password_pending === true);
 
-  // Administración de métodos de pago / configuración → NO incluye sucursal_account
   const canManagePayments = isOwner || isGeneralManager || isManager;
-  // Operación diaria: Cobrar, Caja, Gastos → SÍ incluye sucursal_account
   const canOperarCajaYGastos = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canManageConfig = isOwner || isGeneralManager;
   const canManageBarbers = isOwner || isGeneralManager;
@@ -180,9 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canViewAllClosings = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewResumen = !hasNoAccess && roles.length > 0;
   const canViewTareas = !hasNoAccess && roles.length > 0;
-  // Mi Negocio queda fuera de Cuenta de sucursal por diseño (gestión de sucursales/equipo).
   const canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount;
-  // Sucursal account uses Finanzas only for registering operational expenses & payments (RLS limits writes).
   const canViewFinanzas = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewTurnosAgenda = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canViewClientes = !hasNoAccess && (isOwner || isGeneralManager || isManager || isBarber || isSucursalAccount);

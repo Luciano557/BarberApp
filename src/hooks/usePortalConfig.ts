@@ -6,11 +6,16 @@ export interface PortalLink {
   url: string;
   active: boolean;
   sort_order: number;
+  icon?: string | null;
 }
 
 export interface PortalConfig {
   organization_id: string;
   logo_path: string | null;
+  cover_path: string | null;
+  cover_position_x: number;
+  cover_position_y: number;
+  cover_zoom: number;
   description: string | null;
   primary_color: string | null;
   links: PortalLink[];
@@ -28,6 +33,24 @@ export function getLogoPublicUrl(logoPath: string | null): string | null {
   return data?.publicUrl ?? null;
 }
 
+export function getCoverPublicUrl(coverPath: string | null): string | null {
+  if (!coverPath) return null;
+  const { data } = supabase.storage.from('portal-logos').getPublicUrl(coverPath);
+  return data?.publicUrl ?? null;
+}
+
+const clampPos = (n: any): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 50;
+  return Math.max(0, Math.min(100, Math.round(v)));
+};
+
+const clampZoom = (n: any): number => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 1;
+  return Math.max(1, Math.min(3, v));
+};
+
 export function usePortalConfig(organizationId: string | undefined) {
   const [config, setConfig] = useState<PortalConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,17 +65,26 @@ export function usePortalConfig(organizationId: string | undefined) {
       .eq('organization_id', organizationId)
       .maybeSingle();
     if (data) {
+      const d: any = data;
       setConfig({
-        organization_id: data.organization_id,
-        logo_path: data.logo_path,
-        description: data.description,
-        primary_color: data.primary_color,
-        links: Array.isArray(data.links) ? (data.links as unknown as PortalLink[]) : [],
+        organization_id: d.organization_id,
+        logo_path: d.logo_path,
+        cover_path: d.cover_path ?? null,
+        cover_position_x: clampPos(d.cover_position_x ?? 50),
+        cover_position_y: clampPos(d.cover_position_y ?? 50),
+        cover_zoom: clampZoom(d.cover_zoom ?? 1),
+        description: d.description,
+        primary_color: d.primary_color,
+        links: Array.isArray(d.links) ? (d.links as unknown as PortalLink[]) : [],
       });
     } else {
       setConfig({
         organization_id: organizationId,
         logo_path: null,
+        cover_path: null,
+        cover_position_x: 50,
+        cover_position_y: 50,
+        cover_zoom: 1,
         description: null,
         primary_color: null,
         links: [],
@@ -66,11 +98,21 @@ export function usePortalConfig(organizationId: string | undefined) {
   const save = useCallback(async (updates: Partial<PortalConfig>) => {
     if (!organizationId) return { error: new Error('No organization') };
     setSaving(true);
-    const payload = {
+    const payload: any = {
       organization_id: organizationId,
-      logo_path: updates.logo_path ?? config?.logo_path ?? null,
-      description: updates.description ?? config?.description ?? null,
-      primary_color: updates.primary_color ?? config?.primary_color ?? null,
+      logo_path: updates.logo_path !== undefined ? updates.logo_path : config?.logo_path ?? null,
+      cover_path: updates.cover_path !== undefined ? updates.cover_path : config?.cover_path ?? null,
+      cover_position_x: updates.cover_position_x !== undefined
+        ? clampPos(updates.cover_position_x)
+        : clampPos(config?.cover_position_x ?? 50),
+      cover_position_y: updates.cover_position_y !== undefined
+        ? clampPos(updates.cover_position_y)
+        : clampPos(config?.cover_position_y ?? 50),
+      cover_zoom: updates.cover_zoom !== undefined
+        ? clampZoom(updates.cover_zoom)
+        : clampZoom(config?.cover_zoom ?? 1),
+      description: updates.description !== undefined ? updates.description : config?.description ?? null,
+      primary_color: updates.primary_color !== undefined ? updates.primary_color : config?.primary_color ?? null,
       links: (updates.links ?? config?.links ?? []) as any,
     };
     const { error } = await supabase
@@ -105,5 +147,40 @@ export function usePortalConfig(organizationId: string | undefined) {
     return await save({ logo_path: null });
   }, [config, save]);
 
-  return { config, setConfig, loading, saving, save, uploadLogo, removeLogo, refetch: fetch };
+  const uploadCover = useCallback(async (file: File) => {
+    if (!organizationId) return { error: new Error('No organization'), path: null as string | null };
+    const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      return { error: new Error('Formato no permitido. Usá PNG, JPG o WEBP.'), path: null };
+    }
+    if (file.size > 2 * 1048576) {
+      return { error: new Error('La portada no puede superar 2 MB.'), path: null };
+    }
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+    const path = `${organizationId}/covers/cover-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('portal-logos')
+      .upload(path, file, { contentType: file.type, upsert: false });
+    if (error) return { error, path: null };
+    return { error: null, path };
+  }, [organizationId]);
+
+  const removeCover = useCallback(async () => {
+    if (!config?.cover_path) return { error: null };
+    await supabase.storage.from('portal-logos').remove([config.cover_path]);
+    return await save({ cover_path: null, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
+  }, [config, save]);
+
+  return {
+    config,
+    setConfig,
+    loading,
+    saving,
+    save,
+    uploadLogo,
+    removeLogo,
+    uploadCover,
+    removeCover,
+    refetch: fetch,
+  };
 }

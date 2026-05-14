@@ -1,8 +1,9 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Barber } from '@/types/barbershop';
 import { Turno, Bloqueo, Servicio, Horario } from './hooks/useAgendaData';
 import { useBarberColors } from './hooks/useBarberColors';
+import { usePointerDragDrop, usePointerTap } from './hooks/usePointerDragDrop';
 import { timeToMinutes, minutesToTime, formatHHMM, PX_PER_MIN } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 
@@ -137,23 +138,43 @@ export function AgendaDayView({
   const COL_WIDTH = 160;
   const TIME_RAIL_WIDTH = 56;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!canDrag || dayOff) return;
-    e.preventDefault();
-  };
+  // Resolve drop target via DOM hit-test on data-col-root columns.
+  const resolveDrop = useCallback((x: number, y: number): { barberoId: string; horaInicio: string } | null => {
+    if (dayOff) return null;
+    const stack = (typeof document !== 'undefined' ? document.elementsFromPoint(x, y) : []) as HTMLElement[];
+    const col = stack.find((el) => el?.dataset?.colRoot === 'true') as HTMLElement | undefined;
+    if (!col) return null;
+    const barberoId = col.dataset.barberoId;
+    if (!barberoId) return null;
+    const rect = col.getBoundingClientRect();
+    const offY = y - rect.top;
+    const minRaw = offY / PX_PER_MIN + rangeStart;
+    const snapped = Math.round(minRaw / SLOT_MIN) * SLOT_MIN;
+    const clamped = Math.max(rangeStart, Math.min(rangeEnd - SLOT_MIN, snapped));
+    return { barberoId, horaInicio: minutesToTime(clamped) };
+  }, [dayOff, rangeStart, rangeEnd]);
 
-  const handleDrop = (e: React.DragEvent, barberoId: string) => {
-    if (!canDrag || dayOff) return;
-    e.preventDefault();
-    const turnoId = e.dataTransfer.getData('text/turno-id');
-    const turno = dayTurnos.find(t => t.id === turnoId) || turnos.find(t => t.id === turnoId);
-    if (!turno) return;
-    // Compute drop minute relative to column
-    const colRect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const offsetY = e.clientY - colRect.top;
-    const droppedMin = Math.round(offsetY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + rangeStart;
-    onMoveTurno(turno, barberoId, minutesToTime(Math.max(rangeStart, droppedMin)), dateStr);
-  };
+  const handleTurnoTap = useCallback((t: Turno) => onTurnoClick(t), [onTurnoClick]);
+  const handleTurnoDrop = useCallback((t: Turno, x: number, y: number) => {
+    const target = resolveDrop(x, y);
+    if (!target) return;
+    onMoveTurno(t, target.barberoId, target.horaInicio, dateStr);
+  }, [resolveDrop, onMoveTurno, dateStr]);
+
+  const ghostLabel = useCallback((t: Turno, x: number, y: number) => {
+    const target = resolveDrop(x, y);
+    const hora = target?.horaInicio ?? formatHHMM(t.hora_inicio);
+    const name = t.cliente_nombre || 'Sin nombre';
+    return `${hora} · ${name}`;
+  }, [resolveDrop]);
+
+  const { getHandlers: getTurnoHandlers, ghost } = usePointerDragDrop<Turno>({
+    enabled: canDrag && !dayOff,
+    canDragItem: (t) => ['pendiente', 'confirmado'].includes(t.estado),
+    onTap: handleTurnoTap,
+    onDrop: handleTurnoDrop,
+    buildGhostLabel: ghostLabel,
+  });
 
   return (
     <div className="border rounded-lg bg-card overflow-hidden">
@@ -201,47 +222,39 @@ export function AgendaDayView({
             const blocks = bloqueosByBarber[b.id] || [];
 
             return (
-              <div
+              <BarberColumn
                 key={b.id}
-                className={cn(
-                  "shrink-0 border-r relative",
-                  !works && "bg-muted/40",
-                )}
-                style={{ width: COL_WIDTH }}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, b.id)}
+                barberId={b.id}
+                width={COL_WIDTH}
+                works={works}
               >
                 {/* Hour grid lines */}
                 {hourRails.slice(0, -1).map(m => (
                   <div
                     key={m}
-                    className="absolute left-0 right-0 border-t border-border/40"
+                    className="absolute left-0 right-0 border-t border-border/40 pointer-events-none"
                     style={{ top: (m - rangeStart) * PX_PER_MIN }}
                   />
                 ))}
-                {/* Working hours overlay (subtle) */}
-                {works && barberHorarios.map(h => {
-                  const top = (timeToMinutes(h.hora_inicio) - rangeStart) * PX_PER_MIN;
-                  const height = (timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * PX_PER_MIN;
-                  return (
-                    <div
-                      key={h.id}
-                      className="absolute left-0 right-0 bg-background"
-                      style={{ top, height }}
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const offY = e.clientY - rect.top;
-                        const min = Math.round(offY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
-                        onSlotClick(b.id, minutesToTime(min));
-                      }}
-                    />
-                  );
-                })}
+                {/* Working hours overlay (subtle) - tappable for new appointment */}
+                {works && barberHorarios.map(h => (
+                  <SlotTapArea
+                    key={h.id}
+                    top={(timeToMinutes(h.hora_inicio) - rangeStart) * PX_PER_MIN}
+                    height={(timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * PX_PER_MIN}
+                    onTap={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const offY = e.clientY - rect.top;
+                      const min = Math.round(offY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
+                      onSlotClick(b.id, minutesToTime(min));
+                    }}
+                  />
+                ))}
                 {/* Bloqueos del barbero */}
                 {blocks.map(bl => {
                   if (bl.todo_el_dia) {
                     return (
-                      <div key={bl.id} className="absolute inset-0 bg-muted/60 backdrop-blur-[1px] flex items-center justify-center">
+                      <div key={bl.id} className="absolute inset-0 bg-muted/60 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
                         <span className="text-[10px] text-muted-foreground rotate-90">No disponible</span>
                       </div>
                     );
@@ -252,7 +265,7 @@ export function AgendaDayView({
                   return (
                     <div
                       key={bl.id}
-                      className="absolute left-0 right-0 bg-muted/70 border-l-2 border-muted-foreground/40"
+                      className="absolute left-0 right-0 bg-muted/70 border-l-2 border-muted-foreground/40 pointer-events-none"
                       style={{ top, height, backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 6px, hsl(var(--muted-foreground)/0.15) 6px, hsl(var(--muted-foreground)/0.15) 7px)' }}
                       title={bl.motivo || 'No disponible'}
                     />
@@ -267,17 +280,13 @@ export function AgendaDayView({
                   const leftPct = widthPct * layout.idx;
                   const servicio = servicios.find(s => s.id === t.servicio_id);
                   const isPending = t.estado === 'pendiente';
+                  const turnoHandlers = getTurnoHandlers(t);
                   return (
                     <div
                       key={t.id}
-                      draggable={canDrag && ['pendiente', 'confirmado'].includes(t.estado)}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('text/turno-id', t.id);
-                        e.dataTransfer.effectAllowed = 'move';
-                      }}
-                      onClick={(e) => { e.stopPropagation(); onTurnoClick(t); }}
+                      {...turnoHandlers}
                       className={cn(
-                        "absolute rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card",
+                        "absolute rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none",
                         isPending ? "border border-dashed" : "border",
                       )}
                       style={{
@@ -285,6 +294,9 @@ export function AgendaDayView({
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
                         borderLeft: `3px solid ${colors[b.id]}`,
+                        touchAction: 'pan-y',
+                        WebkitUserSelect: 'none',
+                        WebkitTouchCallout: 'none',
                       }}
                     >
                       <div className="text-[10px] font-mono text-muted-foreground">
@@ -299,7 +311,7 @@ export function AgendaDayView({
                     </div>
                   );
                 })}
-              </div>
+              </BarberColumn>
             );
           })}
 
@@ -324,6 +336,58 @@ export function AgendaDayView({
           )}
         </div>
       </div>
+
+      {/* Drag ghost */}
+      {ghost && (
+        <div
+          className="fixed z-[100] pointer-events-none rounded-md border bg-card px-2 py-1 text-xs shadow-md"
+          style={{
+            left: 0,
+            top: 0,
+            transform: `translate(${ghost.x + 12}px, ${ghost.y + 12}px)`,
+          }}
+        >
+          <span className="font-medium text-foreground">{ghost.label}</span>
+        </div>
+      )}
     </div>
   );
 }
+
+interface BarberColumnProps {
+  barberId: string;
+  width: number;
+  works: boolean;
+  children: React.ReactNode;
+}
+
+function BarberColumn({ barberId, width, works, children }: BarberColumnProps) {
+  return (
+    <div
+      data-col-root="true"
+      data-barbero-id={barberId}
+      className={cn("shrink-0 border-r relative", !works && "bg-muted/40")}
+      style={{ width, touchAction: 'pan-y' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface SlotTapAreaProps {
+  top: number;
+  height: number;
+  onTap: (e: React.PointerEvent<HTMLDivElement>) => void;
+}
+
+function SlotTapArea({ top, height, onTap }: SlotTapAreaProps) {
+  const handlers = usePointerTap((e) => onTap(e as React.PointerEvent<HTMLDivElement>));
+  return (
+    <div
+      className="absolute left-0 right-0 bg-background"
+      style={{ top, height, touchAction: 'pan-y' }}
+      {...handlers}
+    />
+  );
+}
+

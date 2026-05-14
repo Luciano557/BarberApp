@@ -54,6 +54,7 @@ export type Database = {
       }
       agenda_config: {
         Row: {
+          anticipacion_minima_reserva_min: number
           buffer_antes_min: number
           buffer_despues_min: number
           cancelacion_limite_hs: number
@@ -67,6 +68,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anticipacion_minima_reserva_min?: number
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number
@@ -80,6 +82,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anticipacion_minima_reserva_min?: number
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number
@@ -1860,6 +1863,10 @@ export type Database = {
       }
       portal_config: {
         Row: {
+          cover_path: string | null
+          cover_position_x: number
+          cover_position_y: number
+          cover_zoom: number
           created_at: string
           description: string | null
           links: Json
@@ -1869,6 +1876,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cover_path?: string | null
+          cover_position_x?: number
+          cover_position_y?: number
+          cover_zoom?: number
           created_at?: string
           description?: string | null
           links?: Json
@@ -1878,6 +1889,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cover_path?: string | null
+          cover_position_x?: number
+          cover_position_y?: number
+          cover_zoom?: number
           created_at?: string
           description?: string | null
           links?: Json

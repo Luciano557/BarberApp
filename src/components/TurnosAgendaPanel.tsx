@@ -115,7 +115,11 @@ export function TurnosAgendaPanel() {
               <AgendaManagement
                 sucursalId={s.id}
                 organizationId={organization?.id || ''}
-                barbers={allBarbers.filter(b => b.sucursalId === s.id)}
+                barbers={allBarbers.filter(b => {
+                  if (b.sucursalId !== s.id) return false;
+                  const role = (b.teamRole || '').toString().toLowerCase();
+                  return role !== 'otros';
+                })}
               />
             </TabsContent>
           ))}

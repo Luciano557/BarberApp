@@ -3,6 +3,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { ChangePasswordForm } from './ChangePasswordForm';
+import { LoadingScreen, RecoverableErrorScreen } from './LoadingScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,38 +11,53 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { user, roles, isLoading, mustChangePassword } = useAuth();
-  const { organization, isLoading: orgLoading } = useOrganization();
+  const { user, roles, isLoading, mustChangePassword, signOut } = useAuth();
+  const { organization, isLoading: orgLoading, error: orgError, refreshOrganization } = useOrganization();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
 
+  // 1. Mientras realmente se está inicializando, mostrar loader con fallback progresivo.
   if (isLoading || orgLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Verificando sesión...</p>
-        </div>
-      </div>
+      <LoadingScreen
+        message="Verificando sesión..."
+        onRetry={() => refreshOrganization()}
+      />
     );
   }
 
+  // 2. Sin sesión → al login.
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Bloquear acceso si el email no está verificado (excepto invitados)
+  // 3. Email no verificado (excepto invitados).
   const isInvited = user.user_metadata?.invited_by != null;
   if (!user.email_confirmed_at && !isInvited) {
     return <Navigate to="/verify-email" replace />;
   }
 
-  // Force password change for invited users + sucursal accounts on first login / after reset
+  // 4. Forzar cambio de contraseña si corresponde.
   if (mustChangePassword && !passwordChanged) {
     return <ChangePasswordForm onSuccess={() => setPasswordChanged(true)} />;
   }
 
-  // Validate :orgSlug matches user's organization
+  // 5. Hay user pero la organización no se pudo cargar → pantalla recuperable.
+  if (!organization && orgError) {
+    return (
+      <RecoverableErrorScreen
+        title="No pudimos cargar tu cuenta"
+        description={orgError}
+        onRetry={() => refreshOrganization()}
+        onSignOut={async () => {
+          await signOut();
+          window.location.href = '/login';
+        }}
+      />
+    );
+  }
+
+  // 6. Validar slug en URL.
   if (orgSlug && organization && orgSlug !== organization.slug) {
     return <Navigate to={`/app/${organization.slug}`} replace />;
   }

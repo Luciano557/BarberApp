@@ -33,11 +33,23 @@ export function AgendaManagement({ sucursalId, organizationId, barbers }: Agenda
         />
       </TabsContent>
 
-      <TabsContent value="config" className="mt-4 space-y-6">
-        <PortalPublicoSection />
-        <AgendaConfigSection sucursalId={sucursalId} organizationId={organizationId} />
-        <HorariosTrabajoSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
-        <BloqueosSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
+      <TabsContent value="config" className="mt-4">
+        <Tabs defaultValue="portal" className="w-full">
+          <TabsList className="h-9 bg-muted p-1 rounded-lg">
+            <TabsTrigger value="portal" className="text-xs px-4">Portal público</TabsTrigger>
+            <TabsTrigger value="reservas" className="text-xs px-4">Configuración de reservas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="portal" className="mt-4">
+            <PortalPublicoSection />
+          </TabsContent>
+
+          <TabsContent value="reservas" className="mt-4 space-y-6">
+            <AgendaConfigSection sucursalId={sucursalId} organizationId={organizationId} />
+            <HorariosTrabajoSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
+            <BloqueosSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
+          </TabsContent>
+        </Tabs>
       </TabsContent>
     </Tabs>
   );
