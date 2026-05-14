@@ -136,8 +136,9 @@ function dbToDiscount(row: any, branchRow?: DescuentoSucursalRow): Discount {
 }
 
 export function useSupabaseData() {
-  const { organization } = useOrganization();
+  const { organization, isLoading: orgLoading } = useOrganization();
   const { currentSucursal } = useSucursal();
+  const { user, isLoading: authLoading, roles, hasNoAccess } = useAuth();
   const sucursalId = currentSucursal?.id ?? null;
 
   const [services, setServices] = useState<Service[]>([]);
@@ -148,25 +149,34 @@ export function useSupabaseData() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Gating: hasta que auth y org no terminen de hidratar, o si el usuario no tiene cargo,
+  // NO disparamos fetch (no hay datos que cargar).
+  const ready = !authLoading && !orgLoading && !!user && !!organization && roles.length > 0 && !hasNoAccess;
+  const skip = !authLoading && !orgLoading && (hasNoAccess || roles.length === 0);
+
   // Fetch all data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    console.info('[Data] phase=fetch:start');
+    console.info('[Data] phase=fetch:start', {
+      userId: user?.id,
+      organizationId: organization?.id,
+      sucursalId,
+      roles,
+    });
     try {
-      // Lines first (services depend on them)
-      const linesRes = await supabase.from('lineas').select('*').eq('eliminado', false).order('nombre');
-      if (linesRes.error) throw linesRes.error;
-      const fetchedLines = linesRes.data.map(dbToLine);
+      const linesData = await runQuery<any[]>(
+        'lineas',
+        supabase.from('lineas').select('*').eq('eliminado', false).order('nombre') as any
+      );
+      const fetchedLines = linesData.map(dbToLine);
       setLines(fetchedLines);
 
-      // Barberos query — filter by sucursal when one is selected
       let barbersQuery = supabase.from('barberos').select('*').order('nombre');
       if (sucursalId) {
         barbersQuery = barbersQuery.eq('sucursal_id', sucursalId);
       }
 
-      // Branch-config queries (only when sucursal active)
       const servSucPromise = sucursalId
         ? supabase.from('servicios_sucursales').select('*').eq('sucursal_id', sucursalId)
         : Promise.resolve({ data: [] as ServicioSucursalRow[], error: null as any });
@@ -177,34 +187,25 @@ export function useSupabaseData() {
         ? supabase.from('descuentos_sucursales').select('*').eq('sucursal_id', sucursalId)
         : Promise.resolve({ data: [] as DescuentoSucursalRow[], error: null as any });
 
-      const [servicesRes, extrasRes, barbersRes, discountsRes, servSucRes, extSucRes, descSucRes] = await Promise.all([
-        supabase.from('servicios').select('*').eq('eliminado', false).order('nombre'),
-        supabase.from('extras').select('*').eq('eliminado', false).order('nombre'),
-        barbersQuery,
-        supabase.from('descuentos').select('*').eq('eliminado', false).order('valor'),
-        servSucPromise,
-        extSucPromise,
-        descSucPromise,
+      const [servicesData, extrasData, barbersData, discountsData, servSucData, extSucData, descSucData] = await Promise.all([
+        runQuery<any[]>('servicios', supabase.from('servicios').select('*').eq('eliminado', false).order('nombre') as any),
+        runQuery<any[]>('extras', supabase.from('extras').select('*').eq('eliminado', false).order('nombre') as any),
+        runQuery<any[]>('barberos', barbersQuery as any),
+        runQuery<any[]>('descuentos', supabase.from('descuentos').select('*').eq('eliminado', false).order('valor') as any),
+        runQuery<ServicioSucursalRow[]>('servicios_sucursales', servSucPromise as any),
+        runQuery<ExtraSucursalRow[]>('extras_sucursales', extSucPromise as any),
+        runQuery<DescuentoSucursalRow[]>('descuentos_sucursales', descSucPromise as any),
       ]);
 
-      if (servicesRes.error) throw servicesRes.error;
-      if (extrasRes.error) throw extrasRes.error;
-      if (barbersRes.error) throw barbersRes.error;
-      if (discountsRes.error) throw discountsRes.error;
-      if ((servSucRes as any).error) throw (servSucRes as any).error;
-      if ((extSucRes as any).error) throw (extSucRes as any).error;
-      if ((descSucRes as any).error) throw (descSucRes as any).error;
-
       const servSucMap = new Map<string, ServicioSucursalRow>();
-      ((servSucRes.data as ServicioSucursalRow[]) || []).forEach(r => servSucMap.set(r.servicio_id, r));
+      (servSucData || []).forEach(r => servSucMap.set(r.servicio_id, r));
       const extSucMap = new Map<string, ExtraSucursalRow>();
-      ((extSucRes.data as ExtraSucursalRow[]) || []).forEach(r => extSucMap.set(r.extra_id, r));
+      (extSucData || []).forEach(r => extSucMap.set(r.extra_id, r));
       const descSucMap = new Map<string, DescuentoSucursalRow>();
-      ((descSucRes.data as DescuentoSucursalRow[]) || []).forEach(r => descSucMap.set(r.descuento_id, r));
+      (descSucData || []).forEach(r => descSucMap.set(r.descuento_id, r));
 
-      // Build services with branch enrichment; if sucursal active and config missing, warn + skip
       const builtServices: Service[] = [];
-      for (const row of servicesRes.data) {
+      for (const row of servicesData) {
         if (sucursalId) {
           const br = servSucMap.get(row.id);
           if (!br) {
@@ -219,7 +220,7 @@ export function useSupabaseData() {
       setServices(builtServices);
 
       const builtExtras: Extra[] = [];
-      for (const row of extrasRes.data) {
+      for (const row of extrasData) {
         if (sucursalId) {
           const br = extSucMap.get(row.id);
           if (!br) {
@@ -233,10 +234,10 @@ export function useSupabaseData() {
       }
       setExtras(builtExtras);
 
-      setBarbers(barbersRes.data.map(dbToBarber));
+      setBarbers(barbersData.map(dbToBarber));
 
       const builtDiscounts: Discount[] = [];
-      for (const row of discountsRes.data) {
+      for (const row of discountsData) {
         if (sucursalId) {
           const br = descSucMap.get(row.id);
           if (!br) {
@@ -250,18 +251,36 @@ export function useSupabaseData() {
       }
       setDiscounts(builtDiscounts);
       console.info('[Data] phase=fetch:success');
-    } catch (err) {
-      console.error('[Data] phase=fetch:error', err);
+    } catch (err: any) {
+      console.error('[Data] phase=fetch:error', {
+        table: err?.table ?? 'unknown',
+        code: err?.code,
+        message: err?.message,
+      });
       setError('No pudimos cargar los datos. Reintentá en unos segundos.');
       toast.error('Error al cargar datos');
     } finally {
       setIsLoading(false);
     }
-  }, [sucursalId]);
+  }, [sucursalId, user?.id, organization?.id, roles]);
 
   useEffect(() => {
+    if (skip) {
+      setLines([]);
+      setServices([]);
+      setExtras([]);
+      setBarbers([]);
+      setDiscounts([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+    if (!ready) {
+      setIsLoading(true);
+      return;
+    }
     fetchData();
-  }, [fetchData]);
+  }, [ready, skip, fetchData]);
 
   // ============= Helpers para resolver sucursalConfigId =============
   const findServicioSucursalId = useCallback(async (servicioId: string): Promise<string | null> => {
