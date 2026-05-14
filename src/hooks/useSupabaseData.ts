@@ -1,10 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line, TeamRole } from '@/types/barbershop';
-import type { AppRole } from '@/contexts/AuthContext';
+import { useAuth, type AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
+
+// Helper: ejecuta una query y, si falla, anota la tabla en el error para diagnóstico.
+async function runQuery<T>(table: string, p: PromiseLike<{ data: T; error: any }>): Promise<T> {
+  const { data, error } = await p;
+  if (error) {
+    const tagged: any = new Error(error.message || `Error consultando ${table}`);
+    tagged.code = error.code;
+    tagged.table = table;
+    tagged.original = error;
+    throw tagged;
+  }
+  return data as T;
+}
 
 // ============= Branch row shapes =============
 type ServicioSucursalRow = { id: string; servicio_id: string; sucursal_id: string; precio: number; activo: boolean };
