@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { ONBOARDING_STEPS, OnboardingStep, OnboardingSubTab, OnboardingEvent } from './steps';
 import { useOnboardingState } from '@/hooks/useOnboardingState';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OnboardingContextValue {
   isActive: boolean;
