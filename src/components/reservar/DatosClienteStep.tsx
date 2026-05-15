@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { COUNTRIES, buildPhone } from "./lib/phone";
+import { supabase } from "@/integrations/supabase/client";
+import { UserCheck, Search } from "lucide-react";
 
 export interface ClienteData {
   nombre: string;
@@ -22,11 +24,68 @@ export interface ClienteData {
 }
 
 interface Props {
+  organizationId: string;
   initial?: Partial<ClienteData>;
   onSubmit: (cliente: ClienteData) => void;
 }
 
-export const DatosClienteStep = ({ initial, onSubmit }: Props) => {
+export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) => {
+  // ===== Lookup state =====
+  const [lookupCountry, setLookupCountry] = useState("AR");
+  const [lookupPhone, setLookupPhone] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [matched, setMatched] = useState<ClienteData | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  const lookupCountryObj = useMemo(
+    () => COUNTRIES.find((c) => c.code === lookupCountry) ?? COUNTRIES[0],
+    [lookupCountry],
+  );
+
+  const handleLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const digits = lookupPhone.replace(/\D/g, "");
+    if (!digits || digits.length < 6) {
+      toast.error("Ingresá un teléfono válido");
+      return;
+    }
+    const fullPhone = buildPhone(lookupCountryObj.dial, digits);
+    setLookupLoading(true);
+    setNotFound(false);
+    setMatched(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("lookup-cliente-by-phone", {
+        body: { organization_id: organizationId, telefono: fullPhone },
+      });
+      if (error || data?.error) {
+        toast.error("No pudimos buscar tus datos. Intentá de nuevo.");
+        return;
+      }
+      if (data?.found) {
+        setMatched({
+          nombre: data.cliente.nombre || "",
+          apellido: data.cliente.apellido || "",
+          telefono: data.cliente.telefono || fullPhone,
+          phone_country: lookupCountryObj.code,
+          email: data.cliente.email || null,
+          birth_date: data.cliente.birth_date || null,
+        });
+      } else {
+        setNotFound(true);
+      }
+    } catch {
+      toast.error("Error de conexión.");
+    } finally {
+      setLookupLoading(false);
+    }
+  };
+
+  const handleConfirmMatch = () => {
+    if (!matched) return;
+    onSubmit(matched);
+  };
+
+  // ===== Register form state =====
   const [countryCode, setCountryCode] = useState(initial?.phone_country || "AR");
   const [nombre, setNombre] = useState(initial?.nombre || "");
   const [apellido, setApellido] = useState(initial?.apellido || "");
@@ -62,14 +121,112 @@ export const DatosClienteStep = ({ initial, onSubmit }: Props) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-foreground">Tus datos</h2>
         <p className="text-sm text-muted-foreground">
-          Completá tus datos para reservar el turno.
+          Si ya reservaste antes, buscá tus datos por teléfono. Si no, registrate abajo.
         </p>
       </div>
 
+      {/* ===== Lookup block ===== */}
+      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-semibold text-foreground">¿Ya estás registrado?</h3>
+          <p className="text-xs text-muted-foreground">
+            Ingresá tu teléfono y te identificamos al instante.
+          </p>
+        </div>
+
+        {!matched ? (
+          <form onSubmit={handleLookup} className="space-y-3">
+            <div className="flex gap-2">
+              <Select value={lookupCountry} onValueChange={setLookupCountry}>
+                <SelectTrigger className="h-11 w-[100px] text-sm">
+                  <SelectValue>{lookupCountryObj.dial}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name} ({c.dial})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="tel"
+                inputMode="tel"
+                className="h-11 text-base flex-1"
+                value={lookupPhone}
+                onChange={(e) => {
+                  setLookupPhone(e.target.value.replace(/[^\d\s-]/g, ""));
+                  setNotFound(false);
+                }}
+                placeholder={lookupCountryObj.placeholder}
+                autoComplete="tel-national"
+                maxLength={20}
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="outline"
+              className="w-full h-11 gap-2"
+              disabled={lookupLoading}
+            >
+              <Search className="h-4 w-4" />
+              {lookupLoading ? "Buscando..." : "Buscar mis datos"}
+            </Button>
+            {notFound && (
+              <p className="text-xs text-muted-foreground">
+                No encontramos ese teléfono. Registrate abajo para reservar.
+              </p>
+            )}
+          </form>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3">
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <UserCheck className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Encontramos tu cuenta</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {[matched.nombre, matched.apellido].filter(Boolean).join(" ")}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button className="flex-1 h-11" onClick={handleConfirmMatch}>
+                Sí, soy yo. Continuar
+              </Button>
+              <Button
+                variant="ghost"
+                className="flex-1 h-11"
+                onClick={() => {
+                  setMatched(null);
+                  setLookupPhone("");
+                }}
+              >
+                No soy yo
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ===== Separator ===== */}
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border/60" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">
+            o registrate por primera vez
+          </span>
+        </div>
+      </div>
+
+      {/* ===== Register form ===== */}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="space-y-1">
           <Label htmlFor="nombre">Nombre *</Label>
