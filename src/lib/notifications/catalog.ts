@@ -39,6 +39,8 @@ export const CATEGORY_ORDER: EventCategory[] = [
   'sistema_seguridad',
 ];
 
+export type PrefMode = 'disabled' | 'always' | 'sucursal_account_only';
+
 export interface NotificationEventDef {
   eventType: string;
   category: EventCategory;
@@ -62,6 +64,10 @@ export interface NotificationEventDef {
   /** Suele incluir metadata/body que justifica vista desplegable. */
   requiresDetails: boolean;
   sourceModule: string;
+  /** Si true, la preferencia soporta modos (No notificar / Siempre / Solo cuenta de sucursal). */
+  supportsMode?: boolean;
+  /** Modo default cuando supportsMode=true y no hay preferencia. */
+  defaultMode?: Exclude<PrefMode, 'disabled'>;
 }
 
 /**
