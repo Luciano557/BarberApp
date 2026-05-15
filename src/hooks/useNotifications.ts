@@ -6,6 +6,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTareas, type Tarea } from '@/hooks/useTareas';
 import { getTareaVencimiento, getPeticionVencimiento } from '@/lib/tareasVencimiento';
 import { parseISO, startOfDay, addDays } from 'date-fns';
+import { getEventDef, resolveNotificationEventType } from '@/lib/notifications/catalog';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
 export type NotificationType =
   | 'tarea_pendiente'
@@ -23,8 +25,17 @@ interface DeliveryRow {
   notifications: {
     id: string;
     organization_id: string;
+    sucursal_id: string | null;
     event_key: string;
     type: NotificationType | string;
+    category: string | null;
+    summary: string | null;
+    actor_user_id: string | null;
+    actor_name: string | null;
+    actor_account_type: string | null;
+    authorized_by_user_id: string | null;
+    authorized_by_name: string | null;
+    expires_at: string | null;
     source_module: string;
     source_table: string | null;
     source_id: string | null;
@@ -41,11 +52,21 @@ export interface NotificationItem {
   id: string;                  // notification_deliveries.id (UUID)
   notification_id: string;     // notifications.id
   source_type: NotificationType | string;
+  /** eventType canónico del catálogo (resuelto desde legacy si aplica). */
+  event_type: string;
+  /** Categoría del catálogo (si el evento existe en él). */
+  category: string | null;
   source_id: string;           // tarea/peticion id
   titulo: string;
+  body: string | null;
+  summary: string | null;
   fecha: string;               // notification_at ISO
   read: boolean;
   source_module: string;
+  sucursal_id: string | null;
+  actor_name: string | null;
+  authorized_by_name: string | null;
+  metadata: Record<string, unknown>;
   tarea?: Tarea;
 }
 
@@ -69,6 +90,7 @@ export function useNotifications() {
   const { user } = useAuth();
   const { organization } = useOrganization();
   const { tareas } = useTareas();
+  const { preferences } = useNotificationPreferences();
   const queryClient = useQueryClient();
 
   const tareasDias = organization?.tareas_vencimiento_dias_default ?? 1;
@@ -151,8 +173,19 @@ export function useNotifications() {
     const handle = setTimeout(() => {
       (async () => {
         try {
+          // Filtra candidatos cuyo evento esté no-implementado o desactivado por
+          // preferencia del usuario, para no crear deliveries innecesarias.
+          const filtered = candidates.filter(c => {
+            const canon = resolveNotificationEventType(c.type) ?? c.type;
+            const def = getEventDef(canon);
+            if (!def) return true; // tipo desconocido: comportamiento legacy
+            if (!def.implemented) return false;
+            const pref = preferences.get(def.eventType);
+            const enabled = pref ?? def.defaultEnabled;
+            return enabled;
+          });
           await Promise.all(
-            candidates.map(c =>
+            filtered.map(c =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (supabase as any).rpc('upsert_notification', {
                 _organization_id: organization.id,
@@ -247,6 +280,20 @@ export function useNotifications() {
     for (const d of deliveries) {
       const n = d.notifications;
       if (!n) continue;
+
+      // Filtro por catálogo + preferencia del usuario.
+      // - Evento `implemented = false` → ocultar.
+      // - Preferencia desactivada → ocultar.
+      // - Tipo desconocido (no en catálogo) → mostrar (compatibilidad).
+      const canon = resolveNotificationEventType(n.type) ?? n.type;
+      const def = getEventDef(canon);
+      if (def) {
+        if (!def.implemented) continue;
+        const pref = preferences.get(def.eventType);
+        const enabled = pref ?? def.defaultEnabled;
+        if (!enabled) continue;
+      }
+
       // Filtrado activo: por ahora solo modulo tareas
       if (n.source_module === 'tareas' && n.source_id) {
         const t = tareasById.get(n.source_id);
@@ -263,16 +310,24 @@ export function useNotifications() {
         id: d.id,
         notification_id: n.id,
         source_type: n.type,
+        event_type: canon,
+        category: def?.category ?? n.category ?? null,
         source_id: n.source_id ?? '',
         titulo: n.title,
+        body: n.body ?? null,
+        summary: n.summary ?? null,
         fecha: n.notification_at,
         read: !!read,
         source_module: n.source_module,
+        sucursal_id: n.sucursal_id ?? null,
+        actor_name: n.actor_name ?? null,
+        authorized_by_name: n.authorized_by_name ?? null,
+        metadata: (n.metadata ?? {}) as Record<string, unknown>,
         tarea: n.source_id ? tareasById.get(n.source_id) : undefined,
       });
     }
     return out;
-  }, [deliveries, tareasById, legacyReadsBySourceKey]);
+  }, [deliveries, tareasById, legacyReadsBySourceKey, preferences]);
 
   const unreadNotifications = useMemo(
     () => notifications.filter(n => !n.read),
