@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
