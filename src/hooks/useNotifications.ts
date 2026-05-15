@@ -136,33 +136,39 @@ export function useNotifications() {
   useEffect(() => {
     if (!organization?.id || !user?.id || candidates.length === 0) return;
     let cancelled = false;
-    (async () => {
-      for (const c of candidates) {
-        if (cancelled) break;
+    // Defer to next tick so we don't invalidate queries during the same
+    // commit phase that mounted observers (avoids React Query queue corruption).
+    const handle = setTimeout(() => {
+      (async () => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any).rpc('upsert_notification', {
-            _organization_id: organization.id,
-            _event_key: c.event_key,
-            _type: c.type,
-            _source_module: c.source_module,
-            _source_table: c.source_table,
-            _source_id: c.source_id,
-            _title: c.title,
-            _body: null,
-            _notification_at: c.notification_at,
-            _metadata: c.metadata,
-          });
+          await Promise.all(
+            candidates.map(c =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (supabase as any).rpc('upsert_notification', {
+                _organization_id: organization.id,
+                _event_key: c.event_key,
+                _type: c.type,
+                _source_module: c.source_module,
+                _source_table: c.source_table,
+                _source_id: c.source_id,
+                _title: c.title,
+                _body: null,
+                _notification_at: c.notification_at,
+                _metadata: c.metadata,
+              }),
+            ),
+          );
         } catch (e) {
           console.warn('[notifications] upsert error', e);
         }
-      }
-      if (!cancelled) {
-        queryClient.invalidateQueries({ queryKey: ['notifications', organization.id] });
-      }
-    })();
+        if (!cancelled) {
+          queryClient.invalidateQueries({ queryKey: ['notifications', organization.id] });
+        }
+      })().catch(e => console.warn('[notifications] upsert batch error', e));
+    }, 0);
     return () => {
       cancelled = true;
+      clearTimeout(handle);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidatesFingerprint, organization?.id, user?.id]);
