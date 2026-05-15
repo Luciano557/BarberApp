@@ -27,7 +27,9 @@ export function useOnboarding() {
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const { row, isLoading, isOwner, upsert } = useOnboardingState();
+  const { row, isLoading, upsert } = useOnboardingState();
+  const { isOwner, isGeneralManager } = useAuth();
+  const canSeeOnboarding = isOwner || isGeneralManager;
   const tabSetterRef = useRef<((tab: string) => void) | null>(null);
   const subTabSetterRef = useRef<((kind: OnboardingSubTab) => void) | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
