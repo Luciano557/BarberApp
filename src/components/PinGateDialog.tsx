@@ -63,7 +63,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o && onClose) onClose(); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetState(); if (onClose) onClose(); } }}>
       <DialogContent 
         className="sm:max-w-md" 
         onPointerDownOutside={(e) => !onClose && e.preventDefault()}
