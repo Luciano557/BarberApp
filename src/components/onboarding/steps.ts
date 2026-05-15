@@ -49,11 +49,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     targetId: 'cuentas-sucursal-bullets',
     title: '¿Para qué sirve la cuenta de sucursal?',
     description: 'Tres ideas clave para tener en cuenta:',
-    bullets: [
-      'Cada sucursal tiene una cuenta propia.',
-      'Sirve para operar el día a día sin usar cuentas personales del equipo.',
-      'No accede a configuraciones, estadísticas, comisiones ni gestión del negocio.',
-    ],
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'general',
   },
