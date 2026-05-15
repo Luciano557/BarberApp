@@ -74,7 +74,7 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
         </PopoverTrigger>
         <PopoverContent
           side={isMobile ? 'bottom' : 'right'}
-          align={isMobile ? 'center' : 'start'}
+          align={isMobile ? 'center' : 'end'}
           sideOffset={8}
           collisionPadding={12}
           className={cn(
