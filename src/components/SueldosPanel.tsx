@@ -793,11 +793,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [organization, barbers, periodStartDate, currentSucursal]);
+  }, [organization, barbers, periodStartDate, periodEndDate, currentSucursal]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, periodStartDate]);
+  }, [fetchData, periodStartDate, periodEndDate]);
 
   const handleSubmitPago = async () => {
     if (!organization || !selectedBarberId || !monto) {
