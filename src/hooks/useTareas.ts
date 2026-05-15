@@ -25,6 +25,7 @@ export interface Tarea {
   recurrencia_semana_del_mes: number | null;
   dias_para_limite: number | null;
   proxima_fecha: string | null;
+  fecha_inicio: string | null;
   fecha_limite: string | null;
   hora: string | null;
   repeat_preset: string | null;
