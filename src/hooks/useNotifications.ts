@@ -25,8 +25,17 @@ interface DeliveryRow {
   notifications: {
     id: string;
     organization_id: string;
+    sucursal_id: string | null;
     event_key: string;
     type: NotificationType | string;
+    category: string | null;
+    summary: string | null;
+    actor_user_id: string | null;
+    actor_name: string | null;
+    actor_account_type: string | null;
+    authorized_by_user_id: string | null;
+    authorized_by_name: string | null;
+    expires_at: string | null;
     source_module: string;
     source_table: string | null;
     source_id: string | null;
@@ -43,11 +52,21 @@ export interface NotificationItem {
   id: string;                  // notification_deliveries.id (UUID)
   notification_id: string;     // notifications.id
   source_type: NotificationType | string;
+  /** eventType canónico del catálogo (resuelto desde legacy si aplica). */
+  event_type: string;
+  /** Categoría del catálogo (si el evento existe en él). */
+  category: string | null;
   source_id: string;           // tarea/peticion id
   titulo: string;
+  body: string | null;
+  summary: string | null;
   fecha: string;               // notification_at ISO
   read: boolean;
   source_module: string;
+  sucursal_id: string | null;
+  actor_name: string | null;
+  authorized_by_name: string | null;
+  metadata: Record<string, unknown>;
   tarea?: Tarea;
 }
 
