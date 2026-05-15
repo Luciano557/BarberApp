@@ -2498,6 +2498,7 @@ export type Database = {
           descripcion: string | null
           dias_para_limite: number | null
           estado: string
+          fecha_inicio: string | null
           fecha_limite: string | null
           frecuencia_dias: number | null
           hora: string | null
@@ -2531,6 +2532,7 @@ export type Database = {
           descripcion?: string | null
           dias_para_limite?: number | null
           estado?: string
+          fecha_inicio?: string | null
           fecha_limite?: string | null
           frecuencia_dias?: number | null
           hora?: string | null
@@ -2564,6 +2566,7 @@ export type Database = {
           descripcion?: string | null
           dias_para_limite?: number | null
           estado?: string
+          fecha_inicio?: string | null
           fecha_limite?: string | null
           frecuencia_dias?: number | null
           hora?: string | null
