@@ -233,17 +233,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               />
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="instagram">Instagram</Label>
-              <Input
-                id="instagram"
-                className="h-12 text-base"
-                value={form.instagram}
-                onChange={(e) => update("instagram", e.target.value)}
-                placeholder="@tuusuario"
-                maxLength={80}
-              />
-            </div>
           </>
         )}
 
