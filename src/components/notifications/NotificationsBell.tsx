@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare } from 'lucide-react';
+import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare, Wallet, Receipt, Banknote, ShieldAlert, KeyRound, Eye, LogIn, Lock, FileEdit, Settings2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -44,6 +44,28 @@ const TYPE_META: Record<string, { label: string; icon: typeof ClipboardList; ton
   turno_cancelado: { label: 'Turno cancelado', icon: CalendarX, tone: 'text-status-warning-foreground' },
   turno_cancelado_propio: { label: 'Mi turno cancelado', icon: CalendarX, tone: 'text-status-warning-foreground' },
   turno_cancelado_companero: { label: 'Compañero cancelado', icon: CalendarX, tone: 'text-muted-foreground' },
+  // Fase 4 — caja
+  cierre_caja_realizado: { label: 'Cierre de caja', icon: Wallet, tone: 'text-status-info-foreground' },
+  cierre_caja_dia_anterior_realizado: { label: 'Cierre día anterior', icon: Wallet, tone: 'text-status-warning-foreground' },
+  transaccion_anulada: { label: 'Transacción anulada', icon: Undo2, tone: 'text-status-warning-foreground' },
+  anulacion_cierre: { label: 'Anulación de cierre', icon: Undo2, tone: 'text-status-warning-foreground' },
+  // Fase 4 — finanzas
+  visualizacion_gastos: { label: 'Visualización de gastos', icon: Eye, tone: 'text-muted-foreground' },
+  gasto_registrado: { label: 'Gasto registrado', icon: Receipt, tone: 'text-status-info-foreground' },
+  gasto_editado: { label: 'Gasto editado', icon: FileEdit, tone: 'text-status-info-foreground' },
+  gasto_anulado: { label: 'Gasto anulado', icon: Undo2, tone: 'text-status-warning-foreground' },
+  inversion_creada: { label: 'Inversión registrada', icon: Banknote, tone: 'text-status-info-foreground' },
+  deuda_creada: { label: 'Deuda registrada', icon: Banknote, tone: 'text-status-warning-foreground' },
+  // Fase 4 — sueldos
+  visualizacion_sueldos: { label: 'Visualización de sueldos', icon: Eye, tone: 'text-muted-foreground' },
+  pago_sueldo_registrado: { label: 'Pago de sueldo', icon: Banknote, tone: 'text-status-info-foreground' },
+  // Fase 4 — seguridad
+  cambio_permisos: { label: 'Cambio de acceso', icon: ShieldAlert, tone: 'text-status-info-foreground' },
+  cambio_roles: { label: 'Cambio de cargo', icon: ShieldAlert, tone: 'text-status-info-foreground' },
+  cambio_configuracion_critica: { label: 'Configuración crítica', icon: Settings2, tone: 'text-status-info-foreground' },
+  accion_bloqueada_permisos: { label: 'Acción bloqueada', icon: Lock, tone: 'text-status-warning-foreground' },
+  inicio_sesion_cuenta_sucursal: { label: 'Inicio de sesión', icon: LogIn, tone: 'text-muted-foreground' },
+  accion_autorizada_pin: { label: 'Acción autorizada con PIN', icon: KeyRound, tone: 'text-status-info-foreground' },
 };
 
 const TURNO_TYPES = new Set([
@@ -182,8 +204,21 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
     if (tCliente) items.push({ k: 'Cliente', v: tCliente });
     if (tSummary && !TURNO_TYPES.has(n.event_type)) items.push({ k: 'Detalle', v: tSummary });
     if (sName) items.push({ k: 'Sucursal', v: sName });
+    const m = (n.metadata ?? {}) as Record<string, unknown>;
+    const accountType = typeof m.actor_account_type === 'string' ? m.actor_account_type : null;
+    if (accountType === 'sucursal_account') {
+      items.push({ k: 'Desde', v: 'Cuenta de sucursal' });
+    } else if (accountType === 'personal_account') {
+      items.push({ k: 'Desde', v: 'Cuenta personal' });
+    }
     if (n.actor_name) items.push({ k: 'Acción de', v: n.actor_name });
     if (n.authorized_by_name) items.push({ k: 'Autorizado por', v: n.authorized_by_name });
+    if (typeof m.monto === 'number') {
+      items.push({ k: 'Monto', v: new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(m.monto) });
+    }
+    if (typeof m.action_key === 'string' && !items.some(i => i.k === 'Acción')) {
+      items.push({ k: 'Acción', v: m.action_key });
+    }
     return (
       <div className="mt-2 space-y-1.5 rounded-md bg-muted/40 p-2">
         {n.body && <p className="text-xs text-foreground whitespace-pre-wrap">{n.body}</p>}
