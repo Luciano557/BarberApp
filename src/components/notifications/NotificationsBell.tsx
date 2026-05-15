@@ -67,6 +67,8 @@ function turnoCliente(n: NotificationItem): string | null {
   return typeof m.cliente_nombre === 'string' ? (m.cliente_nombre as string) : null;
 }
 
+type DateRange = 'all' | 'today' | '7d' | '30d';
+
 function hasMeaningfulMetadata(n: NotificationItem): boolean {
   if (n.body) return true;
   if (n.summary) return true;
