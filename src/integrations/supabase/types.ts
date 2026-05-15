@@ -1686,6 +1686,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          notification_id: string | null
           organization_id: string
           read_at: string
           source_id: string
@@ -1695,6 +1696,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          notification_id?: string | null
           organization_id: string
           read_at?: string
           source_id: string
@@ -1704,11 +1706,68 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          notification_id?: string | null
           organization_id?: string
           read_at?: string
           source_id?: string
           source_type?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          event_key: string
+          id: string
+          metadata: Json
+          notification_at: string
+          organization_id: string
+          source_id: string | null
+          source_module: string
+          source_table: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          event_key: string
+          id?: string
+          metadata?: Json
+          notification_at?: string
+          organization_id: string
+          source_id?: string | null
+          source_module: string
+          source_table?: string | null
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          event_key?: string
+          id?: string
+          metadata?: Json
+          notification_at?: string
+          organization_id?: string
+          source_id?: string | null
+          source_module?: string
+          source_table?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3424,6 +3483,41 @@ export type Database = {
           _sucursal_id: string
         }
         Returns: boolean
+      }
+      upsert_notification: {
+        Args: {
+          _body: string
+          _event_key: string
+          _metadata: Json
+          _notification_at: string
+          _organization_id: string
+          _source_id: string
+          _source_module: string
+          _source_table: string
+          _title: string
+          _type: string
+        }
+        Returns: {
+          body: string | null
+          created_at: string
+          event_key: string
+          id: string
+          metadata: Json
+          notification_at: string
+          organization_id: string
+          source_id: string | null
+          source_module: string
+          source_table: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notifications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
