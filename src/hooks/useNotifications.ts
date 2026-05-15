@@ -6,6 +6,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTareas, type Tarea } from '@/hooks/useTareas';
 import { getTareaVencimiento, getPeticionVencimiento } from '@/lib/tareasVencimiento';
 import { parseISO, startOfDay, addDays } from 'date-fns';
+import { getEventDef, resolveNotificationEventType } from '@/lib/notifications/catalog';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
 export type NotificationType =
   | 'tarea_pendiente'
