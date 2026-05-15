@@ -172,7 +172,7 @@ export function useNotifications() {
           console.warn('[notifications] upsert error', e);
         }
         if (!cancelled) {
-          queryClient.invalidateQueries({ queryKey: ['notifications', organization.id] });
+          queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
         }
       })().catch(e => console.warn('[notifications] upsert batch error', e));
     }, 0);
