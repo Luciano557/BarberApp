@@ -685,8 +685,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
           const periodStart = periodStartDate || createdAt;
           const efectiveStart = isBefore(createdAt, periodStart) ? periodStart : createdAt;
-          const devengadoFijo = calcularDevengadoFijo(barber.fixedSalary, efectiveStart, now);
-          const dias = differenceInCalendarDays(now, efectiveStart);
+          const efectiveEnd = periodEndDate ?? now;
+          const devengadoFijo = calcularDevengadoFijo(barber.fixedSalary, efectiveStart, efectiveEnd);
+          const dias = differenceInCalendarDays(efectiveEnd, efectiveStart);
           totalDevengado += devengadoFijo;
           fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
         }
