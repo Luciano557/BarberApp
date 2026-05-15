@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,22 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (open) {
+      setPin('');
+      setError(null);
+      setShowPin(false);
+      setIsValidating(false);
+    }
+  }, [open]);
+
+  const resetState = () => {
+    setPin('');
+    setError(null);
+    setShowPin(false);
+    setIsValidating(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -25,7 +41,11 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
 
     try {
       const result = await onValidate(pin);
-      if (!result.success) {
+      if (result.success) {
+        setPin('');
+        setError(null);
+        setShowPin(false);
+      } else {
         setError((result as any).error || 'PIN incorrecto. Intenta de nuevo.');
         setPin('');
       }
@@ -43,7 +63,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o && onClose) onClose(); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetState(); if (onClose) onClose(); } }}>
       <DialogContent 
         className="sm:max-w-md" 
         onPointerDownOutside={(e) => !onClose && e.preventDefault()}
@@ -62,14 +82,14 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4" autoComplete="off">
           <div className="space-y-2">
-            <Label htmlFor="pin">PIN de seguridad</Label>
+            <Label htmlFor="action-auth-field">PIN de seguridad</Label>
             <div className="relative">
               <Input
-                id="pin"
+                id="action-auth-field"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                name="app-pin-code"
+                name="action-auth-field"
                 value={pin}
                 onChange={handlePinChange}
                 placeholder="Ingresa tu PIN"
@@ -77,7 +97,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
                 maxLength={6}
                 autoFocus
                 disabled={isValidating}
-                autoComplete="one-time-code"
+                autoComplete="off"
                 data-1p-ignore
                 data-lpignore="true"
                 data-form-type="other"
