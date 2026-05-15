@@ -99,8 +99,8 @@ export function useNotifications() {
   // 1. Candidatos calculados desde tareas/peticiones visibles
   const candidates: Candidate[] = useMemo(() => {
     if (!tareas?.length || !organization?.id) return [];
-    const today = startOfDay(new Date());
     const out: Candidate[] = [];
+    void startOfDay; // reservado por si se reactiva lógica client-side
 
     for (const t of tareas) {
       if (t.tipo === 'tarea' && t.estado !== 'completada') {
