@@ -154,8 +154,19 @@ export function useNotifications() {
     const handle = setTimeout(() => {
       (async () => {
         try {
+          // Filtra candidatos cuyo evento esté no-implementado o desactivado por
+          // preferencia del usuario, para no crear deliveries innecesarias.
+          const filtered = candidates.filter(c => {
+            const canon = resolveNotificationEventType(c.type) ?? c.type;
+            const def = getEventDef(canon);
+            if (!def) return true; // tipo desconocido: comportamiento legacy
+            if (!def.implemented) return false;
+            const pref = preferences.get(def.eventType);
+            const enabled = pref ?? def.defaultEnabled;
+            return enabled;
+          });
           await Promise.all(
-            candidates.map(c =>
+            filtered.map(c =>
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (supabase as any).rpc('upsert_notification', {
                 _organization_id: organization.id,
