@@ -38,6 +38,7 @@ export function DeudasPanel() {
   const [descripcion, setDescripcion] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [deudaAEliminar, setDeudaAEliminar] = useState<Deuda | null>(null);
+  const [deudaAPagar, setDeudaAPagar] = useState<Deuda | null>(null);
 
   // Monto por cuota calculado
   const montoCuotaCalculado = useMemo(() => {
@@ -123,7 +124,7 @@ export function DeudasPanel() {
 
             <div className="flex items-center gap-1 ml-2">
               {!esPagada && (
-                <Button size="sm" variant="outline" onClick={() => registrarPago(d)}>
+                <Button size="sm" variant="outline" onClick={() => setDeudaAPagar(d)}>
                   <CreditCard className="h-3 w-3 mr-1" /> Confirmar Pago
                 </Button>
               )}
@@ -247,6 +248,32 @@ export function DeudasPanel() {
               }}
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deudaAPagar} onOpenChange={(open) => !open && setDeudaAPagar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deudaAPagar && (
+                <>Vas a marcar la deuda con <strong>{deudaAPagar.acreedor}</strong> como pagada en su totalidad. Esta acción la moverá a "Deudas Pagadas".</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (deudaAPagar) {
+                  await registrarPago(deudaAPagar);
+                  setDeudaAPagar(null);
+                }
+              }}
+            >
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

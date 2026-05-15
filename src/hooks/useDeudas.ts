@@ -100,24 +100,18 @@ export function useDeudas() {
   };
 
   const registrarPago = async (deuda: Deuda) => {
-    const nuevasCuotasPagadas = deuda.cuotas_pagadas + 1;
-    const nuevoMontoPagado = deuda.monto_pagado + (deuda.monto_cuota || 0);
-    const pagada =
-      (deuda.cuotas_totales && nuevasCuotasPagadas >= deuda.cuotas_totales) ||
-      nuevoMontoPagado >= deuda.monto_total;
-
     try {
       const { error } = await supabase
         .from('deudas')
         .update({
-          cuotas_pagadas: nuevasCuotasPagadas,
-          monto_pagado: Math.min(nuevoMontoPagado, deuda.monto_total),
-          estado: pagada ? 'pagada' : 'activa',
+          cuotas_pagadas: deuda.cuotas_totales ?? deuda.cuotas_pagadas,
+          monto_pagado: deuda.monto_total,
+          estado: 'pagada',
         })
         .eq('id', deuda.id);
 
       if (error) throw error;
-      toast.success(pagada ? '¡Deuda pagada en su totalidad!' : 'Pago registrado');
+      toast.success('Deuda marcada como pagada');
       await fetchDeudas();
     } catch (error: any) {
       console.error('Error registrando pago:', error);

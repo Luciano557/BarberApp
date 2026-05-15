@@ -38,7 +38,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     apellido: "",
     phoneLocal: "",
     birthDate: "",
-    instagram: "",
     email: "",
     password: "",
   });
@@ -93,7 +92,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     const apellido = form.apellido.trim();
     const phoneDigits = form.phoneLocal.replace(/[\s-]/g, "");
     const email = form.email.trim();
-    const instagram = form.instagram.trim().replace(/^@+/, "");
+    
 
     // Validate BEFORE setting loading
     if (!nombre) return toast.error("Ingresá tu nombre");
@@ -121,7 +120,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
             phone,
             phone_country: country.code,
             birth_date: form.birthDate,
-            instagram: instagram || null,
           },
           emailRedirectTo: window.location.href,
         },
@@ -139,9 +137,16 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         onAuthenticated();
         return;
       }
-      // User created but no session: email confirmation pending
-      toast.info("Cuenta creada. Revisá tu email para confirmar el acceso antes de continuar.");
-      setIsLogin(true);
+      // TODO: re-enable email verification (temporal: forzamos sign-in inmediato)
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.password,
+      });
+      if (signInErr) {
+        toast.error("No pudimos iniciar sesión. Intentá de nuevo.");
+        return;
+      }
+      onAuthenticated();
     } catch (err) {
       console.error("Signup error:", err);
       toast.error("Ocurrió un error inesperado. Probá nuevamente.");
@@ -235,17 +240,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
               />
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="instagram">Instagram</Label>
-              <Input
-                id="instagram"
-                className="h-12 text-base"
-                value={form.instagram}
-                onChange={(e) => update("instagram", e.target.value)}
-                placeholder="@tuusuario"
-                maxLength={80}
-              />
-            </div>
           </>
         )}
 
