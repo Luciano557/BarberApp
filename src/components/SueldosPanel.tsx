@@ -18,7 +18,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
-import { format, startOfMonth, subDays, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth, addDays, addWeeks, addYears } from 'date-fns';
+import { format, startOfMonth, differenceInCalendarDays, getDaysInMonth, addMonths, startOfDay, endOfMonth, isBefore, isSameMonth, addDays, addWeeks, addYears } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
@@ -199,7 +199,7 @@ function BarberDetailRow({
           </div>
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Devengado</p>
+              <p className="text-xs text-muted-foreground">A pagar</p>
               <p className="font-medium">{formatCurrency(barber.totalDevengado)}</p>
             </div>
             <div className="text-right">
@@ -218,7 +218,7 @@ function BarberDetailRow({
           {/* Fixed salary explanation */}
           {barber.fixedSalaryInfo && (
             <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
-              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} a pagar
             </div>
           )}
           {/* Comision extra por equipo */}
@@ -361,8 +361,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [concepto, setConcepto] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Date filter for devengado (period start) - default to start of current month
+  // Date filter for devengado: rango personalizado [start, end]
   const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
+  const [periodEndDate, setPeriodEndDate] = useState<Date | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     if (!organization) return;
@@ -437,6 +438,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         ingresosQuery = ingresosQuery.gte('created_at', `${startDateStr}T00:00:00`);
       }
+      if (periodEndDate) {
+        const endDateStr = format(periodEndDate, 'yyyy-MM-dd');
+        ingresosQuery = ingresosQuery.lte('created_at', `${endDateStr}T23:59:59`);
+      }
 
       const { data: ingresosFiltrados, error: ingresosFiltradosError } = await ingresosQuery;
       if (ingresosFiltradosError) throw ingresosFiltradosError;
@@ -455,6 +460,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       if (periodStartDate) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         pagosQuery = pagosQuery.gte('created_at', `${startDateStr}T00:00:00`);
+      }
+      if (periodEndDate) {
+        const endDateStr = format(periodEndDate, 'yyyy-MM-dd');
+        pagosQuery = pagosQuery.lte('created_at', `${endDateStr}T23:59:59`);
       }
 
       const { data: pagosFiltrados, error: pagosFiltradosError } = await pagosQuery;
@@ -566,7 +575,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             result.historico[ingreso.barbero_id].porcentaje = regla.porcentaje; // last one wins
 
             // Filtered (only if within period)
-            const inPeriod = !periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd');
+            const inPeriod = (!periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd')) &&
+              (!periodEndDate || fechaCierre <= format(periodEndDate, 'yyyy-MM-dd'));
             if (inPeriod) {
               if (!result.filtrado[ingreso.barbero_id]) {
                 result.filtrado[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
@@ -651,7 +661,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         bonoOcurrenciasPorId[bid].push({ fecha: o.fecha, monto: m });
 
         // Filtered
-        const inPeriod = !periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd');
+        const inPeriod = (!periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd')) &&
+          (!periodEndDate || o.fecha <= format(periodEndDate, 'yyyy-MM-dd'));
         if (inPeriod) {
           if (!bonoFiltradoPorId[bid]) bonoFiltradoPorId[bid] = { total: 0, ocurrencias: [] };
           bonoFiltradoPorId[bid].total += m;
@@ -674,8 +685,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           const createdAt = barberCreatedAtMap[barber.id] ? new Date(barberCreatedAtMap[barber.id]) : now;
           const periodStart = periodStartDate || createdAt;
           const efectiveStart = isBefore(createdAt, periodStart) ? periodStart : createdAt;
-          const devengadoFijo = calcularDevengadoFijo(barber.fixedSalary, efectiveStart, now);
-          const dias = differenceInCalendarDays(now, efectiveStart);
+          const efectiveEnd = periodEndDate ?? now;
+          const devengadoFijo = calcularDevengadoFijo(barber.fixedSalary, efectiveStart, efectiveEnd);
+          const dias = differenceInCalendarDays(efectiveEnd, efectiveStart);
           totalDevengado += devengadoFijo;
           fixedSalaryInfo = { sueldoFijo: barber.fixedSalary, dias: Math.max(0, dias), devengado: devengadoFijo };
         }
@@ -781,11 +793,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [organization, barbers, periodStartDate, currentSucursal]);
+  }, [organization, barbers, periodStartDate, periodEndDate, currentSucursal]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, periodStartDate]);
+  }, [fetchData, periodStartDate, periodEndDate]);
 
   const handleSubmitPago = async () => {
     if (!organization || !selectedBarberId || !monto) {
@@ -893,60 +905,54 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           {/* Period Presets */}
           <div className="flex items-center gap-1">
             <Button
-              variant={!periodStartDate ? "default" : "outline"}
+              variant={!periodStartDate && !periodEndDate ? "default" : "outline"}
               size="sm"
-              onClick={() => setPeriodStartDate(undefined)}
+              onClick={() => { setPeriodStartDate(undefined); setPeriodEndDate(undefined); }}
             >
               Todo
             </Button>
             <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd') ? "default" : "outline"}
+              variant={
+                !periodEndDate &&
+                periodStartDate &&
+                format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')
+                  ? "default"
+                  : "outline"
+              }
               size="sm"
-              onClick={() => setPeriodStartDate(startOfMonth(new Date()))}
+              onClick={() => { setPeriodStartDate(startOfMonth(new Date())); setPeriodEndDate(undefined); }}
             >
               Este mes
             </Button>
-            <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 15), 'yyyy-MM-dd') ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriodStartDate(subDays(new Date(), 15))}
-            >
-              Últimos 15 días
-            </Button>
-            <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 30), 'yyyy-MM-dd') ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriodStartDate(subDays(new Date(), 30))}
-            >
-              Últimos 30 días
-            </Button>
           </div>
-          
-          {/* Custom Date Picker */}
+
+          {/* Custom Date Range Picker */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "w-[140px] justify-start text-left font-normal",
-                  periodStartDate && ![
-                    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-                    format(subDays(new Date(), 15), 'yyyy-MM-dd'),
-                    format(subDays(new Date(), 30), 'yyyy-MM-dd')
-                  ].includes(format(periodStartDate, 'yyyy-MM-dd')) && "border-primary"
+                  "min-w-[180px] justify-start text-left font-normal",
+                  periodEndDate && "border-primary"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                Personalizado
+                {periodStartDate && periodEndDate
+                  ? `${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")}`
+                  : 'Personalizado'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
-                mode="single"
-                selected={periodStartDate}
-                onSelect={setPeriodStartDate}
+                mode="range"
+                selected={{ from: periodStartDate, to: periodEndDate }}
+                onSelect={(range) => {
+                  setPeriodStartDate(range?.from);
+                  setPeriodEndDate(range?.to);
+                }}
                 locale={es}
+                numberOfMonths={2}
                 initialFocus
                 className="pointer-events-auto"
               />
@@ -1031,7 +1037,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Devengado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+                  A pagar {periodStartDate && periodEndDate ? `(${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")})` : periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1044,7 +1050,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+                  Pagado {periodStartDate && periodEndDate ? `(${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")})` : periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
                 </CardTitle>
               </CardHeader>
               <CardContent>

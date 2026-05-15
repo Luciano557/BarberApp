@@ -1,31 +1,38 @@
-## Cambios al onboarding: paso "Configuración general"
 
-### Comportamiento
+## Finanzas — reordenar tabs
 
-- **Desktop**: el paso 2 actual (`s2_cuenta_intro` — "¿Para qué sirve la cuenta de sucursal?") se mantiene igual. Se agrega un nuevo paso justo después como **paso 3**, que ilumina la tab "General" con el siguiente contenido:
-  - Título: `Configuración General`
-  - Descripción: `Desde aquí vas a administrar la información general de tu negocio. Los cambios que hagas acá se van a reflejar en todas tus sucursales.`
-- **Mobile**: el paso 2 (`s2_cuenta_intro`) se **reemplaza** por el paso de "Configuración General" descrito arriba (mismo título, descripción y target). Es decir, en mobile no se muestra el paso original de "cuenta de sucursal" intro, pero sí el nuevo.
-- El resto de los pasos (`s3_cuenta_bullets`, `s4_select_sucursal`, etc.) sigue igual en ambos.
+En `src/components/FinanzasPanel.tsx`:
+- Cambiar `defaultValue="gastos"` a `defaultValue="estadisticas"`.
+- Reordenar `TabsList` y `TabsContent`: Estadísticas, Sueldos, Gastos, Inversiones, Deudas.
+- Para la cuenta de sucursal (vista reducida) mantener: Sueldos, Gastos (en ese orden) con `defaultValue="sueldos"`.
 
-### Implementación
+## Deudas — `src/components/DeudasPanel.tsx`
 
-1. **`src/components/MiNegocioPanel.tsx`**: agregar `data-onboarding-id="general-tab"` al `TabsTrigger` con valor `GENERAL_TAB` (línea ~356) para que el nuevo paso pueda apuntarlo.
+1. **Monto por cuota calculado**: quitar el input editable. Calcular automáticamente como `montoTotal / cuotasTotales` cuando ambos estén cargados y mostrarlo en modo solo lectura (texto formateado en moneda AR debajo del campo de cuotas, o input deshabilitado). En `handleSubmit` enviar el valor calculado.
+2. **Renombrar sección**: el header `"Deudas"` pasa a `"Deudas Activas"`.
+3. **Sección "Deudas pagadas"**: dividir el render en dos bloques. Filtrar `deudas` en dos arrays: `activas = deudas.filter(d => d.estado !== 'pagada')` y `pagadas = deudas.filter(d => d.estado === 'pagada')`. Renderizar primero "Deudas Activas" (con su empty state actual) y luego "Deudas Pagadas" (solo si hay registros, con un empty state breve si no). Reutilizar el mismo componente de Card; en pagadas ocultar el botón de pago.
+4. **Botón "Pagar" → "Confirmar Pago"**: cambiar el label. La lógica actual (`registrarPago`) ya marca como pagada cuando se completan cuotas/monto; al pasar el monto total restante de una vez, automáticamente cae en "Deudas pagadas". Para deudas con cuotas, "Confirmar Pago" sigue registrando una cuota; pasa a "pagadas" sólo al completar.
+5. **Confirmación de eliminación**: envolver la acción del tacho con `AlertDialog` (shadcn) con título "Eliminar deuda", descripción explicando que la acción es irreversible, y botones "Cancelar" / "Eliminar" (variante destructive). Sólo al confirmar se llama `deleteDeuda(d.id)`.
 
-2. **`src/components/onboarding/steps.ts`**:
-   - Extender `OnboardingStep` con un flag opcional `hideOnMobile?: boolean` y `hideOnDesktop?: boolean`.
-   - Agregar un nuevo step `s2b_general_tab` justo después de `s2_cuenta_intro`:
-     - `targetId: 'general-tab'`
-     - `requiredTab: 'mi-negocio'`, `miNegocioSubTab: 'general'`
-     - Título y descripción según el pedido.
-   - Marcar `s2_cuenta_intro` con `hideOnMobile: true`.
-   - (No hace falta `hideOnDesktop` para `s2b_general_tab`; aparece en ambos.)
+## Inversiones — `src/components/InversionesPanel.tsx`
 
-3. **`src/components/onboarding/OnboardingProvider.tsx`**:
-   - Calcular la lista efectiva de pasos según `useIsMobile()` filtrando los `hideOnMobile`/`hideOnDesktop`. Reemplazar todos los usos de `ONBOARDING_STEPS` dentro del provider por esta lista (`steps`), incluyendo `totalSteps`, `currentStep`, persistencia (`current_step` por id), resume por id y `completed_steps`.
-   - Como `useOnboarding` se usa también en `OnboardingTooltip`/`OnboardingOverlay`, no cambia la API pública: solo cambia el contenido de la lista y los índices.
+- **Confirmación de eliminación**: igual patrón que Deudas, envolver el botón del tacho con `AlertDialog` antes de llamar `deleteInversion(inv.id)`.
 
-### Notas
+## Sueldos — `src/components/SueldosPanel.tsx`
 
-- En mobile el paso "Configuración General" funciona porque el bottom sheet no depende del `targetRect` para posicionarse; igualmente la tab "General" es visible dentro del panel "Mi Negocio" cuando esa pestaña principal está activa.
-- No se tocan migraciones, RLS ni la tabla `user_onboarding`. El campo `current_step` ya guarda el id del paso, no el índice, así que filtrar por dispositivo es seguro.
+1. **Reemplazar "Devengado"** por **"A pagar"** en toda la UI visible (encabezados de fila, totales del resumen y la línea explicativa de sueldo fijo). No se renombran variables internas (`totalDevengado`, `calcularDevengadoFijo`, etc.) para no romper lógica.
+2. **Eliminar presets "Últimos 15 días" y "Últimos 30 días"** del bloque de filtros.
+3. **"Personalizado" como rango de fechas**:
+   - Agregar estado `periodEndDate?: Date` además de `periodStartDate`.
+   - Cambiar el `Popover` de "Personalizado" a un `Calendar mode="range"` con `selected={{ from: periodStartDate, to: periodEndDate }}`.
+   - El botón muestra el rango formateado (`dd/MM/yyyy – dd/MM/yyyy`) o "Personalizado" si no hay selección.
+   - En `fetchData`, agregar filtro adicional `lte('dia', endDateStr)` para `ingresos` y `lte('fecha', endDateStr)` para `pagos_sueldos` cuando `periodEndDate` esté seteado. Aplicar la misma cota superior a los filtros en memoria de comisión por equipo, bonos fijos y comisión por productos.
+   - Para `calcularDevengadoFijo`, cambiar el `now` por `periodEndDate ?? new Date()` cuando hay rango personalizado.
+   - Incluir `periodEndDate` en las dependencias de `useCallback`/`useEffect`.
+   - Actualizar los textos del resumen ("A pagar (desde X hasta Y)").
+
+## Notas técnicas
+
+- Usar `AlertDialog` de `@/components/ui/alert-dialog` (ya existe en el proyecto).
+- Mantener tokens semánticos y formato de moneda AR existente.
+- No se requieren migraciones de DB ni cambios en hooks (`useDeudas`, `useInversiones`).
