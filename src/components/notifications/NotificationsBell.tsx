@@ -47,7 +47,7 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'unread' | 'read'>('unread');
   const isMobile = useIsMobile();
-  const { isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount } = useAuth();
+  const { isOwner, isGeneralManager } = useAuth();
   const { sucursales } = useSucursal();
   const { scope } = useNotificationPreferences();
   const {
