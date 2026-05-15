@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import type { OrgPublicData } from "@/pages/Reservar";
 import { SucursalStep } from "./SucursalStep";
 import { ServicioStep } from "./ServicioStep";
 import { BarberoStep } from "./BarberoStep";
 import { FechaHorarioStep } from "./FechaHorarioStep";
-import { AuthStep } from "./AuthStep";
+import { DatosClienteStep, type ClienteData } from "./DatosClienteStep";
 import { ConfirmacionStep } from "./ConfirmacionStep";
+import { LookupTelefonoStep } from "./LookupTelefonoStep";
 import { MisTurnosStep } from "./MisTurnosStep";
 import { RescheduleFlow } from "./RescheduleFlow";
 import { BookingSummary } from "./BookingSummary";
@@ -26,6 +26,7 @@ export interface BookingState {
   fecha: string;
   horaInicio: string;
   horaFin: string;
+  cliente: ClienteData | null;
 }
 
 const STEP_LABELS = ["Sucursal", "Servicio", "Barbero", "Fecha y horario", "Datos", "Confirmar"];
@@ -52,27 +53,13 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     fecha: "",
     horaInicio: "",
     horaFin: "",
+    cliente: null,
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
 
   // Manage mode state
-  const [manageAuthDone, setManageAuthDone] = useState(false);
+  const [managePhone, setManagePhone] = useState<string | null>(null);
   const [rescheduleTurno, setRescheduleTurno] = useState<any>(null);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const authed = !!data.session;
-      setIsAuthenticated(authed);
-      if (mode === "manage" && authed) setManageAuthDone(true);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const authed = !!session;
-      setIsAuthenticated(authed);
-      if (mode === "manage" && authed) setManageAuthDone(true);
-    });
-    return () => subscription.unsubscribe();
-  }, [mode]);
 
   useEffect(() => {
     if (mode === "book" && step === 0 && orgData.sucursales.length === 1) {
@@ -84,11 +71,12 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
   // === MANAGE MODE ===
   if (mode === "manage") {
-    if (rescheduleTurno) {
+    if (rescheduleTurno && managePhone) {
       return (
         <div className={`mx-auto max-w-2xl ${cardClasses}`}>
           <RescheduleFlow
             turno={rescheduleTurno}
+            telefono={managePhone}
             onDone={() => setRescheduleTurno(null)}
             onBack={() => setRescheduleTurno(null)}
           />
@@ -96,13 +84,13 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       );
     }
 
-    if (!manageAuthDone) {
+    if (!managePhone) {
       return (
         <div className={`mx-auto max-w-md ${cardClasses}`}>
           <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 gap-1">
             <ChevronLeft className="h-4 w-4" /> Volver
           </Button>
-          <AuthStep onAuthenticated={() => setManageAuthDone(true)} />
+          <LookupTelefonoStep onLookup={(tel) => setManagePhone(tel)} />
         </div>
       );
     }
@@ -114,6 +102,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         </Button>
         <MisTurnosStep
           organizationId={orgData.organization.id}
+          telefono={managePhone}
           onReschedule={(turno) => setRescheduleTurno(turno)}
           onBookNew={() => onBackToLanding()}
         />
@@ -122,7 +111,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   }
 
   // === BOOK MODE ===
-  const totalSteps = isAuthenticated ? 5 : 6;
+  const totalSteps = 6;
   const progress = ((step + 1) / totalSteps) * 100;
 
   const resetFieldsFromStep = (fromStep: number) => {
@@ -132,6 +121,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       if (fromStep <= 1) { updated.servicioId = null; updated.servicioNombre = ""; updated.servicioPrecio = 0; }
       if (fromStep <= 2) { updated.barberoId = null; updated.barberoNombre = ""; }
       if (fromStep <= 3) { updated.fecha = ""; updated.horaInicio = ""; updated.horaFin = ""; }
+      if (fromStep <= 4) { updated.cliente = null; }
       return updated;
     });
   };
@@ -149,14 +139,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     }
   };
 
-  const getActualStep = () => {
-    if (step <= 3) return step;
-    if (isAuthenticated) return step === 4 ? 5 : step;
-    return step;
-  };
-
-  const actualStep = getActualStep();
-  const stepLabel = STEP_LABELS[actualStep] || STEP_LABELS[STEP_LABELS.length - 1];
+  const stepLabel = STEP_LABELS[step] || STEP_LABELS[STEP_LABELS.length - 1];
 
   if (confirmed) {
     const calendarUrl = buildGoogleCalendarUrl({
@@ -208,7 +191,6 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div className={cardClasses}>
-        {/* Header */}
         <div className="mb-5 space-y-3">
           <div className="flex items-center justify-between">
             <div>
@@ -218,7 +200,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
               <p className="text-xs text-muted-foreground">Reservá tu turno</p>
             </div>
             <span className="rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-              Paso {Math.min(actualStep + 1, totalSteps)} de {totalSteps}
+              Paso {Math.min(step + 1, totalSteps)} de {totalSteps}
             </span>
           </div>
           <Progress value={progress} className="h-1.5" />
@@ -230,12 +212,11 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           </Button>
         </div>
 
-        {/* Mobile resumen compacto */}
         <div className="mb-5 lg:hidden">
           <BookingSummary booking={booking} stepLabel={stepLabel} />
         </div>
 
-        {actualStep === 0 && (
+        {step === 0 && (
           <SucursalStep
             sucursales={orgData.sucursales}
             onSelect={(id, nombre) => {
@@ -244,7 +225,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
             }}
           />
         )}
-        {actualStep === 1 && (
+        {step === 1 && (
           <ServicioStep
             servicios={orgData.servicios.filter((s) => s.sucursal_id === booking.sucursalId || !s.sucursal_id)}
             onSelect={(id, nombre, precio) => {
@@ -253,7 +234,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
             }}
           />
         )}
-        {actualStep === 2 && (
+        {step === 2 && (
           <BarberoStep
             barberos={orgData.barberos.filter((b) => b.sucursal_id === booking.sucursalId)}
             onSelect={(id, nombre) => {
@@ -262,7 +243,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
             }}
           />
         )}
-        {actualStep === 3 && (
+        {step === 3 && (
           <FechaHorarioStep
             organizationId={orgData.organization.id}
             sucursalId={booking.sucursalId!}
@@ -285,10 +266,16 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
             }}
           />
         )}
-        {actualStep === 4 && !isAuthenticated && (
-          <AuthStep onAuthenticated={() => setStep(5)} />
+        {step === 4 && (
+          <DatosClienteStep
+            initial={booking.cliente ?? undefined}
+            onSubmit={(cliente) => {
+              setBooking((b) => ({ ...b, cliente }));
+              setStep(5);
+            }}
+          />
         )}
-        {(actualStep === 5 || (actualStep === 4 && isAuthenticated)) && (
+        {step === 5 && (
           <ConfirmacionStep
             booking={booking}
             orgData={orgData}
@@ -301,7 +288,6 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         )}
       </div>
 
-      {/* Desktop sidebar */}
       <div className="hidden lg:block">
         <div className="sticky top-6">
           <BookingSummary booking={booking} stepLabel={stepLabel} />

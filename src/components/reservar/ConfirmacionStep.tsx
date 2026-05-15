@@ -18,18 +18,14 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
   const [loading, setLoading] = useState(false);
 
   const handleConfirm = async () => {
+    if (!booking.cliente) {
+      toast.error("Faltan tus datos. Volvé al paso anterior.");
+      return;
+    }
     setLoading(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
-      const md = (user?.user_metadata ?? {}) as Record<string, any>;
-      const nombre = (md.nombre || "").toString().trim();
-      const apellido = (md.apellido || "").toString().trim();
-      const nombreCompleto =
-        [nombre, apellido].filter(Boolean).join(" ").trim() ||
-        md.full_name ||
-        user?.email ||
-        "Cliente";
+      const { cliente } = booking;
+      const nombreCompleto = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ").trim();
 
       const { data, error: fnError } = await supabase.functions.invoke("validate-turno", {
         body: {
@@ -39,14 +35,11 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           servicio_id: booking.servicioId,
           fecha: booking.fecha,
           hora_inicio: booking.horaInicio,
-          cliente_nombre: nombreCompleto,
-          cliente_telefono: md.phone || null,
-          cliente_email: user?.email || null,
-          cliente_nombre_simple: nombre || null,
-          cliente_apellido: apellido || null,
-          cliente_fecha_nacimiento: md.birth_date || null,
-          cliente_instagram: md.instagram || null,
-          user_id: user?.id || null,
+          cliente_nombre: cliente.nombre,
+          cliente_apellido: cliente.apellido,
+          cliente_telefono: cliente.telefono,
+          cliente_email: cliente.email,
+          cliente_fecha_nacimiento: cliente.birth_date,
         },
       });
 
@@ -60,7 +53,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
         return;
       }
 
-      toast.success("¡Turno reservado con éxito!");
+      toast.success(`¡Turno reservado, ${nombreCompleto || "listo"}!`);
       onConfirmed();
     } catch {
       toast.error("Ocurrió un problema. Probá nuevamente.");

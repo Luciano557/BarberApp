@@ -5,6 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+  return hasPlus ? `+${digits}` : digits;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -12,20 +22,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { organization_id } = body;
+    const { organization_id, telefono } = body;
 
-    if (!organization_id) {
-      return new Response(JSON.stringify({ error: "Missing organization_id" }), {
+    if (!organization_id || !telefono) {
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Extract JWT
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+    const phone = normalizePhone(telefono);
+    if (!phone) {
+      return new Response(JSON.stringify({ error: "Invalid phone" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -35,22 +44,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify JWT and get user
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const uid = user.id;
-    const email = user.email || null;
-    const phone = user.phone || null;
-
-    // Get org timezone
     const { data: org } = await supabase
       .from("organizations")
       .select("timezone")
@@ -58,15 +51,9 @@ Deno.serve(async (req) => {
       .single();
 
     const timezone = org?.timezone || "America/Argentina/Buenos_Aires";
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
 
-    // Build ownership filter — secure fallback
-    // user_id match OR (user_id IS NULL AND email/phone match)
-    let ownershipFilter = `user_id.eq.${uid}`;
-    const nullFilters: string[] = [];
-    if (email) nullFilters.push(`cliente_email.eq.${email}`);
-    if (phone) nullFilters.push(`cliente_telefono.eq.${phone}`);
-
-    let query = supabase
+    const { data: turnos, error: queryError } = await supabase
       .from("turnos")
       .select(`
         id, fecha, hora_inicio, hora_fin, estado, cliente_nombre,
@@ -76,33 +63,20 @@ Deno.serve(async (req) => {
         servicios!inner(nombre, precio, duracion_min)
       `)
       .eq("organization_id", organization_id)
-      .in("estado", ["pendiente", "confirmado"]);
-
-    // Apply ownership filter using or()
-    if (nullFilters.length > 0) {
-      const nullFallback = `and(user_id.is.null,or(${nullFilters.join(",")}))`;
-      query = query.or(`${ownershipFilter},${nullFallback}`);
-    } else {
-      query = query.eq("user_id", uid);
-    }
-
-    // Filter future turnos only (date-level, we'll refine with hora below)
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-    query = query.gte("fecha", today);
-    query = query.order("fecha", { ascending: true }).order("hora_inicio", { ascending: true });
-
-    const { data: turnos, error: queryError } = await query;
+      .eq("cliente_telefono", phone)
+      .in("estado", ["pendiente", "confirmado"])
+      .gte("fecha", today)
+      .order("fecha", { ascending: true })
+      .order("hora_inicio", { ascending: true });
 
     if (queryError) {
-      console.error("get-my-turnos query error:", queryError);
+      console.error("get-my-turnos-by-phone error:", queryError);
       return new Response(JSON.stringify({ error: "Query failed" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get agenda_config for cancellation/modification limits
-    // We need configs per sucursal for the turnos found
     const sucursalIds = [...new Set((turnos || []).map((t: any) => t.sucursal_id))];
     let configs: any[] = [];
     if (sucursalIds.length > 0) {
@@ -113,10 +87,8 @@ Deno.serve(async (req) => {
         .in("sucursal_id", sucursalIds);
       configs = cfgData || [];
     }
-
     const configMap = new Map(configs.map((c: any) => [c.sucursal_id, c]));
 
-    // Filter out past turnos (today but hora already passed) and enrich
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
@@ -124,14 +96,11 @@ Deno.serve(async (req) => {
     const enriched = (turnos || [])
       .filter((t: any) => {
         if (t.fecha > today) return true;
-        // Same day — check hora_inicio
         const [h, m] = t.hora_inicio.split(":").map(Number);
         return h * 60 + m > nowMinutes;
       })
       .map((t: any) => {
         const cfg = configMap.get(t.sucursal_id) || { cancelacion_limite_hs: 2, modificacion_limite_hs: 2 };
-
-        // Calculate hours until turno
         const turnoDateTime = new Date(`${t.fecha}T${t.hora_inicio}`);
         const turnoInTz = new Date(turnoDateTime.toLocaleString("en-US", { timeZone: timezone }));
         const hoursUntil = (turnoInTz.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
@@ -163,7 +132,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("get-my-turnos error:", e);
+    console.error("get-my-turnos-by-phone error:", e);
     return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
