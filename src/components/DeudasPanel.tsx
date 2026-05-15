@@ -252,6 +252,32 @@ export function DeudasPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!deudaAPagar} onOpenChange={(open) => !open && setDeudaAPagar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar pago</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deudaAPagar && (
+                <>Vas a marcar la deuda con <strong>{deudaAPagar.acreedor}</strong> como pagada en su totalidad. Esta acción la moverá a "Deudas Pagadas".</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (deudaAPagar) {
+                  await registrarPago(deudaAPagar);
+                  setDeudaAPagar(null);
+                }
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
