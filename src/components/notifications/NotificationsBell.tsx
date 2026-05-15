@@ -204,8 +204,21 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
     if (tCliente) items.push({ k: 'Cliente', v: tCliente });
     if (tSummary && !TURNO_TYPES.has(n.event_type)) items.push({ k: 'Detalle', v: tSummary });
     if (sName) items.push({ k: 'Sucursal', v: sName });
+    const m = (n.metadata ?? {}) as Record<string, unknown>;
+    const accountType = typeof m.actor_account_type === 'string' ? m.actor_account_type : null;
+    if (accountType === 'sucursal_account') {
+      items.push({ k: 'Desde', v: 'Cuenta de sucursal' });
+    } else if (accountType === 'personal_account') {
+      items.push({ k: 'Desde', v: 'Cuenta personal' });
+    }
     if (n.actor_name) items.push({ k: 'Acción de', v: n.actor_name });
     if (n.authorized_by_name) items.push({ k: 'Autorizado por', v: n.authorized_by_name });
+    if (typeof m.monto === 'number') {
+      items.push({ k: 'Monto', v: new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(m.monto) });
+    }
+    if (typeof m.action_key === 'string' && !items.some(i => i.k === 'Acción')) {
+      items.push({ k: 'Acción', v: m.action_key });
+    }
     return (
       <div className="mt-2 space-y-1.5 rounded-md bg-muted/40 p-2">
         {n.body && <p className="text-xs text-foreground whitespace-pre-wrap">{n.body}</p>}
