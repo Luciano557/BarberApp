@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter } from 'lucide-react';
+import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -29,16 +29,49 @@ interface NotificationsBellProps {
 const TYPE_META: Record<string, { label: string; icon: typeof ClipboardList; tone: string }> = {
   tarea_pendiente: { label: 'Tarea pendiente', icon: ClipboardList, tone: 'text-status-info-foreground' },
   tarea_asignada: { label: 'Tarea asignada', icon: ClipboardList, tone: 'text-status-info-foreground' },
+  tarea_equipo_asignada: { label: 'Tarea de equipo', icon: ClipboardList, tone: 'text-status-info-foreground' },
   tarea_vencida: { label: 'Tarea vencida', icon: AlertTriangle, tone: 'text-status-warning-foreground' },
+  peticion_nueva: { label: 'Petición nueva', icon: MessageSquare, tone: 'text-status-info-foreground' },
+  peticion_aprobada: { label: 'Petición aprobada', icon: MessageSquare, tone: 'text-status-success-foreground' },
+  peticion_rechazada: { label: 'Petición rechazada', icon: MessageSquare, tone: 'text-status-warning-foreground' },
   peticion_vencida: { label: 'Petición vencida', icon: AlertTriangle, tone: 'text-status-warning-foreground' },
+  turno_creado: { label: 'Turno creado', icon: Calendar, tone: 'text-status-info-foreground' },
+  turno_creado_propio: { label: 'Mi nuevo turno', icon: Calendar, tone: 'text-status-info-foreground' },
+  turno_creado_companero: { label: 'Turno de un compañero', icon: Calendar, tone: 'text-muted-foreground' },
+  turno_reprogramado: { label: 'Turno reprogramado', icon: CalendarClock, tone: 'text-status-info-foreground' },
+  turno_reprogramado_propio: { label: 'Mi turno reprogramado', icon: CalendarClock, tone: 'text-status-info-foreground' },
+  turno_reprogramado_companero: { label: 'Compañero reprogramado', icon: CalendarClock, tone: 'text-muted-foreground' },
+  turno_cancelado: { label: 'Turno cancelado', icon: CalendarX, tone: 'text-status-warning-foreground' },
+  turno_cancelado_propio: { label: 'Mi turno cancelado', icon: CalendarX, tone: 'text-status-warning-foreground' },
+  turno_cancelado_companero: { label: 'Compañero cancelado', icon: CalendarX, tone: 'text-muted-foreground' },
 };
 
-type DateRange = 'all' | 'today' | '7d' | '30d';
+const TURNO_TYPES = new Set([
+  'turno_creado', 'turno_creado_propio', 'turno_creado_companero',
+  'turno_reprogramado', 'turno_reprogramado_propio', 'turno_reprogramado_companero',
+  'turno_cancelado', 'turno_cancelado_propio', 'turno_cancelado_companero',
+]);
+
+function turnoSummary(n: NotificationItem): string | null {
+  if (!TURNO_TYPES.has(n.event_type)) return null;
+  const m = (n.metadata ?? {}) as Record<string, unknown>;
+  const hora = typeof m.hora_inicio === 'string' ? String(m.hora_inicio).slice(0, 5) : null;
+  const barbero = typeof m.barbero_nombre === 'string' ? (m.barbero_nombre as string).trim() : null;
+  const servicio = typeof m.servicio_nombre === 'string' ? (m.servicio_nombre as string) : null;
+  return [hora, barbero, servicio].filter(Boolean).join(' · ') || null;
+}
+
+function turnoCliente(n: NotificationItem): string | null {
+  if (!TURNO_TYPES.has(n.event_type)) return null;
+  const m = (n.metadata ?? {}) as Record<string, unknown>;
+  return typeof m.cliente_nombre === 'string' ? (m.cliente_nombre as string) : null;
+}
 
 function hasMeaningfulMetadata(n: NotificationItem): boolean {
   if (n.body) return true;
   if (n.summary) return true;
   if (n.actor_name || n.authorized_by_name) return true;
+  if (turnoSummary(n) || turnoCliente(n)) return true;
   if (n.metadata && typeof n.metadata === 'object' && Object.keys(n.metadata).length > 0) return true;
   return false;
 }
