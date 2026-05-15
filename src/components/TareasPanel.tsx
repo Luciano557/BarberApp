@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -57,6 +57,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const canManageTareas = isOwner || isGeneralManager || isManager;
 
   const [showForm, setShowForm] = useState(false);
+  const [editingTarea, setEditingTarea] = useState<TareaItem | null>(null);
   const [activeTab, setActiveTab] = useState('tareas');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroResp, setFiltroResp] = useState('todos');
@@ -152,7 +153,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   // PIN flows: delegados a requirePinForAction (bypass automático para cuentas personales).
-  const handleNuevaTarea = () => { setPeticionCreador(null); setShowForm(true); };
+  const handleNuevaTarea = () => { setEditingTarea(null); setPeticionCreador(null); setShowForm(true); };
+  const handleEditTarea = (t: TareaItem) => { setEditingTarea(t); setPeticionCreador(null); setShowForm(true); };
 
   const handleNuevaPeticion = async () => {
     const gate = await requirePinForAction('crear_tarea', currentSucursal?.id ?? null);
@@ -207,6 +209,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             {t.fecha_limite && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
+                <span className="text-foreground/80">Inicio:</span>{' '}
                 {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
                 {t.hora && <span>· {t.hora}</span>}
               </span>
@@ -218,7 +221,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
 
-          {(canStart || canComplete || canDelete) && (
+          {(canStart || canComplete || canDelete || canManageTareas) && (
             <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
               {canStart && t.estado === 'pendiente' && (
                 <Button size="sm" variant="ghost" onClick={() => updateTarea.mutate({ id: t.id, estado: 'en_progreso' })}>
@@ -228,6 +231,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso') && (
                 <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })}>
                   <CheckCircle className="h-4 w-4 mr-1" />Completar
+                </Button>
+              )}
+              {canManageTareas && (
+                <Button size="sm" variant="ghost" onClick={() => handleEditTarea(t)}>
+                  <Pencil className="h-4 w-4" />
                 </Button>
               )}
               {canDelete && (
@@ -420,12 +428,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
       <TareaFormDialog
         open={showForm}
-        onOpenChange={setShowForm}
+        onOpenChange={(o) => { setShowForm(o); if (!o) setEditingTarea(null); }}
         barbers={barbers}
         onSubmit={tarea => addTarea.mutate(tarea)}
-        isPending={addTarea.isPending}
+        onUpdate={(id, patch) => {
+          const { id: _omit, ...rest } = patch;
+          updateTarea.mutate({ id, ...rest });
+        }}
+        isPending={addTarea.isPending || updateTarea.isPending}
         tipo={isTareasTab ? 'tarea' : 'peticion'}
         creadorNombre={peticionCreador?.nombre}
+        tarea={editingTarea}
       />
 
       {/* Tabs */}
