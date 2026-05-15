@@ -329,6 +329,7 @@ export function useNotifications() {
         .upsert(rows as any, { onConflict: 'user_id,source_type,source_id' });
       if (error) throw error;
     },
+    onError: (e) => console.warn('[notifications] markAllAsRead error', e),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
     },
