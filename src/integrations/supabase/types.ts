@@ -3409,6 +3409,59 @@ export type Database = {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
       }
+      _notif_emit: {
+        Args: {
+          _actor_name: string
+          _actor_user_id: string
+          _body: string
+          _category: string
+          _default_enabled: boolean
+          _event_key: string
+          _event_type: string
+          _metadata: Json
+          _organization_id: string
+          _recipients: string[]
+          _source_id: string
+          _source_module: string
+          _source_table: string
+          _sucursal_id: string
+          _summary: string
+          _title: string
+        }
+        Returns: undefined
+      }
+      _notif_org_admins: { Args: { _org: string }; Returns: string[] }
+      _notif_sucursal_account: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_sucursal_barbers: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_sucursal_managers: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_turno_dispatch: {
+        Args: {
+          _event_key_suffix: string
+          _turno: Database["public"]["Tables"]["turnos"]["Row"]
+          _verbo: string
+        }
+        Returns: undefined
+      }
+      _notif_turno_metadata: {
+        Args: { _turno: Database["public"]["Tables"]["turnos"]["Row"] }
+        Returns: Json
+      }
+      _notif_turno_title: {
+        Args: {
+          _turno: Database["public"]["Tables"]["turnos"]["Row"]
+          _verbo: string
+        }
+        Returns: string
+      }
       barberos_pin_status: {
         Args: { _ids: string[] }
         Returns: {
