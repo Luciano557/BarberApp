@@ -6,8 +6,9 @@ import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
 import { OrganizationSettings } from './OrganizationSettings';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
+import { NotificationsConfig } from './config/NotificationsConfig';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones';
 
 const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
@@ -15,6 +16,7 @@ const sectionTitles: Record<ConfigSection, string> = {
   tareas: 'Tareas y Peticiones',
   plan: 'Plan y Suscripción',
   payments: 'Métodos de pago y recargos',
+  notificaciones: 'Notificaciones',
 };
 
 interface ConfigurationPanelProps {
@@ -25,7 +27,6 @@ interface ConfigurationPanelProps {
 export function ConfigurationPanel({ initialSection, onSectionChange }: ConfigurationPanelProps = {}) {
   const [activeSection, setActiveSection] = useState<ConfigSection>(initialSection ?? 'menu');
 
-  // Sync if parent updates initialSection (deep-link from another panel)
   useEffect(() => {
     if (initialSection) setActiveSection(initialSection);
   }, [initialSection]);
@@ -51,28 +52,18 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
           {activeSection === 'payments' && (
             <p className="text-muted-foreground text-sm mt-1">Configuración general del negocio</p>
           )}
+          {activeSection === 'notificaciones' && (
+            <p className="text-muted-foreground text-sm mt-1">Personalizá los avisos del Centro de Notificaciones</p>
+          )}
         </div>
       </div>
 
-      {activeSection === 'menu' && (
-        <ConfigMenu onSelect={handleSelect} />
-      )}
-
-      {activeSection === 'plan' && (
-        <OrganizationSettings />
-      )}
-
-      {activeSection === 'payments' && (
-        <PaymentMethodsConfig sucursalId={null} />
-      )}
-
-      {activeSection === 'pin' && (
-        <PinConfigSection />
-      )}
-
-      {activeSection === 'tareas' && (
-        <TareasConfig />
-      )}
+      {activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}
+      {activeSection === 'plan' && <OrganizationSettings />}
+      {activeSection === 'payments' && <PaymentMethodsConfig sucursalId={null} />}
+      {activeSection === 'pin' && <PinConfigSection />}
+      {activeSection === 'tareas' && <TareasConfig />}
+      {activeSection === 'notificaciones' && <NotificationsConfig />}
     </div>
   );
 }
