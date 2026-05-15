@@ -191,6 +191,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
       {/* Lock, Logout & Toggle */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        {canViewTareas && (
+          <NotificationsBell
+            collapsed={collapsed}
+            onNavigate={() => handleTabChange('tareas')}
+          />
+        )}
         {requiresPin && isUnlocked && (
           <Button
             variant="ghost"
