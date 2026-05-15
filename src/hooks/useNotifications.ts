@@ -12,24 +12,34 @@ export type NotificationType =
   | 'tarea_vencida'
   | 'peticion_vencida';
 
-interface NotificationRow {
-  id: string;
+interface DeliveryRow {
+  id: string;                       // notification_deliveries.id
+  notification_id: string;
   organization_id: string;
-  event_key: string;
-  type: NotificationType | string;
-  source_module: string;
-  source_table: string | null;
-  source_id: string | null;
-  title: string;
-  body: string | null;
-  notification_at: string;
-  metadata: Record<string, unknown>;
+  user_id: string;
+  read_at: string | null;
+  hidden_at: string | null;
   created_at: string;
-  updated_at: string;
+  notifications: {
+    id: string;
+    organization_id: string;
+    event_key: string;
+    type: NotificationType | string;
+    source_module: string;
+    source_table: string | null;
+    source_id: string | null;
+    title: string;
+    body: string | null;
+    notification_at: string;
+    metadata: Record<string, unknown>;
+    created_at: string;
+    updated_at: string;
+  };
 }
 
 export interface NotificationItem {
-  id: string;                  // notifications.id (UUID)
+  id: string;                  // notification_deliveries.id (UUID)
+  notification_id: string;     // notifications.id
   source_type: NotificationType | string;
   source_id: string;           // tarea/peticion id
   titulo: string;
@@ -162,7 +172,7 @@ export function useNotifications() {
           console.warn('[notifications] upsert error', e);
         }
         if (!cancelled) {
-          queryClient.invalidateQueries({ queryKey: ['notifications', organization.id] });
+          queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
         }
       })().catch(e => console.warn('[notifications] upsert batch error', e));
     }, 0);
@@ -173,32 +183,42 @@ export function useNotifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidatesFingerprint, organization?.id, user?.id]);
 
-  // 3. Query principal: últimas 100 notificaciones de la org
-  const { data: rawNotifications = [] } = useQuery({
-    queryKey: ['notifications', organization?.id],
+  // 3. Query principal: deliveries del usuario actual + notificacion embebida
+  const { data: deliveries = [] } = useQuery({
+    queryKey: ['notification_deliveries', user?.id, organization?.id],
     queryFn: async () => {
-      if (!organization?.id) return [] as NotificationRow[];
+      if (!user?.id || !organization?.id) return [] as DeliveryRow[];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
-        .from('notifications')
-        .select('*')
+        .from('notification_deliveries')
+        .select('id, notification_id, organization_id, user_id, read_at, hidden_at, created_at, notifications!inner(*)')
+        .eq('user_id', user.id)
         .eq('organization_id', organization.id)
-        .order('notification_at', { ascending: false })
+        .is('hidden_at', null)
+        .order('created_at', { ascending: false })
         .limit(100);
       if (error) throw error;
-      return (data ?? []) as NotificationRow[];
+      // Reorder by notification_at desc client-side (preserves historical order)
+      const rows = (data ?? []) as DeliveryRow[];
+      rows.sort(
+        (a, b) =>
+          new Date(b.notifications?.notification_at ?? b.created_at).getTime() -
+          new Date(a.notifications?.notification_at ?? a.created_at).getTime(),
+      );
+      return rows;
     },
-    enabled: !!organization?.id,
+    enabled: !!user?.id && !!organization?.id,
   });
 
-  // 4. Lecturas por usuario
-  const { data: reads = [] } = useQuery({
+  // 4. Compatibilidad: lecturas legacy (notification_reads) por (source_type, source_id)
+  // notification_reads.source_type guarda el mismo string que notifications.type.
+  const { data: legacyReads = [] } = useQuery({
     queryKey: ['notification_reads', user?.id, organization?.id],
     queryFn: async () => {
       if (!user?.id || !organization?.id) return [];
       const { data, error } = await supabase
         .from('notification_reads')
-        .select('source_type, source_id, notification_id')
+        .select('source_type, source_id')
         .eq('user_id', user.id)
         .eq('organization_id', organization.id);
       if (error) throw error;
@@ -207,21 +227,13 @@ export function useNotifications() {
     enabled: !!user?.id && !!organization?.id,
   });
 
-  const readsByNotificationId = useMemo(() => {
+  const legacyReadsBySourceKey = useMemo(() => {
     const s = new Set<string>();
-    for (const r of reads as Array<{ notification_id: string | null; source_type: string; source_id: string }>) {
-      if (r.notification_id) s.add(r.notification_id);
-    }
-    return s;
-  }, [reads]);
-
-  const readsBySourceKey = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of reads as Array<{ notification_id: string | null; source_type: string; source_id: string }>) {
+    for (const r of legacyReads as Array<{ source_type: string; source_id: string }>) {
       s.add(`${r.source_type}:${r.source_id}`);
     }
     return s;
-  }, [reads]);
+  }, [legacyReads]);
 
   // 5. Filtrar fuentes activas (tareas/peticiones aún visibles y vigentes)
   const tareasById = useMemo(() => {
@@ -232,8 +244,10 @@ export function useNotifications() {
 
   const notifications: NotificationItem[] = useMemo(() => {
     const out: NotificationItem[] = [];
-    for (const n of rawNotifications) {
-      // Filtrado activo: por ahora solo módulo tareas
+    for (const d of deliveries) {
+      const n = d.notifications;
+      if (!n) continue;
+      // Filtrado activo: por ahora solo modulo tareas
       if (n.source_module === 'tareas' && n.source_id) {
         const t = tareasById.get(n.source_id);
         if (!t) continue; // no visible para el usuario o eliminada
@@ -241,12 +255,13 @@ export function useNotifications() {
         if (t.tipo === 'peticion' && t.estado !== 'pendiente') continue;
       }
       const read =
-        (n.id && readsByNotificationId.has(n.id)) ||
-        (n.source_id && readsBySourceKey.has(`${n.type}:${n.source_id}`)) ||
+        !!d.read_at ||
+        (n.source_id && legacyReadsBySourceKey.has(`${n.type}:${n.source_id}`)) ||
         false;
 
       out.push({
-        id: n.id,
+        id: d.id,
+        notification_id: n.id,
         source_type: n.type,
         source_id: n.source_id ?? '',
         titulo: n.title,
@@ -257,7 +272,7 @@ export function useNotifications() {
       });
     }
     return out;
-  }, [rawNotifications, tareasById, readsByNotificationId, readsBySourceKey]);
+  }, [deliveries, tareasById, legacyReadsBySourceKey]);
 
   const unreadNotifications = useMemo(
     () => notifications.filter(n => !n.read),
@@ -269,44 +284,48 @@ export function useNotifications() {
   );
   const unreadCount = unreadNotifications.length;
 
-  // 6. Mutations
+  // 6. Mutations — operan sobre notification_deliveries (id = delivery.id)
   const markAsRead = useMutation({
     mutationFn: async (item: Pick<NotificationItem, 'id' | 'source_type' | 'source_id'>) => {
       if (!user?.id || !organization?.id) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const payload: any = {
-        user_id: user.id,
-        organization_id: organization.id,
-        notification_id: item.id,
-        source_type: item.source_type,
-        source_id: item.source_id,
-      };
-      const { error } = await supabase
-        .from('notification_reads')
-        .upsert(payload, { onConflict: 'user_id,source_type,source_id' });
+      const { error } = await (supabase as any)
+        .from('notification_deliveries')
+        .update({ read_at: new Date().toISOString() })
+        .eq('id', item.id)
+        .eq('user_id', user.id);
       if (error) throw error;
     },
     onError: (e) => console.warn('[notifications] markAsRead error', e),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
+      queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
     },
   });
 
   const markAsUnread = useMutation({
     mutationFn: async (item: Pick<NotificationItem, 'id' | 'source_type' | 'source_id'>) => {
       if (!user?.id || !organization?.id) return;
-      // Borrar por notification_id y, por compatibilidad, también por (source_type, source_id)
-      let q = supabase
-        .from('notification_reads')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('organization_id', organization.id);
-      const { error } = await q
-        .or(`notification_id.eq.${item.id},and(source_type.eq.${item.source_type},source_id.eq.${item.source_id})`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
+        .from('notification_deliveries')
+        .update({ read_at: null })
+        .eq('id', item.id)
+        .eq('user_id', user.id);
       if (error) throw error;
+      // Compat: también limpiar lectura legacy si existiera
+      if (item.source_type && item.source_id) {
+        await supabase
+          .from('notification_reads')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('organization_id', organization.id)
+          .eq('source_type', item.source_type)
+          .eq('source_id', item.source_id);
+      }
     },
     onError: (e) => console.warn('[notifications] markAsUnread error', e),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
       queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
     },
   });
@@ -314,29 +333,24 @@ export function useNotifications() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!user?.id || !organization?.id) return;
-      const unread = unreadNotifications;
-      if (!unread.length) return;
-      const rows = unread.map(n => ({
-        user_id: user.id,
-        organization_id: organization.id,
-        notification_id: n.id,
-        source_type: n.source_type,
-        source_id: n.source_id,
-      }));
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await supabase
-        .from('notification_reads')
-        .upsert(rows as any, { onConflict: 'user_id,source_type,source_id' });
+      const { error } = await (supabase as any)
+        .from('notification_deliveries')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .eq('organization_id', organization.id)
+        .is('read_at', null)
+        .is('hidden_at', null);
       if (error) throw error;
     },
     onError: (e) => console.warn('[notifications] markAllAsRead error', e),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
+      queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
     },
   });
 
   const refresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['notifications', organization?.id] });
+    queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
     queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
     queryClient.invalidateQueries({ queryKey: ['tareas'] });
   };
