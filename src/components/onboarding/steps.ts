@@ -19,6 +19,10 @@ export interface OnboardingStep {
   hideContinueButton?: boolean;
   /** Paso de bienvenida: se muestra como diálogo centrado, sin target */
   isWelcome?: boolean;
+  /** Ocultar este paso en mobile */
+  hideOnMobile?: boolean;
+  /** Ocultar este paso en desktop */
+  hideOnDesktop?: boolean;
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
