@@ -69,7 +69,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // Track target rect
   useEffect(() => {
-    if (!currentStep) { setTargetRect(null); return; }
+    if (!currentStep || currentStep.isWelcome) { setTargetRect(null); return; }
     let raf = 0;
     const update = () => {
       const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;
