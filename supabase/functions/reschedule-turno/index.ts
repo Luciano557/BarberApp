@@ -33,6 +33,16 @@ function slotInstantMs(fecha: string, hora: string, tz: string): number {
   return utcGuess - offset;
 }
 
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+  return hasPlus ? `+${digits}` : digits;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -40,19 +50,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { turno_id, nueva_fecha, nueva_hora_inicio } = body;
+    const { turno_id, nueva_fecha, nueva_hora_inicio, telefono } = body;
 
-    if (!turno_id || !nueva_fecha || !nueva_hora_inicio) {
+    if (!turno_id || !nueva_fecha || !nueva_hora_inicio || !telefono) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+    const phone = normalizePhone(telefono);
+    if (!phone) {
+      return new Response(JSON.stringify({ error: "Invalid phone" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -62,19 +72,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch turno with service duration
     const { data: turno, error: turnoError } = await supabase
       .from("turnos")
-      .select("id, user_id, cliente_email, cliente_telefono, estado, fecha, hora_inicio, hora_fin, organization_id, sucursal_id, barbero_id, servicio_id")
+      .select("id, cliente_telefono, estado, fecha, hora_inicio, hora_fin, organization_id, sucursal_id, barbero_id, servicio_id")
       .eq("id", turno_id)
       .single();
 
@@ -85,15 +85,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate ownership
-    const isOwner =
-      turno.user_id === user.id ||
-      (turno.user_id === null && (
-        (user.email && turno.cliente_email === user.email) ||
-        (user.phone && turno.cliente_telefono === user.phone)
-      ));
-
-    if (!isOwner) {
+    if (turno.cliente_telefono !== phone) {
       return new Response(JSON.stringify({ error: "Not authorized" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,7 +99,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get config, service, timezone
     const [configRes, servicioRes, orgRes, sucRes] = await Promise.all([
       supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
@@ -120,7 +111,6 @@ Deno.serve(async (req) => {
     const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
     const duracion = servicioRes.data?.duracion_min || configRes.data?.duracion_base_min || 30;
 
-    // Check limit against ORIGINAL turno
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const originalDateTime = new Date(`${turno.fecha}T${turno.hora_inicio}`);
@@ -143,7 +133,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Also validate new slot meets minimum lead time
     const antMin = Number((configRes.data as any)?.anticipacion_minima_reserva_min ?? 30);
     const newSlotMs = slotInstantMs(nueva_fecha, nueva_hora_inicio, timezone);
     const cutoffMs = Date.now() + antMin * 60000;
@@ -154,10 +143,8 @@ Deno.serve(async (req) => {
       }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Calculate new hora_fin
     const nueva_hora_fin = minutesToTime(timeToMinutes(nueva_hora_inicio) + duracion);
 
-    // Check conflicts for new slot (excluding current turno)
     const bufferBefore = configRes.data?.buffer_antes_min || 0;
     const bufferAfter = configRes.data?.buffer_despues_min || 0;
     const checkStart = minutesToTime(timeToMinutes(nueva_hora_inicio) - bufferBefore);
@@ -182,7 +169,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Update turno
     const { error: updateError } = await supabase
       .from("turnos")
       .update({

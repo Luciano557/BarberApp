@@ -1,44 +1,119 @@
-## Problema
 
-No podemos desactivar "Confirm email" globalmente en Supabase porque dueños y barberos sí necesitan verificar su email al registrarse. Pero los clientes que reservan turnos deben poder crear cuenta sin verificar (la verificación por teléfono llegará más adelante).
+## Objetivo
 
-## Solución
+Eliminar la verificación por email en el portal público de reserva. El cliente no crea cuenta: completa sus datos, se hace match por teléfono dentro de la organización contra la tabla `clientes`, y se reutiliza o se crea el registro. Para "Mis turnos" se reemplaza el login por un lookup por teléfono.
 
-Crear los clientes desde una edge function con privilegios de servicio que los marque como ya confirmados (`email_confirm: true`). El frontend, después de llamar a la function, hace `signInWithPassword` con las credenciales recién creadas y continúa el flujo de reserva normalmente.
+No se toca el flujo de auth de dueños/barberos ni nada por fuera del portal de reserva.
 
-Esto deja intacto el flujo de owners/barberos (que siguen pasando por `supabase.auth.signUp` y reciben el email de confirmación).
+---
 
-## Cambios
+## 1. Flujo nuevo de reserva (sin auth)
 
-### 1. Nueva edge function `register-customer` (pública, `verify_jwt = false`)
+Pasos del stepper actuales: Sucursal → Servicio → Barbero → Fecha y horario → **Datos** → Confirmar.
 
-`supabase/functions/register-customer/index.ts`:
-- Recibe: `email`, `password`, `nombre`, `apellido`, `phone`, `phone_country`, `birth_date`.
-- Valida campos (zod o validación manual: email válido, password ≥ 6, nombre/apellido no vacíos, teléfono ≥ 6 dígitos).
-- Usa `supabase.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { account_type: "customer", nombre, apellido, full_name, phone, phone_country, birth_date } })`.
-- Si el email ya existe → devuelve `409 { error: "email_exists" }` para que el frontend muestre "Ese email ya está registrado, iniciá sesión".
-- Devuelve `{ ok: true }` en éxito (no devuelve tokens; el cliente hace sign-in después).
-- CORS habilitado, no requiere JWT del caller.
+El paso "Datos" reemplaza completamente a `AuthStep`. Form único con:
 
-Registrar la función en `supabase/config.toml` con `verify_jwt = false`.
+- Nombre *
+- Apellido *
+- Teléfono * (con selector de país, igual que hoy)
+- Email (opcional)
+- Fecha de nacimiento (opcional)
 
-### 2. `src/components/reservar/AuthStep.tsx`
+Validaciones cliente: nombre/apellido no vacíos (máx. 80), teléfono ≥ 6 dígitos, email con formato válido si se completa, fecha válida si se completa. Sin contraseña, sin instagram (ya removido).
 
-En la rama de registro:
-- Reemplazar `supabase.auth.signUp(...)` por `supabase.functions.invoke("register-customer", { body: { ... } })`.
-- Si la function devuelve `email_exists`, mostrar toast "Este email ya tiene cuenta. Iniciá sesión." y cambiar a modo login con el email precargado.
-- Si devuelve ok, llamar a `supabase.auth.signInWithPassword({ email, password })` y luego `onAuthenticated()`.
-- Quitar el `signUp` directo y el comentario `// TODO: re-enable email verification` (ya no aplica acá).
+Los datos quedan en estado local del stepper (`BookingState` extendido con `cliente: { nombre, apellido, telefono, phone_country, email, birthDate }`) y se pasan a `ConfirmacionStep`.
 
-No se tocan: el flujo de login existente, el registro de owners/barberos, ni la configuración global "Confirm email" de Supabase.
+## 2. ConfirmacionStep
+
+Deja de leer de `supabase.auth.getSession()`. Recibe `cliente` por props y lo manda directo al edge `validate-turno`. Sin `user_id`, sin metadata.
+
+## 3. Edge function `validate-turno`
+
+Cambios:
+
+- Quitar toda la lógica de `Authorization` / `getUser` / `verifiedUserId` / `verifiedEmail`. Ya no hay sesión.
+- Ya no recibe `user_id`. El insert de `turnos` guarda `user_id: null`.
+- Match de cliente: **prioridad teléfono** (normalizado, igual a hoy) dentro de `organization_id` y `eliminado=false`. Si no hay match por teléfono y vino email, fallback opcional por email. Si no, se crea.
+- Si existe: **pisar siempre** `nombre`, `apellido`, `telefono`, `email`, `fecha_nacimiento` con lo último ingresado (update directo, sin `fillIfEmpty`). No tocar `instagram`, `tiktok`, `nota_interna`, `acepta_marketing`, ni flags.
+- Si no existe: insertar con `origen: 'portal_publico'`.
+- Mantener `clientes_sucursales` upsert como hoy.
+- Mantener snapshot en `turnos` (`cliente_nombre`, `cliente_telefono`, `cliente_email`, `cliente_id`).
+- Sigue siendo público, sin verificación.
+
+`config.toml`: `validate-turno` debe seguir con `verify_jwt = false` (ya lo está implícitamente, confirmar).
+
+## 4. "Mis turnos" — lookup por teléfono
+
+Reemplazar el `AuthStep` del modo `manage` por un `LookupTelefonoStep`:
+
+- Input país + teléfono.
+- Botón "Buscar mis turnos".
+- Llama a un nuevo edge `get-my-turnos-by-phone` con `{ organization_id, phone_country, phone_local }`.
+
+Nuevo edge `get-my-turnos-by-phone` (`verify_jwt = false`):
+
+- Normaliza teléfono igual que `validate-turno`.
+- Busca `turnos` de la org con `cliente_telefono = phone` y `estado in ('pendiente','confirmado')`, futuros (misma lógica de fecha/hora que el edge actual).
+- Devuelve la misma estructura enriquecida que `get-my-turnos` (sucursal, barbero, servicio, `puede_cancelar`, `puede_reprogramar`).
+- Sin auth. Solo expone datos básicos del turno propio del teléfono buscado.
+
+`MisTurnosStep` se adapta para recibir la lista ya cargada o un callback de búsqueda; mantiene UI actual de listado, cancelar y reprogramar.
+
+## 5. Cancelar / reprogramar sin auth
+
+`cancel-turno` y `reschedule-turno` hoy validan ownership por JWT. Cambio:
+
+- Aceptar `phone` (normalizado) en el body como prueba de ownership en lugar de JWT.
+- Validan que `turno.cliente_telefono === phone_normalizado` y `turno.organization_id` coincida.
+- Mantener resto de validaciones (estado, límite de horas, etc.).
+- `verify_jwt = false`.
+
+Frontend: `MisTurnosStep` y `RescheduleFlow` pasan el teléfono usado en el lookup a esos invokes.
+
+## 6. Limpieza
+
+- Eliminar uso de `AuthStep` en `BookingStepper` (book y manage).
+- Eliminar el edge `register-customer` (ya no se usa). Quitar su entrada de `config.toml`.
+- `get-my-turnos` actual: dejarlo si todavía hay usuarios con cuenta legacy, o eliminarlo. Propuesta: **eliminarlo** junto con `register-customer` para no mantener código muerto.
+- `BookingStepper`: quitar `isAuthenticated`, `useEffect` de `supabase.auth.getSession`, lógica de `totalSteps` variable. Siempre 6 pasos en book.
+
+---
 
 ## Detalles técnicos
 
-- `auth.admin.createUser` con `email_confirm: true` crea el usuario ya confirmado, sin enviar email de verificación. Solo accesible desde el server con `SUPABASE_SERVICE_ROLE_KEY` (ya disponible en edge functions).
-- El `account_type: "customer"` en `user_metadata` permite seguir distinguiendo clientes de owners/barberos en triggers o lógica posterior si hace falta.
-- No hace falta migración de DB.
-- El email del cliente queda disponible para futura verificación opcional, y cuando se implemente verificación por teléfono se puede agregar como paso adicional sin romper este flujo.
+### Archivos a modificar
 
-## Acción manual requerida
+- `src/components/reservar/BookingStepper.tsx` — quitar auth, agregar `cliente` en `BookingState`, render del nuevo step en posición 4.
+- `src/components/reservar/ConfirmacionStep.tsx` — recibir `cliente` por props, sin `supabase.auth`.
+- `src/components/reservar/MisTurnosStep.tsx` — recibir teléfono o aceptar carga inicial vía lookup.
+- `src/components/reservar/RescheduleFlow.tsx` — pasar `phone` a `reschedule-turno`.
+- `src/components/reservar/CancelTurnoDialog.tsx` — pasar `phone` a `cancel-turno`.
 
-Ninguna. "Confirm email" sigue activo en Supabase para owners/barberos.
+### Archivos a crear
+
+- `src/components/reservar/DatosClienteStep.tsx` — form de 5 campos, valida y devuelve `cliente`.
+- `src/components/reservar/LookupTelefonoStep.tsx` — form para "Mis turnos".
+- `supabase/functions/get-my-turnos-by-phone/index.ts`.
+
+### Archivos a eliminar
+
+- `src/components/reservar/AuthStep.tsx`.
+- `supabase/functions/register-customer/index.ts` y su entrada en `config.toml`.
+- `supabase/functions/get-my-turnos/index.ts` (reemplazado).
+
+### Edge functions a editar
+
+- `validate-turno/index.ts` — sin auth, cliente vía body, pisar datos en match.
+- `cancel-turno/index.ts` — ownership por teléfono.
+- `reschedule-turno/index.ts` — ownership por teléfono.
+
+### Base de datos
+
+No se requiere migración. La tabla `clientes` ya tiene `telefono`, `email`, `fecha_nacimiento`. Los `turnos` ya guardan snapshot y permiten `user_id` null. RLS no se modifica (los edges usan service role).
+
+### Riesgos y notas
+
+- **Privacidad**: cualquiera con un teléfono podría listar los turnos asociados a ese número en una organización. El usuario aceptó esta solución como temporal hasta verificación por SMS.
+- **Duplicados**: el match por teléfono normalizado dentro de la org evita duplicar clientes ante reservas repetidas.
+- **Pisar datos**: si dos personas comparten teléfono dentro de la misma barbería, los datos se sobreescriben. Riesgo asumido.
+- Turnos legacy con `user_id` y sin `cliente_telefono` quedan inaccesibles desde "Mis turnos" nuevo. Aceptable porque el portal público recién se está consolidando.

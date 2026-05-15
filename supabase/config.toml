@@ -14,5 +14,14 @@ verify_jwt = true
 [functions.clear-sucursal-temp-password]
 verify_jwt = true
 
-[functions.register-customer]
+[functions.validate-turno]
+verify_jwt = false
+
+[functions.get-my-turnos-by-phone]
+verify_jwt = false
+
+[functions.cancel-turno]
+verify_jwt = false
+
+[functions.reschedule-turno]
 verify_jwt = false

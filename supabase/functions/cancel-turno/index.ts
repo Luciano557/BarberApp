@@ -5,6 +5,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function normalizePhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+  return hasPlus ? `+${digits}` : digits;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -12,19 +22,19 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { turno_id, motivo } = body;
+    const { turno_id, motivo, telefono } = body;
 
-    if (!turno_id) {
-      return new Response(JSON.stringify({ error: "Missing turno_id" }), {
+    if (!turno_id || !telefono) {
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+    const phone = normalizePhone(telefono);
+    if (!phone) {
+      return new Response(JSON.stringify({ error: "Invalid phone" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -34,19 +44,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch turno
     const { data: turno, error: turnoError } = await supabase
       .from("turnos")
-      .select("id, user_id, cliente_email, cliente_telefono, estado, fecha, hora_inicio, organization_id, sucursal_id")
+      .select("id, cliente_telefono, estado, fecha, hora_inicio, organization_id, sucursal_id")
       .eq("id", turno_id)
       .single();
 
@@ -57,22 +57,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Validate ownership (secure fallback)
-    const isOwner =
-      turno.user_id === user.id ||
-      (turno.user_id === null && (
-        (user.email && turno.cliente_email === user.email) ||
-        (user.phone && turno.cliente_telefono === user.phone)
-      ));
-
-    if (!isOwner) {
+    if (turno.cliente_telefono !== phone) {
       return new Response(JSON.stringify({ error: "Not authorized for this turno" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Validate estado
     if (!["pendiente", "confirmado"].includes(turno.estado)) {
       return new Response(JSON.stringify({ error: "Turno cannot be cancelled in current state" }), {
         status: 400,
@@ -80,7 +71,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get timezone and config
     const [orgRes, configRes] = await Promise.all([
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
       supabase.from("agenda_config").select("cancelacion_limite_hs").eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
@@ -89,7 +79,6 @@ Deno.serve(async (req) => {
     const timezone = orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
     const limiteHs = configRes.data?.cancelacion_limite_hs ?? 2;
 
-    // Check if turno is in the future and respects limit
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const turnoDateTime = new Date(`${turno.fecha}T${turno.hora_inicio}`);
@@ -112,7 +101,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Cancel
     const { error: updateError } = await supabase
       .from("turnos")
       .update({

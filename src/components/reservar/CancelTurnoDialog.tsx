@@ -16,12 +16,13 @@ import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface Props {
   turno: { id: string; fecha: string; hora_inicio: string; servicio_nombre: string };
+  telefono: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCancelled: () => void;
 }
 
-export const CancelTurnoDialog = ({ turno, open, onOpenChange, onCancelled }: Props) => {
+export const CancelTurnoDialog = ({ turno, telefono, open, onOpenChange, onCancelled }: Props) => {
   const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,7 +30,7 @@ export const CancelTurnoDialog = ({ turno, open, onOpenChange, onCancelled }: Pr
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("cancel-turno", {
-        body: { turno_id: turno.id, motivo: motivo || null },
+        body: { turno_id: turno.id, motivo: motivo || null, telefono },
       });
 
       if (error || data?.error) {

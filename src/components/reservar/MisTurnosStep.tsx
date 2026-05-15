@@ -33,11 +33,12 @@ interface Turno {
 
 interface Props {
   organizationId: string;
+  telefono: string;
   onReschedule: (turno: Turno) => void;
   onBookNew: () => void;
 }
 
-export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props) => {
+export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNew }: Props) => {
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelTurno, setCancelTurno] = useState<Turno | null>(null);
@@ -45,8 +46,8 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
   const fetchTurnos = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("get-my-turnos", {
-        body: { organization_id: organizationId },
+      const { data, error } = await supabase.functions.invoke("get-my-turnos-by-phone", {
+        body: { organization_id: organizationId, telefono },
       });
       if (!error && data?.turnos) {
         setTurnos(data.turnos);
@@ -60,7 +61,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
 
   useEffect(() => {
     fetchTurnos();
-  }, [organizationId]);
+  }, [organizationId, telefono]);
 
   if (loading) {
     return (
@@ -173,6 +174,7 @@ export const MisTurnosStep = ({ organizationId, onReschedule, onBookNew }: Props
         {cancelTurno && (
           <CancelTurnoDialog
             turno={cancelTurno}
+            telefono={telefono}
             open={!!cancelTurno}
             onOpenChange={(open) => !open && setCancelTurno(null)}
             onCancelled={() => {
