@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Loader2, Clock, ListChecks } from 'lucide-react';
 
 type FieldKey = 'peticiones_vencimiento_dias' | 'tareas_vencimiento_dias_default';
+type FieldUpdate = Partial<Record<FieldKey, number>>;
 
 interface VencimientoCardProps {
   icon: React.ReactNode;
