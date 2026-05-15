@@ -33,7 +33,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 's1_sidebar',
     targetId: 'mi-negocio-nav',
     title: 'Configurá tu negocio',
-    description: 'Desde aquí vas a administrar la informacion general de tu negocio. Los cambios que hagas acá se van a reflejar en todas tus sucursales',
+    description: 'Desde aquí vas a administrar toda la información principal de tu barbería.',
     requiredTab: 'mi-negocio',
   },
   {
