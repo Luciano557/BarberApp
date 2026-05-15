@@ -19,6 +19,10 @@ export interface OnboardingStep {
   hideContinueButton?: boolean;
   /** Paso de bienvenida: se muestra como diálogo centrado, sin target */
   isWelcome?: boolean;
+  /** Ocultar este paso en mobile */
+  hideOnMobile?: boolean;
+  /** Ocultar este paso en desktop */
+  hideOnDesktop?: boolean;
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
@@ -43,17 +47,21 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     description: 'La cuenta de sucursal está pensada para el trabajo diario de la barbería, sin necesidad de utilizar cuentas personales.',
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'general',
+    hideOnMobile: true,
+  },
+  {
+    id: 's2b_general_tab',
+    targetId: 'general-tab',
+    title: 'Configuración General',
+    description: 'Desde aquí vas a administrar la información general de tu negocio. Los cambios que hagas acá se van a reflejar en todas tus sucursales.',
+    requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
   },
   {
     id: 's3_cuenta_bullets',
     targetId: 'cuentas-sucursal-bullets',
     title: '¿Para qué sirve la cuenta de sucursal?',
     description: 'Tres ideas clave para tener en cuenta:',
-    bullets: [
-      'Cada sucursal tiene una cuenta propia.',
-      'Sirve para operar el día a día sin usar cuentas personales del equipo.',
-      'No accede a configuraciones, estadísticas, comisiones ni gestión del negocio.',
-    ],
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'general',
   },
