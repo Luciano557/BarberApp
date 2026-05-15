@@ -153,7 +153,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   // PIN flows: delegados a requirePinForAction (bypass automático para cuentas personales).
-  const handleNuevaTarea = () => { setPeticionCreador(null); setShowForm(true); };
+  const handleNuevaTarea = () => { setEditingTarea(null); setPeticionCreador(null); setShowForm(true); };
+  const handleEditTarea = (t: TareaItem) => { setEditingTarea(t); setPeticionCreador(null); setShowForm(true); };
 
   const handleNuevaPeticion = async () => {
     const gate = await requirePinForAction('crear_tarea', currentSucursal?.id ?? null);
