@@ -25,3 +25,6 @@ verify_jwt = false
 
 [functions.reschedule-turno]
 verify_jwt = false
+
+[functions.lookup-cliente-by-phone]
+verify_jwt = false
