@@ -100,9 +100,10 @@ export function TareaFormDialog({
       setDescripcion(tarea.descripcion ?? '');
       const isTeam = tarea.assignment_scope === 'team' || !tarea.asignado_a_id;
       setAsignadoId(isTeam ? TEAM_VALUE : tarea.asignado_a_id!);
-      if (tarea.fecha_limite) {
+      const fechaSrc = tarea.fecha_inicio ?? tarea.fecha_limite ?? null;
+      if (fechaSrc) {
         setHasDate(true);
-        try { setSelectedDate(parseISO(tarea.fecha_limite)); } catch { setSelectedDate(new Date()); }
+        try { setSelectedDate(parseISO(fechaSrc)); } catch { setSelectedDate(new Date()); }
       } else {
         setHasDate(false);
         setSelectedDate(undefined);
