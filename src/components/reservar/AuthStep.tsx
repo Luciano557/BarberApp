@@ -38,7 +38,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     apellido: "",
     phoneLocal: "",
     birthDate: "",
-    instagram: "",
     email: "",
     password: "",
   });
