@@ -8,6 +8,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SucursalSelector } from '@/components/SucursalSelector';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 interface AppSidebarProps {
   activeTab: string;
