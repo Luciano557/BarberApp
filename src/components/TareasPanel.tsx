@@ -434,9 +434,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
         ) : (
-          <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
-            <Plus className="h-4 w-4 mr-2" />Nueva petición
-          </Button>
+          !isBarber && (
+            <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
+              <Plus className="h-4 w-4 mr-2" />Nueva petición
+            </Button>
+          )
         )}
       </div>
 
