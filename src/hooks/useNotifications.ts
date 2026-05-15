@@ -261,6 +261,20 @@ export function useNotifications() {
     for (const d of deliveries) {
       const n = d.notifications;
       if (!n) continue;
+
+      // Filtro por catálogo + preferencia del usuario.
+      // - Evento `implemented = false` → ocultar.
+      // - Preferencia desactivada → ocultar.
+      // - Tipo desconocido (no en catálogo) → mostrar (compatibilidad).
+      const canon = resolveNotificationEventType(n.type) ?? n.type;
+      const def = getEventDef(canon);
+      if (def) {
+        if (!def.implemented) continue;
+        const pref = preferences.get(def.eventType);
+        const enabled = pref ?? def.defaultEnabled;
+        if (!enabled) continue;
+      }
+
       // Filtrado activo: por ahora solo modulo tareas
       if (n.source_module === 'tareas' && n.source_id) {
         const t = tareasById.get(n.source_id);
@@ -286,7 +300,7 @@ export function useNotifications() {
       });
     }
     return out;
-  }, [deliveries, tareasById, legacyReadsBySourceKey]);
+  }, [deliveries, tareasById, legacyReadsBySourceKey, preferences]);
 
   const unreadNotifications = useMemo(
     () => notifications.filter(n => !n.read),
