@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Loader2, Clock, ListChecks } from 'lucide-react';
 
 type FieldKey = 'peticiones_vencimiento_dias' | 'tareas_vencimiento_dias_default';
+type FieldUpdate = Partial<Record<FieldKey, number>>;
 
 interface VencimientoCardProps {
   icon: React.ReactNode;
@@ -23,6 +24,11 @@ function VencimientoCard({ icon, title, description, field, presets, initialValu
   const [dias, setDias] = useState(String(initialValue));
   const [saving, setSaving] = useState(false);
 
+  // Sincronizar si la organización carga después del primer render.
+  useEffect(() => {
+    setDias(String(initialValue));
+  }, [initialValue]);
+
   const handleSave = async () => {
     const value = parseInt(dias);
     if (isNaN(value) || value < 1 || value > 365) {
@@ -30,7 +36,8 @@ function VencimientoCard({ icon, title, description, field, presets, initialValu
       return;
     }
     setSaving(true);
-    const { error } = await updateOrganization({ [field]: value } as never);
+    const update: FieldUpdate = { [field]: value };
+    const { error } = await updateOrganization(update);
     setSaving(false);
     if (error) toast.error('Error al guardar');
     else toast.success('Configuración guardada');
@@ -92,20 +99,6 @@ export function TareasConfig() {
   return (
     <div className="space-y-4">
       <VencimientoCard
-        icon={<ListChecks className="h-5 w-5 text-primary" />}
-        title="Vencimiento de tareas"
-        description="Las tareas pendientes se marcarán como vencidas después de este plazo."
-        field="tareas_vencimiento_dias_default"
-        presets={[
-          { label: '1 día', value: 1 },
-          { label: '2 días', value: 2 },
-          { label: '7 días', value: 7 },
-          { label: '15 días', value: 15 },
-        ]}
-        initialValue={organization?.tareas_vencimiento_dias_default ?? 1}
-      />
-
-      <VencimientoCard
         icon={<Clock className="h-5 w-5 text-primary" />}
         title="Vencimiento de peticiones"
         description="Las peticiones pendientes se marcarán como vencidas después de este plazo."
@@ -117,6 +110,20 @@ export function TareasConfig() {
           { label: '90 días', value: 90 },
         ]}
         initialValue={organization?.peticiones_vencimiento_dias ?? 60}
+      />
+
+      <VencimientoCard
+        icon={<ListChecks className="h-5 w-5 text-primary" />}
+        title="Vencimiento de tareas"
+        description="Las tareas pendientes se marcarán como vencidas después de este plazo."
+        field="tareas_vencimiento_dias_default"
+        presets={[
+          { label: '1 día', value: 1 },
+          { label: '2 días', value: 2 },
+          { label: '7 días', value: 7 },
+          { label: '15 días', value: 15 },
+        ]}
+        initialValue={organization?.tareas_vencimiento_dias_default ?? 1}
       />
     </div>
   );

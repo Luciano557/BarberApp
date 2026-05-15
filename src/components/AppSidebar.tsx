@@ -8,6 +8,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SucursalSelector } from '@/components/SucursalSelector';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -190,6 +191,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
       {/* Lock, Logout & Toggle */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        {canViewTareas && (
+          <NotificationsBell
+            collapsed={collapsed}
+            onNavigate={() => handleTabChange('tareas')}
+          />
+        )}
         {requiresPin && isUnlocked && (
           <Button
             variant="ghost"

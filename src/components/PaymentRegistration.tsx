@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, ClipboardList, X, Split, Package, Plus, Trash2 } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -77,7 +77,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [efectivoAmount, setEfectivoAmount] = useState<string>('');
   const [mpAmount, setMpAmount] = useState<string>('');
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
-  const [showTasksBubble, setShowTasksBubble] = useState(true);
+  // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Productos
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -1334,34 +1334,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </AlertDialog>
 
 
-      {showTasksBubble && pendingTasks.length > 0 && (
-        <div
-          onClick={() => { setShowTasksBubble(false); onNavigateToTareas?.(); }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md flex items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-md animate-fade-in cursor-pointer hover:bg-muted/50 transition-colors"
-        >
-          <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 shrink-0">
-            <ClipboardList className="h-4 w-4 text-primary" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-              {pendingTasks.length}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              Tenés {pendingTasks.length} tarea{pendingTasks.length > 1 ? 's' : ''} pendiente{pendingTasks.length > 1 ? 's' : ''}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {pendingTasks.slice(0, 2).map(t => t.titulo).join(', ')}
-              {pendingTasks.length > 2 ? ` y ${pendingTasks.length - 2} más` : ''}
-            </p>
-          </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowTasksBubble(false); }}
-            className="shrink-0 p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
