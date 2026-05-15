@@ -428,12 +428,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
       <TareaFormDialog
         open={showForm}
-        onOpenChange={setShowForm}
+        onOpenChange={(o) => { setShowForm(o); if (!o) setEditingTarea(null); }}
         barbers={barbers}
         onSubmit={tarea => addTarea.mutate(tarea)}
-        isPending={addTarea.isPending}
+        onUpdate={(id, patch) => {
+          const { id: _omit, ...rest } = patch;
+          updateTarea.mutate({ id, ...rest });
+        }}
+        isPending={addTarea.isPending || updateTarea.isPending}
         tipo={isTareasTab ? 'tarea' : 'peticion'}
         creadorNombre={peticionCreador?.nombre}
+        tarea={editingTarea}
       />
 
       {/* Tabs */}
