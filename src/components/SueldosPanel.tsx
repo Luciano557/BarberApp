@@ -199,7 +199,7 @@ function BarberDetailRow({
           </div>
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Devengado</p>
+              <p className="text-xs text-muted-foreground">A pagar</p>
               <p className="font-medium">{formatCurrency(barber.totalDevengado)}</p>
             </div>
             <div className="text-right">
