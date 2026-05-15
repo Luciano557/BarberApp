@@ -661,7 +661,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         bonoOcurrenciasPorId[bid].push({ fecha: o.fecha, monto: m });
 
         // Filtered
-        const inPeriod = !periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd');
+        const inPeriod = (!periodStartDate || o.fecha >= format(periodStartDate, 'yyyy-MM-dd')) &&
+          (!periodEndDate || o.fecha <= format(periodEndDate, 'yyyy-MM-dd'));
         if (inPeriod) {
           if (!bonoFiltradoPorId[bid]) bonoFiltradoPorId[bid] = { total: 0, ocurrencias: [] };
           bonoFiltradoPorId[bid].total += m;
