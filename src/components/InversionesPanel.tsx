@@ -1,8 +1,18 @@
 import { useState } from 'react';
 import { TrendingUp, Trash2, Plus, Package } from 'lucide-react';
-import { useInversiones } from '@/hooks/useInversiones';
+import { useInversiones, type Inversion } from '@/hooks/useInversiones';
 import { useDeudas } from '@/hooks/useDeudas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -31,6 +41,7 @@ export function InversionesPanel() {
   const [montoCuota, setMontoCuota] = useState('');
   const [fechaProximoPago, setFechaProximoPago] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [inversionAEliminar, setInversionAEliminar] = useState<Inversion | null>(null);
 
   const resetForm = () => {
     setNombre('');
@@ -192,7 +203,12 @@ export function InversionesPanel() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => deleteInversion(inv.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive h-8 w-8"
+                      onClick={() => setInversionAEliminar(inv)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -202,6 +218,33 @@ export function InversionesPanel() {
           })}
         </div>
       )}
+
+      <AlertDialog open={!!inversionAEliminar} onOpenChange={(open) => !open && setInversionAEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar inversión</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inversionAEliminar && (
+                <>Vas a eliminar la inversión <strong>{inversionAEliminar.nombre}</strong>. Esta acción no se puede deshacer.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (inversionAEliminar) {
+                  await deleteInversion(inversionAEliminar.id);
+                  setInversionAEliminar(null);
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
