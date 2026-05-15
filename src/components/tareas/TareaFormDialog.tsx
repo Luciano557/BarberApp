@@ -55,7 +55,7 @@ export function TareaFormDialog({
   const [asignadoId, setAsignadoId] = useState<string>(TEAM_VALUE);
   const [submitted, setSubmitted] = useState(false);
 
-  // Fecha de inicio (mapea a fecha_limite en DB por compatibilidad)
+  // Fecha de inicio (columna real fecha_inicio)
   const [hasDate, setHasDate] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dateOpen, setDateOpen] = useState(false);
