@@ -77,7 +77,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [efectivoAmount, setEfectivoAmount] = useState<string>('');
   const [mpAmount, setMpAmount] = useState<string>('');
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
-  const [showTasksBubble, setShowTasksBubble] = useState(true);
+  // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Productos
   const [cart, setCart] = useState<CartItem[]>([]);
