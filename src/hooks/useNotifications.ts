@@ -305,6 +305,7 @@ export function useNotifications() {
         .or(`notification_id.eq.${item.id},and(source_type.eq.${item.source_type},source_id.eq.${item.source_id})`);
       if (error) throw error;
     },
+    onError: (e) => console.warn('[notifications] markAsUnread error', e),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
     },
