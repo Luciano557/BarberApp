@@ -209,6 +209,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             {t.fecha_limite && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
+                <span className="text-foreground/80">Inicio:</span>{' '}
                 {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
                 {t.hora && <span>· {t.hora}</span>}
               </span>
