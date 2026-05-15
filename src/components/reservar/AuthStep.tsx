@@ -92,7 +92,7 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
     const apellido = form.apellido.trim();
     const phoneDigits = form.phoneLocal.replace(/[\s-]/g, "");
     const email = form.email.trim();
-    const instagram = form.instagram.trim().replace(/^@+/, "");
+    
 
     // Validate BEFORE setting loading
     if (!nombre) return toast.error("Ingresá tu nombre");
