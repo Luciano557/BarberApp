@@ -51,12 +51,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     const status = row?.status ?? 'pending';
     if (status === 'completed' || status === 'skipped') return;
     const resumeId = row?.current_step;
-    const resumeIdx = resumeId ? ONBOARDING_STEPS.findIndex(s => s.id === resumeId) : 0;
+    const resumeIdx = resumeId ? steps.findIndex(s => s.id === resumeId) : 0;
     setCurrentIndex(resumeIdx >= 0 ? resumeIdx : 0);
     if (status === 'pending') {
-      upsert({ status: 'in_progress', started_at: new Date().toISOString(), current_step: ONBOARDING_STEPS[0].id });
+      upsert({ status: 'in_progress', started_at: new Date().toISOString(), current_step: steps[0].id });
     }
-  }, [isLoading, canSeeOnboarding, row, currentIndex, upsert]);
+  }, [isLoading, canSeeOnboarding, row, currentIndex, upsert, steps]);
 
   // Apply requiredTab + sub-tab on step change
   useEffect(() => {
