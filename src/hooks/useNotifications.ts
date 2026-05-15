@@ -71,6 +71,7 @@ export function useNotifications() {
   const { user } = useAuth();
   const { organization } = useOrganization();
   const { tareas } = useTareas();
+  const { preferences } = useNotificationPreferences();
   const queryClient = useQueryClient();
 
   const tareasDias = organization?.tareas_vencimiento_dias_default ?? 1;
