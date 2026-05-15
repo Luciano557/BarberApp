@@ -2889,6 +2889,7 @@ export type Database = {
           enabled: boolean
           event_type: string
           id: string
+          mode: string | null
           organization_id: string
           updated_at: string
           user_id: string
@@ -2898,6 +2899,7 @@ export type Database = {
           enabled?: boolean
           event_type: string
           id?: string
+          mode?: string | null
           organization_id: string
           updated_at?: string
           user_id: string
@@ -2907,6 +2909,7 @@ export type Database = {
           enabled?: boolean
           event_type?: string
           id?: string
+          mode?: string | null
           organization_id?: string
           updated_at?: string
           user_id?: string
@@ -3409,6 +3412,8 @@ export type Database = {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
       }
+      _notif_actor_account_type: { Args: { _user: string }; Returns: string }
+      _notif_actor_name: { Args: { _user: string }; Returns: string }
       _notif_emit: {
         Args: {
           _actor_name: string
@@ -3430,7 +3435,31 @@ export type Database = {
         }
         Returns: undefined
       }
+      _notif_emit_sensitive: {
+        Args: {
+          _actor_user_id: string
+          _category: string
+          _default_mode: string
+          _event_key: string
+          _event_type: string
+          _metadata: Json
+          _organization_id: string
+          _recipients: string[]
+          _source_id: string
+          _source_module: string
+          _source_table: string
+          _sucursal_id: string
+          _summary: string
+          _supports_mode: boolean
+          _title: string
+        }
+        Returns: undefined
+      }
       _notif_org_admins: { Args: { _org: string }; Returns: string[] }
+      _notif_pref_mode: {
+        Args: { _default_mode: string; _event_type: string; _user: string }
+        Returns: string
+      }
       _notif_sucursal_account: {
         Args: { _org: string; _sucursal: string }
         Returns: string[]
@@ -3514,6 +3543,27 @@ export type Database = {
         Returns: Json
       }
       is_sucursal_account: { Args: { _user_id: string }; Returns: boolean }
+      notif_emit_action_blocked: {
+        Args: { _action_key: string; _sucursal_id: string }
+        Returns: undefined
+      }
+      notif_emit_login_sucursal_account: {
+        Args: { _sucursal_id: string }
+        Returns: undefined
+      }
+      notif_emit_pin_authorized: {
+        Args: {
+          _action_key: string
+          _authorized_by_name: string
+          _authorized_by_user_id: string
+          _sucursal_id: string
+        }
+        Returns: undefined
+      }
+      notif_emit_view_event: {
+        Args: { _module: string; _sucursal_id: string }
+        Returns: undefined
+      }
       org_has_any_pin: { Args: never; Returns: boolean }
       registrar_movimiento_stock: {
         Args: {
