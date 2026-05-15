@@ -47,6 +47,15 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     description: 'La cuenta de sucursal está pensada para el trabajo diario de la barbería, sin necesidad de utilizar cuentas personales.',
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'general',
+    hideOnMobile: true,
+  },
+  {
+    id: 's2b_general_tab',
+    targetId: 'general-tab',
+    title: 'Configuración General',
+    description: 'Desde aquí vas a administrar la información general de tu negocio. Los cambios que hagas acá se van a reflejar en todas tus sucursales.',
+    requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
   },
   {
     id: 's3_cuenta_bullets',
