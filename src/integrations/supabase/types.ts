@@ -1696,6 +1696,7 @@ export type Database = {
           plan: string | null
           plan_expires_at: string | null
           slug: string
+          tareas_vencimiento_dias_default: number
           timezone: string | null
           updated_at: string | null
         }
@@ -1712,6 +1713,7 @@ export type Database = {
           plan?: string | null
           plan_expires_at?: string | null
           slug: string
+          tareas_vencimiento_dias_default?: number
           timezone?: string | null
           updated_at?: string | null
         }
@@ -1728,6 +1730,7 @@ export type Database = {
           plan?: string | null
           plan_expires_at?: string | null
           slug?: string
+          tareas_vencimiento_dias_default?: number
           timezone?: string | null
           updated_at?: string | null
         }
