@@ -97,7 +97,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
                 maxLength={6}
                 autoFocus
                 disabled={isValidating}
-                autoComplete="one-time-code"
+                autoComplete="off"
                 data-1p-ignore
                 data-lpignore="true"
                 data-form-type="other"
