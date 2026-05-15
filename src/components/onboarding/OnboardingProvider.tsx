@@ -40,7 +40,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // Auto-start for owners
   useEffect(() => {
-    if (isLoading || !isOwner) return;
+    if (isLoading || !canSeeOnboarding) return;
     if (currentIndex !== -1) return;
     const status = row?.status ?? 'pending';
     if (status === 'completed' || status === 'skipped') return;
@@ -50,7 +50,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (status === 'pending') {
       upsert({ status: 'in_progress', started_at: new Date().toISOString(), current_step: ONBOARDING_STEPS[0].id });
     }
-  }, [isLoading, isOwner, row, currentIndex, upsert]);
+  }, [isLoading, canSeeOnboarding, row, currentIndex, upsert]);
 
   // Apply requiredTab + sub-tab on step change
   useEffect(() => {
