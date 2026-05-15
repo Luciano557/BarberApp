@@ -218,7 +218,7 @@ function BarberDetailRow({
           {/* Fixed salary explanation */}
           {barber.fixedSalaryInfo && (
             <div className="p-3 rounded-md bg-accent/30 border border-accent/50 text-sm">
-              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} devengado
+              <span className="font-medium">Sueldo fijo:</span> {formatCurrency(barber.fixedSalaryInfo.sueldoFijo)}/mes — {barber.fixedSalaryInfo.dias} días → {formatCurrency(barber.fixedSalaryInfo.devengado)} a pagar
             </div>
           )}
           {/* Comision extra por equipo */}
