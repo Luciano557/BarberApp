@@ -136,6 +136,7 @@ export function useTareas() {
     asignado_a_id?: string | null;
     asignado_a_nombre?: string | null;
     assignment_scope?: 'individual' | 'team';
+    fecha_inicio?: string | null;
     fecha_limite?: string | null;
     hora?: string | null;
     repeat_preset?: string | null;
