@@ -268,6 +268,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         )}
         {step === 4 && (
           <DatosClienteStep
+            organizationId={orgData.organization.id}
             initial={booking.cliente ?? undefined}
             onSubmit={(cliente) => {
               setBooking((b) => ({ ...b, cliente }));
