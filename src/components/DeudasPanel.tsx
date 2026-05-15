@@ -124,7 +124,7 @@ export function DeudasPanel() {
 
             <div className="flex items-center gap-1 ml-2">
               {!esPagada && (
-                <Button size="sm" variant="outline" onClick={() => registrarPago(d)}>
+                <Button size="sm" variant="outline" onClick={() => setDeudaAPagar(d)}>
                   <CreditCard className="h-3 w-3 mr-1" /> Confirmar Pago
                 </Button>
               )}
