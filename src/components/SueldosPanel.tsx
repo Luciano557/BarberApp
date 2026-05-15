@@ -349,6 +349,15 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     const gate = await requirePinForAction('ver_sueldos', currentSucursal?.id ?? null);
     if (!gate.ok) return;
     setSueldosViewUnlocked(true);
+    if (isSucursalAccount && currentSucursal?.id) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).rpc('notif_emit_view_event', {
+          _module: 'sueldos',
+          _sucursal_id: currentSucursal.id,
+        });
+      } catch (e) { console.warn('[notif] view event error', e); }
+    }
   };
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
