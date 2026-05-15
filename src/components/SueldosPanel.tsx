@@ -575,7 +575,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             result.historico[ingreso.barbero_id].porcentaje = regla.porcentaje; // last one wins
 
             // Filtered (only if within period)
-            const inPeriod = !periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd');
+            const inPeriod = (!periodStartDate || fechaCierre >= format(periodStartDate, 'yyyy-MM-dd')) &&
+              (!periodEndDate || fechaCierre <= format(periodEndDate, 'yyyy-MM-dd'));
             if (inPeriod) {
               if (!result.filtrado[ingreso.barbero_id]) {
                 result.filtrado[ingreso.barbero_id] = { nombre, porcentaje: regla.porcentaje, monto: 0 };
