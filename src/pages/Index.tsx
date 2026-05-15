@@ -37,7 +37,7 @@ const Index = () => {
   };
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
-  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas'>('menu');
+  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones'>('menu');
 
   // Register tab setter so onboarding can drive navigation
   useEffect(() => {
