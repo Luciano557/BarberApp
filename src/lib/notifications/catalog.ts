@@ -243,7 +243,7 @@ export const NOTIFICATION_CATALOG: NotificationEventDef[] = [
     description: 'Cuando se asigna una tarea a todo el equipo de la sucursal.',
     defaultEnabled: true,
     configurable: true,
-    implemented: false,
+    implemented: true,
     phase: 3,
     rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
     showForSucursalAccount: true,
