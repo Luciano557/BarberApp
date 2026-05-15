@@ -16,8 +16,9 @@ interface ConfigMenuProps {
 }
 
 export function ConfigMenu({ onSelect }: ConfigMenuProps) {
-  const { isOwner } = useAuth();
+  const { isOwner, isGeneralManager } = useAuth();
   const { restart } = useOnboarding();
+  const canSeeOnboarding = isOwner || isGeneralManager;
 
   const items: ConfigMenuItem[] = [
     {
@@ -65,7 +66,7 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
         </button>
       ))}
 
-      {isOwner && (
+      {canSeeOnboarding && (
         <button
           onClick={restart}
           className="w-full flex items-center gap-4 p-4 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors text-left"

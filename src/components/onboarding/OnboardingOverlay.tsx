@@ -1,8 +1,10 @@
 import { useOnboarding } from './OnboardingProvider';
 
 export function OnboardingOverlay() {
-  const { isActive, targetRect } = useOnboarding();
+  const { isActive, currentStep, targetRect } = useOnboarding();
   if (!isActive) return null;
+  // El paso de bienvenida usa Dialog con su propio backdrop
+  if (currentStep?.isWelcome) return null;
 
   const pad = 8;
   const r = targetRect
@@ -14,9 +16,9 @@ export function OnboardingOverlay() {
       }
     : null;
 
-  // Fallback: full overlay if rect not yet measured
+  // Sin target visible (típico en mobile con sidebar colapsada): fondo suave sin spotlight
   if (!r) {
-    return <div className="fixed inset-0 z-[60] bg-foreground/60 backdrop-blur-[1px] animate-fade-in" />;
+    return <div className="fixed inset-0 z-[60] bg-foreground/40 backdrop-blur-[1px] animate-fade-in pointer-events-none" />;
   }
 
   const overlayCls = 'fixed bg-foreground/60 backdrop-blur-[1px] z-[60] transition-all duration-300';

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { ONBOARDING_STEPS, OnboardingStep, OnboardingSubTab, OnboardingEvent } from './steps';
 import { useOnboardingState } from '@/hooks/useOnboardingState';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface OnboardingContextValue {
   isActive: boolean;
@@ -26,7 +27,9 @@ export function useOnboarding() {
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const { row, isLoading, isOwner, upsert } = useOnboardingState();
+  const { row, isLoading, upsert } = useOnboardingState();
+  const { isOwner, isGeneralManager } = useAuth();
+  const canSeeOnboarding = isOwner || isGeneralManager;
   const tabSetterRef = useRef<((tab: string) => void) | null>(null);
   const subTabSetterRef = useRef<((kind: OnboardingSubTab) => void) | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
@@ -37,7 +40,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // Auto-start for owners
   useEffect(() => {
-    if (isLoading || !isOwner) return;
+    if (isLoading || !canSeeOnboarding) return;
     if (currentIndex !== -1) return;
     const status = row?.status ?? 'pending';
     if (status === 'completed' || status === 'skipped') return;
@@ -47,7 +50,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (status === 'pending') {
       upsert({ status: 'in_progress', started_at: new Date().toISOString(), current_step: ONBOARDING_STEPS[0].id });
     }
-  }, [isLoading, isOwner, row, currentIndex, upsert]);
+  }, [isLoading, canSeeOnboarding, row, currentIndex, upsert]);
 
   // Apply requiredTab + sub-tab on step change
   useEffect(() => {
@@ -66,7 +69,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // Track target rect
   useEffect(() => {
-    if (!currentStep) { setTargetRect(null); return; }
+    if (!currentStep || currentStep.isWelcome) { setTargetRect(null); return; }
     let raf = 0;
     const update = () => {
       const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;

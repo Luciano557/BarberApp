@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useOnboarding } from './OnboardingProvider';
 import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 const TOOLTIP_W = 340;
 const MARGIN = 16;
 
 export function OnboardingTooltip() {
   const { isActive, currentStep, currentIndex, totalSteps, targetRect, next, skip } = useOnboarding();
-  const [vp, setVp] = useState({ w: typeof window !== 'undefined' ? window.innerWidth : 1024, h: typeof window !== 'undefined' ? window.innerHeight : 768 });
+  const isMobile = useIsMobile();
+  const [vp, setVp] = useState({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1024,
+    h: typeof window !== 'undefined' ? window.innerHeight : 768,
+  });
 
   useEffect(() => {
     const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
@@ -18,7 +24,80 @@ export function OnboardingTooltip() {
 
   if (!isActive || !currentStep) return null;
 
-  // Position
+  // === Paso de bienvenida: diálogo centrado ===
+  if (currentStep.isWelcome) {
+    return (
+      <Dialog open onOpenChange={(open) => { if (!open) skip(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-2">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <DialogTitle>{currentStep.title}</DialogTitle>
+            <DialogDescription className="leading-relaxed pt-1">
+              {currentStep.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={skip} className="sm:mr-auto">
+              Omitir por ahora
+            </Button>
+            <Button onClick={next} className="gap-1.5">
+              Empezar recorrido
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // === Mobile: bottom sheet fijo ===
+  if (isMobile) {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-[70] animate-fade-in px-3 pb-3 pt-2">
+        <div className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl p-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Paso {currentIndex + 1} de {totalSteps}
+            </span>
+          </div>
+          <h3 className="text-base font-semibold text-foreground">{currentStep.title}</h3>
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{currentStep.description}</p>
+
+          {currentStep.bullets && currentStep.bullets.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {currentStep.bullets.map((b, i) => (
+                <li key={i} className="flex gap-2 text-sm text-foreground">
+                  <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
+                  <span className="leading-relaxed">{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
+            <button
+              onClick={skip}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Omitir tutorial
+            </button>
+            {currentStep.hideContinueButton ? (
+              <span className="text-xs text-muted-foreground italic">Tocá para continuar</span>
+            ) : (
+              <Button size="sm" onClick={next} className="gap-1.5">
+                Continuar
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // === Desktop: tooltip posicionado sobre el target ===
   let top = vp.h / 2 - 100;
   let left = vp.w / 2;
   let transform = 'translate(-50%, -50%)';
@@ -51,7 +130,6 @@ export function OnboardingTooltip() {
       arrow = 'right';
     }
 
-    // Clamp horizontally
     const halfW = TOOLTIP_W / 2;
     if (transform.startsWith('translate(-50%')) {
       left = Math.min(Math.max(left, halfW + 12), vp.w - halfW - 12);
