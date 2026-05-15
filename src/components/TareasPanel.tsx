@@ -81,13 +81,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const matchesFecha = (t: TareaItem) => {
     if (filtroFecha === 'todas') return true;
+    const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
       if (t.tipo === 'peticion' && t.estado === 'pendiente') return getPeticionVencimiento(t).vencida;
-      if (t.fecha_limite) return new Date(t.fecha_limite) < new Date(new Date().toDateString());
+      if (fechaRef) return new Date(fechaRef) < new Date(new Date().toDateString());
       return false;
     }
-    if (!t.fecha_limite) return false;
-    const diff = differenceInDays(new Date(t.fecha_limite), new Date());
+    if (!fechaRef) return false;
+    const diff = differenceInDays(new Date(fechaRef), new Date());
     if (filtroFecha === 'hoy') return diff === 0;
     if (filtroFecha === 'semana') return diff >= 0 && diff <= 7;
     if (filtroFecha === 'mes') return diff >= 0 && diff <= 30;
