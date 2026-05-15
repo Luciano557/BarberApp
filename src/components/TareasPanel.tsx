@@ -119,7 +119,9 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
-        if (!(t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida)) return false;
+        const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
+        const tareaVencida = t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida;
+        if (!peticionVencida && !tareaVencida) return false;
       } else if (t.estado !== filtroEstado) return false;
     }
     return matchesFecha(t) && matchesSucursal(t) && (t.tipo === 'peticion' || matchesResp(t));
