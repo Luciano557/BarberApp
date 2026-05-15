@@ -108,42 +108,40 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: form.password,
-        options: {
-          data: {
-            account_type: "customer",
+      const { data: fnData, error: fnError } = await supabase.functions.invoke(
+        "register-customer",
+        {
+          body: {
+            email,
+            password: form.password,
             nombre,
             apellido,
-            full_name: fullName,
             phone,
             phone_country: country.code,
             birth_date: form.birthDate,
           },
-          emailRedirectTo: window.location.href,
         },
-      });
+      );
 
-      if (error) {
-        toast.error(error.message || "Error al crear la cuenta. Intentá de nuevo.");
-        return;
-      }
-      if (!data.user) {
+      if (fnError || (fnData && (fnData as any).error)) {
+        const errCode = (fnData as any)?.error || "";
+        const ctxStatus = (fnError as any)?.context?.status;
+        if (errCode === "email_exists" || ctxStatus === 409) {
+          toast.error("Este email ya tiene cuenta. Iniciá sesión.");
+          setIsLogin(true);
+          return;
+        }
         toast.error("No pudimos crear tu cuenta. Intentá nuevamente.");
         return;
       }
-      if (data.session) {
-        onAuthenticated();
-        return;
-      }
-      // TODO: re-enable email verification (temporal: forzamos sign-in inmediato)
+
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email,
         password: form.password,
       });
       if (signInErr) {
-        toast.error("No pudimos iniciar sesión. Intentá de nuevo.");
+        toast.error("Cuenta creada, pero no pudimos iniciar sesión. Intentá ingresar manualmente.");
+        setIsLogin(true);
         return;
       }
       onAuthenticated();
