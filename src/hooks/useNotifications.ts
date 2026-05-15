@@ -106,23 +106,9 @@ export function useNotifications() {
       if (t.tipo === 'tarea' && t.estado !== 'completada') {
         const venc = getTareaVencimiento(t, tareasDias);
 
-        // tarea_pendiente: estado pendiente y fecha_inicio <= hoy
-        if (
-          t.estado === 'pendiente' &&
-          t.fecha_inicio &&
-          startOfDay(parseISO(t.fecha_inicio)).getTime() <= today.getTime()
-        ) {
-          out.push({
-            event_key: `tarea:${t.id}:pendiente`,
-            type: 'tarea_pendiente',
-            source_module: 'tareas',
-            source_table: 'tareas',
-            source_id: t.id,
-            title: t.titulo,
-            notification_at: toIsoFromYmd(t.fecha_inicio),
-            metadata: {},
-          });
-        }
+        // tarea_pendiente: ya no se genera client-side. El trigger SQL
+        // `trg_tareas_after_insert_notif` emite `tarea_asignada` /
+        // `tarea_equipo_asignada` al crear la tarea.
 
         // tarea_vencida: helper marca vencida
         if (venc.vencida && t.fecha_inicio) {
