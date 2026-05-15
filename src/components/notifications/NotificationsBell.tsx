@@ -21,6 +21,7 @@ const TYPE_META: Record<NotificationItem['source_type'], { label: string; icon: 
 
 export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellProps) {
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
   const { notifications, unreadCount, markAsRead, markAllAsRead, refresh } = useNotifications();
 
   const handleOpenChange = (next: boolean) => {
