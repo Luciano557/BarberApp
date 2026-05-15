@@ -353,7 +353,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
           {(showGeneralTab || visibleSucursales.length > 1) && (
             <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               {showGeneralTab && (
-                <TabsTrigger value={GENERAL_TAB} className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
+                <TabsTrigger value={GENERAL_TAB} data-onboarding-id="general-tab" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
                   General
                 </TabsTrigger>
               )}

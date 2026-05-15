@@ -1,53 +1,31 @@
-## Cambios al Onboarding
+## Cambios al onboarding: paso "Configuración general"
 
-### 1. Restringir audiencia a Dueño y Encargado General
+### Comportamiento
 
-- En `src/components/onboarding/OnboardingProvider.tsx`, reemplazar la condición de auto-start (`if (isLoading || !isOwner) return`) por una que combine `isOwner || isGeneralManager`.
-- Exponer `isGeneralManager` desde `useOnboardingState` (lo lee de `useAuth`) o consumir `useAuth` directo en el provider.
-- Mismo gating para el botón "Ver tutorial otra vez" en `src/components/config/ConfigMenu.tsx`: mostrarlo si es dueño o encargado general (hoy solo `isOwner`).
-- Cualquier otro rol (manager de sucursal, barbero, cuenta de sucursal, etc.) nunca dispara el onboarding ni ve el botón de reinicio.
+- **Desktop**: el paso 2 actual (`s2_cuenta_intro` — "¿Para qué sirve la cuenta de sucursal?") se mantiene igual. Se agrega un nuevo paso justo después como **paso 3**, que ilumina la tab "General" con el siguiente contenido:
+  - Título: `Configuración General`
+  - Descripción: `Desde aquí vas a administrar la información general de tu negocio. Los cambios que hagas acá se van a reflejar en todas tus sucursales.`
+- **Mobile**: el paso 2 (`s2_cuenta_intro`) se **reemplaza** por el paso de "Configuración General" descrito arriba (mismo título, descripción y target). Es decir, en mobile no se muestra el paso original de "cuenta de sucursal" intro, pero sí el nuevo.
+- El resto de los pasos (`s3_cuenta_bullets`, `s4_select_sucursal`, etc.) sigue igual en ambos.
 
-### 2. Pantalla de bienvenida inicial
+### Implementación
 
-- Nuevo paso `s0_welcome` al inicio de `ONBOARDING_STEPS` en `src/components/onboarding/steps.ts`, marcado con un flag `isWelcome: true`.
-- A diferencia del resto, no apunta a un `targetId`: se renderiza como **modal centrado a pantalla completa** (no tooltip), con:
-  - Título: "Te damos la bienvenida a Vittro"
-  - Descripción breve y clara siguiendo el tono de marca: qué es Vittro, qué resuelve, y qué va a hacer este recorrido (~2-3 frases).
-  - Botones: "Empezar recorrido" (avanza) y "Omitir por ahora" (skip).
-- El `OnboardingTooltip` actual detecta `isWelcome` y, en ese caso, renderiza un componente nuevo `OnboardingWelcomeDialog` (basado en `Dialog` de shadcn) en vez del tooltip posicionado.
-- El `OnboardingOverlay` no se muestra detrás del welcome (el Dialog ya tiene su propio backdrop).
+1. **`src/components/MiNegocioPanel.tsx`**: agregar `data-onboarding-id="general-tab"` al `TabsTrigger` con valor `GENERAL_TAB` (línea ~356) para que el nuevo paso pueda apuntarlo.
 
-### 3. Adaptación a mobile
+2. **`src/components/onboarding/steps.ts`**:
+   - Extender `OnboardingStep` con un flag opcional `hideOnMobile?: boolean` y `hideOnDesktop?: boolean`.
+   - Agregar un nuevo step `s2b_general_tab` justo después de `s2_cuenta_intro`:
+     - `targetId: 'general-tab'`
+     - `requiredTab: 'mi-negocio'`, `miNegocioSubTab: 'general'`
+     - Título y descripción según el pedido.
+   - Marcar `s2_cuenta_intro` con `hideOnMobile: true`.
+   - (No hace falta `hideOnDesktop` para `s2b_general_tab`; aparece en ambos.)
 
-Problema actual: en mobile la sidebar está colapsada (los `targetId` del sidebar como `mi-negocio-nav` y `sucursal-tab` no son visibles ni alcanzables) y los tooltips quedan fuera del viewport.
+3. **`src/components/onboarding/OnboardingProvider.tsx`**:
+   - Calcular la lista efectiva de pasos según `useIsMobile()` filtrando los `hideOnMobile`/`hideOnDesktop`. Reemplazar todos los usos de `ONBOARDING_STEPS` dentro del provider por esta lista (`steps`), incluyendo `totalSteps`, `currentStep`, persistencia (`current_step` por id), resume por id y `completed_steps`.
+   - Como `useOnboarding` se usa también en `OnboardingTooltip`/`OnboardingOverlay`, no cambia la API pública: solo cambia el contenido de la lista y los índices.
 
-**Estrategia: bottom sheet en mobile, tooltip en desktop.**
+### Notas
 
-- Detectar mobile con el hook existente `useIsMobile` dentro de `OnboardingTooltip`.
-- En mobile, en lugar de tooltip flotante posicionado sobre el target:
-  - Renderizar un **bottom sheet fijo** (basado en `Sheet` de shadcn con `side="bottom"`, sin modal/backdrop bloqueante) que ocupa el ancho completo y queda anclado abajo, con el contenido del paso (título, descripción, bullets, paso X de Y, botones Continuar / Omitir).
-  - No depender del `targetRect` para posicionar; solo usarlo (cuando exista) para hacer scroll al elemento y resaltarlo si está visible.
-  - El `OnboardingOverlay` en mobile se simplifica: si no hay `targetRect` visible o el spotlight no aplica (caso sidebar colapsada), no recorta nada — solo aplica un fondo semi-transparente suave detrás del sheet (o se omite).
-- En desktop: comportamiento actual (tooltip + overlay con spotlight) se mantiene.
-
-**Pasos que dependen del sidebar (`s1_sidebar`, `s4_select_sucursal`):**
-- En mobile el sidebar de `Sheet` no está abierto. Dos opciones, elegimos la más simple:
-  - Para `s1_sidebar`: el bottom sheet explica el módulo "Mi Negocio" sin requerir señalar el ítem del sidebar; al continuar, dispara directamente el cambio de tab (ya hace `tabSetterRef.current(currentStep.requiredTab)` en pasos siguientes — basta con que `s1_sidebar` también tenga `requiredTab: 'mi-negocio'` para que al avanzar el panel correcto esté activo).
-  - Para `s4_select_sucursal`: en mobile la pestaña de sucursal sí es visible dentro del panel "Mi Negocio" (no es del sidebar), así que sigue funcionando. Verificar el `targetId="sucursal-tab"` y, si queda fuera del viewport, hacer `scrollIntoView` (ya existe esa lógica).
-- No se cambia el contenido textual de los pasos.
-
-### 4. Detalles técnicos
-
-- Tipos: agregar `isWelcome?: boolean` a `OnboardingStep` y manejarlo en `OnboardingProvider` (no requiere `targetId` válido) y en `OnboardingTooltip`.
-- `useIsMobile` ya existe en `src/hooks/use-mobile.tsx`.
-- No se tocan migraciones ni RLS; `user_onboarding` queda igual.
-- No se cambia la lógica de avance por evento ni la persistencia.
-
-### Archivos a modificar
-
-- `src/components/onboarding/steps.ts` — nuevo step welcome + tipo.
-- `src/components/onboarding/OnboardingProvider.tsx` — gating por rol + soporte step welcome (no requiere targetRect).
-- `src/components/onboarding/OnboardingTooltip.tsx` — branching: welcome dialog / mobile sheet / desktop tooltip.
-- `src/components/onboarding/OnboardingOverlay.tsx` — no renderizar spotlight cuando es welcome o mobile sin target visible.
-- `src/components/config/ConfigMenu.tsx` — botón "Ver tutorial otra vez" visible para owner y general manager.
-- `src/hooks/useOnboardingState.ts` — exponer `isGeneralManager` (opcional; alternativamente leer `useAuth` directo en el provider).
+- En mobile el paso "Configuración General" funciona porque el bottom sheet no depende del `targetRect` para posicionarse; igualmente la tab "General" es visible dentro del panel "Mi Negocio" cuando esa pestaña principal está activa.
+- No se tocan migraciones, RLS ni la tabla `user_onboarding`. El campo `current_step` ya guarda el id del paso, no el índice, así que filtrar por dispositivo es seguro.
