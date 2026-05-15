@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare } from 'lucide-react';
+import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare, Wallet, Receipt, Banknote, ShieldAlert, KeyRound, Eye, LogIn, Lock, FileEdit, Settings2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
