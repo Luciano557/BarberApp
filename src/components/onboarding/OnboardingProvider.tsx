@@ -172,7 +172,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     isActive,
     currentStep,
     currentIndex,
-    totalSteps: ONBOARDING_STEPS.length,
+    totalSteps: steps.length,
     targetRect,
     next,
     skip,
@@ -181,7 +181,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     registerTabSetter,
     registerSubTabSetter,
     notifyEvent,
-  }), [isActive, currentStep, currentIndex, targetRect, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, notifyEvent]);
+  }), [isActive, currentStep, currentIndex, steps.length, targetRect, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, notifyEvent]);
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 }
