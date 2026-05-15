@@ -108,11 +108,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const next = useCallback(() => {
     setCurrentIndex(idx => {
       const nextIdx = idx + 1;
-      const completedId = ONBOARDING_STEPS[idx]?.id;
+      const completedId = steps[idx]?.id;
       const newCompleted = completedId
         ? Array.from(new Set([...(row?.completed_steps ?? []), completedId]))
         : (row?.completed_steps ?? []);
-      if (nextIdx >= ONBOARDING_STEPS.length) {
+      if (nextIdx >= steps.length) {
         upsert({
           status: 'completed',
           current_step: null,
@@ -123,12 +123,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       }
       upsert({
         status: 'in_progress',
-        current_step: ONBOARDING_STEPS[nextIdx].id,
+        current_step: steps[nextIdx].id,
         completed_steps: newCompleted,
       });
       return nextIdx;
     });
-  }, [row, upsert]);
+  }, [row, upsert, steps]);
 
   const skip = useCallback(() => {
     setCurrentIndex(-1);
