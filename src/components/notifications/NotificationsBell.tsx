@@ -252,6 +252,11 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
                       <p className={cn('text-sm truncate', isRead ? 'text-muted-foreground' : 'text-foreground')}>
                         {n.titulo}
                       </p>
+                      {(() => {
+                        const tSum = turnoSummary(n);
+                        if (tSum) return <p className="text-xs text-muted-foreground truncate">{tSum}</p>;
+                        return null;
+                      })()}
                       {fechaTxt && <p className="text-xs text-muted-foreground">{fechaTxt}</p>}
                     </div>
                   </button>
