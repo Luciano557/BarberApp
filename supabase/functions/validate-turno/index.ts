@@ -177,8 +177,19 @@ Deno.serve(async (req) => {
       verifiedEmail ||
       (typeof bodyClienteEmail === "string" ? bodyClienteEmail.trim() : null);
     const finalEmail = finalEmailRaw ? finalEmailRaw.toLowerCase() : null;
-    const finalTelefono =
-      typeof cliente_telefono === "string" ? cliente_telefono.trim() || null : null;
+    const normalizePhone = (raw: string | null): string | null => {
+      if (!raw) return null;
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      const hasPlus = trimmed.startsWith("+");
+      const digits = trimmed.replace(/\D/g, "");
+      if (!digits) return null;
+      return hasPlus ? `+${digits}` : digits;
+    };
+
+    const finalTelefono = normalizePhone(
+      typeof cliente_telefono === "string" ? cliente_telefono : null,
+    );
     const finalNombreSimple =
       typeof cliente_nombre_simple === "string" ? cliente_nombre_simple.trim() || null : null;
     const finalApellido =
@@ -218,6 +229,26 @@ Deno.serve(async (req) => {
           .limit(1)
           .maybeSingle();
         cliente = data;
+      }
+      if (!cliente && finalUserId) {
+        // Fallback: cliente ya vinculado a este usuario en una reserva previa
+        const { data: prevTurno } = await supabase
+          .from("turnos")
+          .select("cliente_id")
+          .eq("organization_id", organization_id)
+          .eq("user_id", finalUserId)
+          .not("cliente_id", "is", null)
+          .limit(1)
+          .maybeSingle();
+        if (prevTurno?.cliente_id) {
+          const { data } = await supabase
+            .from("clientes")
+            .select("*")
+            .eq("id", prevTurno.cliente_id)
+            .eq("eliminado", false)
+            .maybeSingle();
+          cliente = data;
+        }
       }
 
       if (!cliente) {
