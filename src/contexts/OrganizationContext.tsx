@@ -14,6 +14,7 @@ interface Organization {
   is_active: boolean;
   timezone: string;
   peticiones_vencimiento_dias: number;
+  tareas_vencimiento_dias_default: number;
 }
 
 interface PlanFeatures {
