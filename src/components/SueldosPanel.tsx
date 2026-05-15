@@ -1050,7 +1050,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Pagado {periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
+                  Pagado {periodStartDate && periodEndDate ? `(${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")})` : periodStartDate ? `(desde ${format(periodStartDate, "dd/MM/yyyy")})` : '(total)'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
