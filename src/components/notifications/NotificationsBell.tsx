@@ -177,6 +177,10 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
   const renderDetails = (n: NotificationItem) => {
     const items: Array<{ k: string; v: string }> = [];
     const sName = sucursalName(n.sucursal_id);
+    const tCliente = turnoCliente(n);
+    const tSummary = turnoSummary(n);
+    if (tCliente) items.push({ k: 'Cliente', v: tCliente });
+    if (tSummary && !TURNO_TYPES.has(n.event_type)) items.push({ k: 'Detalle', v: tSummary });
     if (sName) items.push({ k: 'Sucursal', v: sName });
     if (n.actor_name) items.push({ k: 'Acción de', v: n.actor_name });
     if (n.authorized_by_name) items.push({ k: 'Autorizado por', v: n.authorized_by_name });
