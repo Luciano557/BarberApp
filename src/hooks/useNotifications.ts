@@ -1,25 +1,58 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTareas, type Tarea } from '@/hooks/useTareas';
 import { getTareaVencimiento, getPeticionVencimiento } from '@/lib/tareasVencimiento';
-import { parseISO, startOfDay } from 'date-fns';
+import { parseISO, startOfDay, addDays } from 'date-fns';
 
 export type NotificationType =
   | 'tarea_pendiente'
   | 'tarea_vencida'
   | 'peticion_vencida';
 
+interface NotificationRow {
+  id: string;
+  organization_id: string;
+  event_key: string;
+  type: NotificationType | string;
+  source_module: string;
+  source_table: string | null;
+  source_id: string | null;
+  title: string;
+  body: string | null;
+  notification_at: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface NotificationItem {
-  id: string;            // composite key for UI
-  source_type: NotificationType;
-  source_id: string;     // tarea.id
+  id: string;                  // notifications.id (UUID)
+  source_type: NotificationType | string;
+  source_id: string;           // tarea/peticion id
   titulo: string;
-  fecha: string | null;  // YYYY-MM-DD reference
+  fecha: string;               // notification_at ISO
   read: boolean;
-  tarea: Tarea;
+  source_module: string;
+  tarea?: Tarea;
+}
+
+interface Candidate {
+  event_key: string;
+  type: NotificationType;
+  source_module: string;
+  source_table: string;
+  source_id: string;
+  title: string;
+  notification_at: string;
+  metadata: Record<string, unknown>;
+}
+
+function toIsoFromYmd(ymd: string): string {
+  // Local midnight ISO for a YYYY-MM-DD string
+  return startOfDay(parseISO(ymd)).toISOString();
 }
 
 export function useNotifications() {
@@ -31,64 +64,135 @@ export function useNotifications() {
   const tareasDias = organization?.tareas_vencimiento_dias_default ?? 1;
   const peticionesDias = organization?.peticiones_vencimiento_dias ?? 60;
 
-  const candidates: Omit<NotificationItem, 'read'>[] = useMemo(() => {
-    if (!tareas?.length) return [];
+  // 1. Candidatos calculados desde tareas/peticiones visibles
+  const candidates: Candidate[] = useMemo(() => {
+    if (!tareas?.length || !organization?.id) return [];
     const today = startOfDay(new Date());
-    const out: Omit<NotificationItem, 'read'>[] = [];
+    const out: Candidate[] = [];
 
     for (const t of tareas) {
       if (t.tipo === 'tarea' && t.estado !== 'completada') {
         const venc = getTareaVencimiento(t, tareasDias);
-        if (venc.vencida) {
-          out.push({
-            id: `tarea_vencida:${t.id}`,
-            source_type: 'tarea_vencida',
-            source_id: t.id,
-            titulo: t.titulo,
-            fecha: t.fecha_inicio,
-            tarea: t,
-          });
-          continue;
-        }
+
+        // tarea_pendiente: estado pendiente y fecha_inicio <= hoy
         if (
           t.estado === 'pendiente' &&
           t.fecha_inicio &&
           startOfDay(parseISO(t.fecha_inicio)).getTime() <= today.getTime()
         ) {
           out.push({
-            id: `tarea_pendiente:${t.id}`,
-            source_type: 'tarea_pendiente',
+            event_key: `tarea:${t.id}:pendiente`,
+            type: 'tarea_pendiente',
+            source_module: 'tareas',
+            source_table: 'tareas',
             source_id: t.id,
-            titulo: t.titulo,
-            fecha: t.fecha_inicio,
-            tarea: t,
+            title: t.titulo,
+            notification_at: toIsoFromYmd(t.fecha_inicio),
+            metadata: {},
+          });
+        }
+
+        // tarea_vencida: helper marca vencida
+        if (venc.vencida && t.fecha_inicio) {
+          const vencDate = addDays(startOfDay(parseISO(t.fecha_inicio)), Math.max(0, tareasDias) + 1);
+          out.push({
+            event_key: `tarea:${t.id}:vencida`,
+            type: 'tarea_vencida',
+            source_module: 'tareas',
+            source_table: 'tareas',
+            source_id: t.id,
+            title: t.titulo,
+            notification_at: vencDate.toISOString(),
+            metadata: {},
           });
         }
       } else if (t.tipo === 'peticion' && t.estado === 'pendiente') {
         const venc = getPeticionVencimiento(t, peticionesDias);
-        if (venc.vencida) {
+        if (venc.vencida && t.created_at) {
+          const dias = t.vencimiento_dias ?? peticionesDias ?? 60;
+          const vencDate = addDays(startOfDay(parseISO(t.created_at)), dias + 1);
           out.push({
-            id: `peticion_vencida:${t.id}`,
-            source_type: 'peticion_vencida',
+            event_key: `peticion:${t.id}:vencida`,
+            type: 'peticion_vencida',
+            source_module: 'tareas',
+            source_table: 'tareas',
             source_id: t.id,
-            titulo: t.titulo,
-            fecha: t.created_at?.slice(0, 10) ?? null,
-            tarea: t,
+            title: t.titulo,
+            notification_at: vencDate.toISOString(),
+            metadata: {},
           });
         }
       }
     }
     return out;
-  }, [tareas, tareasDias, peticionesDias]);
+  }, [tareas, tareasDias, peticionesDias, organization?.id]);
 
-  // Fetch reads
+  // 2. Persistir candidatos vía RPC (idempotente). Solo cuando cambia la fingerprint.
+  const candidatesFingerprint = useMemo(
+    () => candidates.map(c => `${c.event_key}|${c.title}`).join('||'),
+    [candidates],
+  );
+
+  useEffect(() => {
+    if (!organization?.id || !user?.id || candidates.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const c of candidates) {
+        if (cancelled) break;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (supabase as any).rpc('upsert_notification', {
+            _organization_id: organization.id,
+            _event_key: c.event_key,
+            _type: c.type,
+            _source_module: c.source_module,
+            _source_table: c.source_table,
+            _source_id: c.source_id,
+            _title: c.title,
+            _body: null,
+            _notification_at: c.notification_at,
+            _metadata: c.metadata,
+          });
+        } catch (e) {
+          console.warn('[notifications] upsert error', e);
+        }
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ['notifications', organization.id] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidatesFingerprint, organization?.id, user?.id]);
+
+  // 3. Query principal: últimas 100 notificaciones de la org
+  const { data: rawNotifications = [] } = useQuery({
+    queryKey: ['notifications', organization?.id],
+    queryFn: async () => {
+      if (!organization?.id) return [] as NotificationRow[];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
+        .from('notifications')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('notification_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as NotificationRow[];
+    },
+    enabled: !!organization?.id,
+  });
+
+  // 4. Lecturas por usuario
   const { data: reads = [] } = useQuery({
     queryKey: ['notification_reads', user?.id, organization?.id],
     queryFn: async () => {
       if (!user?.id || !organization?.id) return [];
       const { data, error } = await supabase
         .from('notification_reads')
-        .select('source_type, source_id')
+        .select('source_type, source_id, notification_id')
         .eq('user_id', user.id)
         .eq('organization_id', organization.id);
       if (error) throw error;
@@ -97,33 +201,101 @@ export function useNotifications() {
     enabled: !!user?.id && !!organization?.id,
   });
 
-  const readSet = useMemo(() => {
+  const readsByNotificationId = useMemo(() => {
     const s = new Set<string>();
-    for (const r of reads) s.add(`${r.source_type}:${r.source_id}`);
+    for (const r of reads as Array<{ notification_id: string | null; source_type: string; source_id: string }>) {
+      if (r.notification_id) s.add(r.notification_id);
+    }
     return s;
   }, [reads]);
 
-  const notifications: NotificationItem[] = useMemo(
-    () => candidates.map(c => ({ ...c, read: readSet.has(c.id) })),
-    [candidates, readSet],
+  const readsBySourceKey = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of reads as Array<{ notification_id: string | null; source_type: string; source_id: string }>) {
+      s.add(`${r.source_type}:${r.source_id}`);
+    }
+    return s;
+  }, [reads]);
+
+  // 5. Filtrar fuentes activas (tareas/peticiones aún visibles y vigentes)
+  const tareasById = useMemo(() => {
+    const m = new Map<string, Tarea>();
+    for (const t of tareas ?? []) m.set(t.id, t);
+    return m;
+  }, [tareas]);
+
+  const notifications: NotificationItem[] = useMemo(() => {
+    const out: NotificationItem[] = [];
+    for (const n of rawNotifications) {
+      // Filtrado activo: por ahora solo módulo tareas
+      if (n.source_module === 'tareas' && n.source_id) {
+        const t = tareasById.get(n.source_id);
+        if (!t) continue; // no visible para el usuario o eliminada
+        if (t.estado === 'completada') continue;
+        if (t.tipo === 'peticion' && t.estado !== 'pendiente') continue;
+      }
+      const read =
+        (n.id && readsByNotificationId.has(n.id)) ||
+        (n.source_id && readsBySourceKey.has(`${n.type}:${n.source_id}`)) ||
+        false;
+
+      out.push({
+        id: n.id,
+        source_type: n.type,
+        source_id: n.source_id ?? '',
+        titulo: n.title,
+        fecha: n.notification_at,
+        read: !!read,
+        source_module: n.source_module,
+        tarea: n.source_id ? tareasById.get(n.source_id) : undefined,
+      });
+    }
+    return out;
+  }, [rawNotifications, tareasById, readsByNotificationId, readsBySourceKey]);
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter(n => !n.read),
+    [notifications],
   );
+  const readNotifications = useMemo(
+    () => notifications.filter(n => n.read),
+    [notifications],
+  );
+  const unreadCount = unreadNotifications.length;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-
+  // 6. Mutations
   const markAsRead = useMutation({
-    mutationFn: async (item: Pick<NotificationItem, 'source_type' | 'source_id'>) => {
+    mutationFn: async (item: Pick<NotificationItem, 'id' | 'source_type' | 'source_id'>) => {
       if (!user?.id || !organization?.id) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload: any = {
+        user_id: user.id,
+        organization_id: organization.id,
+        notification_id: item.id,
+        source_type: item.source_type,
+        source_id: item.source_id,
+      };
       const { error } = await supabase
         .from('notification_reads')
-        .upsert(
-          {
-            user_id: user.id,
-            organization_id: organization.id,
-            source_type: item.source_type,
-            source_id: item.source_id,
-          },
-          { onConflict: 'user_id,source_type,source_id' },
-        );
+        .upsert(payload, { onConflict: 'user_id,source_type,source_id' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
+    },
+  });
+
+  const markAsUnread = useMutation({
+    mutationFn: async (item: Pick<NotificationItem, 'id' | 'source_type' | 'source_id'>) => {
+      if (!user?.id || !organization?.id) return;
+      // Borrar por notification_id y, por compatibilidad, también por (source_type, source_id)
+      let q = supabase
+        .from('notification_reads')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('organization_id', organization.id);
+      const { error } = await q
+        .or(`notification_id.eq.${item.id},and(source_type.eq.${item.source_type},source_id.eq.${item.source_id})`);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -134,17 +306,19 @@ export function useNotifications() {
   const markAllAsRead = useMutation({
     mutationFn: async () => {
       if (!user?.id || !organization?.id) return;
-      const unread = notifications.filter(n => !n.read);
+      const unread = unreadNotifications;
       if (!unread.length) return;
       const rows = unread.map(n => ({
         user_id: user.id,
         organization_id: organization.id,
+        notification_id: n.id,
         source_type: n.source_type,
         source_id: n.source_id,
       }));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabase
         .from('notification_reads')
-        .upsert(rows, { onConflict: 'user_id,source_type,source_id' });
+        .upsert(rows as any, { onConflict: 'user_id,source_type,source_id' });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -153,9 +327,19 @@ export function useNotifications() {
   });
 
   const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['notifications', organization?.id] });
     queryClient.invalidateQueries({ queryKey: ['notification_reads'] });
     queryClient.invalidateQueries({ queryKey: ['tareas'] });
   };
 
-  return { notifications, unreadCount, markAsRead, markAllAsRead, refresh };
+  return {
+    notifications,
+    unreadNotifications,
+    readNotifications,
+    unreadCount,
+    markAsRead,
+    markAsUnread,
+    markAllAsRead,
+    refresh,
+  };
 }
