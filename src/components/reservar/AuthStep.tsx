@@ -137,9 +137,16 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
         onAuthenticated();
         return;
       }
-      // User created but no session: email confirmation pending
-      toast.info("Cuenta creada. Revisá tu email para confirmar el acceso antes de continuar.");
-      setIsLogin(true);
+      // TODO: re-enable email verification (temporal: forzamos sign-in inmediato)
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.password,
+      });
+      if (signInErr) {
+        toast.error("No pudimos iniciar sesión. Intentá de nuevo.");
+        return;
+      }
+      onAuthenticated();
     } catch (err) {
       console.error("Signup error:", err);
       toast.error("Ocurrió un error inesperado. Probá nuevamente.");
