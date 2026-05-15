@@ -26,11 +26,12 @@ interface TurnoData {
 
 interface Props {
   turno: TurnoData;
+  telefono: string;
   onDone: () => void;
   onBack: () => void;
 }
 
-export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
+export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
   const [step, setStep] = useState<"fecha" | "horario" | "confirming" | "done">("fecha");
   const [nuevaFecha, setNuevaFecha] = useState(turno.fecha);
   const [nuevaHoraInicio, setNuevaHoraInicio] = useState("");
@@ -45,6 +46,7 @@ export const RescheduleFlow = ({ turno, onDone, onBack }: Props) => {
           turno_id: turno.id,
           nueva_fecha: nuevaFecha,
           nueva_hora_inicio: nuevaHoraInicio,
+          telefono,
         },
       });
 
