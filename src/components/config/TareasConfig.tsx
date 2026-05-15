@@ -24,6 +24,11 @@ function VencimientoCard({ icon, title, description, field, presets, initialValu
   const [dias, setDias] = useState(String(initialValue));
   const [saving, setSaving] = useState(false);
 
+  // Sincronizar si la organización carga después del primer render.
+  useEffect(() => {
+    setDias(String(initialValue));
+  }, [initialValue]);
+
   const handleSave = async () => {
     const value = parseInt(dias);
     if (isNaN(value) || value < 1 || value > 365) {
@@ -31,7 +36,8 @@ function VencimientoCard({ icon, title, description, field, presets, initialValu
       return;
     }
     setSaving(true);
-    const { error } = await updateOrganization({ [field]: value } as never);
+    const update: FieldUpdate = { [field]: value };
+    const { error } = await updateOrganization(update);
     setSaving(false);
     if (error) toast.error('Error al guardar');
     else toast.success('Configuración guardada');
