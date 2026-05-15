@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ONBOARDING_STEPS, OnboardingStep, OnboardingSubTab, OnboardingEvent } from './steps';
 import { useOnboardingState } from '@/hooks/useOnboardingState';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface OnboardingContextValue {
   isActive: boolean;
