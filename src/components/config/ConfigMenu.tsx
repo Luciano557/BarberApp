@@ -16,8 +16,9 @@ interface ConfigMenuProps {
 }
 
 export function ConfigMenu({ onSelect }: ConfigMenuProps) {
-  const { isOwner } = useAuth();
+  const { isOwner, isGeneralManager } = useAuth();
   const { restart } = useOnboarding();
+  const canSeeOnboarding = isOwner || isGeneralManager;
 
   const items: ConfigMenuItem[] = [
     {
