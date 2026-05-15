@@ -17,14 +17,24 @@ export interface OnboardingStep {
   advanceOnEvent?: OnboardingEvent;
   /** Oculta el botón "Continuar" (cuando se avanza por evento) */
   hideContinueButton?: boolean;
+  /** Paso de bienvenida: se muestra como diálogo centrado, sin target */
+  isWelcome?: boolean;
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
+  {
+    id: 's0_welcome',
+    targetId: '',
+    title: 'Te damos la bienvenida a Vittro',
+    description: 'Vittro centraliza la operación, la agenda, el equipo y las finanzas de tu barbería en un solo lugar, para que la gestionés con más claridad y menos tareas manuales. En los próximos pasos te mostramos cómo dejar todo configurado para empezar a trabajar.',
+    isWelcome: true,
+  },
   {
     id: 's1_sidebar',
     targetId: 'mi-negocio-nav',
     title: 'Configurá tu negocio',
     description: 'Desde aquí vas a administrar toda la información principal de tu barbería.',
+    requiredTab: 'mi-negocio',
   },
   {
     id: 's2_cuenta_intro',

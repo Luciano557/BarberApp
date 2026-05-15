@@ -25,6 +25,7 @@ export interface Tarea {
   recurrencia_semana_del_mes: number | null;
   dias_para_limite: number | null;
   proxima_fecha: string | null;
+  fecha_inicio: string | null;
   fecha_limite: string | null;
   hora: string | null;
   repeat_preset: string | null;
@@ -48,6 +49,7 @@ export interface TareaInsert {
   assignment_scope?: 'individual' | 'team';
   sucursal_id?: string | null;
   creado_por_nombre?: string;
+  fecha_inicio?: string;
   fecha_limite?: string;
   hora?: string;
   repeat_preset?: string;
@@ -126,8 +128,26 @@ export function useTareas() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  type TareaUpdate = {
+    id: string;
+    estado?: string;
+    titulo?: string;
+    descripcion?: string | null;
+    asignado_a_id?: string | null;
+    asignado_a_nombre?: string | null;
+    assignment_scope?: 'individual' | 'team';
+    fecha_inicio?: string | null;
+    fecha_limite?: string | null;
+    hora?: string | null;
+    repeat_preset?: string | null;
+    repeat_frequency?: string | null;
+    repeat_interval?: number | null;
+    repeat_byweekday?: number[] | null;
+    recurrente?: boolean;
+  };
+
   const updateTarea = useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; estado?: string; titulo?: string; descripcion?: string }) => {
+    mutationFn: async ({ id, ...updates }: TareaUpdate) => {
       const payload: Record<string, unknown> = { ...updates };
       if (updates.estado === 'completada') {
         payload.completada_at = new Date().toISOString();

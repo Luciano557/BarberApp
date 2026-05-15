@@ -1,128 +1,53 @@
-# Estabilizar el flujo de login de Vittro
+## Cambios al Onboarding
 
-Foco: corregir la **causa real** por la que la app queda en "Verificando sesión..." o "Cargando datos...". El timeout es solo una red de seguridad UX, **no** la solución.
+### 1. Restringir audiencia a Dueño y Encargado General
 
-## Diagnóstico de la causa real
+- En `src/components/onboarding/OnboardingProvider.tsx`, reemplazar la condición de auto-start (`if (isLoading || !isOwner) return`) por una que combine `isOwner || isGeneralManager`.
+- Exponer `isGeneralManager` desde `useOnboardingState` (lo lee de `useAuth`) o consumir `useAuth` directo en el provider.
+- Mismo gating para el botón "Ver tutorial otra vez" en `src/components/config/ConfigMenu.tsx`: mostrarlo si es dueño o encargado general (hoy solo `isOwner`).
+- Cualquier otro rol (manager de sucursal, barbero, cuenta de sucursal, etc.) nunca dispara el onboarding ni ve el botón de reinicio.
 
+### 2. Pantalla de bienvenida inicial
 
-| #   | Problema                                                                                                                            | Archivo                                        | Síntoma observable                                                            |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | `onAuthStateChange` y `getSession()` corren ambos y pueden pisar `isLoading`/`profile`/`roles`                                      | `src/contexts/AuthContext.tsx`                 | "Verificando sesión..." intermitente tras login                               |
-| 2   | `Promise.all([fetchProfile, fetchRoles])` sin `try/catch/finally` dentro del listener                                               | `AuthContext.tsx`                              | Si una query falla por red, `setIsLoading(false)` nunca corre                 |
-| 3   | `from('organizations').select('*').single()` sin filtro explícito ni `maybeSingle`; sin `error` en el contexto                      | `OrganizationContext.tsx`                      | Org no carga → `isLoading` queda en true → ProtectedRoute se queda en spinner |
-| 4   | `Login.handleLogin` duplica fetch de `getUser` + profile + organization en paralelo a `AuthContext`, sin try/catch ni timeout local | `pages/Login.tsx`                              | Botón "Ingresando..." atascado si una de esas queries cuelga                  |
-| 5   | `ProtectedRoute` solo conoce loading; no maneja error recuperable                                                                   | `ProtectedRoute.tsx`                           | Spinner eterno cuando algo falla "en silencio"                                |
-| 6   | `useSupabaseData.fetchData` sí tiene `finally`, pero no expone `error` ni `refetch` para reintento UX                               | `hooks/useSupabaseData.ts` + `pages/Index.tsx` | "Cargando datos..." sin salida si falla la fetch inicial                      |
+- Nuevo paso `s0_welcome` al inicio de `ONBOARDING_STEPS` en `src/components/onboarding/steps.ts`, marcado con un flag `isWelcome: true`.
+- A diferencia del resto, no apunta a un `targetId`: se renderiza como **modal centrado a pantalla completa** (no tooltip), con:
+  - Título: "Te damos la bienvenida a Vittro"
+  - Descripción breve y clara siguiendo el tono de marca: qué es Vittro, qué resuelve, y qué va a hacer este recorrido (~2-3 frases).
+  - Botones: "Empezar recorrido" (avanza) y "Omitir por ahora" (skip).
+- El `OnboardingTooltip` actual detecta `isWelcome` y, en ese caso, renderiza un componente nuevo `OnboardingWelcomeDialog` (basado en `Dialog` de shadcn) en vez del tooltip posicionado.
+- El `OnboardingOverlay` no se muestra detrás del welcome (el Dialog ya tiene su propio backdrop).
 
+### 3. Adaptación a mobile
 
-## Cambios
+Problema actual: en mobile la sidebar está colapsada (los `targetId` del sidebar como `mi-negocio-nav` y `sucursal-tab` no son visibles ni alcanzables) y los tooltips quedan fuera del viewport.
 
-### A. `src/contexts/AuthContext.tsx` — hidratación única e idempotente
+**Estrategia: bottom sheet en mobile, tooltip en desktop.**
 
-- Crear función `hydrateSession(session)` reutilizada por **ambos** caminos:
-  - Sin sesión → limpia `user`, `session`, `profile`, `roles` de forma sincrónica.
-  - Con sesión → setea `user`/`session`, luego `Promise.all([fetchProfile, fetchRoles])`.
-  - Toda la carga envuelta en `try/catch/finally`. `finally` siempre hace `setIsLoading(false)`.
-  - `catch`: `console.error('[Auth] hydrate:error', err)`; mantiene `user`/`session`, limpia `profile`/`roles`. No re-lanza.
-- Usar `hydratingFor` ref (`user.id` o `null`) para evitar carreras: si llega un evento con la misma `session.user.id` que ya está en curso, ignorar.
-- `getSession()` corre primero al montar; el listener `onAuthStateChange` delega siempre en `hydrateSession` (manteniendo el `setTimeout(0)` actual para no bloquear el callback de Supabase).
-- Logs: `[Auth] phase=getSession:start|done`, `[Auth] phase=onAuthStateChange event=<event>`, `[Auth] phase=hydrate:start|success|error`. Sin tokens, sin emails completos.
+- Detectar mobile con el hook existente `useIsMobile` dentro de `OnboardingTooltip`.
+- En mobile, en lugar de tooltip flotante posicionado sobre el target:
+  - Renderizar un **bottom sheet fijo** (basado en `Sheet` de shadcn con `side="bottom"`, sin modal/backdrop bloqueante) que ocupa el ancho completo y queda anclado abajo, con el contenido del paso (título, descripción, bullets, paso X de Y, botones Continuar / Omitir).
+  - No depender del `targetRect` para posicionar; solo usarlo (cuando exista) para hacer scroll al elemento y resaltarlo si está visible.
+  - El `OnboardingOverlay` en mobile se simplifica: si no hay `targetRect` visible o el spotlight no aplica (caso sidebar colapsada), no recorta nada — solo aplica un fondo semi-transparente suave detrás del sheet (o se omite).
+- En desktop: comportamiento actual (tooltip + overlay con spotlight) se mantiene.
 
-### B. `src/contexts/OrganizationContext.tsx` — fetch determinístico
+**Pasos que dependen del sidebar (`s1_sidebar`, `s4_select_sucursal`):**
+- En mobile el sidebar de `Sheet` no está abierto. Dos opciones, elegimos la más simple:
+  - Para `s1_sidebar`: el bottom sheet explica el módulo "Mi Negocio" sin requerir señalar el ítem del sidebar; al continuar, dispara directamente el cambio de tab (ya hace `tabSetterRef.current(currentStep.requiredTab)` en pasos siguientes — basta con que `s1_sidebar` también tenga `requiredTab: 'mi-negocio'` para que al avanzar el panel correcto esté activo).
+  - Para `s4_select_sucursal`: en mobile la pestaña de sucursal sí es visible dentro del panel "Mi Negocio" (no es del sidebar), así que sigue funcionando. Verificar el `targetId="sucursal-tab"` y, si queda fuera del viewport, hacer `scrollIntoView` (ya existe esa lógica).
+- No se cambia el contenido textual de los pasos.
 
-- Reescribir `fetchOrganization(userId)`:
-  1. Si no hay user → limpiar `organization`, `planFeatures`, `error=null`, `setIsLoading(false)`.
-  2. `select('organization_id').from('profiles').eq('id', userId).maybeSingle()`.
-  3. Si no hay `organization_id` → `setError('Tu cuenta no tiene una organización asignada.')` y cerrar loading.
-  4. `from('organizations').select('*').eq('id', orgId).maybeSingle()` → si null → `setError('No pudimos cargar tu organización.')`.
-  5. Si OK → `setOrganization` + cargar `plan_features` (errores en plan_features no rompen, solo log).
-- `try/catch/finally` con `setIsLoading(false)` siempre y `console.error('[Org] phase=fetch:error', err)`.
-- Exponer al contexto: `error: string | null`, `refreshOrganization()` (limpia error y reintenta).
+### 4. Detalles técnicos
 
-### C. src/pages/Login.tsx — sin lógica duplicada y con cierre garantizado
+- Tipos: agregar `isWelcome?: boolean` a `OnboardingStep` y manejarlo en `OnboardingProvider` (no requiere `targetId` válido) y en `OnboardingTooltip`.
+- `useIsMobile` ya existe en `src/hooks/use-mobile.tsx`.
+- No se tocan migraciones ni RLS; `user_onboarding` queda igual.
+- No se cambia la lógica de avance por evento ni la persistencia.
 
-- handleLogin envuelto en try/catch/finally; finally hace setIsLoading(false) en todos los caminos.
+### Archivos a modificar
 
-- Tras signIn exitoso, resolver la navegación con un helper aislado y controlado.
-
-- El helper puede usar el user devuelto por signInWithPassword si está disponible, o leer la sesión actual de forma segura.
-
-- Evitar duplicar innecesariamente la lógica de AuthContext.
-
-- Si se necesita obtener organization.slug para navegar a /app/:orgSlug, hacerlo mediante resolveOrgSlug(userId).
-
-- resolveOrgSlug debe:
-
-  - consultar profiles.organization_id con maybeSingle();
-
-  - consultar organizations.slug con eq('id', organization_id).maybeSingle();
-
-  - tener timeout local de 6 s vía Promise.race;
-
-  - usar try/catch/finally;
-
-  - no interferir con el estado global de AuthContext.
-
-- Si hay timeout/error resolviendo orgSlug:
-
-  - mostrar toast informativo;
-
-  - navegar a "/" o a una pantalla segura;
-
-  - dejar que AuthContext/ProtectedRoute terminen de resolver;
-
-  - nunca dejar el botón en "Ingresando...".
-
-- No tocar el resto del componente: UI, modos, registro.
-
-### D. `src/components/ProtectedRoute.tsx` — error recuperable, no spinner eterno
-
-- Mantener spinner solo mientras `authLoading || orgLoading`.
-- Cuando termina la carga:
-  - Si no hay `user` → `<Navigate to="/login" />` (igual que hoy).
-  - Si hay `user` y `orgError` → render de pantalla recuperable (mismo estilo del fallback actual): título "No pudimos cargar tu cuenta", mensaje del error, botones **Reintentar** (`refreshOrganization()`) y **Cerrar sesión** (`signOut()` + redirect a `/login`).
-- No rediseñar nada más.
-
-### E. `src/hooks/useSupabaseData.ts` + `src/pages/Index.tsx` — error recuperable en datos
-
-- En `useSupabaseData`:
-  - Agregar estado `error: string | null`.
-  - En el `catch` de `fetchData`: `setError(msg)` además del toast actual; `console.error('[Data] phase=fetch:error', err)`.
-  - En el `try` al inicio: `setError(null)`; al éxito: `console.info('[Data] phase=fetch:success')`.
-  - Exponer `error` y `refetch: fetchData`.
-- En `Index.tsx`:
-  - Si `!isLoading && error` → renderizar pantalla recuperable con **Reintentar** (`refetch()`) y **Cerrar sesión**. Sin tocar permisos, tabs ni queries.
-
-### F. Fallback progresivo de timeout (red de seguridad UX, no solución)
-
-- Crear hook reutilizable `useProgressiveLoading(active: boolean)` con tres umbrales: `delayed=8s`, `showRetry=25s`, `fatal=90s`.
-- Usarlo en los dos loaders existentes: `ProtectedRoute` ("Verificando sesión...") y `Index` ("Cargando datos...").
-  - 8 s → texto auxiliar `"Esto está tardando más de lo normal..."` debajo del loader.
-  - 25 s → botón **Reintentar** que llama al retry contextual:
-    - En `ProtectedRoute`: `refreshOrganization()` si hay user; si no, no aparece.
-    - En `Index`: `refetch()`.
-  - 90 s → render full-screen recuperable: "No pudimos terminar de cargar tu sesión. Puede deberse a una conexión lenta o a un problema temporal." + **Reintentar** + **Cerrar sesión**.
-- Reglas estrictas: **no** logout automático, **no** navegación automática, **no** `window.location.reload`, **no** ocultar errores reales (un error → pantalla recuperable inmediata, no espera al timeout).
-
-## Pruebas
-
-1. Login normal (owner, general_manager, manager, barber, sucursal_account).
-2. Logout + login.
-3. Refresh con sesión guardada.
-4. Conexión lenta simulada (DevTools throttling) → ver mensajes a 8 s y botón a 25 s.
-5. Usuario sin roles / sin organization → pantalla recuperable, no spinner.
-6. Bloquear request a `organizations` (DevTools) → pantalla recuperable con Reintentar.
-7. Bloquear `servicios` → "Cargando datos..." termina en pantalla recuperable.
-8. Múltiples eventos rápidos de `onAuthStateChange` (login → refresh token) → estados consistentes.
-
-## Devolutiva al finalizar (lo que voy a reportar)
-
-1. Cuál loading quedaba activo y dónde.
-2. Archivo causante principal.
-3. Cambios concretos en `AuthContext`, `OrganizationContext`, `Login.tsx`, `ProtectedRoute`, `Index`/`useSupabaseData`.
-4. Cómo opera el fallback progresivo.
-5. Cómo verificar el fix.
-
-## Fuera de alcance
-
-RLS, edge functions, modelo de roles, schema DB, rediseño visual del Login, PIN, permisos funcionales, lógica de negocio de Index, rutas públicas de reservas.
+- `src/components/onboarding/steps.ts` — nuevo step welcome + tipo.
+- `src/components/onboarding/OnboardingProvider.tsx` — gating por rol + soporte step welcome (no requiere targetRect).
+- `src/components/onboarding/OnboardingTooltip.tsx` — branching: welcome dialog / mobile sheet / desktop tooltip.
+- `src/components/onboarding/OnboardingOverlay.tsx` — no renderizar spotlight cuando es welcome o mobile sin target visible.
+- `src/components/config/ConfigMenu.tsx` — botón "Ver tutorial otra vez" visible para owner y general manager.
+- `src/hooks/useOnboardingState.ts` — exponer `isGeneralManager` (opcional; alternativamente leer `useAuth` directo en el provider).
