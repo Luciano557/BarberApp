@@ -407,7 +407,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const estadoOptions = isTareasTab ? ESTADO_OPTIONS_TAREA : ESTADO_OPTIONS_PETICION;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-4xl lg:max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
