@@ -100,7 +100,6 @@ export function useNotifications() {
   const candidates: Candidate[] = useMemo(() => {
     if (!tareas?.length || !organization?.id) return [];
     const out: Candidate[] = [];
-    void startOfDay; // reservado por si se reactiva lógica client-side
 
     for (const t of tareas) {
       if (t.tipo === 'tarea' && t.estado !== 'completada') {
