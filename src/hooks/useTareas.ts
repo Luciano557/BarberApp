@@ -49,6 +49,7 @@ export interface TareaInsert {
   assignment_scope?: 'individual' | 'team';
   sucursal_id?: string | null;
   creado_por_nombre?: string;
+  fecha_inicio?: string;
   fecha_limite?: string;
   hora?: string;
   repeat_preset?: string;
