@@ -461,6 +461,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
         const startDateStr = format(periodStartDate, 'yyyy-MM-dd');
         pagosQuery = pagosQuery.gte('created_at', `${startDateStr}T00:00:00`);
       }
+      if (periodEndDate) {
+        const endDateStr = format(periodEndDate, 'yyyy-MM-dd');
+        pagosQuery = pagosQuery.lte('created_at', `${endDateStr}T23:59:59`);
+      }
 
       const { data: pagosFiltrados, error: pagosFiltradosError } = await pagosQuery;
       if (pagosFiltradosError) throw pagosFiltradosError;
