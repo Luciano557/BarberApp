@@ -81,13 +81,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const matchesFecha = (t: TareaItem) => {
     if (filtroFecha === 'todas') return true;
+    const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
       if (t.tipo === 'peticion' && t.estado === 'pendiente') return getPeticionVencimiento(t).vencida;
-      if (t.fecha_limite) return new Date(t.fecha_limite) < new Date(new Date().toDateString());
+      if (fechaRef) return new Date(fechaRef) < new Date(new Date().toDateString());
       return false;
     }
-    if (!t.fecha_limite) return false;
-    const diff = differenceInDays(new Date(t.fecha_limite), new Date());
+    if (!fechaRef) return false;
+    const diff = differenceInDays(new Date(fechaRef), new Date());
     if (filtroFecha === 'hoy') return diff === 0;
     if (filtroFecha === 'semana') return diff >= 0 && diff <= 7;
     if (filtroFecha === 'mes') return diff >= 0 && diff <= 30;
@@ -206,11 +207,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 <MapPin className="h-3.5 w-3.5" />{sNombre}
               </span>
             )}
-            {t.fecha_limite && (
+            {(t.fecha_inicio ?? t.fecha_limite) && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
                 <span className="text-foreground/80">Inicio:</span>{' '}
-                {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
+                {format(new Date((t.fecha_inicio ?? t.fecha_limite)!), 'dd MMM', { locale: es })}
                 {t.hora && <span>· {t.hora}</span>}
               </span>
             )}
@@ -334,10 +335,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 <MapPin className="h-3.5 w-3.5" />{sNombre}
               </span>
             )}
-            {t.fecha_limite && (
+            {(t.fecha_inicio ?? t.fecha_limite) && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="h-3.5 w-3.5" />
-                {format(new Date(t.fecha_limite), 'dd MMM', { locale: es })}
+                {format(new Date((t.fecha_inicio ?? t.fecha_limite)!), 'dd MMM', { locale: es })}
                 {t.hora && <span>· {t.hora}</span>}
               </span>
             )}

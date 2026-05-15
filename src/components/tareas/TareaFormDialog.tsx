@@ -55,7 +55,7 @@ export function TareaFormDialog({
   const [asignadoId, setAsignadoId] = useState<string>(TEAM_VALUE);
   const [submitted, setSubmitted] = useState(false);
 
-  // Fecha de inicio (mapea a fecha_limite en DB por compatibilidad)
+  // Fecha de inicio (columna real fecha_inicio)
   const [hasDate, setHasDate] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dateOpen, setDateOpen] = useState(false);
@@ -100,9 +100,10 @@ export function TareaFormDialog({
       setDescripcion(tarea.descripcion ?? '');
       const isTeam = tarea.assignment_scope === 'team' || !tarea.asignado_a_id;
       setAsignadoId(isTeam ? TEAM_VALUE : tarea.asignado_a_id!);
-      if (tarea.fecha_limite) {
+      const fechaSrc = tarea.fecha_inicio ?? tarea.fecha_limite ?? null;
+      if (fechaSrc) {
         setHasDate(true);
-        try { setSelectedDate(parseISO(tarea.fecha_limite)); } catch { setSelectedDate(new Date()); }
+        try { setSelectedDate(parseISO(fechaSrc)); } catch { setSelectedDate(new Date()); }
       } else {
         setHasDate(false);
         setSelectedDate(undefined);
@@ -157,7 +158,7 @@ export function TareaFormDialog({
     } else {
       const isTeam = asignadoId === TEAM_VALUE || !asignadoId;
       const barber = !isTeam ? activeBarbers.find(b => b.id === asignadoId) : undefined;
-      const fecha_limite = hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
+      const fecha_inicio = hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
       const hora = hasTime ? selectedTime : null;
       const repeat_preset = repeatPreset;
       const repeat_frequency = repeatPreset === 'custom' ? repeatFrequency : null;
@@ -173,7 +174,7 @@ export function TareaFormDialog({
           asignado_a_id: isTeam ? null : asignadoId,
           asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : tarea.asignado_a_nombre),
           assignment_scope: isTeam ? 'team' : 'individual',
-          fecha_limite,
+          fecha_inicio,
           hora,
           repeat_preset,
           repeat_frequency,
@@ -189,7 +190,7 @@ export function TareaFormDialog({
           asignado_a_id: isTeam ? null : asignadoId,
           asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : undefined),
           assignment_scope: isTeam ? 'team' : 'individual',
-          fecha_limite: fecha_limite ?? undefined,
+          fecha_inicio: fecha_inicio ?? undefined,
           hora: hora ?? undefined,
           repeat_preset,
           repeat_frequency: repeat_frequency ?? undefined,
