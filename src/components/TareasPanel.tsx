@@ -221,7 +221,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
 
-          {(canStart || canComplete || canDelete) && (
+          {(canStart || canComplete || canDelete || canManageTareas) && (
             <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
               {canStart && t.estado === 'pendiente' && (
                 <Button size="sm" variant="ghost" onClick={() => updateTarea.mutate({ id: t.id, estado: 'en_progreso' })}>
@@ -231,6 +231,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso') && (
                 <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })}>
                   <CheckCircle className="h-4 w-4 mr-1" />Completar
+                </Button>
+              )}
+              {canManageTareas && (
+                <Button size="sm" variant="ghost" onClick={() => handleEditTarea(t)}>
+                  <Pencil className="h-4 w-4" />
                 </Button>
               )}
               {canDelete && (
