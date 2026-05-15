@@ -55,7 +55,7 @@ export function OnboardingTooltip() {
   // === Mobile: bottom sheet fijo ===
   if (isMobile) {
     return (
-      <div className="fixed inset-x-0 bottom-0 z-[70] animate-slide-in-bottom px-3 pb-3 pt-2">
+      <div className="fixed inset-x-0 bottom-0 z-[70] animate-fade-in px-3 pb-3 pt-2">
         <div className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl p-4">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
