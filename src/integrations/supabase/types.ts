@@ -1682,6 +1682,44 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          notification_id: string
+          organization_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          notification_id: string
+          organization_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          notification_id?: string
+          organization_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_reads: {
         Row: {
           created_at: string
@@ -1725,9 +1763,16 @@ export type Database = {
       }
       notifications: {
         Row: {
+          actor_account_type: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          authorized_by_name: string | null
+          authorized_by_user_id: string | null
           body: string | null
+          category: string | null
           created_at: string
           event_key: string
+          expires_at: string | null
           id: string
           metadata: Json
           notification_at: string
@@ -1735,14 +1780,23 @@ export type Database = {
           source_id: string | null
           source_module: string
           source_table: string | null
+          sucursal_id: string | null
+          summary: string | null
           title: string
           type: string
           updated_at: string
         }
         Insert: {
+          actor_account_type?: string | null
+          actor_name?: string | null
+          actor_user_id?: string | null
+          authorized_by_name?: string | null
+          authorized_by_user_id?: string | null
           body?: string | null
+          category?: string | null
           created_at?: string
           event_key: string
+          expires_at?: string | null
           id?: string
           metadata?: Json
           notification_at?: string
@@ -1750,14 +1804,23 @@ export type Database = {
           source_id?: string | null
           source_module: string
           source_table?: string | null
+          sucursal_id?: string | null
+          summary?: string | null
           title: string
           type: string
           updated_at?: string
         }
         Update: {
+          actor_account_type?: string | null
+          actor_name?: string | null
+          actor_user_id?: string | null
+          authorized_by_name?: string | null
+          authorized_by_user_id?: string | null
           body?: string | null
+          category?: string | null
           created_at?: string
           event_key?: string
+          expires_at?: string | null
           id?: string
           metadata?: Json
           notification_at?: string
@@ -1765,6 +1828,8 @@ export type Database = {
           source_id?: string | null
           source_module?: string
           source_table?: string | null
+          sucursal_id?: string | null
+          summary?: string | null
           title?: string
           type?: string
           updated_at?: string
@@ -3486,21 +3551,38 @@ export type Database = {
       }
       upsert_notification: {
         Args: {
+          _actor_account_type?: string
+          _actor_name?: string
+          _actor_user_id?: string
+          _authorized_by_name?: string
+          _authorized_by_user_id?: string
           _body: string
+          _category?: string
+          _deliver_to_caller?: boolean
           _event_key: string
+          _expires_at?: string
           _metadata: Json
           _notification_at: string
           _organization_id: string
           _source_id: string
           _source_module: string
           _source_table: string
+          _sucursal_id?: string
+          _summary?: string
           _title: string
           _type: string
         }
         Returns: {
+          actor_account_type: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          authorized_by_name: string | null
+          authorized_by_user_id: string | null
           body: string | null
+          category: string | null
           created_at: string
           event_key: string
+          expires_at: string | null
           id: string
           metadata: Json
           notification_at: string
@@ -3508,6 +3590,8 @@ export type Database = {
           source_id: string | null
           source_module: string
           source_table: string | null
+          sucursal_id: string | null
+          summary: string | null
           title: string
           type: string
           updated_at: string
@@ -3515,6 +3599,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "notifications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      upsert_notification_delivery: {
+        Args: { _notification_id: string; _user_id: string }
+        Returns: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          notification_id: string
+          organization_id: string
+          read_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notification_deliveries"
           isOneToOne: true
           isSetofReturn: false
         }
