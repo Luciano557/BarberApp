@@ -85,7 +85,7 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
             <Label htmlFor="action-auth-field">PIN de seguridad</Label>
             <div className="relative">
               <Input
-                id="pin"
+                id="action-auth-field"
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
