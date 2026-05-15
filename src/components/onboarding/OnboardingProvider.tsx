@@ -138,13 +138,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const restart = useCallback(() => {
     upsert({
       status: 'in_progress',
-      current_step: ONBOARDING_STEPS[0].id,
+      current_step: steps[0].id,
       completed_steps: [],
       started_at: new Date().toISOString(),
       completed_at: null,
     });
     setCurrentIndex(0);
-  }, [upsert]);
+  }, [upsert, steps]);
 
   const isAllowedTab = useCallback((tabId: string) => {
     if (!currentStep) return true;
