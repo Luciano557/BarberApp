@@ -53,10 +53,13 @@ const FECHA_OPTIONS = [
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
   const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
+  const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
   const requirePinForAction = useRequirePinForAction();
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
+  const tareasDiasDefault = organization?.tareas_vencimiento_dias_default ?? 1;
+  const peticionesDiasDefault = organization?.peticiones_vencimiento_dias ?? 60;
 
   const [showForm, setShowForm] = useState(false);
   const [editingTarea, setEditingTarea] = useState<TareaItem | null>(null);
@@ -74,19 +77,22 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const activeBarbers = barbers.filter(b => b.active);
   const myBarberoId = profile?.barbero_id ?? null;
 
-  const getPeticionVencimiento = (t: TareaItem) => {
-    const dias = t.vencimiento_dias ?? 60;
-    const diasTranscurridos = differenceInDays(new Date(), new Date(t.created_at));
-    const diasRestantes = dias - diasTranscurridos;
-    return { diasTranscurridos, diasRestantes, vencida: diasRestantes <= 0 };
-  };
+  const getPeticionVencimiento = (t: TareaItem) =>
+    getPeticionVencHelper(t, peticionesDiasDefault);
+
+  const getTareaVencimiento = (t: TareaItem) =>
+    getTareaVencHelper(t, tareasDiasDefault);
 
   const matchesFecha = (t: TareaItem) => {
     if (filtroFecha === 'todas') return true;
     const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
-      if (t.tipo === 'peticion' && t.estado === 'pendiente') return getPeticionVencimiento(t).vencida;
-      if (fechaRef) return new Date(fechaRef) < new Date(new Date().toDateString());
+      if (t.tipo === 'peticion' && t.estado === 'pendiente') {
+        return getPeticionVencimiento(t).vencida;
+      }
+      if (t.tipo === 'tarea' && t.estado !== 'completada') {
+        return getTareaVencimiento(t).vencida;
+      }
       return false;
     }
     if (!fechaRef) return false;
