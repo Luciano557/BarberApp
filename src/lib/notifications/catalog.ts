@@ -1,0 +1,691 @@
+/**
+ * Centro de Notificaciones — Catálogo central de eventos.
+ *
+ * Cada evento del catálogo representa una notificación del sistema final.
+ *
+ * - `configurable`: aparece en `Configuración → Notificaciones`.
+ * - `implemented`: el evento ya está conectado técnicamente y puede generar deliveries.
+ *
+ * Reglas:
+ * - Si `implemented = false`, el evento se muestra deshabilitado en configuración
+ *   con texto "Se activará próximamente" y nunca produce notificaciones, aunque
+ *   exista preferencia activada.
+ * - Eventos sensibles (finanzas, caja, sueldos, permisos, roles, PIN, cuenta de
+ *   sucursal, auditoría) deben permanecer `implemented = false` hasta que exista
+ *   validación backend/RPC o generación server-side segura. La validación
+ *   frontend de "rol puede activar evento" es defensa en profundidad, no de
+ *   seguridad.
+ */
+
+import type { AppRole } from '@/contexts/AuthContext';
+
+export type EventCategory =
+  | 'actividad_operativa'
+  | 'gestion_interna'
+  | 'finanzas_caja'
+  | 'sistema_seguridad';
+
+export const CATEGORY_LABELS: Record<EventCategory, string> = {
+  actividad_operativa: 'Actividad operativa',
+  gestion_interna: 'Gestión interna',
+  finanzas_caja: 'Finanzas y caja',
+  sistema_seguridad: 'Sistema y seguridad',
+};
+
+export const CATEGORY_ORDER: EventCategory[] = [
+  'actividad_operativa',
+  'gestion_interna',
+  'finanzas_caja',
+  'sistema_seguridad',
+];
+
+export interface NotificationEventDef {
+  eventType: string;
+  category: EventCategory;
+  label: string;
+  description: string;
+  defaultEnabled: boolean;
+  /** Forma parte del catálogo y aparece en Configuración → Notificaciones. */
+  configurable: boolean;
+  /** Está conectado técnicamente y puede generar notificaciones reales. */
+  implemented: boolean;
+  /** Fase prevista de implementación (informativo). */
+  phase: 1 | 2 | 3 | 4;
+  /** Cargos que tienen permitido recibirlo. */
+  rolesAllowed: AppRole[];
+  /** Visible para cuenta de sucursal (sucursal_account). */
+  showForSucursalAccount: boolean;
+  /** Visible para barbero. */
+  showForBarber: boolean;
+  /** Contiene datos sensibles (finanzas, seguridad, etc.). */
+  sensitive: boolean;
+  /** Suele incluir metadata/body que justifica vista desplegable. */
+  requiresDetails: boolean;
+  sourceModule: string;
+}
+
+/**
+ * Catálogo completo del sistema final.
+ *
+ * Mantener `implemented = false` para todo evento sensible o no conectado.
+ * Solo tareas/peticiones están conectadas en Fase 2 (compatibilidad con el
+ * sistema legacy).
+ */
+export const NOTIFICATION_CATALOG: NotificationEventDef[] = [
+  // ───────── Actividad operativa ─────────
+  {
+    eventType: 'turno_creado',
+    category: 'actividad_operativa',
+    label: 'Turno creado',
+    description: 'Cuando se reserva un nuevo turno en la agenda.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'agenda',
+  },
+  {
+    eventType: 'turno_cancelado',
+    category: 'actividad_operativa',
+    label: 'Turno cancelado',
+    description: 'Cuando un turno se cancela desde el portal o internamente.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'agenda',
+  },
+  {
+    eventType: 'turno_reprogramado',
+    category: 'actividad_operativa',
+    label: 'Turno reprogramado',
+    description: 'Cuando un turno cambia de fecha u horario.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'agenda',
+  },
+  {
+    eventType: 'tarea_asignada',
+    category: 'actividad_operativa',
+    label: 'Tarea asignada',
+    description: 'Cuando se te asigna una tarea pendiente.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: true,
+    phase: 2,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'tarea_equipo_asignada',
+    category: 'actividad_operativa',
+    label: 'Tarea asignada al equipo',
+    description: 'Cuando se asigna una tarea a todo el equipo de la sucursal.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'tarea_por_vencer',
+    category: 'actividad_operativa',
+    label: 'Tarea por vencer',
+    description: 'Cuando una tarea pendiente se acerca a su fecha límite.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'tarea_vencida',
+    category: 'actividad_operativa',
+    label: 'Tarea vencida',
+    description: 'Cuando una tarea pendiente supera su fecha límite.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: true,
+    phase: 2,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber', 'sucursal_account'],
+    showForSucursalAccount: true,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'cliente_bloqueado',
+    category: 'actividad_operativa',
+    label: 'Cliente bloqueado',
+    description: 'Cuando un cliente queda bloqueado para reservar online.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'clientes',
+  },
+
+  // ───────── Gestión interna ─────────
+  {
+    eventType: 'peticion_nueva',
+    category: 'gestion_interna',
+    label: 'Petición nueva',
+    description: 'Cuando alguien del equipo envía una petición.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'peticion_aprobada',
+    category: 'gestion_interna',
+    label: 'Petición aprobada',
+    description: 'Cuando se aprueba una de tus peticiones.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber'],
+    showForSucursalAccount: false,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'peticion_rechazada',
+    category: 'gestion_interna',
+    label: 'Petición rechazada',
+    description: 'Cuando se rechaza una de tus peticiones.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager', 'barber'],
+    showForSucursalAccount: false,
+    showForBarber: true,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'peticion_por_vencer',
+    category: 'gestion_interna',
+    label: 'Petición por vencer',
+    description: 'Cuando una petición pendiente se acerca a su vencimiento.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'peticion_vencida',
+    category: 'gestion_interna',
+    label: 'Petición vencida',
+    description: 'Cuando una petición pendiente supera su vencimiento.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: true,
+    phase: 2,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: false,
+    requiresDetails: false,
+    sourceModule: 'tareas',
+  },
+  {
+    eventType: 'stock_bajo',
+    category: 'gestion_interna',
+    label: 'Stock bajo',
+    description: 'Cuando un producto cae por debajo del stock mínimo configurado.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 3,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: false,
+    requiresDetails: true,
+    sourceModule: 'productos',
+  },
+
+  // ───────── Finanzas y caja (sensible — implementar server-side en Fase 4) ─────────
+  {
+    eventType: 'gasto_registrado',
+    category: 'finanzas_caja',
+    label: 'Gasto registrado',
+    description: 'Cuando se registra un nuevo gasto en finanzas.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+  {
+    eventType: 'gasto_editado',
+    category: 'finanzas_caja',
+    label: 'Gasto editado',
+    description: 'Cuando se modifica un gasto existente.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+  {
+    eventType: 'gasto_anulado',
+    category: 'finanzas_caja',
+    label: 'Gasto anulado',
+    description: 'Cuando se anula un gasto registrado.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+  {
+    eventType: 'pago_sueldo_registrado',
+    category: 'finanzas_caja',
+    label: 'Pago de sueldo registrado',
+    description: 'Cuando se registra el pago de un sueldo.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'sueldos',
+  },
+  {
+    eventType: 'cierre_caja_realizado',
+    category: 'finanzas_caja',
+    label: 'Cierre de caja realizado',
+    description: 'Cuando se confirma el cierre de caja del día.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'caja',
+  },
+  {
+    eventType: 'anulacion_cierre',
+    category: 'finanzas_caja',
+    label: 'Anulación de cierre',
+    description: 'Cuando se anula un cierre de caja confirmado.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'caja',
+  },
+  {
+    eventType: 'anulacion_transaccion',
+    category: 'finanzas_caja',
+    label: 'Anulación de transacción',
+    description: 'Cuando se anula una venta o cobro.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'caja',
+  },
+  {
+    eventType: 'anulacion_venta_corte',
+    category: 'finanzas_caja',
+    label: 'Anulación de venta de corte',
+    description: 'Cuando se anula la venta asociada a un corte.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'caja',
+  },
+  {
+    eventType: 'deuda_proxima_vencer',
+    category: 'finanzas_caja',
+    label: 'Deuda próxima a vencer',
+    description: 'Cuando una deuda registrada se acerca a su fecha de vencimiento.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+  {
+    eventType: 'deuda_vencida',
+    category: 'finanzas_caja',
+    label: 'Deuda vencida',
+    description: 'Cuando una deuda registrada supera su fecha de vencimiento.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager', 'manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+  {
+    eventType: 'inversion_registrada',
+    category: 'finanzas_caja',
+    label: 'Inversión registrada',
+    description: 'Cuando se registra una nueva inversión.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'finanzas',
+  },
+
+  // ───────── Sistema y seguridad (sensible — implementar server-side en Fase 4) ─────────
+  {
+    eventType: 'cambio_permisos',
+    category: 'sistema_seguridad',
+    label: 'Cambio de permisos',
+    description: 'Cuando se modifican los permisos de un usuario.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'cambio_roles',
+    category: 'sistema_seguridad',
+    label: 'Cambio de cargos',
+    description: 'Cuando se modifica el cargo de un usuario.',
+    defaultEnabled: true,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'cambio_configuracion_critica',
+    category: 'sistema_seguridad',
+    label: 'Cambio en configuración crítica',
+    description: 'Cuando se modifica una configuración sensible del negocio.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'accion_bloqueada_permisos',
+    category: 'sistema_seguridad',
+    label: 'Acción bloqueada por permisos',
+    description: 'Cuando se intenta una acción no autorizada.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'inicio_sesion_cuenta_sucursal',
+    category: 'sistema_seguridad',
+    label: 'Inicio de sesión de cuenta de sucursal',
+    description: 'Cuando una cuenta de sucursal inicia sesión.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'accion_autorizada_pin',
+    category: 'sistema_seguridad',
+    label: 'Acción autorizada con PIN',
+    description: 'Cuando se autoriza una acción sensible con PIN.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+  {
+    eventType: 'error_importante_sincronizacion',
+    category: 'sistema_seguridad',
+    label: 'Error de sincronización',
+    description: 'Cuando ocurre un error importante de sincronización.',
+    defaultEnabled: false,
+    configurable: true,
+    implemented: false,
+    phase: 4,
+    rolesAllowed: ['owner', 'general_manager'],
+    showForSucursalAccount: false,
+    showForBarber: false,
+    sensitive: true,
+    requiresDetails: true,
+    sourceModule: 'seguridad',
+  },
+];
+
+/**
+ * Mapping de tipos legacy persistidos en `notifications.type` (Fase 1)
+ * hacia el catálogo de Fase 2.
+ *
+ * - tarea_pendiente → tarea_asignada
+ *   (la antigua "tarea_pendiente" indica que la tarea está pendiente y visible
+ *   para el usuario; semánticamente corresponde al evento "tarea_asignada".
+ *   NO se mapea a "tarea_por_vencer" porque no implica proximidad de
+ *   vencimiento.)
+ * - tarea_vencida → tarea_vencida
+ * - peticion_vencida → peticion_vencida
+ */
+const LEGACY_TYPE_MAP: Record<string, string> = {
+  tarea_pendiente: 'tarea_asignada',
+  tarea_vencida: 'tarea_vencida',
+  peticion_vencida: 'peticion_vencida',
+};
+
+/**
+ * Resuelve el `eventType` canónico del catálogo a partir de un valor
+ * persistido en `notifications.type` (que puede ser legacy).
+ */
+export function resolveNotificationEventType(rawType: string | null | undefined): string | null {
+  if (!rawType) return null;
+  return LEGACY_TYPE_MAP[rawType] ?? rawType;
+}
+
+const CATALOG_BY_EVENT: Record<string, NotificationEventDef> = Object.fromEntries(
+  NOTIFICATION_CATALOG.map(e => [e.eventType, e]),
+);
+
+export function getEventDef(eventType: string | null | undefined): NotificationEventDef | undefined {
+  if (!eventType) return undefined;
+  return CATALOG_BY_EVENT[eventType];
+}
+
+export interface RoleScope {
+  roles: AppRole[];
+  isSucursalAccount: boolean;
+  isBarber: boolean;
+}
+
+/**
+ * Determina si un evento del catálogo debe ser visible para el rol actual.
+ */
+export function isEventVisibleForRole(def: NotificationEventDef, scope: RoleScope): boolean {
+  // Cuenta de sucursal tiene flag dedicado.
+  if (scope.isSucursalAccount) return def.showForSucursalAccount;
+  // Barbero tiene flag dedicado (los demás flags no aplican aquí).
+  if (scope.isBarber && !scope.roles.some(r => r === 'owner' || r === 'general_manager' || r === 'manager')) {
+    return def.showForBarber;
+  }
+  // Resto: chequeo por rolesAllowed.
+  return scope.roles.some(r => def.rolesAllowed.includes(r));
+}
+
+/**
+ * Devuelve el subconjunto del catálogo visible para el rol actual.
+ */
+export function getCatalogForRole(scope: RoleScope): NotificationEventDef[] {
+  return NOTIFICATION_CATALOG.filter(def => def.configurable && isEventVisibleForRole(def, scope));
+}
+
+/**
+ * Agrupa una lista de eventos por categoría, respetando `CATEGORY_ORDER`.
+ * Categorías sin eventos no se incluyen.
+ */
+export function groupByCategory(
+  events: NotificationEventDef[],
+): Array<{ category: EventCategory; events: NotificationEventDef[] }> {
+  const map = new Map<EventCategory, NotificationEventDef[]>();
+  for (const e of events) {
+    const arr = map.get(e.category) ?? [];
+    arr.push(e);
+    map.set(e.category, arr);
+  }
+  return CATEGORY_ORDER.filter(c => map.has(c)).map(category => ({
+    category,
+    events: map.get(category)!,
+  }));
+}
+
+/**
+ * Resuelve el estado efectivo de "habilitado" para un evento entregado al
+ * usuario, considerando preferencia guardada + default + disponibilidad.
+ */
+export function isEventEnabledForUser(
+  eventType: string | null | undefined,
+  preferences: Map<string, boolean>,
+): boolean {
+  const def = getEventDef(eventType ?? '');
+  if (!def) return true; // tipos desconocidos: no filtrar (compatibilidad)
+  if (!def.implemented) return false;
+  const pref = preferences.get(def.eventType);
+  return pref ?? def.defaultEnabled;
+}
