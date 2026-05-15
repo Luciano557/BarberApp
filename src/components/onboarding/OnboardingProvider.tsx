@@ -30,14 +30,19 @@ export function useOnboarding() {
 export function OnboardingProvider({ children }: { children: ReactNode }) {
   const { row, isLoading, upsert } = useOnboardingState();
   const { isOwner, isGeneralManager } = useAuth();
+  const isMobile = useIsMobile();
   const canSeeOnboarding = isOwner || isGeneralManager;
+  const steps = useMemo(
+    () => ONBOARDING_STEPS.filter(s => (isMobile ? !s.hideOnMobile : !s.hideOnDesktop)),
+    [isMobile]
+  );
   const tabSetterRef = useRef<((tab: string) => void) | null>(null);
   const subTabSetterRef = useRef<((kind: OnboardingSubTab) => void) | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
-  const isActive = currentIndex >= 0 && currentIndex < ONBOARDING_STEPS.length;
-  const currentStep = isActive ? ONBOARDING_STEPS[currentIndex] : null;
+  const isActive = currentIndex >= 0 && currentIndex < steps.length;
+  const currentStep = isActive ? steps[currentIndex] : null;
 
   // Auto-start for owners
   useEffect(() => {
