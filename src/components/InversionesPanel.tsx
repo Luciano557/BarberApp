@@ -41,6 +41,7 @@ export function InversionesPanel() {
   const [montoCuota, setMontoCuota] = useState('');
   const [fechaProximoPago, setFechaProximoPago] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [inversionAEliminar, setInversionAEliminar] = useState<Inversion | null>(null);
 
   const resetForm = () => {
     setNombre('');
