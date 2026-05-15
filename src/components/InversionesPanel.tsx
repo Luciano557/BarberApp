@@ -1,8 +1,18 @@
 import { useState } from 'react';
 import { TrendingUp, Trash2, Plus, Package } from 'lucide-react';
-import { useInversiones } from '@/hooks/useInversiones';
+import { useInversiones, type Inversion } from '@/hooks/useInversiones';
 import { useDeudas } from '@/hooks/useDeudas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
