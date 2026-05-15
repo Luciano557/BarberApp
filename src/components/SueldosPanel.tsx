@@ -905,60 +905,54 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           {/* Period Presets */}
           <div className="flex items-center gap-1">
             <Button
-              variant={!periodStartDate ? "default" : "outline"}
+              variant={!periodStartDate && !periodEndDate ? "default" : "outline"}
               size="sm"
-              onClick={() => setPeriodStartDate(undefined)}
+              onClick={() => { setPeriodStartDate(undefined); setPeriodEndDate(undefined); }}
             >
               Todo
             </Button>
             <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd') ? "default" : "outline"}
+              variant={
+                !periodEndDate &&
+                periodStartDate &&
+                format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')
+                  ? "default"
+                  : "outline"
+              }
               size="sm"
-              onClick={() => setPeriodStartDate(startOfMonth(new Date()))}
+              onClick={() => { setPeriodStartDate(startOfMonth(new Date())); setPeriodEndDate(undefined); }}
             >
               Este mes
             </Button>
-            <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 15), 'yyyy-MM-dd') ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriodStartDate(subDays(new Date(), 15))}
-            >
-              Últimos 15 días
-            </Button>
-            <Button
-              variant={periodStartDate && format(periodStartDate, 'yyyy-MM-dd') === format(subDays(new Date(), 30), 'yyyy-MM-dd') ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPeriodStartDate(subDays(new Date(), 30))}
-            >
-              Últimos 30 días
-            </Button>
           </div>
-          
-          {/* Custom Date Picker */}
+
+          {/* Custom Date Range Picker */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "w-[140px] justify-start text-left font-normal",
-                  periodStartDate && ![
-                    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-                    format(subDays(new Date(), 15), 'yyyy-MM-dd'),
-                    format(subDays(new Date(), 30), 'yyyy-MM-dd')
-                  ].includes(format(periodStartDate, 'yyyy-MM-dd')) && "border-primary"
+                  "min-w-[180px] justify-start text-left font-normal",
+                  periodEndDate && "border-primary"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                Personalizado
+                {periodStartDate && periodEndDate
+                  ? `${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")}`
+                  : 'Personalizado'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
-                mode="single"
-                selected={periodStartDate}
-                onSelect={setPeriodStartDate}
+                mode="range"
+                selected={{ from: periodStartDate, to: periodEndDate }}
+                onSelect={(range) => {
+                  setPeriodStartDate(range?.from);
+                  setPeriodEndDate(range?.to);
+                }}
                 locale={es}
+                numberOfMonths={2}
                 initialFocus
                 className="pointer-events-auto"
               />
