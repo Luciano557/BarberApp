@@ -15,28 +15,28 @@ interface FinanzasPanelProps {
 export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
   const { isSucursalAccount } = useAuth();
 
-  // Cuenta de sucursal: solo Gastos y Sueldos.
+  // Cuenta de sucursal: solo Sueldos y Gastos.
   if (isSucursalAccount) {
     return (
       <div>
         <h2 className="text-xl font-semibold text-foreground mb-6">Finanzas</h2>
-        <Tabs defaultValue="gastos">
+        <Tabs defaultValue="sueldos">
           <TabsList className="mb-6 flex-wrap h-auto gap-1">
-            <TabsTrigger value="gastos" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Gastos
-            </TabsTrigger>
             <TabsTrigger value="sueldos" className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
               Sueldos
             </TabsTrigger>
+            <TabsTrigger value="gastos" className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Gastos
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="gastos">
-            <GastosPanel />
-          </TabsContent>
           <TabsContent value="sueldos">
             <SueldosPanel barbers={barbers} />
+          </TabsContent>
+          <TabsContent value="gastos">
+            <GastosPanel />
           </TabsContent>
         </Tabs>
       </div>
@@ -46,8 +46,16 @@ export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
   return (
     <div>
       <h2 className="text-xl font-semibold text-foreground mb-6">Finanzas</h2>
-      <Tabs defaultValue="gastos">
+      <Tabs defaultValue="estadisticas">
         <TabsList className="mb-6 flex-wrap h-auto gap-1">
+          <TabsTrigger value="estadisticas" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Estadísticas
+          </TabsTrigger>
+          <TabsTrigger value="sueldos" className="flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            Sueldos
+          </TabsTrigger>
           <TabsTrigger value="gastos" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
             Gastos
@@ -60,16 +68,14 @@ export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
             <Landmark className="h-4 w-4" />
             Deudas
           </TabsTrigger>
-          <TabsTrigger value="estadisticas" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Estadísticas
-          </TabsTrigger>
-          <TabsTrigger value="sueldos" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            Sueldos
-          </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="estadisticas">
+          <EstadisticasPanel />
+        </TabsContent>
+        <TabsContent value="sueldos">
+          <SueldosPanel barbers={barbers} />
+        </TabsContent>
         <TabsContent value="gastos">
           <GastosPanel />
         </TabsContent>
@@ -78,12 +84,6 @@ export function FinanzasPanel({ barbers }: FinanzasPanelProps) {
         </TabsContent>
         <TabsContent value="deudas">
           <DeudasPanel />
-        </TabsContent>
-        <TabsContent value="estadisticas">
-          <EstadisticasPanel />
-        </TabsContent>
-        <TabsContent value="sueldos">
-          <SueldosPanel barbers={barbers} />
         </TabsContent>
       </Tabs>
     </div>
