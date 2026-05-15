@@ -57,6 +57,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const canManageTareas = isOwner || isGeneralManager || isManager;
 
   const [showForm, setShowForm] = useState(false);
+  const [editingTarea, setEditingTarea] = useState<TareaItem | null>(null);
   const [activeTab, setActiveTab] = useState('tareas');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroResp, setFiltroResp] = useState('todos');
