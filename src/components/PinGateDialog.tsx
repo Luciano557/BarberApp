@@ -18,6 +18,22 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (open) {
+      setPin('');
+      setError(null);
+      setShowPin(false);
+      setIsValidating(false);
+    }
+  }, [open]);
+
+  const resetState = () => {
+    setPin('');
+    setError(null);
+    setShowPin(false);
+    setIsValidating(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -25,7 +41,11 @@ export function PinGateDialog({ open, onValidate, onClose, sectionName = 'esta s
 
     try {
       const result = await onValidate(pin);
-      if (!result.success) {
+      if (result.success) {
+        setPin('');
+        setError(null);
+        setShowPin(false);
+      } else {
         setError((result as any).error || 'PIN incorrecto. Intenta de nuevo.');
         setPin('');
       }
