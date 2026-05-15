@@ -818,3 +818,21 @@ export function isEventEnabledForUser(
   const pref = preferences.get(def.eventType);
   return pref ?? def.defaultEnabled;
 }
+
+/**
+ * Resuelve el modo efectivo para un evento dado el catálogo + preferencia.
+ * Reglas:
+ *  - mode IS NOT NULL → manda mode.
+ *  - mode IS NULL pero enabled definido → enabled=false→disabled, enabled=true→defaultMode||'always'.
+ *  - sin preferencia → defaultMode || (defaultEnabled ? 'always' : 'disabled').
+ */
+export function resolveModeForUser(
+  def: NotificationEventDef,
+  pref: { mode: PrefMode | null; enabled: boolean | null } | undefined,
+): PrefMode {
+  const fallback: PrefMode = def.defaultMode ?? (def.defaultEnabled ? 'always' : 'disabled');
+  if (!pref) return fallback;
+  if (pref.mode) return pref.mode;
+  if (pref.enabled === null || pref.enabled === undefined) return fallback;
+  return pref.enabled ? (def.defaultMode ?? 'always') : 'disabled';
+}
