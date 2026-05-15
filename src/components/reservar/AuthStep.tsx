@@ -120,7 +120,6 @@ export const AuthStep = ({ onAuthenticated }: Props) => {
             phone,
             phone_country: country.code,
             birth_date: form.birthDate,
-            instagram: instagram || null,
           },
           emailRedirectTo: window.location.href,
         },
