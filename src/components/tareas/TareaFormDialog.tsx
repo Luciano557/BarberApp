@@ -158,7 +158,7 @@ export function TareaFormDialog({
     } else {
       const isTeam = asignadoId === TEAM_VALUE || !asignadoId;
       const barber = !isTeam ? activeBarbers.find(b => b.id === asignadoId) : undefined;
-      const fecha_limite = hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
+      const fecha_inicio = hasDate && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : null;
       const hora = hasTime ? selectedTime : null;
       const repeat_preset = repeatPreset;
       const repeat_frequency = repeatPreset === 'custom' ? repeatFrequency : null;
@@ -174,7 +174,7 @@ export function TareaFormDialog({
           asignado_a_id: isTeam ? null : asignadoId,
           asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : tarea.asignado_a_nombre),
           assignment_scope: isTeam ? 'team' : 'individual',
-          fecha_limite,
+          fecha_inicio,
           hora,
           repeat_preset,
           repeat_frequency,
@@ -190,7 +190,7 @@ export function TareaFormDialog({
           asignado_a_id: isTeam ? null : asignadoId,
           asignado_a_nombre: isTeam ? 'Todo el equipo' : (barber ? getBarberDisplayName(barber) : undefined),
           assignment_scope: isTeam ? 'team' : 'individual',
-          fecha_limite: fecha_limite ?? undefined,
+          fecha_inicio: fecha_inicio ?? undefined,
           hora: hora ?? undefined,
           repeat_preset,
           repeat_frequency: repeat_frequency ?? undefined,
