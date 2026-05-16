@@ -148,23 +148,31 @@ function Actions({
   onStart,
   onManage,
   links,
+  emptyMessage,
 }: {
   primary: string | null;
-  onStart: () => void;
+  onStart?: () => void;
   onManage: () => void;
   links: PortalLandingLink[];
+  emptyMessage?: string;
 }) {
   return (
     <>
       <div className="w-full max-w-sm space-y-3">
-        <Button
-          onClick={onStart}
-          className="w-full h-12 text-base font-medium"
-          style={primary ? { backgroundColor: 'var(--portal-primary)', color: '#fff', borderColor: 'transparent' } : undefined}
-        >
-          <CalendarPlus className="h-5 w-5 mr-2" />
-          Reservar mi cita
-        </Button>
+        {emptyMessage ? (
+          <div className="rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
+            {emptyMessage}
+          </div>
+        ) : (
+          <Button
+            onClick={onStart}
+            className="w-full h-12 text-base font-medium"
+            style={primary ? { backgroundColor: 'var(--portal-primary)', color: '#fff', borderColor: 'transparent' } : undefined}
+          >
+            <CalendarPlus className="h-5 w-5 mr-2" />
+            Reservar mi cita
+          </Button>
+        )}
 
         <Button
           onClick={onManage}
