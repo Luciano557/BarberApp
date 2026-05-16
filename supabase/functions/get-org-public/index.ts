@@ -141,10 +141,15 @@ Deno.serve(async (req) => {
       };
     }
 
-    const rawServicios = serviciosRes.data || [];
-    // Strip internal flags from response payload (kept for debug only)
-    const servicios = rawServicios.map(({ activo: _a, eliminado: _e, ...s }: any) => s);
-    const sucursalesConServicios = new Set(rawServicios.map((s: any) => s.sucursal_id));
+    const rawRows = (serviciosRes.data || []).filter((r: any) => r && r.servicio);
+    const servicios = rawRows.map((r: any) => ({
+      id: r.servicio.id,
+      nombre: r.servicio.nombre,
+      precio: r.precio,
+      duracion_min: r.servicio.duracion_min,
+      sucursal_id: r.sucursal_id,
+    }));
+    const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
     const sucursalesActivas = sucursalesRes.data || [];
     const sucursales = sucursalesActivas.filter((s: any) => sucursalesConServicios.has(s.id));
     const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
