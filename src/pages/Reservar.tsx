@@ -65,6 +65,7 @@ const Reservar = () => {
   }
 
   const themeStyle = getPortalThemeStyle(orgData.portal?.primary_color);
+  const sinReservables = orgData.sucursales.length === 0 || orgData.servicios.length === 0;
 
   return (
     <div style={themeStyle} className="min-h-screen bg-muted/40">
@@ -76,8 +77,9 @@ const Reservar = () => {
                 orgName={orgData.organization.name}
                 fallbackLogo={orgData.organization.logo_url}
                 portal={orgData.portal}
-                onStart={() => setMode("book")}
+                onStart={sinReservables ? undefined : () => setMode("book")}
                 onManage={() => setMode("manage")}
+                emptyMessage={sinReservables ? "No hay servicios disponibles para reservar en este momento." : undefined}
               />
             </div>
           </div>

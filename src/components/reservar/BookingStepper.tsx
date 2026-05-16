@@ -227,7 +227,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         )}
         {step === 1 && (
           <ServicioStep
-            servicios={orgData.servicios.filter((s) => s.sucursal_id === booking.sucursalId || !s.sucursal_id)}
+            servicios={orgData.servicios.filter((s) => s.sucursal_id === booking.sucursalId)}
             onSelect={(id, nombre, precio) => {
               setBooking((b) => ({ ...b, servicioId: id, servicioNombre: nombre, servicioPrecio: precio }));
               setStep(2);

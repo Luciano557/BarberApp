@@ -1156,6 +1156,8 @@ interface StaffFormProps {
 const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData, onSave, onCancel }: StaffFormProps) {
   const [localData, setLocalData] = useState<StaffFormData>(initialData);
   const [localCommissionError, setLocalCommissionError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   // Reset only when switching to a different barber (or entering/leaving add mode).
   // Do NOT reset on every initialData reference change — the parent may re-render
@@ -1179,12 +1181,20 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
     setLocalCommissionError(''); return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!localData.firstName || !localData.lastName || !localData.phone) return;
     if (isComision && commissionRequired && !localData.commission) return;
     if (isComision && !validateLocalCommission(localData.commission)) return;
     if (!isComision && !localData.fixedSalary) return;
-    onSave(localData);
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSave(localData));
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1314,10 +1324,10 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
         );
       })()}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
+        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel} disabled={isSubmitting}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
         <Button size="sm" onClick={handleSubmit} className="w-full bg-success hover:bg-success/90 sm:w-auto"
-          disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
-          <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
+          disabled={isSubmitting || !localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? 'Guardando…' : (isEdit ? 'Guardar' : 'Agregar')}
         </Button>
       </div>
     </div>

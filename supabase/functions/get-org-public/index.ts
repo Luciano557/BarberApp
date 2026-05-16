@@ -61,7 +61,9 @@ Deno.serve(async (req) => {
         .select("id, nombre, precio, duracion_min, sucursal_id")
         .eq("organization_id", org.id)
         .eq("activo", true)
-        .eq("eliminado", false),
+        .eq("eliminado", false)
+        .gt("precio", 0)
+        .not("sucursal_id", "is", null),
       supabase
         .from("portal_config")
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
@@ -138,12 +140,17 @@ Deno.serve(async (req) => {
       };
     }
 
+    const servicios = serviciosRes.data || [];
+    const sucursalesConServicios = new Set(servicios.map((s: any) => s.sucursal_id));
+    const sucursales = (sucursalesRes.data || []).filter((s: any) => sucursalesConServicios.has(s.id));
+    const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
+
     return new Response(
       JSON.stringify({
         organization: { id: org.id, name: org.name, logo_url: org.logo_url },
-        sucursales: sucursalesRes.data || [],
-        barberos: barberosRes.data || [],
-        servicios: serviciosRes.data || [],
+        sucursales,
+        barberos,
+        servicios,
         portal,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
