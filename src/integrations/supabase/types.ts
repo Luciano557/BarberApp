@@ -3369,31 +3369,34 @@ export type Database = {
         Row: {
           activo: boolean | null
           apellido: string | null
-          comision: number | null
           created_at: string | null
           id: string | null
           nombre: string | null
           organization_id: string | null
+          rol_equipo: string | null
+          sucursal_id: string | null
           updated_at: string | null
         }
         Insert: {
           activo?: boolean | null
           apellido?: string | null
-          comision?: number | null
           created_at?: string | null
           id?: string | null
           nombre?: string | null
           organization_id?: string | null
+          rol_equipo?: string | null
+          sucursal_id?: string | null
           updated_at?: string | null
         }
         Update: {
           activo?: boolean | null
           apellido?: string | null
-          comision?: number | null
           created_at?: string | null
           id?: string | null
           nombre?: string | null
           organization_id?: string | null
+          rol_equipo?: string | null
+          sucursal_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3402,6 +3405,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
             referencedColumns: ["id"]
           },
         ]

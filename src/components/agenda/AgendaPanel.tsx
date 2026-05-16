@@ -47,8 +47,9 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   } | null>(null);
   const [movingLoading, setMovingLoading] = useState(false);
 
-  const canCreateDayOff = isOwner || isGeneralManager || isManager;
-  const canDrag = !isBarber || true; // permitir, RLS valida; UI no bloquea por rol aquí
+  const canManageAgenda = isOwner || isGeneralManager || isManager;
+  const canCreateDayOff = canManageAgenda;
+  const canDrag = canManageAgenda;
 
   const { fromDate, toDate } = useMemo(() => {
     if (view === 'day') return { fromDate: date, toDate: date };
@@ -74,11 +75,13 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   };
 
   const handleSlotClick = (barberoId: string, horaInicio: string) => {
+    if (!canManageAgenda) return;
     setNewApptDefaults({ barberId: barberoId, horaInicio });
     setNewApptOpen(true);
   };
 
   const handleMoveTurno = (turno: Turno, newBarberoId: string, newHoraInicio: string, newFecha: string) => {
+    if (!canManageAgenda) return;
     // Validaciones front
     const newBarber = barbers.find(b => b.id === newBarberoId);
     if (!newBarber || !newBarber.active) {
@@ -95,6 +98,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   };
 
   const confirmMove = async () => {
+    if (!canManageAgenda) return;
     if (!moveDialog) return;
     setMovingLoading(true);
     const { turno, newBarberoId, newHoraInicio, newHoraFin, newFecha } = moveDialog;
@@ -159,26 +163,28 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
             <ToggleGroupItem value="week" className="text-xs px-3">Semana</ToggleGroupItem>
           </ToggleGroup>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="gap-1">
-                <Plus className="h-4 w-4" /> Añadir
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => { setNewApptDefaults({}); setNewApptOpen(true); }}>
-                <CalendarPlus className="h-4 w-4" /> Cita
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setUnavOpen(true)}>
-                <Ban className="h-4 w-4" /> Horario no disponible
-              </DropdownMenuItem>
-              {canCreateDayOff && (
-                <DropdownMenuItem onClick={() => setDayOffOpen(true)}>
-                  <CalendarX className="h-4 w-4" /> Día off
+          {canManageAgenda && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="gap-1">
+                  <Plus className="h-4 w-4" /> Añadir
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setNewApptDefaults({}); setNewApptOpen(true); }}>
+                  <CalendarPlus className="h-4 w-4" /> Cita
                 </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem onClick={() => setUnavOpen(true)}>
+                  <Ban className="h-4 w-4" /> Horario no disponible
+                </DropdownMenuItem>
+                {canCreateDayOff && (
+                  <DropdownMenuItem onClick={() => setDayOffOpen(true)}>
+                    <CalendarX className="h-4 w-4" /> Día off
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
@@ -259,6 +265,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         barbers={barbers}
         servicios={servicios}
         onChanged={refetch}
+        readOnly={!canManageAgenda}
       />
       <MoveConfirmDialog
         open={!!moveDialog}
