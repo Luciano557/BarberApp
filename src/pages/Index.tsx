@@ -214,7 +214,7 @@ const Index = () => {
             <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
           )}
 
-          {activeTab === 'config' && canManageConfig && (
+          {activeTab === 'config' && canViewConfig && (
             <ConfigurationPanel
               initialSection={configInitialSection}
               onSectionChange={setConfigInitialSection}
