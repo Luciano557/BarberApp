@@ -42,7 +42,7 @@ const clampZoom = (n: number | null | undefined) => {
   return Math.max(1, Math.min(3, n));
 };
 
-export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage }: Props) => {
+export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage, emptyMessage }: Props) => {
   const logo = portal?.logo_url || fallbackLogo || null;
   const cover = portal?.cover_url || null;
   const description = portal?.description?.trim() || buildDefaultPortalDescription(orgName);
