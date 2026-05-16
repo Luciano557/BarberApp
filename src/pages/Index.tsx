@@ -23,7 +23,7 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const onboarding = useOnboarding();
 
   const rolesLoaded = roles.length > 0;
