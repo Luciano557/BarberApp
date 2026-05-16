@@ -6,6 +6,7 @@ import { PortalPublicoSection } from './PortalPublicoSection';
 import { AgendaPanel } from '@/components/agenda/AgendaPanel';
 import { Barber } from '@/types/barbershop';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AgendaManagementProps {
   sucursalId: string;
@@ -16,6 +17,21 @@ interface AgendaManagementProps {
 export function AgendaManagement({ sucursalId, organizationId, barbers }: AgendaManagementProps) {
   const { sucursales } = useSucursal();
   const sucursal = sucursales.find(s => s.id === sucursalId);
+  const { isOwner, isGeneralManager, isManager } = useAuth();
+  const canManageAgendaConfig = isOwner || isGeneralManager || isManager;
+
+  if (!canManageAgendaConfig) {
+    return (
+      <div className="mt-2">
+        <AgendaPanel
+          sucursalId={sucursalId}
+          organizationId={organizationId}
+          sucursalTimezone={sucursal?.timezone}
+          barbers={barbers}
+        />
+      </div>
+    );
+  }
 
   return (
     <Tabs defaultValue="agenda" className="w-full mt-2">
