@@ -2,7 +2,7 @@ import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles, Bell } fr
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones' | 'mi-cuenta';
 
 interface ConfigMenuItem {
   id: ConfigSection;
