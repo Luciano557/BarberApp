@@ -146,7 +146,7 @@ const Index = () => {
               services={services}
               extras={extras}
               barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
-              discounts={discounts}
+              discounts={discounts.filter(d => d.active)}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
