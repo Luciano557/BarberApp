@@ -58,13 +58,13 @@ Deno.serve(async (req) => {
         .eq("rol_equipo", "barbero")
         .not("sucursal_id", "is", null),
       supabase
-        .from("servicios")
-        .select("id, nombre, precio, duracion_min, sucursal_id, activo, eliminado")
+        .from("servicios_sucursales")
+        .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, eliminado)")
         .eq("organization_id", org.id)
         .eq("activo", true)
         .gt("precio", 0)
         .not("sucursal_id", "is", null)
-        .or("eliminado.is.null,eliminado.eq.false"),
+        .or("eliminado.is.null,eliminado.eq.false", { foreignTable: "servicios" }),
       supabase
         .from("portal_config")
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
@@ -141,10 +141,15 @@ Deno.serve(async (req) => {
       };
     }
 
-    const rawServicios = serviciosRes.data || [];
-    // Strip internal flags from response payload (kept for debug only)
-    const servicios = rawServicios.map(({ activo: _a, eliminado: _e, ...s }: any) => s);
-    const sucursalesConServicios = new Set(rawServicios.map((s: any) => s.sucursal_id));
+    const rawRows = (serviciosRes.data || []).filter((r: any) => r && r.servicio);
+    const servicios = rawRows.map((r: any) => ({
+      id: r.servicio.id,
+      nombre: r.servicio.nombre,
+      precio: r.precio,
+      duracion_min: r.servicio.duracion_min,
+      sucursal_id: r.sucursal_id,
+    }));
+    const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
     const sucursalesActivas = sucursalesRes.data || [];
     const sucursales = sucursalesActivas.filter((s: any) => sucursalesConServicios.has(s.id));
     const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
@@ -161,10 +166,14 @@ Deno.serve(async (req) => {
       responseBody.debug = {
         sucursales_activas_count: sucursalesActivas.length,
         sucursales_activas: sucursalesActivas.map((s: any) => ({ id: s.id, nombre: s.nombre })),
-        servicios_reservables_count: rawServicios.length,
-        servicios_considerados: rawServicios.map((s: any) => ({
-          id: s.id, nombre: s.nombre, sucursal_id: s.sucursal_id,
-          activo: s.activo, precio: s.precio, eliminado: s.eliminado,
+        servicios_reservables_count: rawRows.length,
+        servicios_considerados: rawRows.map((r: any) => ({
+          id: r.servicio.id,
+          nombre: r.servicio.nombre,
+          sucursal_id: r.sucursal_id,
+          activo: r.activo,
+          precio: r.precio,
+          eliminado_global: r.servicio.eliminado,
         })),
         sucursales_reservables_ids: Array.from(sucursalesConServicios),
         sucursales_devueltas_count: sucursales.length,
