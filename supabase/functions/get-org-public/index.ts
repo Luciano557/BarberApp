@@ -166,10 +166,14 @@ Deno.serve(async (req) => {
       responseBody.debug = {
         sucursales_activas_count: sucursalesActivas.length,
         sucursales_activas: sucursalesActivas.map((s: any) => ({ id: s.id, nombre: s.nombre })),
-        servicios_reservables_count: rawServicios.length,
-        servicios_considerados: rawServicios.map((s: any) => ({
-          id: s.id, nombre: s.nombre, sucursal_id: s.sucursal_id,
-          activo: s.activo, precio: s.precio, eliminado: s.eliminado,
+        servicios_reservables_count: rawRows.length,
+        servicios_considerados: rawRows.map((r: any) => ({
+          id: r.servicio.id,
+          nombre: r.servicio.nombre,
+          sucursal_id: r.sucursal_id,
+          activo: r.activo,
+          precio: r.precio,
+          eliminado_global: r.servicio.eliminado,
         })),
         sucursales_reservables_ids: Array.from(sucursalesConServicios),
         sucursales_devueltas_count: sucursales.length,
