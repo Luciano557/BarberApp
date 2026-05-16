@@ -1,8 +1,8 @@
-import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles } from 'lucide-react';
+import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones' | 'mi-cuenta';
 
 interface ConfigMenuItem {
   id: ConfigSection;
@@ -16,7 +16,7 @@ interface ConfigMenuProps {
 }
 
 export function ConfigMenu({ onSelect }: ConfigMenuProps) {
-  const { isOwner, isGeneralManager } = useAuth();
+  const { isOwner, isGeneralManager, isSucursalAccount } = useAuth();
   const { restart } = useOnboarding();
   const canSeeOnboarding = isOwner || isGeneralManager;
 
@@ -46,6 +46,16 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
       description: 'Vencimiento de peticiones',
     },
   ];
+
+  // La cuenta de sucursal NO ve la configuración de notificaciones.
+  if (!isSucursalAccount) {
+    items.push({
+      id: 'notificaciones',
+      icon: <Bell className="h-5 w-5" />,
+      title: 'Notificaciones',
+      description: 'Elegí qué avisos querés recibir en tu Centro de Notificaciones',
+    });
+  }
 
   return (
     <div className="space-y-3">

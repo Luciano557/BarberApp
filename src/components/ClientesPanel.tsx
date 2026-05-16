@@ -24,8 +24,8 @@ export function ClientesPanel() {
     if (!q) return clientes;
     return clientes.filter(c => {
       return (
-        c.nombre.toLowerCase().includes(q) ||
-        c.apellido.toLowerCase().includes(q) ||
+        (c.nombre ?? '').toLowerCase().includes(q) ||
+        (c.apellido ?? '').toLowerCase().includes(q) ||
         (c.telefono ?? '').toLowerCase().includes(q) ||
         (c.email ?? '').toLowerCase().includes(q)
       );

@@ -1682,6 +1682,44 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          notification_id: string
+          organization_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          notification_id: string
+          organization_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hidden_at?: string | null
+          id?: string
+          notification_id?: string
+          organization_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_reads: {
         Row: {
           created_at: string
@@ -1725,9 +1763,16 @@ export type Database = {
       }
       notifications: {
         Row: {
+          actor_account_type: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          authorized_by_name: string | null
+          authorized_by_user_id: string | null
           body: string | null
+          category: string | null
           created_at: string
           event_key: string
+          expires_at: string | null
           id: string
           metadata: Json
           notification_at: string
@@ -1735,14 +1780,23 @@ export type Database = {
           source_id: string | null
           source_module: string
           source_table: string | null
+          sucursal_id: string | null
+          summary: string | null
           title: string
           type: string
           updated_at: string
         }
         Insert: {
+          actor_account_type?: string | null
+          actor_name?: string | null
+          actor_user_id?: string | null
+          authorized_by_name?: string | null
+          authorized_by_user_id?: string | null
           body?: string | null
+          category?: string | null
           created_at?: string
           event_key: string
+          expires_at?: string | null
           id?: string
           metadata?: Json
           notification_at?: string
@@ -1750,14 +1804,23 @@ export type Database = {
           source_id?: string | null
           source_module: string
           source_table?: string | null
+          sucursal_id?: string | null
+          summary?: string | null
           title: string
           type: string
           updated_at?: string
         }
         Update: {
+          actor_account_type?: string | null
+          actor_name?: string | null
+          actor_user_id?: string | null
+          authorized_by_name?: string | null
+          authorized_by_user_id?: string | null
           body?: string | null
+          category?: string | null
           created_at?: string
           event_key?: string
+          expires_at?: string | null
           id?: string
           metadata?: Json
           notification_at?: string
@@ -1765,6 +1828,8 @@ export type Database = {
           source_id?: string | null
           source_module?: string
           source_table?: string | null
+          sucursal_id?: string | null
+          summary?: string | null
           title?: string
           type?: string
           updated_at?: string
@@ -2818,6 +2883,39 @@ export type Database = {
           },
         ]
       }
+      user_notification_preferences: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          event_type: string
+          id: string
+          mode: string | null
+          organization_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          event_type: string
+          id?: string
+          mode?: string | null
+          organization_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          id?: string
+          mode?: string | null
+          organization_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_onboarding: {
         Row: {
           completed_at: string | null
@@ -3271,31 +3369,34 @@ export type Database = {
         Row: {
           activo: boolean | null
           apellido: string | null
-          comision: number | null
           created_at: string | null
           id: string | null
           nombre: string | null
           organization_id: string | null
+          rol_equipo: string | null
+          sucursal_id: string | null
           updated_at: string | null
         }
         Insert: {
           activo?: boolean | null
           apellido?: string | null
-          comision?: number | null
           created_at?: string | null
           id?: string | null
           nombre?: string | null
           organization_id?: string | null
+          rol_equipo?: string | null
+          sucursal_id?: string | null
           updated_at?: string | null
         }
         Update: {
           activo?: boolean | null
           apellido?: string | null
-          comision?: number | null
           created_at?: string | null
           id?: string | null
           nombre?: string | null
           organization_id?: string | null
+          rol_equipo?: string | null
+          sucursal_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3306,6 +3407,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "barberos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -3313,6 +3421,85 @@ export type Database = {
       _assert_can_write_sucursal_catalog: {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
+      }
+      _notif_actor_account_type: { Args: { _user: string }; Returns: string }
+      _notif_actor_name: { Args: { _user: string }; Returns: string }
+      _notif_emit: {
+        Args: {
+          _actor_name: string
+          _actor_user_id: string
+          _body: string
+          _category: string
+          _default_enabled: boolean
+          _event_key: string
+          _event_type: string
+          _metadata: Json
+          _organization_id: string
+          _recipients: string[]
+          _source_id: string
+          _source_module: string
+          _source_table: string
+          _sucursal_id: string
+          _summary: string
+          _title: string
+        }
+        Returns: undefined
+      }
+      _notif_emit_sensitive: {
+        Args: {
+          _actor_user_id: string
+          _category: string
+          _default_mode: string
+          _event_key: string
+          _event_type: string
+          _metadata: Json
+          _organization_id: string
+          _recipients: string[]
+          _source_id: string
+          _source_module: string
+          _source_table: string
+          _sucursal_id: string
+          _summary: string
+          _supports_mode: boolean
+          _title: string
+        }
+        Returns: undefined
+      }
+      _notif_org_admins: { Args: { _org: string }; Returns: string[] }
+      _notif_pref_mode: {
+        Args: { _default_mode: string; _event_type: string; _user: string }
+        Returns: string
+      }
+      _notif_sucursal_account: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_sucursal_barbers: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_sucursal_managers: {
+        Args: { _org: string; _sucursal: string }
+        Returns: string[]
+      }
+      _notif_turno_dispatch: {
+        Args: {
+          _event_key_suffix: string
+          _turno: Database["public"]["Tables"]["turnos"]["Row"]
+          _verbo: string
+        }
+        Returns: undefined
+      }
+      _notif_turno_metadata: {
+        Args: { _turno: Database["public"]["Tables"]["turnos"]["Row"] }
+        Returns: Json
+      }
+      _notif_turno_title: {
+        Args: {
+          _turno: Database["public"]["Tables"]["turnos"]["Row"]
+          _verbo: string
+        }
+        Returns: string
       }
       barberos_pin_status: {
         Args: { _ids: string[] }
@@ -3366,6 +3553,27 @@ export type Database = {
         Returns: Json
       }
       is_sucursal_account: { Args: { _user_id: string }; Returns: boolean }
+      notif_emit_action_blocked: {
+        Args: { _action_key: string; _sucursal_id: string }
+        Returns: undefined
+      }
+      notif_emit_login_sucursal_account: {
+        Args: { _sucursal_id: string }
+        Returns: undefined
+      }
+      notif_emit_pin_authorized: {
+        Args: {
+          _action_key: string
+          _authorized_by_name: string
+          _authorized_by_user_id: string
+          _sucursal_id: string
+        }
+        Returns: undefined
+      }
+      notif_emit_view_event: {
+        Args: { _module: string; _sucursal_id: string }
+        Returns: undefined
+      }
       org_has_any_pin: { Args: never; Returns: boolean }
       registrar_movimiento_stock: {
         Args: {
@@ -3486,21 +3694,38 @@ export type Database = {
       }
       upsert_notification: {
         Args: {
+          _actor_account_type?: string
+          _actor_name?: string
+          _actor_user_id?: string
+          _authorized_by_name?: string
+          _authorized_by_user_id?: string
           _body: string
+          _category?: string
+          _deliver_to_caller?: boolean
           _event_key: string
+          _expires_at?: string
           _metadata: Json
           _notification_at: string
           _organization_id: string
           _source_id: string
           _source_module: string
           _source_table: string
+          _sucursal_id?: string
+          _summary?: string
           _title: string
           _type: string
         }
         Returns: {
+          actor_account_type: string | null
+          actor_name: string | null
+          actor_user_id: string | null
+          authorized_by_name: string | null
+          authorized_by_user_id: string | null
           body: string | null
+          category: string | null
           created_at: string
           event_key: string
+          expires_at: string | null
           id: string
           metadata: Json
           notification_at: string
@@ -3508,6 +3733,8 @@ export type Database = {
           source_id: string | null
           source_module: string
           source_table: string | null
+          sucursal_id: string | null
+          summary: string | null
           title: string
           type: string
           updated_at: string
@@ -3515,6 +3742,24 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "notifications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      upsert_notification_delivery: {
+        Args: { _notification_id: string; _user_id: string }
+        Returns: {
+          created_at: string
+          hidden_at: string | null
+          id: string
+          notification_id: string
+          organization_id: string
+          read_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "notification_deliveries"
           isOneToOne: true
           isSetofReturn: false
         }

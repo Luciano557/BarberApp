@@ -16,7 +16,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { org_slug } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { org_slug, debug } = body || {};
     if (!org_slug || typeof org_slug !== "string") {
       return new Response(JSON.stringify({ error: "org_slug is required" }), {
         status: 400,
@@ -57,11 +58,13 @@ Deno.serve(async (req) => {
         .eq("rol_equipo", "barbero")
         .not("sucursal_id", "is", null),
       supabase
-        .from("servicios")
-        .select("id, nombre, precio, duracion_min, sucursal_id")
+        .from("servicios_sucursales")
+        .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, eliminado)")
         .eq("organization_id", org.id)
         .eq("activo", true)
-        .eq("eliminado", false),
+        .gt("precio", 0)
+        .not("sucursal_id", "is", null)
+        .or("eliminado.is.null,eliminado.eq.false", { foreignTable: "servicios" }),
       supabase
         .from("portal_config")
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
@@ -138,14 +141,47 @@ Deno.serve(async (req) => {
       };
     }
 
+    const rawRows = (serviciosRes.data || []).filter((r: any) => r && r.servicio);
+    const servicios = rawRows.map((r: any) => ({
+      id: r.servicio.id,
+      nombre: r.servicio.nombre,
+      precio: r.precio,
+      duracion_min: r.servicio.duracion_min,
+      sucursal_id: r.sucursal_id,
+    }));
+    const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
+    const sucursalesActivas = sucursalesRes.data || [];
+    const sucursales = sucursalesActivas.filter((s: any) => sucursalesConServicios.has(s.id));
+    const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
+
+    const responseBody: Record<string, unknown> = {
+      organization: { id: org.id, name: org.name, logo_url: org.logo_url },
+      sucursales,
+      barberos,
+      servicios,
+      portal,
+    };
+
+    if (debug === true) {
+      responseBody.debug = {
+        sucursales_activas_count: sucursalesActivas.length,
+        sucursales_activas: sucursalesActivas.map((s: any) => ({ id: s.id, nombre: s.nombre })),
+        servicios_reservables_count: rawRows.length,
+        servicios_considerados: rawRows.map((r: any) => ({
+          id: r.servicio.id,
+          nombre: r.servicio.nombre,
+          sucursal_id: r.sucursal_id,
+          activo: r.activo,
+          precio: r.precio,
+          eliminado_global: r.servicio.eliminado,
+        })),
+        sucursales_reservables_ids: Array.from(sucursalesConServicios),
+        sucursales_devueltas_count: sucursales.length,
+      };
+    }
+
     return new Response(
-      JSON.stringify({
-        organization: { id: org.id, name: org.name, logo_url: org.logo_url },
-        sucursales: sucursalesRes.data || [],
-        barberos: barberosRes.data || [],
-        servicios: serviciosRes.data || [],
-        portal,
-      }),
+      JSON.stringify(responseBody),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

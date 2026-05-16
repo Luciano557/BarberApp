@@ -17,9 +17,10 @@ interface AppointmentDetailDialogProps {
   barbers: Barber[];
   servicios: Servicio[];
   onChanged: () => void;
+  readOnly?: boolean;
 }
 
-export function AppointmentDetailDialog({ open, onOpenChange, turno, barbers, servicios, onChanged }: AppointmentDetailDialogProps) {
+export function AppointmentDetailDialog({ open, onOpenChange, turno, barbers, servicios, onChanged, readOnly = false }: AppointmentDetailDialogProps) {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [cancelling, setCancelling] = useState(false);
@@ -27,7 +28,7 @@ export function AppointmentDetailDialog({ open, onOpenChange, turno, barbers, se
   if (!turno) return null;
   const barber = barbers.find(b => b.id === turno.barbero_id);
   const servicio = servicios.find(s => s.id === turno.servicio_id);
-  const canCancel = ['pendiente', 'confirmado'].includes(turno.estado);
+  const canCancel = !readOnly && ['pendiente', 'confirmado'].includes(turno.estado);
 
   const handleCancel = async () => {
     setCancelling(true);

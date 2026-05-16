@@ -27,7 +27,7 @@ function dbToBarber(row: any): Barber {
 export function TurnosAgendaPanel() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
-  const { isOwner, isGeneralManager, isManager, user } = useAuth();
+  const { isOwner, isGeneralManager, isManager, isBarber, user } = useAuth();
 
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
   const [allBarbers, setAllBarbers] = useState<(Barber & { sucursalId: string | null })[]>([]);
@@ -53,6 +53,18 @@ export function TurnosAgendaPanel() {
 
   const fetchAllBarbers = useCallback(async () => {
     if (!organization?.id) return;
+    // Barbers read teammates via the safe view (no PII/salary/PIN exposure).
+    // Owner/GM/Manager keep direct access to barberos for full fields.
+    if (isBarber && !isOwner && !isGeneralManager && !isManager) {
+      const { data } = await supabase
+        .from('barberos_safe')
+        .select('id, nombre, apellido, activo, organization_id, sucursal_id, rol_equipo')
+        .eq('organization_id', organization.id)
+        .eq('activo', true)
+        .order('nombre');
+      if (data) setAllBarbers(data.map(r => ({ ...dbToBarber(r), sucursalId: r.sucursal_id })));
+      return;
+    }
     const { data } = await supabase
       .from('barberos')
       .select('*')
@@ -60,7 +72,7 @@ export function TurnosAgendaPanel() {
       .eq('activo', true)
       .order('nombre');
     if (data) setAllBarbers(data.map(r => ({ ...dbToBarber(r), sucursalId: r.sucursal_id })));
-  }, [organization?.id]);
+  }, [organization?.id, isBarber, isOwner, isGeneralManager, isManager]);
 
   const fetchManagerSucursales = useCallback(async () => {
     if (!isManagerOnly || !user?.id) return;

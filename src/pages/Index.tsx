@@ -23,7 +23,7 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const onboarding = useOnboarding();
 
   const rolesLoaded = roles.length > 0;
@@ -37,7 +37,7 @@ const Index = () => {
   };
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
-  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas'>('menu');
+  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
 
   // Register tab setter so onboarding can drive navigation
   useEffect(() => {
@@ -74,7 +74,7 @@ const Index = () => {
     if (activeTab === 'registro' && !canOperarCajaYGastos) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-    if (activeTab === 'config' && !canManageConfig) {
+    if (activeTab === 'config' && !canViewConfig) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
     if (activeTab === 'resumen' && !canViewResumen) {
@@ -146,7 +146,7 @@ const Index = () => {
               services={services}
               extras={extras}
               barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
-              discounts={discounts}
+              discounts={discounts.filter(d => d.active)}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
@@ -214,7 +214,7 @@ const Index = () => {
             <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
           )}
 
-          {activeTab === 'config' && canManageConfig && (
+          {activeTab === 'config' && canViewConfig && (
             <ConfigurationPanel
               initialSection={configInitialSection}
               onSectionChange={setConfigInitialSection}
