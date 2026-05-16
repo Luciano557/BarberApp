@@ -24,8 +24,9 @@ interface Props {
   orgName: string;
   fallbackLogo?: string | null;
   portal: PortalDataView | null;
-  onStart: () => void;
+  onStart?: () => void;
   onManage: () => void;
+  emptyMessage?: string;
 }
 
 export const buildDefaultPortalDescription = (orgName: string) =>
