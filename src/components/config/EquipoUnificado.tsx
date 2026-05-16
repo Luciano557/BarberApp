@@ -1324,10 +1324,10 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
         );
       })()}
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
+        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel} disabled={isSubmitting}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
         <Button size="sm" onClick={handleSubmit} className="w-full bg-success hover:bg-success/90 sm:w-auto"
-          disabled={!localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
-          <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
+          disabled={isSubmitting || !localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? 'Guardando…' : (isEdit ? 'Guardar' : 'Agregar')}
         </Button>
       </div>
     </div>
