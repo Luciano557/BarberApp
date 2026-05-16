@@ -34,7 +34,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock }] : []),
     ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
     ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
-    ...(canManageConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
+    ...(canViewConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
   const getRoleBadges = () => {
