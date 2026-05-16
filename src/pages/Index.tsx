@@ -74,7 +74,7 @@ const Index = () => {
     if (activeTab === 'registro' && !canOperarCajaYGastos) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
-    if (activeTab === 'config' && !canManageConfig) {
+    if (activeTab === 'config' && !canViewConfig) {
       setActiveTab(canViewResumen ? 'resumen' : 'no-access');
     }
     if (activeTab === 'resumen' && !canViewResumen) {
