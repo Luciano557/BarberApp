@@ -217,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canManagePayments = isOwner || isGeneralManager || isManager;
   const canOperarCajaYGastos = isOwner || isGeneralManager || isManager || isSucursalAccount;
   const canManageConfig = isOwner || isGeneralManager;
+  const canViewConfig = !hasNoAccess && roles.length > 0; // todos los roles operativos
   const canManageBarbers = isOwner || isGeneralManager;
   const canManageUsers = isOwner || isGeneralManager;
   const canViewAllClosings = isOwner || isGeneralManager || isManager || isSucursalAccount;
@@ -224,8 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canViewTareas = !hasNoAccess && roles.length > 0;
   const canViewMiNegocio = (isOwner || isGeneralManager || isManager) && !isSucursalAccount;
   const canViewFinanzas = isOwner || isGeneralManager || isManager || isSucursalAccount;
-  const canViewTurnosAgenda = isOwner || isGeneralManager || isManager || isSucursalAccount;
-  const canViewClientes = !hasNoAccess && (isOwner || isGeneralManager || isManager || isBarber || isSucursalAccount);
+  const canViewTurnosAgenda = isOwner || isGeneralManager || isManager || isSucursalAccount || isBarber;
+  const canViewClientes = !hasNoAccess && (isOwner || isGeneralManager || isManager || isSucursalAccount);
 
   return (
     <AuthContext.Provider
