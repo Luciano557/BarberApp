@@ -27,6 +27,7 @@ interface AuthContextType {
   canManagePayments: boolean;
   canOperarCajaYGastos: boolean;
   canManageConfig: boolean;
+  canViewConfig: boolean;
   canManageBarbers: boolean;
   canManageUsers: boolean;
   canViewAllClosings: boolean;
