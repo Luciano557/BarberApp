@@ -58,13 +58,13 @@ Deno.serve(async (req) => {
         .eq("rol_equipo", "barbero")
         .not("sucursal_id", "is", null),
       supabase
-        .from("servicios")
-        .select("id, nombre, precio, duracion_min, sucursal_id, activo, eliminado")
+        .from("servicios_sucursales")
+        .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, eliminado)")
         .eq("organization_id", org.id)
         .eq("activo", true)
         .gt("precio", 0)
         .not("sucursal_id", "is", null)
-        .or("eliminado.is.null,eliminado.eq.false"),
+        .or("eliminado.is.null,eliminado.eq.false", { foreignTable: "servicios" }),
       supabase
         .from("portal_config")
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
