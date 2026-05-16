@@ -247,6 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         canManagePayments,
         canOperarCajaYGastos,
         canManageConfig,
+        canViewConfig,
         canManageBarbers,
         canManageUsers,
         canViewAllClosings,
