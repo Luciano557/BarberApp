@@ -7,8 +7,10 @@ import { PinConfigSection } from './PinConfigSection';
 import { OrganizationSettings } from './OrganizationSettings';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { NotificationsConfig } from './config/NotificationsConfig';
+import { MiCuentaConfig } from './config/MiCuentaConfig';
+import { useAuth } from '@/contexts/AuthContext';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones' | 'mi-cuenta';
 
 const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
@@ -17,6 +19,7 @@ const sectionTitles: Record<ConfigSection, string> = {
   plan: 'Plan y Suscripción',
   payments: 'Métodos de pago y recargos',
   notificaciones: 'Notificaciones',
+  'mi-cuenta': 'Mi cuenta',
 };
 
 interface ConfigurationPanelProps {
