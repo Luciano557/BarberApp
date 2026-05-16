@@ -1156,6 +1156,8 @@ interface StaffFormProps {
 const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData, onSave, onCancel }: StaffFormProps) {
   const [localData, setLocalData] = useState<StaffFormData>(initialData);
   const [localCommissionError, setLocalCommissionError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   // Reset only when switching to a different barber (or entering/leaving add mode).
   // Do NOT reset on every initialData reference change — the parent may re-render
@@ -1179,12 +1181,20 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
     setLocalCommissionError(''); return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (submittingRef.current) return;
     if (!localData.firstName || !localData.lastName || !localData.phone) return;
     if (isComision && commissionRequired && !localData.commission) return;
     if (isComision && !validateLocalCommission(localData.commission)) return;
     if (!isComision && !localData.fixedSalary) return;
-    onSave(localData);
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSave(localData));
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
