@@ -63,18 +63,42 @@ export function useSucursalActionPinConfig({ scope, sucursalId, enabled = true }
       return [...prev, { action_key: action, requires_pin: value }];
     });
     try {
-      const { error } = await supabase
-        .from('sucursal_action_pin_config')
-        .upsert(
-          {
-            organization_id: orgId,
-            sucursal_id: targetSucursalId,
-            action_key: action,
-            requires_pin: value,
-          },
-          { onConflict: 'organization_id,sucursal_id,action_key' },
-        );
-      if (error) throw error;
+      if (scope === 'org') {
+        // upsert con onConflict no matchea filas con sucursal_id IS NULL
+        // (NULL ≠ NULL en constraints únicos compuestos). Hacemos update-then-insert.
+        const { data: updated, error: updErr } = await supabase
+          .from('sucursal_action_pin_config')
+          .update({ requires_pin: value })
+          .eq('organization_id', orgId)
+          .is('sucursal_id', null)
+          .eq('action_key', action)
+          .select('id');
+        if (updErr) throw updErr;
+        if (!updated || updated.length === 0) {
+          const { error: insErr } = await supabase
+            .from('sucursal_action_pin_config')
+            .insert({
+              organization_id: orgId,
+              sucursal_id: null,
+              action_key: action,
+              requires_pin: value,
+            });
+          if (insErr) throw insErr;
+        }
+      } else {
+        const { error } = await supabase
+          .from('sucursal_action_pin_config')
+          .upsert(
+            {
+              organization_id: orgId,
+              sucursal_id: targetSucursalId,
+              action_key: action,
+              requires_pin: value,
+            },
+            { onConflict: 'organization_id,sucursal_id,action_key' },
+          );
+        if (error) throw error;
+      }
       toast.success('Cambio guardado', { duration: 1500 });
     } catch (e: any) {
       console.error('setRequiresPin', e);
