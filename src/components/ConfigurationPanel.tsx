@@ -28,13 +28,22 @@ interface ConfigurationPanelProps {
 }
 
 export function ConfigurationPanel({ initialSection, onSectionChange }: ConfigurationPanelProps = {}) {
-  const [activeSection, setActiveSection] = useState<ConfigSection>(initialSection ?? 'menu');
+  const { canManageConfig } = useAuth();
+  // Roles no administrativos solo ven Mi cuenta — entran directo a esa sección.
+  const initial: ConfigSection = !canManageConfig ? 'mi-cuenta' : (initialSection ?? 'menu');
+  const [activeSection, setActiveSection] = useState<ConfigSection>(initial);
 
   useEffect(() => {
-    if (initialSection) setActiveSection(initialSection);
-  }, [initialSection]);
+    if (!canManageConfig) {
+      setActiveSection('mi-cuenta');
+    } else if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection, canManageConfig]);
 
   const handleSelect = (section: ConfigSection) => {
+    // Bloquear secciones administrativas para roles no admin.
+    if (!canManageConfig && section !== 'mi-cuenta') return;
     setActiveSection(section);
     onSectionChange?.(section);
   };
@@ -42,7 +51,7 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start gap-3">
-        {activeSection !== 'menu' && (
+        {canManageConfig && activeSection !== 'menu' && (
           <Button variant="ghost" size="icon" onClick={() => handleSelect('menu')} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -58,15 +67,19 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
           {activeSection === 'notificaciones' && (
             <p className="text-muted-foreground text-sm mt-1">Personalizá los avisos del Centro de Notificaciones</p>
           )}
+          {activeSection === 'mi-cuenta' && (
+            <p className="text-muted-foreground text-sm mt-1">Datos de tu cuenta y preferencias personales</p>
+          )}
         </div>
       </div>
 
-      {activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}
-      {activeSection === 'plan' && <OrganizationSettings />}
-      {activeSection === 'payments' && <PaymentMethodsConfig sucursalId={null} />}
-      {activeSection === 'pin' && <PinConfigSection />}
-      {activeSection === 'tareas' && <TareasConfig />}
-      {activeSection === 'notificaciones' && <NotificationsConfig />}
+      {canManageConfig && activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}
+      {canManageConfig && activeSection === 'plan' && <OrganizationSettings />}
+      {canManageConfig && activeSection === 'payments' && <PaymentMethodsConfig sucursalId={null} />}
+      {canManageConfig && activeSection === 'pin' && <PinConfigSection />}
+      {canManageConfig && activeSection === 'tareas' && <TareasConfig />}
+      {canManageConfig && activeSection === 'notificaciones' && <NotificationsConfig />}
+      {activeSection === 'mi-cuenta' && <MiCuentaConfig />}
     </div>
   );
 }
