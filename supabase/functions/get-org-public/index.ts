@@ -61,7 +61,9 @@ Deno.serve(async (req) => {
         .select("id, nombre, precio, duracion_min, sucursal_id")
         .eq("organization_id", org.id)
         .eq("activo", true)
-        .eq("eliminado", false),
+        .eq("eliminado", false)
+        .gt("precio", 0)
+        .not("sucursal_id", "is", null),
       supabase
         .from("portal_config")
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
