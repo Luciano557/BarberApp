@@ -135,6 +135,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
             onStart={onStart}
             onManage={onManage}
             links={links}
+            emptyMessage={emptyMessage}
           />
         </div>
       )}
