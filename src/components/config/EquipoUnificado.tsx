@@ -1161,7 +1161,10 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
   const [localData, setLocalData] = useState<StaffFormData>(initialData);
   const [localCommissionError, setLocalCommissionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const submittingRef = useRef(false);
+  const phoneHasInvalidContent = !!phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty';
+
 
   // Reset only when switching to a different barber (or entering/leaving add mode).
   // Do NOT reset on every initialData reference change — the parent may re-render
@@ -1187,7 +1190,8 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
 
   const handleSubmit = async () => {
     if (submittingRef.current) return;
-    if (!localData.firstName || !localData.lastName || !localData.phone) return;
+    if (!localData.firstName || !localData.lastName) return;
+    if (phoneHasInvalidContent) return;
     if (isComision && commissionRequired && !localData.commission) return;
     if (isComision && !validateLocalCommission(localData.commission)) return;
     if (!isComision && !localData.fixedSalary) return;
@@ -1208,7 +1212,15 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
         <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
+        <PhoneInput
+          value={localData.phone || null}
+          onChange={(o) => {
+            setLocalData(prev => ({ ...prev, phone: o.e164 ?? '' }));
+            setPhoneOut(o);
+          }}
+          defaultCountry="AR"
+          allowedCountries={['AR']}
+        />
         <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
       </div>
       <div className="grid grid-cols-1 gap-3">
