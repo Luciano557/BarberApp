@@ -91,7 +91,7 @@ export function NewAppointmentDialog({
     setMode('existing');
     setSelectedCliente(null);
     setQuery(''); setResults([]); setSearchOpen(false);
-    setNombre(''); setApellido(''); setTelefono(''); setEmail('');
+    setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail('');
     setServicioId(''); setNotas('');
   };
 
