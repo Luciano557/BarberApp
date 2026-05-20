@@ -16,6 +16,7 @@ import { Loader2, ChevronDown, CalendarIcon, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 
 interface NuevoClienteDialogProps {
   open: boolean;
