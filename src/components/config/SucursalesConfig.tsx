@@ -138,12 +138,14 @@ export function SucursalesConfig() {
   const handleOpenCreate = () => {
     setEditingSucursal(null);
     setFormData({ nombre: '', direccion: '', telefono: '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
   const handleOpenEdit = (suc: Sucursal) => {
     setEditingSucursal(suc);
     setFormData({ nombre: suc.nombre, direccion: suc.direccion || '', telefono: suc.telefono || '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
