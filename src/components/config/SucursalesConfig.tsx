@@ -74,6 +74,7 @@ export function SucursalesConfig() {
   const [editingSucursal, setEditingSucursal] = useState<Sucursal | null>(null);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
 
   // Users assignment dialog
   const [showAssignDialog, setShowAssignDialog] = useState(false);
