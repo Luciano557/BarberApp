@@ -16,7 +16,7 @@ function safeBarberPhone(input: unknown): string | null {
   if (!raw) return null;
   const r = canonicalizePhoneAR(raw);
   if (r.ok) return r.e164;
-  throw new Error(phoneErrorMessage(r.reason));
+  throw new Error(phoneErrorMessage((r as { ok: false; reason: 'empty' | 'invalid' | 'foreign' | 'ambiguous_landline' }).reason));
 }
 
 // Helper: ejecuta una query y, si falla, anota la tabla en el error para diagnóstico.
