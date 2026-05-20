@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
@@ -79,6 +81,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [allBarbers, setAllBarbers] = useState<BarberWithSucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
 
@@ -275,17 +278,29 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   // --- Sucursal CRUD ---
   const handleOpenCreate = () => {
     setFormData({ nombre: '', direccion: '', telefono: '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
   const handleSaveSucursal = async () => {
     if (!organization?.id || !formData.nombre.trim()) return;
+    let telefonoToSave: string | null = formData.telefono || null;
+    if (phoneOut) {
+      if (!phoneOut.isValid && phoneOut.reason !== 'empty') {
+        toast.error(phoneErrorMessage(phoneOut.reason ?? 'invalid'));
+        return;
+      }
+      telefonoToSave = phoneOut.e164;
+    } else if (telefonoToSave) {
+      const r = canonicalizePhone(telefonoToSave, { defaultCountry: 'AR', allowLandline: true });
+      telefonoToSave = r.ok ? r.e164 : telefonoToSave;
+    }
     setIsSaving(true);
     const { data: insData, error } = await supabase.from('sucursales').insert({
       organization_id: organization.id,
       nombre: formData.nombre.trim(),
       direccion: formData.direccion || null,
-      telefono: formData.telefono || null,
+      telefono: telefonoToSave,
       timezone: organization.timezone,
     }).select('id').single();
     if (error) {
@@ -453,7 +468,13 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
-              <Input value={formData.telefono} onChange={(e) => setFormData(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+              <PhoneInput
+                value={phoneOut?.e164 ?? (formData.telefono || null)}
+                onChange={(o) => { setPhoneOut(o); setFormData(p => ({ ...p, telefono: o.e164 ?? '' })); }}
+                defaultCountry="AR"
+                allowedCountries={['AR']}
+                mode="any"
+              />
             </div>
           </div>
           <DialogFooter>

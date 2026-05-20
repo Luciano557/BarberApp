@@ -43,7 +43,17 @@ const onlyDigits = (s: string): string => s.replace(/\D+/g, '');
 // Argentina (reglas legacy + fallback libphonenumber-js)
 // ---------------------------------------------------------------------------
 
-export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
+export interface CanonicalizeOptions {
+  defaultCountry?: CountryCode;
+  /** Si true: permite fijos AR (E.164 sin el `9` móvil). Default false. */
+  allowLandline?: boolean;
+}
+
+export function canonicalizePhoneAR(
+  input: unknown,
+  opts?: { allowLandline?: boolean },
+): CanonicalizeResult {
+  const allowLandline = !!opts?.allowLandline;
   if (input === null || input === undefined) return { ok: false, reason: 'empty' };
   const raw = String(input).trim();
   if (!raw) return { ok: false, reason: 'empty' };
@@ -57,13 +67,14 @@ export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
   const L = d.length;
   if (L === 0) return { ok: false, reason: 'invalid' };
 
-  // 13 dígitos: 549XXXXXXXXXX (ya canónico)
+  // 13 dígitos: 549XXXXXXXXXX (ya canónico móvil)
   if (L === 13 && d.startsWith('549') && '123'.includes(d[3])) {
     return { ok: true, e164: '+' + d };
   }
 
-  // 12 dígitos: 54 + área(1|2|3) + 8 (sin el 9 móvil)
+  // 12 dígitos: 54 + área(1|2|3) + 8 → fijo si allowLandline, móvil si no.
   if (L === 12 && d.startsWith('54') && '123'.includes(d[2])) {
+    if (allowLandline) return { ok: true, e164: '+' + d };
     return { ok: true, e164: '+549' + d.slice(2) };
   }
 
@@ -72,23 +83,28 @@ export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
     return { ok: true, e164: '+549' + d.slice(1, 3) + d.slice(5) };
   }
 
-  // 11 dígitos: 0 + área(1|2|3) + 8 → posible fijo, no convertir
+  // 11 dígitos: 0 + área(1|2|3) + 8 → fijo nacional.
+  // mode=any (allowLandline): aceptar como fijo → +54 + 10 dígitos.
+  // mode=mobile: ambiguous_landline, no convertir.
   if (L === 11 && d[0] === '0' && '123'.includes(d[1])) {
+    if (allowLandline) return { ok: true, e164: '+54' + d.slice(1) };
     return { ok: false, reason: 'ambiguous_landline' };
   }
 
-  // 10 dígitos nacionales: área(1|2|3) + abonado
+  // 10 dígitos nacionales: área(1|2|3) + abonado.
+  // mode=any guarda como fijo (+54...); mode=mobile como móvil (+549...).
   if (L === 10 && '123'.includes(d[0])) {
+    if (allowLandline) return { ok: true, e164: '+54' + d };
     return { ok: true, e164: '+549' + d };
   }
 
-  // Fallback: si libphonenumber-js puede resolverlo como AR, aceptamos.
-  // Cubre formatos que la heurística no contempla pero la librería sí.
+  // Fallback: libphonenumber-js como AR.
   try {
     const pn = parsePhoneNumberFromString(raw, 'AR');
     if (pn && pn.isValid() && pn.country === 'AR') {
       const e164 = pn.number;
-      // Forzar prefijo móvil 9 si la librería lo omitió.
+      if (allowLandline) return { ok: true, e164 };
+      // En modo móvil, forzar prefijo 9 si la librería lo omitió.
       if (e164.startsWith('+549')) return { ok: true, e164 };
       if (e164.startsWith('+54')) return { ok: true, e164: '+549' + e164.slice(3) };
       return { ok: true, e164 };
@@ -104,10 +120,10 @@ export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
 
 export function canonicalizePhone(
   input: unknown,
-  opts?: { defaultCountry?: CountryCode },
+  opts?: CanonicalizeOptions,
 ): CanonicalizeResult {
   const country = opts?.defaultCountry ?? 'AR';
-  if (country === 'AR') return canonicalizePhoneAR(input);
+  if (country === 'AR') return canonicalizePhoneAR(input, { allowLandline: !!opts?.allowLandline });
 
   if (input === null || input === undefined) return { ok: false, reason: 'empty' };
   const raw = String(input).trim();
@@ -123,12 +139,12 @@ export function canonicalizePhone(
   }
 }
 
-export function isValidPhoneAR(input: unknown): boolean {
-  return canonicalizePhoneAR(input).ok;
+export function isValidPhoneAR(input: unknown, opts?: { allowLandline?: boolean }): boolean {
+  return canonicalizePhoneAR(input, opts).ok;
 }
 
-export function isValidPhone(input: unknown, country: CountryCode = 'AR'): boolean {
-  return canonicalizePhone(input, { defaultCountry: country }).ok;
+export function isValidPhone(input: unknown, country: CountryCode = 'AR', opts?: { allowLandline?: boolean }): boolean {
+  return canonicalizePhone(input, { defaultCountry: country, allowLandline: opts?.allowLandline }).ok;
 }
 
 /**
@@ -168,20 +184,38 @@ export function parsePhoneAR(
 
 /**
  * Formato humano tolerante.
- *   - null/undefined/''  → ''
- *   - E.164 AR válido    → "+54 9 11 6959-9710"
- *   - E.164 otro país    → formato internacional de libphonenumber-js
- *   - inválido/legacy    → string original (no rompe la UI)
+ *   - null/undefined/''      → ''
+ *   - E.164 AR móvil válido  → "+54 9 11 6959-9710"
+ *   - E.164 AR fijo válido   → "+54 11 4555-1234" (sin el 9)
+ *   - E.164 otro país        → formato internacional de libphonenumber-js
+ *   - inválido/legacy        → string original (no rompe la UI)
  */
 export function formatPhoneDisplay(input: string | null | undefined): string {
   if (input === null || input === undefined) return '';
   const raw = String(input).trim();
   if (!raw) return '';
 
-  // AR canónico: render manual coherente con resto de Vittro.
-  const r = canonicalizePhoneAR(raw);
-  if (r.ok) {
-    const rest = r.e164.slice(4); // 10 dígitos
+  // AR móvil canónico: +549 + 10 dígitos (13 dígitos tras el +).
+  const digitsRaw = onlyDigits(raw);
+  if (raw.startsWith('+549') && digitsRaw.length === 13) {
+    const rest = digitsRaw.slice(3); // 10 dígitos
+    const area = rest.slice(0, 2);
+    const ab = rest.slice(2);
+    return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+  }
+
+  // AR fijo canónico: +54 + 10 dígitos (12 dígitos tras el +), no empieza con 9.
+  if (raw.startsWith('+54') && !raw.startsWith('+549') && digitsRaw.length === 12) {
+    const rest = digitsRaw.slice(2); // 10 dígitos
+    const area = rest.slice(0, 2);
+    const ab = rest.slice(2);
+    return `+54 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+  }
+
+  // Reintento AR como móvil (legacy: ingresan crudo).
+  const rMobile = canonicalizePhoneAR(raw);
+  if (rMobile.ok) {
+    const rest = rMobile.e164.slice(4);
     const area = rest.slice(0, 2);
     const ab = rest.slice(2);
     return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
@@ -196,6 +230,7 @@ export function formatPhoneDisplay(input: string | null | undefined): string {
   // Último recurso: devolver tal cual para no romper la UI.
   return raw;
 }
+
 
 /**
  * Número estilo WhatsApp: 549XXXXXXXXXX (sin '+').

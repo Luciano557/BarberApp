@@ -14,19 +14,23 @@ import {
 interface CountryMeta {
   code: CountryCode;
   name: string;
+  /** Bandera en emoji-text (sobria, sin asset). */
+  flag: string;
   dial: string;
   placeholder: string;
 }
 
 const COUNTRY_META: Record<CountryCode, CountryMeta> = {
-  AR: { code: 'AR', name: 'Argentina', dial: '+54', placeholder: '11 2516-2528' },
-  MX: { code: 'MX', name: 'México', dial: '+52', placeholder: '55 1234 5678' },
-  ES: { code: 'ES', name: 'España', dial: '+34', placeholder: '612 34 56 78' },
-  BR: { code: 'BR', name: 'Brasil', dial: '+55', placeholder: '11 91234 5678' },
-  UY: { code: 'UY', name: 'Uruguay', dial: '+598', placeholder: '9 123 4567' },
-  CL: { code: 'CL', name: 'Chile', dial: '+56', placeholder: '9 1234 5678' },
-  CO: { code: 'CO', name: 'Colombia', dial: '+57', placeholder: '300 1234567' },
+  AR: { code: 'AR', name: 'Argentina', flag: '🇦🇷', dial: '+54', placeholder: '11 2516-2528' },
+  MX: { code: 'MX', name: 'México', flag: '🇲🇽', dial: '+52', placeholder: '55 1234 5678' },
+  ES: { code: 'ES', name: 'España', flag: '🇪🇸', dial: '+34', placeholder: '612 34 56 78' },
+  BR: { code: 'BR', name: 'Brasil', flag: '🇧🇷', dial: '+55', placeholder: '11 91234 5678' },
+  UY: { code: 'UY', name: 'Uruguay', flag: '🇺🇾', dial: '+598', placeholder: '9 123 4567' },
+  CL: { code: 'CL', name: 'Chile', flag: '🇨🇱', dial: '+56', placeholder: '9 1234 5678' },
+  CO: { code: 'CO', name: 'Colombia', flag: '🇨🇴', dial: '+57', placeholder: '300 1234567' },
 };
+
+export type PhoneInputMode = 'mobile' | 'any';
 
 export interface PhoneInputChange {
   e164: string | null;
@@ -41,15 +45,29 @@ export interface PhoneInputProps {
   onChange: (out: PhoneInputChange) => void;
   defaultCountry?: CountryCode;
   allowedCountries?: CountryCode[];
+  /**
+   * 'mobile' (default): rechaza fijos AR (`ambiguous_landline`).
+   * 'any': acepta móvil o fijo AR. No fuerza el `9` para fijos.
+   */
+  mode?: PhoneInputMode;
   required?: boolean;
   disabled?: boolean;
   id?: string;
   name?: string;
   className?: string;
+  placeholder?: string;
 }
 
 // Permite dígitos y separadores comunes mientras se tipea/pega.
 const sanitizeKeepSeparators = (s: string): string => s.replace(/[^\d\s\-()+]/g, '');
+
+/** Stripea el prefijo "+54 9 " o "+54 " de un display AR para hidratar el input nacional. */
+function stripDialPrefix(display: string, dial: string): string {
+  if (display.startsWith(dial + ' 9 ')) return display.slice(dial.length + 3);
+  if (display.startsWith(dial + ' ')) return display.slice(dial.length + 1);
+  if (display.startsWith(dial)) return display.slice(dial.length).trimStart();
+  return display;
+}
 
 export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
   function PhoneInput(
@@ -58,11 +76,13 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       onChange,
       defaultCountry = 'AR',
       allowedCountries = ['AR'],
+      mode = 'mobile',
       required = false,
       disabled = false,
       id,
       name,
       className,
+      placeholder,
     },
     ref,
   ) {
@@ -71,22 +91,17 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
     const [touched, setTouched] = React.useState(false);
     const [pickerOpen, setPickerOpen] = React.useState(false);
     const lastEmittedE164 = React.useRef<string | null>(null);
+    const allowLandline = mode === 'any';
 
     // Hidratar desde value externo (E.164 canónico).
     React.useEffect(() => {
       if (value && value !== lastEmittedE164.current) {
         const display = formatPhoneDisplay(value);
-        if (display.startsWith('+54 9 ')) {
-          setRaw(display.slice(6));
-          setCountry('AR');
-        } else if (display.startsWith('+')) {
-          const meta = Object.values(COUNTRY_META).find((m) => display.startsWith(m.dial + ' '));
-          if (meta) {
-            setRaw(display.slice(meta.dial.length + 1));
-            setCountry(meta.code);
-          } else {
-            setRaw(display);
-          }
+        // AR móvil: "+54 9 ..." | AR fijo: "+54 ..."
+        const meta = Object.values(COUNTRY_META).find((m) => display.startsWith(m.dial));
+        if (meta) {
+          setCountry(meta.code);
+          setRaw(stripDialPrefix(display, meta.dial));
         } else {
           setRaw(display || value);
         }
@@ -113,7 +128,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           onChange(out);
           return;
         }
-        const r = canonicalizePhone(cleaned, { defaultCountry: nextCountry });
+        const r = canonicalizePhone(cleaned, { defaultCountry: nextCountry, allowLandline });
         if (r.ok) {
           const out: PhoneInputChange = {
             e164: r.e164,
@@ -136,7 +151,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           onChange(out);
         }
       },
-      [onChange, required],
+      [onChange, required, allowLandline],
     );
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,12 +177,11 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
 
     const handleBlur = () => {
       setTouched(true);
-      const r = canonicalizePhone(raw, { defaultCountry: country });
+      const r = canonicalizePhone(raw, { defaultCountry: country, allowLandline });
       if (r.ok) {
         const display = formatPhoneDisplay(r.e164);
-        if (country === 'AR' && display.startsWith('+54 9 ')) {
-          setRaw(display.slice(6));
-        }
+        const meta = COUNTRY_META[country];
+        setRaw(stripDialPrefix(display, meta.dial));
       }
     };
 
@@ -179,8 +193,8 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
 
     const meta = COUNTRY_META[country];
     const result = React.useMemo(
-      () => canonicalizePhone(sanitizeKeepSeparators(raw), { defaultCountry: country }),
-      [raw, country],
+      () => canonicalizePhone(sanitizeKeepSeparators(raw), { defaultCountry: country, allowLandline }),
+      [raw, country, allowLandline],
     );
     const hasContent = raw.trim().length > 0;
     const showError = touched && hasContent && !result.ok;
@@ -193,6 +207,24 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
 
     const singleCountry = allowedCountries.length <= 1;
 
+    const CountryTrigger = (
+      <button
+        type="button"
+        disabled={disabled || singleCountry}
+        className={cn(
+          'flex items-center gap-1.5 px-3 text-sm border-r border-input bg-muted/30 transition-colors shrink-0',
+          !singleCountry && 'hover:bg-muted/50 cursor-pointer',
+          singleCountry && 'cursor-default',
+        )}
+        aria-label="Seleccionar país"
+        title={`${meta.name} (${meta.dial})`}
+      >
+        <span className="text-base leading-none" aria-hidden>{meta.flag}</span>
+        <span className="text-muted-foreground">{meta.dial}</span>
+        {!singleCountry && <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+      </button>
+    );
+
     return (
       <div className={cn('space-y-1', className)}>
         <div
@@ -203,22 +235,10 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           )}
         >
           {singleCountry ? (
-            <div className="flex items-center px-3 text-sm text-muted-foreground border-r border-input bg-muted/30 select-none">
-              {meta.dial}
-            </div>
+            CountryTrigger
           ) : (
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  className="flex items-center gap-1 px-3 text-sm border-r border-input bg-muted/30 hover:bg-muted/50 transition-colors"
-                  aria-label="Seleccionar país"
-                >
-                  <span className="text-muted-foreground">{meta.dial}</span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                </button>
-              </PopoverTrigger>
+              <PopoverTrigger asChild>{CountryTrigger}</PopoverTrigger>
               <PopoverContent className="w-64 p-0" align="start">
                 <Command>
                   <CommandInput placeholder="Buscar país..." />
@@ -233,6 +253,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
                             value={`${m.name} ${m.dial}`}
                             onSelect={() => handleCountryChange(c)}
                           >
+                            <span className="mr-2 text-base leading-none" aria-hidden>{m.flag}</span>
                             <span className="flex-1">{m.name}</span>
                             <span className="text-xs text-muted-foreground mr-2">{m.dial}</span>
                             {c === country && <Check className="h-3.5 w-3.5" />}
@@ -254,17 +275,19 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             autoComplete="tel"
             disabled={disabled}
             value={raw}
-            placeholder={meta.placeholder}
+            placeholder={placeholder ?? meta.placeholder}
             onChange={handleInputChange}
             onPaste={handlePaste}
             onBlur={handleBlur}
-            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed min-w-0"
           />
         </div>
         {errorMsg ? (
           <p className="text-xs text-destructive">{errorMsg}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Ej: {meta.placeholder}</p>
+          <p className="text-xs text-muted-foreground">
+            {mode === 'any' ? `Móvil o fijo. Ej: ${meta.placeholder}` : `Ej: ${meta.placeholder}`}
+          </p>
         )}
       </div>
     );

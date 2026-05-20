@@ -7,6 +7,8 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { getBarberDisplayName } from '@/types/barbershop';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +74,7 @@ export function SucursalesConfig() {
   const [editingSucursal, setEditingSucursal] = useState<Sucursal | null>(null);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
 
   // Users assignment dialog
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -135,30 +138,44 @@ export function SucursalesConfig() {
   const handleOpenCreate = () => {
     setEditingSucursal(null);
     setFormData({ nombre: '', direccion: '', telefono: '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
   const handleOpenEdit = (suc: Sucursal) => {
     setEditingSucursal(suc);
     setFormData({ nombre: suc.nombre, direccion: suc.direccion || '', telefono: suc.telefono || '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
   const handleSave = async () => {
     if (!organization?.id || !formData.nombre.trim()) return;
+    // Defensa: si hubo edición de teléfono, debe ser válido o vacío.
+    let telefonoToSave: string | null = formData.telefono || null;
+    if (phoneOut) {
+      if (!phoneOut.isValid && phoneOut.reason !== 'empty') {
+        toast.error(phoneErrorMessage(phoneOut.reason ?? 'invalid'));
+        return;
+      }
+      telefonoToSave = phoneOut.e164;
+    } else if (telefonoToSave) {
+      const r = canonicalizePhone(telefonoToSave, { defaultCountry: 'AR', allowLandline: true });
+      telefonoToSave = r.ok ? r.e164 : telefonoToSave;
+    }
     setIsSaving(true);
     try {
       if (editingSucursal) {
         const { error } = await supabase
           .from('sucursales')
-          .update({ nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null })
+          .update({ nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: telefonoToSave })
           .eq('id', editingSucursal.id);
         if (error) throw error;
         toast.success('Sucursal actualizada');
       } else {
         const { data: insData, error } = await supabase
           .from('sucursales')
-          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null, timezone: organization.timezone })
+          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: telefonoToSave, timezone: organization.timezone })
           .select('id')
           .single();
         if (error) throw error;
@@ -345,7 +362,13 @@ export function SucursalesConfig() {
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
-              <Input value={formData.telefono} onChange={(e) => setFormData(prev => ({ ...prev, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+              <PhoneInput
+                value={phoneOut?.e164 ?? (formData.telefono || null)}
+                onChange={(o) => { setPhoneOut(o); setFormData(prev => ({ ...prev, telefono: o.e164 ?? '' })); }}
+                defaultCountry="AR"
+                allowedCountries={['AR']}
+                mode="any"
+              />
             </div>
           </div>
           <DialogFooter>
