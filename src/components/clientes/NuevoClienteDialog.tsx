@@ -71,10 +71,14 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const handleSubmit = async () => {
     const n = nombre.trim();
     const a = apellido.trim();
-    const t = telefono.trim();
+    const t = (phoneOut?.e164 ?? '').trim();
     const e = email.trim();
 
     if (!n) { toast.error('El nombre es obligatorio'); return; }
+    if (phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty') {
+      toast.error('Revisá el teléfono antes de guardar.');
+      return;
+    }
     if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       toast.error('Email inválido');
