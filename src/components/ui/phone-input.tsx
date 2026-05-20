@@ -182,9 +182,16 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       setTouched(true);
       const r = canonicalizePhone(raw, { defaultCountry: country, allowLandline });
       if (r.ok) {
-        const display = formatPhoneDisplay(r.e164);
         const meta = COUNTRY_META[country];
-        setRaw(stripDialPrefix(display, meta.dial));
+        if (country === 'AR') {
+          const display = formatPhoneDisplay(r.e164);
+          setRaw(stripDialPrefix(display, meta.dial));
+        } else {
+          try {
+            const pn = parsePhoneNumberFromString(r.e164);
+            if (pn) setRaw(pn.formatNational());
+          } catch { /* noop */ }
+        }
       }
     };
 
