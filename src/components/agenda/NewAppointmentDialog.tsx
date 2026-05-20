@@ -288,7 +288,7 @@ export function NewAppointmentDialog({
                   <span className="flex items-center gap-2 truncate">
                     <span className="truncate">{fullName(selectedCliente)}</span>
                     {selectedCliente.telefono && (
-                      <span className="text-xs text-muted-foreground truncate">· {selectedCliente.telefono}</span>
+                      <span className="text-xs text-muted-foreground truncate">· {formatPhoneDisplay(selectedCliente.telefono)}</span>
                     )}
                   </span>
                 ) : (
