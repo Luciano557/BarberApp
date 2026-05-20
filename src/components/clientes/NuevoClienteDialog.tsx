@@ -148,7 +148,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
                 setTelefono(o.e164 ?? '');
               }}
               defaultCountry="AR"
-              allowedCountries={['AR']}
+              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
               mode="mobile"
             />
           </div>
