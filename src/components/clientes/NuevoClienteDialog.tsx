@@ -31,6 +31,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
   const [fechaNac, setFechaNac] = useState<string | null>(null);
   const [sucursalId, setSucursalId] = useState<string>('');
