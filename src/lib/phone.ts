@@ -184,20 +184,38 @@ export function parsePhoneAR(
 
 /**
  * Formato humano tolerante.
- *   - null/undefined/''  → ''
- *   - E.164 AR válido    → "+54 9 11 6959-9710"
- *   - E.164 otro país    → formato internacional de libphonenumber-js
- *   - inválido/legacy    → string original (no rompe la UI)
+ *   - null/undefined/''      → ''
+ *   - E.164 AR móvil válido  → "+54 9 11 6959-9710"
+ *   - E.164 AR fijo válido   → "+54 11 4555-1234" (sin el 9)
+ *   - E.164 otro país        → formato internacional de libphonenumber-js
+ *   - inválido/legacy        → string original (no rompe la UI)
  */
 export function formatPhoneDisplay(input: string | null | undefined): string {
   if (input === null || input === undefined) return '';
   const raw = String(input).trim();
   if (!raw) return '';
 
-  // AR canónico: render manual coherente con resto de Vittro.
-  const r = canonicalizePhoneAR(raw);
-  if (r.ok) {
-    const rest = r.e164.slice(4); // 10 dígitos
+  // AR móvil canónico: +549 + 10 dígitos (13 dígitos tras el +).
+  const digitsRaw = onlyDigits(raw);
+  if (raw.startsWith('+549') && digitsRaw.length === 13) {
+    const rest = digitsRaw.slice(3); // 10 dígitos
+    const area = rest.slice(0, 2);
+    const ab = rest.slice(2);
+    return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+  }
+
+  // AR fijo canónico: +54 + 10 dígitos (12 dígitos tras el +), no empieza con 9.
+  if (raw.startsWith('+54') && !raw.startsWith('+549') && digitsRaw.length === 12) {
+    const rest = digitsRaw.slice(2); // 10 dígitos
+    const area = rest.slice(0, 2);
+    const ab = rest.slice(2);
+    return `+54 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+  }
+
+  // Reintento AR como móvil (legacy: ingresan crudo).
+  const rMobile = canonicalizePhoneAR(raw);
+  if (rMobile.ok) {
+    const rest = rMobile.e164.slice(4);
     const area = rest.slice(0, 2);
     const ab = rest.slice(2);
     return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
@@ -212,6 +230,7 @@ export function formatPhoneDisplay(input: string | null | undefined): string {
   // Último recurso: devolver tal cual para no romper la UI.
   return raw;
 }
+
 
 /**
  * Número estilo WhatsApp: 549XXXXXXXXXX (sin '+').
