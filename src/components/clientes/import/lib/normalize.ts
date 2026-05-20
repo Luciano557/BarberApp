@@ -1,20 +1,14 @@
 // Normalization helpers for client import
-import { canonicalizePhoneAR, type CanonicalizeResult } from '@/lib/phone';
+import { canonicalizePhoneAR, type CanonicalizeReason } from '@/lib/phone';
 
 /**
  * Resultado enriquecido para teléfonos de importación.
- * - `display`: el valor que mostramos/persistimos en `telefono` (canónico si convertible,
- *   o el crudo limpio si extranjero/ambiguo, o null si vacío/inválido).
- * - `dedupKey`: clave para detectar duplicados internos. Para convertibles AR es el e164.
- *   Para extranjeros conservados, una clave estable de dígitos. Para inválido/vacío: null.
- * - `needsReview`: true cuando se conserva sin convertir (extranjero/ambiguo) y conviene revisar.
- * - `reason`: el motivo cuando no se canonizó.
  */
 export interface ImportPhoneResult {
   display: string | null;
   dedupKey: string | null;
   needsReview: boolean;
-  reason?: CanonicalizeResult extends { ok: false; reason: infer R } ? R : never;
+  reason?: CanonicalizeReason;
 }
 
 /**
