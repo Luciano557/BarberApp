@@ -27,12 +27,16 @@ export const LookupTelefonoStep = ({ onLookup }: Props) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const digits = phoneLocal.replace(/\D/g, "");
-    if (!digits || digits.length < 6) {
-      toast.error("Ingresá un teléfono válido");
+    const full = buildPhone(country.dial, phoneLocal);
+    if (!full) {
+      toast.error(
+        country.code === "AR"
+          ? "Teléfono inválido. Ejemplo: 11 2516-2528."
+          : "Ingresá un teléfono válido.",
+      );
       return;
     }
-    onLookup(buildPhone(country.dial, digits));
+    onLookup(full);
   };
 
   return (
