@@ -372,7 +372,17 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Teléfono</Label>
-                      <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                      <Input
+                        value={telefono}
+                        onChange={(e) => setTelefono(e.target.value)}
+                        type="tel"
+                        inputMode="tel"
+                        placeholder="Ejemplo: 11 2516-2528"
+                        maxLength={40}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Ingresá código de área sin 0 y número sin 15.
+                      </p>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Email</Label>

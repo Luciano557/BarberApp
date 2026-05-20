@@ -133,7 +133,18 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
 
           <div className="space-y-1.5">
             <Label htmlFor="telefono">Teléfono</Label>
-            <Input id="telefono" type="tel" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="11 5555 5555" />
+            <Input
+              id="telefono"
+              type="tel"
+              inputMode="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="Ejemplo: 11 2516-2528"
+              maxLength={40}
+            />
+            <p className="text-xs text-muted-foreground">
+              Ingresá código de área sin 0 y número sin 15.
+            </p>
           </div>
 
           <div className="space-y-1.5">

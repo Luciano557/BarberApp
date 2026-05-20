@@ -14,6 +14,7 @@ import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
 import { Search, UserPlus, Zap, ArrowLeft, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { canonicalizePhoneAR } from '@/lib/phone';
 
 interface NewAppointmentDialogProps {
   open: boolean;
@@ -147,15 +148,20 @@ export function NewAppointmentDialog({
     return true;
   };
 
-  const validateClienteFields = () => {
-    if (!nombre.trim()) { toast.error('Ingresá el nombre'); return false; }
-    if (!apellido.trim()) { toast.error('Ingresá el apellido'); return false; }
-    if (!telefono.trim()) { toast.error('Ingresá el teléfono'); return false; }
+  const validateClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
+    if (!nombre.trim()) { toast.error('Ingresá el nombre'); return { ok: false, phoneCanonical: null }; }
+    if (!apellido.trim()) { toast.error('Ingresá el apellido'); return { ok: false, phoneCanonical: null }; }
+    if (!telefono.trim()) { toast.error('Ingresá el teléfono'); return { ok: false, phoneCanonical: null }; }
+    const r = canonicalizePhoneAR(telefono);
+    if (!r.ok) {
+      toast.error('Teléfono inválido. Ejemplo: 11 2516-2528.');
+      return { ok: false, phoneCanonical: null };
+    }
     if (email.trim() && !EMAIL_RE.test(email.trim())) {
       toast.error('Email inválido');
-      return false;
+      return { ok: false, phoneCanonical: null };
     }
-    return true;
+    return { ok: true, phoneCanonical: r.e164 };
   };
 
   const ensureRelacion = async (clienteId: string) => {
@@ -182,11 +188,14 @@ export function NewAppointmentDialog({
   const handleSubmit = async () => {
     const servicio = servicios.find(s => s.id === servicioId);
 
+    let telefonoCanonical: string | null = null;
     if (mode === 'existing') {
       if (!selectedCliente) { toast.error('Seleccioná un cliente'); return; }
       if (!validateCommon() || !servicio) return;
     } else {
-      if (!validateClienteFields()) return;
+      const v = validateClienteFields();
+      if (!v.ok) return;
+      telefonoCanonical = v.phoneCanonical;
       if (!validateCommon() || !servicio) return;
     }
 
@@ -210,7 +219,7 @@ export function NewAppointmentDialog({
           _nombre: nombre.trim(),
           _apellido: apellido.trim(),
           _sucursal_id: sucursalId,
-          _telefono: telefono.trim() || null,
+          _telefono: telefonoCanonical,
           _email: email.trim() || null,
           _instagram: null,
           _tiktok: null,
@@ -222,13 +231,13 @@ export function NewAppointmentDialog({
         if (rpcErr) throw rpcErr;
         clienteId = (rpcData as string) || null;
         snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        snapTelefono = telefono.trim() || null;
+        snapTelefono = telefonoCanonical;
         snapEmail = email.trim() || null;
       } else {
         // quick
         clienteId = null;
         snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        snapTelefono = telefono.trim() || null;
+        snapTelefono = telefonoCanonical;
         snapEmail = email.trim() || null;
       }
 
@@ -382,7 +391,14 @@ export function NewAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Teléfono *</Label>
-            <Input value={telefono} onChange={e => setTelefono(e.target.value)} maxLength={80} inputMode="tel" />
+            <Input
+              value={telefono}
+              onChange={e => setTelefono(e.target.value)}
+              maxLength={40}
+              inputMode="tel"
+              type="tel"
+              placeholder="Ejemplo: 11 2516-2528"
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Email (opcional)</Label>

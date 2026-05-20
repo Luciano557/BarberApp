@@ -1,12 +1,53 @@
 // Normalization helpers for client import
+import { canonicalizePhoneAR, type CanonicalizeReason } from '@/lib/phone';
 
-export function normalizePhone(input: unknown): string | null {
-  if (input === null || input === undefined) return null;
+/**
+ * Resultado enriquecido para teléfonos de importación.
+ */
+export interface ImportPhoneResult {
+  display: string | null;
+  dedupKey: string | null;
+  needsReview: boolean;
+  reason?: CanonicalizeReason;
+}
+
+/**
+ * Procesa un teléfono importado aplicando la canonicalización central.
+ * - Convertibles AR → guardar canónico `+549...` y usar como clave de dedup.
+ * - Extranjeros → conservar string limpio sin transformar, dedup por dígitos, marcar revisión.
+ * - Ambiguos (posible fijo 011...) → conservar limpio, marcar revisión.
+ * - Inválidos / vacíos → no guardar, sin dedup por teléfono.
+ */
+export function processImportPhone(input: unknown): ImportPhoneResult {
+  if (input === null || input === undefined) {
+    return { display: null, dedupKey: null, needsReview: false };
+  }
   const raw = String(input).trim();
-  if (!raw) return null;
-  // Keep digits only for matching key
-  const digits = raw.replace(/\D+/g, '');
-  return digits || null;
+  if (!raw) return { display: null, dedupKey: null, needsReview: false };
+
+  const r = canonicalizePhoneAR(raw);
+  if (r.ok === true) {
+    return { display: r.e164, dedupKey: r.e164, needsReview: false };
+  }
+  const reason = r.reason;
+  if (reason === 'foreign' || reason === 'ambiguous_landline') {
+    const digits = raw.replace(/\D+/g, '');
+    return {
+      display: raw,
+      dedupKey: digits ? `raw:${digits}` : null,
+      needsReview: true,
+      reason,
+    };
+  }
+  return { display: null, dedupKey: null, needsReview: false, reason };
+}
+
+/**
+ * @deprecated Reservada por compatibilidad: devuelve solo la clave de dedup.
+ * Internamente usa `processImportPhone`.
+ */
+export function normalizePhone(input: unknown): string | null {
+  return processImportPhone(input).dedupKey;
 }
 
 export function normalizeEmail(input: unknown): string | null {
