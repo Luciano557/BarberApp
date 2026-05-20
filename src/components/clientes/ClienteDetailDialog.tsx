@@ -186,15 +186,18 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     const a = apellido.trim();
     if (!n) { toast.error('El nombre es obligatorio'); return; }
     const e = email.trim();
-    const t = telefono.trim();
+    // Si el usuario editó el teléfono, usar phoneOut; si no tocó, mantener el valor actual.
+    const editedPhone = phoneOut !== null;
+    if (editedPhone && phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty') {
+      toast.error('Revisá el teléfono antes de guardar.');
+      return;
+    }
+    const t = editedPhone ? (phoneOut?.e164 ?? '') : telefono.trim();
     if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { toast.error('Email inválido'); return; }
-    await persist({
-      nombre: n,
-      apellido: a,
-      telefono: t || null,
-      email: e || null,
-    }, 'Datos de contacto actualizados');
+    const patch: ClienteUpdate = { nombre: n, apellido: a, email: e || null };
+    if (editedPhone) (patch as any).telefono = t || null;
+    await persist(patch, 'Datos de contacto actualizados');
   };
 
   const handleSaveRedes = () => persist({
