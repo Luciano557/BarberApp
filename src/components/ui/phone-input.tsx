@@ -78,7 +78,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       value,
       onChange,
       defaultCountry = 'AR',
-      allowedCountries = ['AR'],
+      allowedCountries = DEFAULT_COUNTRIES,
       mode = 'mobile',
       required = false,
       disabled = false,
