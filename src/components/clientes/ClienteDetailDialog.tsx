@@ -91,6 +91,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     setNombre(c.nombre);
     setApellido(c.apellido);
     setTelefono(c.telefono ?? '');
+    setPhoneOut(null);
     setEmail(c.email ?? '');
     setInstagram(c.instagram ?? '');
     setTiktok(c.tiktok ?? '');
