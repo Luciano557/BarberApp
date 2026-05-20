@@ -1,19 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { canonicalPhoneOrNull } from "../_shared/phone.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-function normalizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = String(raw).trim();
-  if (!trimmed) return null;
-  const hasPlus = trimmed.startsWith("+");
-  const digits = trimmed.replace(/\D/g, "");
-  if (!digits) return null;
-  return hasPlus ? `+${digits}` : digits;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,10 +21,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const phone = normalizePhone(telefono);
+    const phone = canonicalPhoneOrNull(telefono);
     if (!phone) {
-      return new Response(JSON.stringify({ error: "Invalid phone" }), {
-        status: 400,
+      // Foreign/ambiguous/invalid → tratamos como "no encontrado" para no filtrar info.
+      return new Response(JSON.stringify({ found: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

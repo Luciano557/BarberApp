@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { canonicalPhoneOrNull } from "../_shared/phone.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,16 +32,6 @@ function slotInstantMs(fecha: string, hora: string, tz: string): number {
   const asTzMs = Date.UTC(+parts.year, +parts.month - 1, +parts.day, hh, +parts.minute);
   const offset = asTzMs - utcGuess;
   return utcGuess - offset;
-}
-
-function normalizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = String(raw).trim();
-  if (!trimmed) return null;
-  const hasPlus = trimmed.startsWith("+");
-  const digits = trimmed.replace(/\D/g, "");
-  if (!digits) return null;
-  return hasPlus ? `+${digits}` : digits;
 }
 
 Deno.serve(async (req) => {
@@ -79,9 +70,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const finalTelefono = normalizePhone(cliente_telefono);
+    const finalTelefono = canonicalPhoneOrNull(cliente_telefono);
     if (!finalTelefono) {
-      return new Response(JSON.stringify({ error: "Invalid phone" }), {
+      return new Response(JSON.stringify({
+        error: "invalid_phone",
+        message: "Teléfono inválido. Ingresá un móvil argentino (ej: 11 2516-2528).",
+      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
