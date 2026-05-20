@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import {
   normalizeName,
   normalizeText,
-  normalizePhone,
+  processImportPhone,
   normalizeEmail,
   normalizeDate,
   normalizeBoolean,
@@ -86,11 +86,13 @@ export async function parseFreshaFile(file: File): Promise<ParseResult> {
     const nota = normalizeText(get(raw, 'comentario'), 1500) ?? '';
     const clientId = normalizeText(get(raw, 'client id'), 80) ?? '';
 
+    const tel = processImportPhone(telRaw);
+
     const row: PreviewRow = {
       rowId: `fr-${i}-${Math.random().toString(36).slice(2, 8)}`,
       nombre,
       apellido,
-      telefono: telRaw,
+      telefono: tel.display ?? telRaw,
       email: emailRaw,
       fecha_nacimiento: fechaNac,
       fecha_cliente_desde: fechaDesde,
@@ -106,14 +108,23 @@ export async function parseFreshaFile(file: File): Promise<ParseResult> {
       external_customer_id: clientId || null,
       errors: [],
       warnings: [],
-      phoneKey: normalizePhone(telRaw),
+      phoneKey: tel.dedupKey,
       emailKey: normalizeEmail(emailRaw),
       duplicateGroupId: null,
       discarded: false,
     };
 
-    // Custom validation: name required + phone OR email required.
     validateRow(row);
+    if (tel.needsReview) {
+      const msg = tel.reason === 'foreign'
+        ? 'Teléfono extranjero — se conserva sin convertir'
+        : 'Posible fijo — revisar manualmente';
+      if (!row.warnings.includes(msg)) row.warnings.push(msg);
+    } else if (telRaw && !tel.display) {
+      if (!row.warnings.includes('Teléfono inválido — no se guardará')) {
+        row.warnings.push('Teléfono inválido — no se guardará');
+      }
+    }
     // For Fresha, "no contact" must be a blocking error, not just a warning.
     if (!row.telefono.trim() && !row.email.trim()) {
       if (!row.errors.includes('Falta teléfono o email')) {
