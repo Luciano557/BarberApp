@@ -26,6 +26,8 @@ import {
 import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 interface ClienteDetailDialogProps {
   clienteId: string | null;
