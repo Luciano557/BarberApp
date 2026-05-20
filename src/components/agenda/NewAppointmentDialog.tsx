@@ -391,13 +391,13 @@ export function NewAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Teléfono *</Label>
-            <Input
-              value={telefono}
-              onChange={e => setTelefono(e.target.value)}
-              maxLength={40}
-              inputMode="tel"
-              type="tel"
-              placeholder="Ejemplo: 11 2516-2528"
+            <PhoneInput
+              value={phoneOut?.e164 ?? null}
+              onChange={(o) => { setPhoneOut(o); setTelefono(o.e164 ?? ''); }}
+              defaultCountry="AR"
+              allowedCountries={['AR']}
+              mode="mobile"
+              required
             />
           </div>
           <div className="space-y-1">
