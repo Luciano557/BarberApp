@@ -52,6 +52,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setNombre('');
       setApellido('');
       setTelefono('');
+      setPhoneOut(null);
       setEmail('');
       setFechaNac(null);
       setSucursalId(currentSucursal?.id ?? '');
