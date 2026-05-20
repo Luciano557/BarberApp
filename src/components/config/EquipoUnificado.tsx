@@ -3,6 +3,8 @@ import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, C
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -773,10 +775,12 @@ export function EquipoUnificado({
                   <span className="break-all">{linkedUser.email}</span>
                 </div>
               )}
-              <div className="flex items-start gap-1.5">
-                <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
-                <span className="break-words">{barber.phone}</span>
-              </div>
+              {barber.phone && formatPhoneDisplay(barber.phone) && (
+                <div className="flex items-start gap-1.5">
+                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
+                  <span className="break-words">{formatPhoneDisplay(barber.phone)}</span>
+                </div>
+              )}
               {barber.address && (
                 <div className="flex items-start gap-1.5">
                   <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Dir</span>
@@ -1157,7 +1161,10 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
   const [localData, setLocalData] = useState<StaffFormData>(initialData);
   const [localCommissionError, setLocalCommissionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const submittingRef = useRef(false);
+  const phoneHasInvalidContent = !!phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty';
+
 
   // Reset only when switching to a different barber (or entering/leaving add mode).
   // Do NOT reset on every initialData reference change — the parent may re-render
@@ -1183,7 +1190,8 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
 
   const handleSubmit = async () => {
     if (submittingRef.current) return;
-    if (!localData.firstName || !localData.lastName || !localData.phone) return;
+    if (!localData.firstName || !localData.lastName) return;
+    if (phoneHasInvalidContent) return;
     if (isComision && commissionRequired && !localData.commission) return;
     if (isComision && !validateLocalCommission(localData.commission)) return;
     if (!isComision && !localData.fixedSalary) return;
@@ -1204,7 +1212,15 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
         <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
+        <PhoneInput
+          value={localData.phone || null}
+          onChange={(o) => {
+            setLocalData(prev => ({ ...prev, phone: o.e164 ?? '' }));
+            setPhoneOut(o);
+          }}
+          defaultCountry="AR"
+          allowedCountries={['AR']}
+        />
         <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
       </div>
       <div className="grid grid-cols-1 gap-3">
@@ -1326,7 +1342,7 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel} disabled={isSubmitting}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
         <Button size="sm" onClick={handleSubmit} className="w-full bg-success hover:bg-success/90 sm:w-auto"
-          disabled={isSubmitting || !localData.firstName || !localData.lastName || !localData.phone || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
+          disabled={isSubmitting || !localData.firstName || !localData.lastName || phoneHasInvalidContent || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
           <Save className="h-4 w-4 mr-1" /> {isSubmitting ? 'Guardando…' : (isEdit ? 'Guardar' : 'Agregar')}
         </Button>
       </div>
