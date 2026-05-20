@@ -3,6 +3,8 @@ import { Plus, Edit2, Save, X, PowerOff, Power, Lock, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Barber } from '@/types/barbershop';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
