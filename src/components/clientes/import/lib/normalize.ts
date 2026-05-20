@@ -1,12 +1,60 @@
 // Normalization helpers for client import
+import { canonicalizePhoneAR, type CanonicalizeResult } from '@/lib/phone';
 
-export function normalizePhone(input: unknown): string | null {
-  if (input === null || input === undefined) return null;
+/**
+ * Resultado enriquecido para teléfonos de importación.
+ * - `display`: el valor que mostramos/persistimos en `telefono` (canónico si convertible,
+ *   o el crudo limpio si extranjero/ambiguo, o null si vacío/inválido).
+ * - `dedupKey`: clave para detectar duplicados internos. Para convertibles AR es el e164.
+ *   Para extranjeros conservados, una clave estable de dígitos. Para inválido/vacío: null.
+ * - `needsReview`: true cuando se conserva sin convertir (extranjero/ambiguo) y conviene revisar.
+ * - `reason`: el motivo cuando no se canonizó.
+ */
+export interface ImportPhoneResult {
+  display: string | null;
+  dedupKey: string | null;
+  needsReview: boolean;
+  reason?: CanonicalizeResult extends { ok: false; reason: infer R } ? R : never;
+}
+
+/**
+ * Procesa un teléfono importado aplicando la canonicalización central.
+ * - Convertibles AR → guardar canónico `+549...` y usar como clave de dedup.
+ * - Extranjeros → conservar string limpio sin transformar, dedup por dígitos, marcar revisión.
+ * - Ambiguos (posible fijo 011...) → conservar limpio, marcar revisión.
+ * - Inválidos / vacíos → no guardar, sin dedup por teléfono.
+ */
+export function processImportPhone(input: unknown): ImportPhoneResult {
+  if (input === null || input === undefined) {
+    return { display: null, dedupKey: null, needsReview: false };
+  }
   const raw = String(input).trim();
-  if (!raw) return null;
-  // Keep digits only for matching key
-  const digits = raw.replace(/\D+/g, '');
-  return digits || null;
+  if (!raw) return { display: null, dedupKey: null, needsReview: false };
+
+  const r = canonicalizePhoneAR(raw);
+  if (r.ok) {
+    return { display: r.e164, dedupKey: r.e164, needsReview: false };
+  }
+  if (r.reason === 'foreign' || r.reason === 'ambiguous_landline') {
+    // Conservar limpio sin convertir, dedup por dígitos como clave estable.
+    const digits = raw.replace(/\D+/g, '');
+    return {
+      display: raw,
+      dedupKey: digits ? `raw:${digits}` : null,
+      needsReview: true,
+      reason: r.reason,
+    };
+  }
+  // invalid / empty → no se persiste como teléfono utilizable
+  return { display: null, dedupKey: null, needsReview: false, reason: r.reason };
+}
+
+/**
+ * @deprecated Reservada por compatibilidad: devuelve solo la clave de dedup.
+ * Internamente usa `processImportPhone`.
+ */
+export function normalizePhone(input: unknown): string | null {
+  return processImportPhone(input).dedupKey;
 }
 
 export function normalizeEmail(input: unknown): string | null {
