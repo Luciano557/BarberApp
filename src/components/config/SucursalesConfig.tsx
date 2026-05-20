@@ -366,7 +366,7 @@ export function SucursalesConfig() {
                 value={phoneOut?.e164 ?? (formData.telefono || null)}
                 onChange={(o) => { setPhoneOut(o); setFormData(prev => ({ ...prev, telefono: o.e164 ?? '' })); }}
                 defaultCountry="AR"
-                allowedCountries={['AR']}
+                allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
                 mode="any"
               />
             </div>

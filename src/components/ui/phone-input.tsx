@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { parsePhoneNumberFromString, type CountryCode as LibCountryCode } from 'libphonenumber-js/min';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,8 @@ import {
   type CountryCode,
   type CanonicalizeReason,
 } from '@/lib/phone';
+
+const DEFAULT_COUNTRIES: CountryCode[] = ['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR'];
 
 interface CountryMeta {
   code: CountryCode;
@@ -75,7 +78,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       value,
       onChange,
       defaultCountry = 'AR',
-      allowedCountries = ['AR'],
+      allowedCountries = DEFAULT_COUNTRIES,
       mode = 'mobile',
       required = false,
       disabled = false,
@@ -179,9 +182,16 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       setTouched(true);
       const r = canonicalizePhone(raw, { defaultCountry: country, allowLandline });
       if (r.ok) {
-        const display = formatPhoneDisplay(r.e164);
         const meta = COUNTRY_META[country];
-        setRaw(stripDialPrefix(display, meta.dial));
+        if (country === 'AR') {
+          const display = formatPhoneDisplay(r.e164);
+          setRaw(stripDialPrefix(display, meta.dial));
+        } else {
+          try {
+            const pn = parsePhoneNumberFromString(r.e164);
+            if (pn) setRaw(pn.formatNational());
+          } catch { /* noop */ }
+        }
       }
     };
 
@@ -286,7 +296,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           <p className="text-xs text-destructive">{errorMsg}</p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {mode === 'any' ? `Móvil o fijo. Ej: ${meta.placeholder}` : `Ej: ${meta.placeholder}`}
+            {mode === 'any' && country === 'AR' ? `Móvil o fijo. Ej: ${meta.placeholder}` : `Ej: ${meta.placeholder}`}
           </p>
         )}
       </div>

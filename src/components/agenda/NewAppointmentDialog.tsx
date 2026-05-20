@@ -395,7 +395,7 @@ export function NewAppointmentDialog({
               value={phoneOut?.e164 ?? null}
               onChange={(o) => { setPhoneOut(o); setTelefono(o.e164 ?? ''); }}
               defaultCountry="AR"
-              allowedCountries={['AR']}
+              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
               mode="mobile"
               required
             />

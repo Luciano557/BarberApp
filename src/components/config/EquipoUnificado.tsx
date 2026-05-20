@@ -1219,7 +1219,7 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
             setPhoneOut(o);
           }}
           defaultCountry="AR"
-          allowedCountries={['AR']}
+          allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
         />
         <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
       </div>

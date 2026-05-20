@@ -111,7 +111,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
               setPhoneOut(o);
             }}
             defaultCountry="AR"
-            allowedCountries={['AR']}
+            allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
           />
           <div>
             <Input type="text" inputMode="numeric" placeholder="Comisión % *" value={localData.commission}
