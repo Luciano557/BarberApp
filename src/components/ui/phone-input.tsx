@@ -296,7 +296,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           <p className="text-xs text-destructive">{errorMsg}</p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {mode === 'any' ? `Móvil o fijo. Ej: ${meta.placeholder}` : `Ej: ${meta.placeholder}`}
+            {mode === 'any' && country === 'AR' ? `Móvil o fijo. Ej: ${meta.placeholder}` : `Ej: ${meta.placeholder}`}
           </p>
         )}
       </div>
