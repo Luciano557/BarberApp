@@ -9,6 +9,7 @@ import { NuevoClienteDialog } from './clientes/NuevoClienteDialog';
 import { ClienteDetailDialog } from './clientes/ClienteDetailDialog';
 import { ImportClientesDialog } from './clientes/import/ImportClientesDialog';
 import { toast } from 'sonner';
+import { canonicalizePhoneAR } from '@/lib/phone';
 
 export function ClientesPanel() {
   const { currentSucursal, isAllMode } = useSucursal();
@@ -22,13 +23,25 @@ export function ClientesPanel() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return clientes;
+    // Si parece teléfono (≥6 dígitos), tratamos con tolerancia: comparamos
+    // dígitos contra dígitos y, si es convertible a AR, contra el canónico.
+    const qDigits = q.replace(/\D/g, '');
+    const looksLikePhone = qDigits.length >= 6;
+    const qCanon = looksLikePhone ? canonicalizePhoneAR(q) : null;
     return clientes.filter(c => {
-      return (
+      const nameMatch =
         (c.nombre ?? '').toLowerCase().includes(q) ||
         (c.apellido ?? '').toLowerCase().includes(q) ||
-        (c.telefono ?? '').toLowerCase().includes(q) ||
-        (c.email ?? '').toLowerCase().includes(q)
-      );
+        (c.email ?? '').toLowerCase().includes(q);
+      if (nameMatch) return true;
+      const phone = (c.telefono ?? '').toLowerCase();
+      if (phone.includes(q)) return true;
+      if (looksLikePhone) {
+        const phoneDigits = phone.replace(/\D/g, '');
+        if (phoneDigits && phoneDigits.includes(qDigits)) return true;
+        if (qCanon && qCanon.ok && phone === qCanon.e164.toLowerCase()) return true;
+      }
+      return false;
     });
   }, [clientes, search]);
 
