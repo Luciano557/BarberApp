@@ -6,14 +6,24 @@ import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { canonicalizePhoneAR, phoneErrorMessage } from '@/lib/phone';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
 /**
  * Defensa final para `barberos.telefono`: vacío → NULL; válido → E.164;
  * inválido → throw con mensaje legible. No depender solo de la UI.
+ * Acepta cualquier E.164 internacional (AR, UY, CL, CO, MX, ES, BR, ...).
  */
 function safeBarberPhone(input: unknown): string | null {
   const raw = (input ?? '').toString().trim();
   if (!raw) return null;
+  // Si ya viene en E.164 válido (cualquier país), aceptar tal cual.
+  if (raw.startsWith('+')) {
+    try {
+      const pn = parsePhoneNumberFromString(raw);
+      if (pn && pn.isValid()) return pn.number;
+    } catch { /* noop */ }
+  }
+  // Fallback AR para entradas legacy (sin '+').
   const r = canonicalizePhoneAR(raw);
   if (r.ok) return r.e164;
   throw new Error(phoneErrorMessage((r as { ok: false; reason: 'empty' | 'invalid' | 'foreign' | 'ambiguous_landline' }).reason));
