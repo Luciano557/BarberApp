@@ -472,7 +472,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 value={phoneOut?.e164 ?? (formData.telefono || null)}
                 onChange={(o) => { setPhoneOut(o); setFormData(p => ({ ...p, telefono: o.e164 ?? '' })); }}
                 defaultCountry="AR"
-                allowedCountries={['AR']}
+                allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
                 mode="any"
               />
             </div>
