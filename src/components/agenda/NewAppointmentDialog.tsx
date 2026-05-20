@@ -153,17 +153,15 @@ export function NewAppointmentDialog({
   const validateClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
     if (!nombre.trim()) { toast.error('Ingresá el nombre'); return { ok: false, phoneCanonical: null }; }
     if (!apellido.trim()) { toast.error('Ingresá el apellido'); return { ok: false, phoneCanonical: null }; }
-    if (!telefono.trim()) { toast.error('Ingresá el teléfono'); return { ok: false, phoneCanonical: null }; }
-    const r = canonicalizePhoneAR(telefono);
-    if (!r.ok) {
-      toast.error('Teléfono inválido. Ejemplo: 11 2516-2528.');
+    if (!phoneOut?.e164 || !phoneOut.isValid) {
+      toast.error('Ingresá un teléfono válido. Ejemplo: 11 2516-2528.');
       return { ok: false, phoneCanonical: null };
     }
     if (email.trim() && !EMAIL_RE.test(email.trim())) {
       toast.error('Email inválido');
       return { ok: false, phoneCanonical: null };
     }
-    return { ok: true, phoneCanonical: r.e164 };
+    return { ok: true, phoneCanonical: phoneOut.e164 };
   };
 
   const ensureRelacion = async (clienteId: string) => {
