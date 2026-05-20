@@ -81,6 +81,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [allBarbers, setAllBarbers] = useState<BarberWithSucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
 
