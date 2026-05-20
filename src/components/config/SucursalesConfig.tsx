@@ -151,19 +151,31 @@ export function SucursalesConfig() {
 
   const handleSave = async () => {
     if (!organization?.id || !formData.nombre.trim()) return;
+    // Defensa: si hubo edición de teléfono, debe ser válido o vacío.
+    let telefonoToSave: string | null = formData.telefono || null;
+    if (phoneOut) {
+      if (!phoneOut.isValid && phoneOut.reason !== 'empty') {
+        toast.error(phoneErrorMessage(phoneOut.reason ?? 'invalid'));
+        return;
+      }
+      telefonoToSave = phoneOut.e164;
+    } else if (telefonoToSave) {
+      const r = canonicalizePhone(telefonoToSave, { defaultCountry: 'AR', allowLandline: true });
+      telefonoToSave = r.ok ? r.e164 : telefonoToSave;
+    }
     setIsSaving(true);
     try {
       if (editingSucursal) {
         const { error } = await supabase
           .from('sucursales')
-          .update({ nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null })
+          .update({ nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: telefonoToSave })
           .eq('id', editingSucursal.id);
         if (error) throw error;
         toast.success('Sucursal actualizada');
       } else {
         const { data: insData, error } = await supabase
           .from('sucursales')
-          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: formData.telefono || null, timezone: organization.timezone })
+          .insert({ organization_id: organization.id, nombre: formData.nombre.trim(), direccion: formData.direccion || null, telefono: telefonoToSave, timezone: organization.timezone })
           .select('id')
           .single();
         if (error) throw error;
