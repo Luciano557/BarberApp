@@ -368,7 +368,7 @@ export function NewAppointmentDialog({
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => { setMode('existing'); setNombre(''); setApellido(''); setTelefono(''); setEmail(''); }}
+            onClick={() => { setMode('existing'); setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail(''); }}
           >
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
