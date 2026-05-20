@@ -1,9 +1,13 @@
 /**
- * Vittro — Utilidad central de teléfonos.
+ * Vittro — Utilidad central de teléfonos (wrapper oficial).
+ *
+ * Único punto de entrada para teléfonos en toda la app. Los componentes y
+ * hooks NO deben importar `libphonenumber-js` directamente.
  *
  * Formato canónico móvil argentino: +549XXXXXXXXXX (13 dígitos después del '+').
  *
- * Reglas de canonicalización AR (idénticas a `_canon_phone_ar` en DB):
+ * Reglas AR (alineadas con `_canon_phone_ar` en DB y conservadas como pre-procesador
+ * para formatos legacy locales antes de delegar en libphonenumber-js):
  *   - 13 dígitos `549XXXXXXXXXX`            → `+549XXXXXXXXXX`
  *   - 12 dígitos `54` + área(1|2|3) + 8     → `+549...`
  *   - 13 dígitos `011 15 + 8`               → `+549 + area(2) + 8`
@@ -12,8 +16,16 @@
  *   - Empieza con `+` y no es `+54...`      → foreign (NO convertir)
  *   - Resto                                  → invalid
  *
- * La función es idempotente: aplicarla dos veces sobre un canónico devuelve el mismo valor.
+ * Idempotente: aplicarla sobre un canónico devuelve el mismo valor.
+ *
+ * Multi-país: para países distintos de AR se delega a `libphonenumber-js`.
+ * Si más adelante se necesita distinguir móvil/fijo con precisión, evaluar
+ * migrar a metadata `mobile` o `max`.
  */
+
+import { parsePhoneNumberFromString, type CountryCode as LibCountryCode } from 'libphonenumber-js/min';
+
+export type CountryCode = 'AR' | 'MX' | 'ES' | 'BR' | 'UY' | 'CL' | 'CO';
 
 export type CanonicalizeReason =
   | 'empty'
@@ -26,6 +38,10 @@ export type CanonicalizeResult =
   | { ok: false; reason: CanonicalizeReason };
 
 const onlyDigits = (s: string): string => s.replace(/\D+/g, '');
+
+// ---------------------------------------------------------------------------
+// Argentina (reglas legacy + fallback libphonenumber-js)
+// ---------------------------------------------------------------------------
 
 export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
   if (input === null || input === undefined) return { ok: false, reason: 'empty' };
@@ -66,59 +82,119 @@ export function canonicalizePhoneAR(input: unknown): CanonicalizeResult {
     return { ok: true, e164: '+549' + d };
   }
 
+  // Fallback: si libphonenumber-js puede resolverlo como AR, aceptamos.
+  // Cubre formatos que la heurística no contempla pero la librería sí.
+  try {
+    const pn = parsePhoneNumberFromString(raw, 'AR');
+    if (pn && pn.isValid() && pn.country === 'AR') {
+      const e164 = pn.number;
+      // Forzar prefijo móvil 9 si la librería lo omitió.
+      if (e164.startsWith('+549')) return { ok: true, e164 };
+      if (e164.startsWith('+54')) return { ok: true, e164: '+549' + e164.slice(3) };
+      return { ok: true, e164 };
+    }
+  } catch { /* noop */ }
+
   return { ok: false, reason: 'invalid' };
 }
 
+// ---------------------------------------------------------------------------
+// Multi-país (delegado a libphonenumber-js)
+// ---------------------------------------------------------------------------
+
 export function canonicalizePhone(
   input: unknown,
-  opts?: { defaultCountry?: 'AR' },
+  opts?: { defaultCountry?: CountryCode },
 ): CanonicalizeResult {
   const country = opts?.defaultCountry ?? 'AR';
   if (country === 'AR') return canonicalizePhoneAR(input);
-  return canonicalizePhoneAR(input);
+
+  if (input === null || input === undefined) return { ok: false, reason: 'empty' };
+  const raw = String(input).trim();
+  if (!raw) return { ok: false, reason: 'empty' };
+
+  try {
+    const pn = parsePhoneNumberFromString(raw, country as LibCountryCode);
+    if (!pn) return { ok: false, reason: 'invalid' };
+    if (!pn.isValid()) return { ok: false, reason: 'invalid' };
+    return { ok: true, e164: pn.number };
+  } catch {
+    return { ok: false, reason: 'invalid' };
+  }
 }
 
 export function isValidPhoneAR(input: unknown): boolean {
   return canonicalizePhoneAR(input).ok;
 }
 
-/**
- * Descompone un teléfono AR en código de área + abonado.
- * Devuelve null si no es convertible.
- */
-export function parsePhoneAR(
-  input: unknown,
-): { areaCode: string; subscriber: string } | null {
-  const r = canonicalizePhoneAR(input);
-  if (!r.ok) return null;
-  // e164: +549 + N (10 dígitos: área(1-4) + abonado)
-  const rest = r.e164.slice(4); // quita +549
-  // Heurística simple para Argentina: área 2 dígitos (más común CABA/GBA),
-  // 3 ó 4 para interior. Para el formato canónico móvil AR los 10 dígitos
-  // son siempre "área + abonado" donde área puede ser 2-4. Sin tabla de
-  // áreas, devolvemos los 2 primeros como área por defecto y el resto como
-  // abonado. El usuario puede ajustar visualmente si lo necesita.
-  if (rest.length < 8) return null;
-  const areaLen = rest.length === 10 ? 2 : Math.max(2, rest.length - 8);
-  return {
-    areaCode: rest.slice(0, areaLen),
-    subscriber: rest.slice(areaLen),
-  };
+export function isValidPhone(input: unknown, country: CountryCode = 'AR'): boolean {
+  return canonicalizePhone(input, { defaultCountry: country }).ok;
 }
 
 /**
- * Devuelve un formato humano: "+54 9 11 6959-9710".
+ * Descompone un teléfono en código de área + abonado.
+ * Para AR usa heurística simple (área = 2 dígitos por defecto).
+ * Devuelve null si no es convertible.
  */
-export function formatPhoneDisplay(e164: string | null | undefined): string {
-  if (!e164) return '';
-  const r = canonicalizePhoneAR(e164);
-  if (!r.ok) return String(e164);
-  const rest = r.e164.slice(4); // 10 dígitos
-  const area = rest.slice(0, 2);
-  const ab = rest.slice(2);
-  const ab1 = ab.slice(0, 4);
-  const ab2 = ab.slice(4);
-  return `+54 9 ${area} ${ab1}-${ab2}`;
+export function parsePhone(
+  input: unknown,
+  country: CountryCode = 'AR',
+): { country: CountryCode; areaCode: string; subscriber: string; e164: string } | null {
+  const r = canonicalizePhone(input, { defaultCountry: country });
+  if (!r.ok) return null;
+  try {
+    const pn = parsePhoneNumberFromString(r.e164);
+    if (pn) {
+      const national = pn.nationalNumber as string;
+      const areaLen = country === 'AR' ? Math.min(2, national.length) : Math.max(2, national.length - 7);
+      return {
+        country: (pn.country as CountryCode) ?? country,
+        areaCode: national.slice(0, areaLen),
+        subscriber: national.slice(areaLen),
+        e164: r.e164,
+      };
+    }
+  } catch { /* noop */ }
+  return null;
+}
+
+export function parsePhoneAR(
+  input: unknown,
+): { areaCode: string; subscriber: string } | null {
+  const p = parsePhone(input, 'AR');
+  if (!p) return null;
+  return { areaCode: p.areaCode, subscriber: p.subscriber };
+}
+
+/**
+ * Formato humano tolerante.
+ *   - null/undefined/''  → ''
+ *   - E.164 AR válido    → "+54 9 11 6959-9710"
+ *   - E.164 otro país    → formato internacional de libphonenumber-js
+ *   - inválido/legacy    → string original (no rompe la UI)
+ */
+export function formatPhoneDisplay(input: string | null | undefined): string {
+  if (input === null || input === undefined) return '';
+  const raw = String(input).trim();
+  if (!raw) return '';
+
+  // AR canónico: render manual coherente con resto de Vittro.
+  const r = canonicalizePhoneAR(raw);
+  if (r.ok) {
+    const rest = r.e164.slice(4); // 10 dígitos
+    const area = rest.slice(0, 2);
+    const ab = rest.slice(2);
+    return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+  }
+
+  // Otros países: intentar parseo libre.
+  try {
+    const pn = parsePhoneNumberFromString(raw);
+    if (pn && pn.isValid()) return pn.formatInternational();
+  } catch { /* noop */ }
+
+  // Último recurso: devolver tal cual para no romper la UI.
+  return raw;
 }
 
 /**
@@ -158,6 +234,6 @@ export function phoneErrorMessage(reason: CanonicalizeReason): string {
       return 'Ese número parece un fijo. Ingresá un móvil con código de área y sin el 0 ni el 15.';
     case 'invalid':
     default:
-      return 'Teléfono inválido. Ejemplo: 11 2516-2528.';
+      return 'Revisá el teléfono. Ingresá código de área y número sin prefijos extra.';
   }
 }
