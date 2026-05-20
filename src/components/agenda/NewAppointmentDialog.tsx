@@ -14,7 +14,8 @@ import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
 import { Search, UserPlus, Zap, ArrowLeft, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { canonicalizePhoneAR } from '@/lib/phone';
+import { canonicalizePhoneAR, formatPhoneDisplay } from '@/lib/phone';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 
 interface NewAppointmentDialogProps {
   open: boolean;
