@@ -171,7 +171,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
             <p className="font-mono text-[10px] opacity-60">UID: {barber.uid}</p>
-            <p>📞 {barber.phone}</p>
+            {barber.phone && formatPhoneDisplay(barber.phone) && <p>Tel: {formatPhoneDisplay(barber.phone)}</p>}
             {barber.address && <p>📍 {barber.address}</p>}
             {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
           </div>
