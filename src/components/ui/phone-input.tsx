@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { parsePhoneNumberFromString, type CountryCode as LibCountryCode } from 'libphonenumber-js/min';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,8 @@ import {
   type CountryCode,
   type CanonicalizeReason,
 } from '@/lib/phone';
+
+const DEFAULT_COUNTRIES: CountryCode[] = ['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR'];
 
 interface CountryMeta {
   code: CountryCode;
