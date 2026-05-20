@@ -47,7 +47,7 @@ export interface Barber {
   uid: string; // Auto-generated, unique, non-editable
   firstName: string;
   lastName: string;
-  phone: string;
+  phone: string; // E.164 canónico (ej: '+5491125162528') o '' si no hay teléfono
   commission: number; // 0-100 percentage
   compensationType: CompensationType;
   fixedSalary?: number;
