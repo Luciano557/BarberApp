@@ -339,7 +339,7 @@ export function NewAppointmentDialog({
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate">{fullName(c)}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {[c.telefono, c.email].filter(Boolean).join(' · ') || '—'}
+                        {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '—'}
                       </div>
                     </div>
                     {!c.inSucursal && (
