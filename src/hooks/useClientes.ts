@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { canonicalizePhoneAR } from '@/lib/phone';
 
 export interface Cliente {
   id: string;
@@ -129,11 +130,22 @@ export function useClientes() {
 
   const createCliente = useCallback(async (params: CreateClienteParams): Promise<{ id: string | null; error: string | null }> => {
     try {
+      // Canonicalizar teléfono AR antes de persistir.
+      let telefonoCanon: string | null = null;
+      const rawTel = (params.telefono ?? '').toString().trim();
+      if (rawTel) {
+        const r = canonicalizePhoneAR(rawTel);
+        if (!r.ok) {
+          return { id: null, error: 'Teléfono inválido. Ejemplo: 11 2516-2528.' };
+        }
+        telefonoCanon = r.e164;
+      }
+
       const { data, error } = await supabase.rpc('create_cliente_with_sucursal', {
         _nombre: params.nombre,
         _apellido: params.apellido,
         _sucursal_id: params.sucursalId,
-        _telefono: params.telefono ?? null,
+        _telefono: telefonoCanon,
         _email: params.email ?? null,
         _instagram: params.instagram ?? null,
         _tiktok: params.tiktok ?? null,
@@ -155,9 +167,22 @@ export function useClientes() {
     patch: ClienteUpdate
   ): Promise<{ error: string | null }> => {
     try {
+      const finalPatch: any = { ...patch };
+      if (Object.prototype.hasOwnProperty.call(patch, 'telefono')) {
+        const rawTel = (patch.telefono ?? '') as string | null;
+        if (rawTel && rawTel.toString().trim()) {
+          const r = canonicalizePhoneAR(rawTel);
+          if (!r.ok) {
+            return { error: 'Teléfono inválido. Ejemplo: 11 2516-2528.' };
+          }
+          finalPatch.telefono = r.e164;
+        } else {
+          finalPatch.telefono = null;
+        }
+      }
       const { error } = await supabase
         .from('clientes')
-        .update(patch as any)
+        .update(finalPatch)
         .eq('id', id);
       if (error) return { error: error.message };
       await fetchClientes();
