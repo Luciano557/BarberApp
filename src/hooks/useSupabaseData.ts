@@ -15,8 +15,8 @@ function safeBarberPhone(input: unknown): string | null {
   const raw = (input ?? '').toString().trim();
   if (!raw) return null;
   const r = canonicalizePhoneAR(raw);
-  if (!r.ok) throw new Error(phoneErrorMessage(r.reason));
-  return r.e164;
+  if (r.ok) return r.e164;
+  throw new Error(phoneErrorMessage(r.reason));
 }
 
 // Helper: ejecuta una query y, si falla, anota la tabla en el error para diagnóstico.
