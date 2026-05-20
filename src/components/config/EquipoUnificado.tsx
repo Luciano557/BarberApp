@@ -3,6 +3,8 @@ import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, C
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -773,10 +775,12 @@ export function EquipoUnificado({
                   <span className="break-all">{linkedUser.email}</span>
                 </div>
               )}
-              <div className="flex items-start gap-1.5">
-                <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
-                <span className="break-words">{barber.phone}</span>
-              </div>
+              {barber.phone && formatPhoneDisplay(barber.phone) && (
+                <div className="flex items-start gap-1.5">
+                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
+                  <span className="break-words">{formatPhoneDisplay(barber.phone)}</span>
+                </div>
+              )}
               {barber.address && (
                 <div className="flex items-start gap-1.5">
                   <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Dir</span>
