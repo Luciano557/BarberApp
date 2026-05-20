@@ -468,7 +468,13 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
-              <Input value={formData.telefono} onChange={(e) => setFormData(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+              <PhoneInput
+                value={phoneOut?.e164 ?? (formData.telefono || null)}
+                onChange={(o) => { setPhoneOut(o); setFormData(p => ({ ...p, telefono: o.e164 ?? '' })); }}
+                defaultCountry="AR"
+                allowedCountries={['AR']}
+                mode="any"
+              />
             </div>
           </div>
           <DialogFooter>
