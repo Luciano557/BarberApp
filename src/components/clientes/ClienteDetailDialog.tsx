@@ -379,17 +379,16 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Teléfono</Label>
-                      <Input
-                        value={telefono}
-                        onChange={(e) => setTelefono(e.target.value)}
-                        type="tel"
-                        inputMode="tel"
-                        placeholder="Ejemplo: 11 2516-2528"
-                        maxLength={40}
+                      <PhoneInput
+                        value={phoneOut?.e164 ?? (telefono || null)}
+                        onChange={(o) => {
+                          setPhoneOut(o);
+                          setTelefono(o.e164 ?? '');
+                        }}
+                        defaultCountry="AR"
+                        allowedCountries={['AR']}
+                        mode="mobile"
                       />
-                      <p className="text-[11px] text-muted-foreground">
-                        Ingresá código de área sin 0 y número sin 15.
-                      </p>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Email</Label>
@@ -401,7 +400,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground">Teléfono</span>
                       <span className={cliente.telefono ? '' : 'text-muted-foreground italic'}>
-                        {cliente.telefono || 'Sin teléfono'}
+                        {cliente.telefono ? formatPhoneDisplay(cliente.telefono) : 'Sin teléfono'}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">
