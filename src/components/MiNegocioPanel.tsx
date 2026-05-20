@@ -278,17 +278,29 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   // --- Sucursal CRUD ---
   const handleOpenCreate = () => {
     setFormData({ nombre: '', direccion: '', telefono: '' });
+    setPhoneOut(null);
     setShowDialog(true);
   };
 
   const handleSaveSucursal = async () => {
     if (!organization?.id || !formData.nombre.trim()) return;
+    let telefonoToSave: string | null = formData.telefono || null;
+    if (phoneOut) {
+      if (!phoneOut.isValid && phoneOut.reason !== 'empty') {
+        toast.error(phoneErrorMessage(phoneOut.reason ?? 'invalid'));
+        return;
+      }
+      telefonoToSave = phoneOut.e164;
+    } else if (telefonoToSave) {
+      const r = canonicalizePhone(telefonoToSave, { defaultCountry: 'AR', allowLandline: true });
+      telefonoToSave = r.ok ? r.e164 : telefonoToSave;
+    }
     setIsSaving(true);
     const { data: insData, error } = await supabase.from('sucursales').insert({
       organization_id: organization.id,
       nombre: formData.nombre.trim(),
       direccion: formData.direccion || null,
-      telefono: formData.telefono || null,
+      telefono: telefonoToSave,
       timezone: organization.timezone,
     }).select('id').single();
     if (error) {
