@@ -38,6 +38,36 @@ export type Database = {
         }
         Relationships: []
       }
+      _backup_phones_remove_ar9_20260520: {
+        Row: {
+          backed_up_at: string | null
+          column_name: string | null
+          new_value: string | null
+          old_value: string | null
+          organization_id: string | null
+          record_id: string | null
+          src: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          column_name?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          column_name?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Relationships: []
+      }
       access_logs: {
         Row: {
           accessed_at: string | null
