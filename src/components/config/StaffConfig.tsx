@@ -80,6 +80,8 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
   }) => {
     const [localData, setLocalData] = useState(initialData);
     const [localCommissionError, setLocalCommissionError] = useState('');
+    const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
+    const phoneHasInvalidContent = !!phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty';
 
     const validateLocalCommission = (value: string): boolean => {
       const num = Number(value);
@@ -89,7 +91,8 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
     };
 
     const handleSubmit = () => {
-      if (!localData.firstName || !localData.lastName || !localData.phone) return;
+      if (!localData.firstName || !localData.lastName) return;
+      if (phoneHasInvalidContent) return;
       if (!validateLocalCommission(localData.commission)) return;
       onSave(localData);
     };
@@ -101,7 +104,15 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
           <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
+          <PhoneInput
+            value={localData.phone || null}
+            onChange={(o) => {
+              setLocalData(prev => ({ ...prev, phone: o.e164 ?? '' }));
+              setPhoneOut(o);
+            }}
+            defaultCountry="AR"
+            allowedCountries={['AR']}
+          />
           <div>
             <Input type="text" inputMode="numeric" placeholder="Comisión % *" value={localData.commission}
               onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
@@ -117,7 +128,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
           <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-            disabled={!localData.firstName || !localData.lastName || !localData.phone || !!localCommissionError}>
+            disabled={!localData.firstName || !localData.lastName || phoneHasInvalidContent || !!localCommissionError}>
             <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
           </Button>
         </div>
