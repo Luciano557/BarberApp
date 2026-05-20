@@ -77,6 +77,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
   const [instagram, setInstagram] = useState('');
   const [tiktok, setTiktok] = useState('');
