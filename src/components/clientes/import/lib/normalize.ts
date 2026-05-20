@@ -26,21 +26,20 @@ export function processImportPhone(input: unknown): ImportPhoneResult {
   if (!raw) return { display: null, dedupKey: null, needsReview: false };
 
   const r = canonicalizePhoneAR(raw);
-  if (r.ok) {
+  if (r.ok === true) {
     return { display: r.e164, dedupKey: r.e164, needsReview: false };
   }
-  if (r.reason === 'foreign' || r.reason === 'ambiguous_landline') {
-    // Conservar limpio sin convertir, dedup por dígitos como clave estable.
+  const reason = r.reason;
+  if (reason === 'foreign' || reason === 'ambiguous_landline') {
     const digits = raw.replace(/\D+/g, '');
     return {
       display: raw,
       dedupKey: digits ? `raw:${digits}` : null,
       needsReview: true,
-      reason: r.reason,
+      reason,
     };
   }
-  // invalid / empty → no se persiste como teléfono utilizable
-  return { display: null, dedupKey: null, needsReview: false, reason: r.reason };
+  return { display: null, dedupKey: null, needsReview: false, reason };
 }
 
 /**
