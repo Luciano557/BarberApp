@@ -124,12 +124,13 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
           lastEmittedE164.current = r.e164;
           onChange(out);
         } else {
+          const fail = r as { ok: false; reason: CanonicalizeReason };
           const out: PhoneInputChange = {
             e164: null,
             isValid: false,
             country: nextCountry,
             display: cleaned,
-            reason: r.reason,
+            reason: fail.reason,
           };
           lastEmittedE164.current = null;
           onChange(out);
