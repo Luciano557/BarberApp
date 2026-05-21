@@ -4,23 +4,24 @@
  * Único punto de entrada para teléfonos en toda la app. Los componentes y
  * hooks NO deben importar `libphonenumber-js` directamente.
  *
- * Formato canónico móvil argentino: +549XXXXXXXXXX (13 dígitos después del '+').
+ * Formato canónico AR: `+54XXXXXXXXXX` (12 dígitos tras el `+`), sin el `9`
+ * intermedio. Alineado con el formato que quedó en DB tras la migración 2026-05
+ * (se eliminó el `9` de móviles para usar el formato Google/libphonenumber base).
  *
- * Reglas AR (alineadas con `_canon_phone_ar` en DB y conservadas como pre-procesador
- * para formatos legacy locales antes de delegar en libphonenumber-js):
- *   - 13 dígitos `549XXXXXXXXXX`            → `+549XXXXXXXXXX`
- *   - 12 dígitos `54` + área(1|2|3) + 8     → `+549...`
- *   - 13 dígitos `011 15 + 8`               → `+549 + area(2) + 8`
- *   - 10 dígitos nacionales (1|2|3...)      → `+549 + 10`
- *   - 11 dígitos `0` + (1|2|3) + ...        → ambiguous_landline (NO convertir)
+ * Reglas AR (idempotentes):
+ *   - 13 dígitos `549XXXXXXXXXX`            → `+54XXXXXXXXXX` (strip del 9)
+ *   - 12 dígitos `54` + área(1|2|3) + 8     → `+54XXXXXXXXXX` (idempotente)
+ *   - 13 dígitos `011 15 + 8`               → `+54 + area(2) + 8`
+ *   - 10 dígitos nacionales (1|2|3...)      → `+54 + 10`
+ *   - 11 dígitos `0` + (1|2|3) + ...        → `+54 + 10` (fijo nacional)
  *   - Empieza con `+` y no es `+54...`      → foreign (NO convertir)
  *   - Resto                                  → invalid
  *
- * Idempotente: aplicarla sobre un canónico devuelve el mismo valor.
+ * WhatsApp: `buildWhatsAppNumber` reinyecta el `9` porque WhatsApp AR sigue
+ * exigiendo `549XXXXXXXXXX`. No es contradictorio: el canónico de almacenamiento
+ * es `+54...`, pero el destino WhatsApp requiere el `9`.
  *
  * Multi-país: para países distintos de AR se delega a `libphonenumber-js`.
- * Si más adelante se necesita distinguir móvil/fijo con precisión, evaluar
- * migrar a metadata `mobile` o `max`.
  */
 
 import { parsePhoneNumberFromString, type CountryCode as LibCountryCode } from 'libphonenumber-js/min';
@@ -45,15 +46,14 @@ const onlyDigits = (s: string): string => s.replace(/\D+/g, '');
 
 export interface CanonicalizeOptions {
   defaultCountry?: CountryCode;
-  /** Si true: permite fijos AR (E.164 sin el `9` móvil). Default false. */
+  /** Mantenido por compatibilidad. Ya no afecta el formato de salida AR. */
   allowLandline?: boolean;
 }
 
 export function canonicalizePhoneAR(
   input: unknown,
-  opts?: { allowLandline?: boolean },
+  _opts?: { allowLandline?: boolean },
 ): CanonicalizeResult {
-  const allowLandline = !!opts?.allowLandline;
   if (input === null || input === undefined) return { ok: false, reason: 'empty' };
   const raw = String(input).trim();
   if (!raw) return { ok: false, reason: 'empty' };
@@ -67,47 +67,38 @@ export function canonicalizePhoneAR(
   const L = d.length;
   if (L === 0) return { ok: false, reason: 'invalid' };
 
-  // 13 dígitos: 549XXXXXXXXXX (ya canónico móvil)
+  // 13 dígitos: 549 + 10 → strip del 9
   if (L === 13 && d.startsWith('549') && '123'.includes(d[3])) {
+    return { ok: true, e164: '+54' + d.slice(3) };
+  }
+
+  // 12 dígitos: 54 + área(1|2|3) + 8 (formato canónico actual). Idempotente.
+  if (L === 12 && d.startsWith('54') && '123'.includes(d[2])) {
     return { ok: true, e164: '+' + d };
   }
 
-  // 12 dígitos: 54 + área(1|2|3) + 8 → fijo si allowLandline, móvil si no.
-  if (L === 12 && d.startsWith('54') && '123'.includes(d[2])) {
-    if (allowLandline) return { ok: true, e164: '+' + d };
-    return { ok: true, e164: '+549' + d.slice(2) };
-  }
-
-  // 13 dígitos antiguos: 011 15 + 8 → móvil
+  // 13 dígitos antiguos: 011 15 + 8
   if (L === 13 && d.startsWith('011') && d.slice(3, 5) === '15') {
-    return { ok: true, e164: '+549' + d.slice(1, 3) + d.slice(5) };
+    return { ok: true, e164: '+54' + d.slice(1, 3) + d.slice(5) };
   }
 
-  // 11 dígitos: 0 + área(1|2|3) + 8 → fijo nacional.
-  // mode=any (allowLandline): aceptar como fijo → +54 + 10 dígitos.
-  // mode=mobile: ambiguous_landline, no convertir.
+  // 11 dígitos: 0 + área + 8 → fijo / móvil nacional con prefijo 0
   if (L === 11 && d[0] === '0' && '123'.includes(d[1])) {
-    if (allowLandline) return { ok: true, e164: '+54' + d.slice(1) };
-    return { ok: false, reason: 'ambiguous_landline' };
+    return { ok: true, e164: '+54' + d.slice(1) };
   }
 
-  // 10 dígitos nacionales: área(1|2|3) + abonado.
-  // mode=any guarda como fijo (+54...); mode=mobile como móvil (+549...).
+  // 10 dígitos nacionales: área + abonado
   if (L === 10 && '123'.includes(d[0])) {
-    if (allowLandline) return { ok: true, e164: '+54' + d };
-    return { ok: true, e164: '+549' + d };
+    return { ok: true, e164: '+54' + d };
   }
 
-  // Fallback: libphonenumber-js como AR.
+  // Fallback: libphonenumber-js como AR. Si devuelve +549..., strippeamos el 9.
   try {
     const pn = parsePhoneNumberFromString(raw, 'AR');
     if (pn && pn.isValid() && pn.country === 'AR') {
       const e164 = pn.number;
-      if (allowLandline) return { ok: true, e164 };
-      // En modo móvil, forzar prefijo 9 si la librería lo omitió.
-      if (e164.startsWith('+549')) return { ok: true, e164 };
-      if (e164.startsWith('+54')) return { ok: true, e164: '+549' + e164.slice(3) };
-      return { ok: true, e164 };
+      if (e164.startsWith('+549')) return { ok: true, e164: '+54' + e164.slice(4) };
+      if (e164.startsWith('+54')) return { ok: true, e164 };
     }
   } catch { /* noop */ }
 
