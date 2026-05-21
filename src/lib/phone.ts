@@ -203,13 +203,13 @@ export function formatPhoneDisplay(input: string | null | undefined): string {
     return `+54 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
   }
 
-  // Reintento AR como móvil (legacy: ingresan crudo).
-  const rMobile = canonicalizePhoneAR(raw);
-  if (rMobile.ok) {
-    const rest = rMobile.e164.slice(4);
+  // Reintento AR (legacy: ingresan crudo). El canónico actual es +54 + 10.
+  const rAR = canonicalizePhoneAR(raw);
+  if (rAR.ok) {
+    const rest = rAR.e164.slice(3); // 10 dígitos tras "+54"
     const area = rest.slice(0, 2);
     const ab = rest.slice(2);
-    return `+54 9 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
+    return `+54 ${area} ${ab.slice(0, 4)}-${ab.slice(4)}`;
   }
 
   // Otros países: intentar parseo libre.
@@ -224,12 +224,16 @@ export function formatPhoneDisplay(input: string | null | undefined): string {
 
 
 /**
- * Número estilo WhatsApp: 549XXXXXXXXXX (sin '+').
+ * Número estilo WhatsApp para AR: `549XXXXXXXXXX` (sin `+`).
+ * El canónico de almacenamiento es `+54XXXXXXXXXX`, pero WhatsApp AR exige el
+ * `9` intermedio para móviles, así que lo reinyectamos acá.
  */
 export function buildWhatsAppNumber(e164: string | null | undefined): string | null {
   if (!e164) return null;
   const r = canonicalizePhoneAR(e164);
   if (!r.ok) return null;
+  // r.e164 = "+54" + 10 dígitos → WhatsApp AR = "549" + 10 dígitos
+  if (r.e164.startsWith('+54')) return '549' + r.e164.slice(3);
   return r.e164.replace(/^\+/, '');
 }
 
