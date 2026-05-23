@@ -26,6 +26,8 @@ import {
 import { format, parseISO, isAfter, isBefore } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 
 interface ClienteDetailDialogProps {
   clienteId: string | null;
@@ -75,6 +77,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
   const [instagram, setInstagram] = useState('');
   const [tiktok, setTiktok] = useState('');
@@ -88,6 +91,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     setNombre(c.nombre);
     setApellido(c.apellido);
     setTelefono(c.telefono ?? '');
+    setPhoneOut(null);
     setEmail(c.email ?? '');
     setInstagram(c.instagram ?? '');
     setTiktok(c.tiktok ?? '');
@@ -182,15 +186,18 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
     const a = apellido.trim();
     if (!n) { toast.error('El nombre es obligatorio'); return; }
     const e = email.trim();
-    const t = telefono.trim();
+    // Si el usuario editó el teléfono, usar phoneOut; si no tocó, mantener el valor actual.
+    const editedPhone = phoneOut !== null;
+    if (editedPhone && phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty') {
+      toast.error('Revisá el teléfono antes de guardar.');
+      return;
+    }
+    const t = editedPhone ? (phoneOut?.e164 ?? '') : telefono.trim();
     if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { toast.error('Email inválido'); return; }
-    await persist({
-      nombre: n,
-      apellido: a,
-      telefono: t || null,
-      email: e || null,
-    }, 'Datos de contacto actualizados');
+    const patch: ClienteUpdate = { nombre: n, apellido: a, email: e || null };
+    if (editedPhone) (patch as any).telefono = t || null;
+    await persist(patch, 'Datos de contacto actualizados');
   };
 
   const handleSaveRedes = () => persist({
@@ -372,7 +379,16 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Teléfono</Label>
-                      <Input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                      <PhoneInput
+                        value={phoneOut?.e164 ?? (telefono || null)}
+                        onChange={(o) => {
+                          setPhoneOut(o);
+                          setTelefono(o.e164 ?? '');
+                        }}
+                        defaultCountry="AR"
+                        allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+                        mode="mobile"
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Email</Label>
@@ -384,7 +400,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
                     <div className="flex justify-between gap-4">
                       <span className="text-muted-foreground">Teléfono</span>
                       <span className={cliente.telefono ? '' : 'text-muted-foreground italic'}>
-                        {cliente.telefono || 'Sin teléfono'}
+                        {cliente.telefono ? formatPhoneDisplay(cliente.telefono) : 'Sin teléfono'}
                       </span>
                     </div>
                     <div className="flex justify-between gap-4">

@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_phones_20260520: {
+        Row: {
+          backed_up_at: string | null
+          old_value: string | null
+          organization_id: string | null
+          record_id: string | null
+          src: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Relationships: []
+      }
+      _backup_phones_remove_ar9_20260520: {
+        Row: {
+          backed_up_at: string | null
+          column_name: string | null
+          new_value: string | null
+          old_value: string | null
+          organization_id: string | null
+          record_id: string | null
+          src: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          column_name?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          column_name?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string | null
+          record_id?: string | null
+          src?: string | null
+        }
+        Relationships: []
+      }
       access_logs: {
         Row: {
           accessed_at: string | null
@@ -3365,6 +3419,45 @@ export type Database = {
       }
     }
     Views: {
+      _phone_dups_report: {
+        Row: {
+          cantidad: number | null
+          cliente_ids: string[] | null
+          organization_id: string | null
+          telefono: string | null
+        }
+        Relationships: []
+      }
+      _phone_migration_report: {
+        Row: {
+          accion: string | null
+          motivo: string | null
+          organization_id: string | null
+          record_id: string | null
+          tabla: string | null
+          valor_canonico: string | null
+          valor_original: string | null
+        }
+        Insert: {
+          accion?: never
+          motivo?: never
+          organization_id?: string | null
+          record_id?: string | null
+          tabla?: string | null
+          valor_canonico?: never
+          valor_original?: string | null
+        }
+        Update: {
+          accion?: never
+          motivo?: never
+          organization_id?: string | null
+          record_id?: string | null
+          tabla?: string | null
+          valor_canonico?: never
+          valor_original?: string | null
+        }
+        Relationships: []
+      }
       barberos_safe: {
         Row: {
           activo: boolean | null
@@ -3422,6 +3515,7 @@ export type Database = {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
       }
+      _canon_phone_ar: { Args: { input: string }; Returns: string }
       _notif_actor_account_type: { Args: { _user: string }; Returns: string }
       _notif_actor_name: { Args: { _user: string }; Returns: string }
       _notif_emit: {

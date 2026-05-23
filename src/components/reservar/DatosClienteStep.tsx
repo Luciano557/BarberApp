@@ -44,12 +44,15 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
 
   const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const digits = lookupPhone.replace(/\D/g, "");
-    if (!digits || digits.length < 6) {
-      toast.error("Ingresá un teléfono válido");
+    const fullPhone = buildPhone(lookupCountryObj.dial, lookupPhone);
+    if (!fullPhone) {
+      toast.error(
+        lookupCountryObj.code === "AR"
+          ? "Teléfono inválido. Ejemplo: 11 2516-2528."
+          : "Ingresá un teléfono válido.",
+      );
       return;
     }
-    const fullPhone = buildPhone(lookupCountryObj.dial, digits);
     setLookupLoading(true);
     setNotFound(false);
     setMatched(null);
@@ -102,18 +105,24 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
     e.preventDefault();
     const n = nombre.trim();
     const a = apellido.trim();
-    const phoneDigits = phoneLocal.replace(/[\s-]/g, "").replace(/\D/g, "");
     const mail = email.trim();
 
     if (!n) return toast.error("Ingresá tu nombre");
     if (!a) return toast.error("Ingresá tu apellido");
-    if (!phoneDigits || phoneDigits.length < 6) return toast.error("Ingresá un teléfono válido");
+    const fullPhone = buildPhone(country.dial, phoneLocal);
+    if (!fullPhone) {
+      return toast.error(
+        country.code === "AR"
+          ? "Teléfono inválido. Ejemplo: 11 2516-2528."
+          : "Ingresá un teléfono válido.",
+      );
+    }
     if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return toast.error("Ingresá un email válido");
 
     onSubmit({
       nombre: n,
       apellido: a,
-      telefono: buildPhone(country.dial, phoneDigits),
+      telefono: fullPhone,
       phone_country: country.code,
       email: mail ? mail.toLowerCase() : null,
       birth_date: birthDate || null,

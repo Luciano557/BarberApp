@@ -5,6 +5,29 @@ import { useAuth, type AppRole } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { canonicalizePhoneAR, phoneErrorMessage } from '@/lib/phone';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
+
+/**
+ * Defensa final para `barberos.telefono`: vacío → NULL; válido → E.164;
+ * inválido → throw con mensaje legible. No depender solo de la UI.
+ * Acepta cualquier E.164 internacional (AR, UY, CL, CO, MX, ES, BR, ...).
+ */
+function safeBarberPhone(input: unknown): string | null {
+  const raw = (input ?? '').toString().trim();
+  if (!raw) return null;
+  // Si ya viene en E.164 válido (cualquier país), aceptar tal cual.
+  if (raw.startsWith('+')) {
+    try {
+      const pn = parsePhoneNumberFromString(raw);
+      if (pn && pn.isValid()) return pn.number;
+    } catch { /* noop */ }
+  }
+  // Fallback AR para entradas legacy (sin '+').
+  const r = canonicalizePhoneAR(raw);
+  if (r.ok) return r.e164;
+  throw new Error(phoneErrorMessage((r as { ok: false; reason: 'empty' | 'invalid' | 'foreign' | 'ambiguous_landline' }).reason));
+}
 
 // Helper: ejecuta una query y, si falla, anota la tabla en el error para diagnóstico.
 async function runQuery<T>(table: string, p: PromiseLike<{ data: T; error: any }>): Promise<T> {
@@ -659,7 +682,7 @@ export function useSupabaseData() {
         .insert({
           nombre: normalizedFirstName,
           apellido: normalizedLastName,
-          telefono: barber.phone || null,
+          telefono: safeBarberPhone(barber.phone),
           dni: barber.dni || null,
           comision: barber.commission,
           activo: barber.active,
@@ -692,7 +715,7 @@ export function useSupabaseData() {
       const dbUpdates: any = {};
       if (updates.firstName !== undefined) dbUpdates.nombre = updates.firstName.replace(/\s+/g, ' ').trim();
       if (updates.lastName !== undefined) dbUpdates.apellido = updates.lastName.replace(/\s+/g, ' ').trim();
-      if (updates.phone !== undefined) dbUpdates.telefono = updates.phone || null;
+      if (updates.phone !== undefined) dbUpdates.telefono = safeBarberPhone(updates.phone);
       if (updates.dni !== undefined) dbUpdates.dni = updates.dni || null;
       if (updates.commission !== undefined) dbUpdates.comision = updates.commission;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;

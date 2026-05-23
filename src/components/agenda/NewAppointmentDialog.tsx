@@ -14,6 +14,8 @@ import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
 import { Search, UserPlus, Zap, ArrowLeft, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { canonicalizePhoneAR, formatPhoneDisplay } from '@/lib/phone';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 
 interface NewAppointmentDialogProps {
   open: boolean;
@@ -63,6 +65,7 @@ export function NewAppointmentDialog({
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
 
   // common
@@ -88,7 +91,7 @@ export function NewAppointmentDialog({
     setMode('existing');
     setSelectedCliente(null);
     setQuery(''); setResults([]); setSearchOpen(false);
-    setNombre(''); setApellido(''); setTelefono(''); setEmail('');
+    setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail('');
     setServicioId(''); setNotas('');
   };
 
@@ -147,15 +150,18 @@ export function NewAppointmentDialog({
     return true;
   };
 
-  const validateClienteFields = () => {
-    if (!nombre.trim()) { toast.error('Ingresá el nombre'); return false; }
-    if (!apellido.trim()) { toast.error('Ingresá el apellido'); return false; }
-    if (!telefono.trim()) { toast.error('Ingresá el teléfono'); return false; }
+  const validateClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
+    if (!nombre.trim()) { toast.error('Ingresá el nombre'); return { ok: false, phoneCanonical: null }; }
+    if (!apellido.trim()) { toast.error('Ingresá el apellido'); return { ok: false, phoneCanonical: null }; }
+    if (!phoneOut?.e164 || !phoneOut.isValid) {
+      toast.error('Ingresá un teléfono válido. Ejemplo: 11 2516-2528.');
+      return { ok: false, phoneCanonical: null };
+    }
     if (email.trim() && !EMAIL_RE.test(email.trim())) {
       toast.error('Email inválido');
-      return false;
+      return { ok: false, phoneCanonical: null };
     }
-    return true;
+    return { ok: true, phoneCanonical: phoneOut.e164 };
   };
 
   const ensureRelacion = async (clienteId: string) => {
@@ -182,11 +188,14 @@ export function NewAppointmentDialog({
   const handleSubmit = async () => {
     const servicio = servicios.find(s => s.id === servicioId);
 
+    let telefonoCanonical: string | null = null;
     if (mode === 'existing') {
       if (!selectedCliente) { toast.error('Seleccioná un cliente'); return; }
       if (!validateCommon() || !servicio) return;
     } else {
-      if (!validateClienteFields()) return;
+      const v = validateClienteFields();
+      if (!v.ok) return;
+      telefonoCanonical = v.phoneCanonical;
       if (!validateCommon() || !servicio) return;
     }
 
@@ -210,7 +219,7 @@ export function NewAppointmentDialog({
           _nombre: nombre.trim(),
           _apellido: apellido.trim(),
           _sucursal_id: sucursalId,
-          _telefono: telefono.trim() || null,
+          _telefono: telefonoCanonical,
           _email: email.trim() || null,
           _instagram: null,
           _tiktok: null,
@@ -222,13 +231,13 @@ export function NewAppointmentDialog({
         if (rpcErr) throw rpcErr;
         clienteId = (rpcData as string) || null;
         snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        snapTelefono = telefono.trim() || null;
+        snapTelefono = telefonoCanonical;
         snapEmail = email.trim() || null;
       } else {
         // quick
         clienteId = null;
         snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        snapTelefono = telefono.trim() || null;
+        snapTelefono = telefonoCanonical;
         snapEmail = email.trim() || null;
       }
 
@@ -279,7 +288,7 @@ export function NewAppointmentDialog({
                   <span className="flex items-center gap-2 truncate">
                     <span className="truncate">{fullName(selectedCliente)}</span>
                     {selectedCliente.telefono && (
-                      <span className="text-xs text-muted-foreground truncate">· {selectedCliente.telefono}</span>
+                      <span className="text-xs text-muted-foreground truncate">· {formatPhoneDisplay(selectedCliente.telefono)}</span>
                     )}
                   </span>
                 ) : (
@@ -330,7 +339,7 @@ export function NewAppointmentDialog({
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate">{fullName(c)}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {[c.telefono, c.email].filter(Boolean).join(' · ') || '—'}
+                        {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '—'}
                       </div>
                     </div>
                     {!c.inSucursal && (
@@ -359,7 +368,7 @@ export function NewAppointmentDialog({
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => { setMode('existing'); setNombre(''); setApellido(''); setTelefono(''); setEmail(''); }}
+            onClick={() => { setMode('existing'); setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail(''); }}
           >
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
@@ -382,7 +391,14 @@ export function NewAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Teléfono *</Label>
-            <Input value={telefono} onChange={e => setTelefono(e.target.value)} maxLength={80} inputMode="tel" />
+            <PhoneInput
+              value={phoneOut?.e164 ?? null}
+              onChange={(o) => { setPhoneOut(o); setTelefono(o.e164 ?? ''); }}
+              defaultCountry="AR"
+              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+              mode="mobile"
+              required
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Email (opcional)</Label>

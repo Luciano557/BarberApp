@@ -3,6 +3,8 @@ import { Plus, Edit2, Save, X, PowerOff, Power, Lock, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { formatPhoneDisplay } from '@/lib/phone';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Barber } from '@/types/barbershop';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
@@ -78,6 +80,8 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
   }) => {
     const [localData, setLocalData] = useState(initialData);
     const [localCommissionError, setLocalCommissionError] = useState('');
+    const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
+    const phoneHasInvalidContent = !!phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty';
 
     const validateLocalCommission = (value: string): boolean => {
       const num = Number(value);
@@ -87,7 +91,8 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
     };
 
     const handleSubmit = () => {
-      if (!localData.firstName || !localData.lastName || !localData.phone) return;
+      if (!localData.firstName || !localData.lastName) return;
+      if (phoneHasInvalidContent) return;
       if (!validateLocalCommission(localData.commission)) return;
       onSave(localData);
     };
@@ -99,7 +104,15 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
           <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input placeholder="Teléfono *" value={localData.phone} onChange={(e) => setLocalData(prev => ({ ...prev, phone: e.target.value }))} autoComplete="off" />
+          <PhoneInput
+            value={localData.phone || null}
+            onChange={(o) => {
+              setLocalData(prev => ({ ...prev, phone: o.e164 ?? '' }));
+              setPhoneOut(o);
+            }}
+            defaultCountry="AR"
+            allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+          />
           <div>
             <Input type="text" inputMode="numeric" placeholder="Comisión % *" value={localData.commission}
               onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
@@ -115,7 +128,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
           <Button size="sm" onClick={handleSubmit} className="bg-success hover:bg-success/90"
-            disabled={!localData.firstName || !localData.lastName || !localData.phone || !!localCommissionError}>
+            disabled={!localData.firstName || !localData.lastName || phoneHasInvalidContent || !!localCommissionError}>
             <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
           </Button>
         </div>
@@ -158,7 +171,7 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
           </div>
           <div className="text-xs text-muted-foreground space-y-1">
             <p className="font-mono text-[10px] opacity-60">UID: {barber.uid}</p>
-            <p>📞 {barber.phone}</p>
+            {barber.phone && formatPhoneDisplay(barber.phone) && <p>Tel: {formatPhoneDisplay(barber.phone)}</p>}
             {barber.address && <p>📍 {barber.address}</p>}
             {barber.dni && <p>🪪 DNI: {barber.dni}</p>}
           </div>

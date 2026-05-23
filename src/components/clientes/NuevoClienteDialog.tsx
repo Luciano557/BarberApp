@@ -16,6 +16,7 @@ import { Loader2, ChevronDown, CalendarIcon, X } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 
 interface NuevoClienteDialogProps {
   open: boolean;
@@ -30,6 +31,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
   const [fechaNac, setFechaNac] = useState<string | null>(null);
   const [sucursalId, setSucursalId] = useState<string>('');
@@ -50,6 +52,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setNombre('');
       setApellido('');
       setTelefono('');
+      setPhoneOut(null);
       setEmail('');
       setFechaNac(null);
       setSucursalId(currentSucursal?.id ?? '');
@@ -68,10 +71,14 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const handleSubmit = async () => {
     const n = nombre.trim();
     const a = apellido.trim();
-    const t = telefono.trim();
+    const t = (phoneOut?.e164 ?? '').trim();
     const e = email.trim();
 
     if (!n) { toast.error('El nombre es obligatorio'); return; }
+    if (phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty') {
+      toast.error('Revisá el teléfono antes de guardar.');
+      return;
+    }
     if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
     if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       toast.error('Email inválido');
@@ -133,7 +140,17 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
 
           <div className="space-y-1.5">
             <Label htmlFor="telefono">Teléfono</Label>
-            <Input id="telefono" type="tel" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="11 5555 5555" />
+            <PhoneInput
+              id="telefono"
+              value={phoneOut?.e164 ?? null}
+              onChange={(o) => {
+                setPhoneOut(o);
+                setTelefono(o.e164 ?? '');
+              }}
+              defaultCountry="AR"
+              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+              mode="mobile"
+            />
           </div>
 
           <div className="space-y-1.5">

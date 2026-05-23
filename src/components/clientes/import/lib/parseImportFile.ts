@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import {
   normalizeName,
   normalizeText,
-  normalizePhone,
+  processImportPhone,
   normalizeEmail,
   normalizeDate,
   normalizeBoolean,
@@ -212,7 +212,7 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
     const apellido = normalizeName(get('apellido')) ?? '';
     const telRaw = String(get('telefono') ?? '').trim();
     const emailRaw = String(get('email') ?? '').trim();
-    const phoneKey = normalizePhone(telRaw);
+    const tel = processImportPhone(telRaw);
     const emailKey = normalizeEmail(emailRaw);
 
     const fechaNac = normalizeDate(get('fecha_nacimiento')) ?? '';
@@ -222,7 +222,7 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
       rowId: `r-${i}-${Math.random().toString(36).slice(2, 8)}`,
       nombre,
       apellido,
-      telefono: telRaw,
+      telefono: tel.display ?? telRaw,
       email: emailRaw,
       fecha_nacimiento: fechaNac,
       fecha_cliente_desde: fechaDesde,
@@ -234,13 +234,23 @@ export async function parseImportFile(file: File): Promise<ParseResult> {
       acepta_marketing: normalizeBoolean(get('acepta_marketing'), true),
       errors: [],
       warnings: [],
-      phoneKey,
+      phoneKey: tel.dedupKey,
       emailKey,
       duplicateGroupId: null,
       discarded: false,
     };
 
     validateRow(row, get);
+    if (tel.needsReview) {
+      const msg = tel.reason === 'foreign'
+        ? 'Teléfono extranjero — se conserva sin convertir'
+        : 'Posible fijo — revisar manualmente';
+      if (!row.warnings.includes(msg)) row.warnings.push(msg);
+    } else if (telRaw && !tel.display) {
+      if (!row.warnings.includes('Teléfono inválido — no se guardará')) {
+        row.warnings.push('Teléfono inválido — no se guardará');
+      }
+    }
     return row;
   });
 
@@ -277,8 +287,14 @@ export function validateRow(row: PreviewRow, originalGet?: (f: string) => unknow
     row.errors.push('Falta teléfono o email');
   }
 
-  // Recompute duplicate keys after edits
-  row.phoneKey = normalizePhone(row.telefono);
+  // Recompute duplicate keys after edits (re-canonicalize si el usuario editó el teléfono)
+  if (row.telefono && row.telefono.trim()) {
+    const tel = processImportPhone(row.telefono);
+    if (tel.display) row.telefono = tel.display;
+    row.phoneKey = tel.dedupKey;
+  } else {
+    row.phoneKey = null;
+  }
   row.emailKey = normalizeEmail(row.email);
 
   // Sticky: once a row had errors, mark it for the session.
