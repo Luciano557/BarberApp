@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, Save } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Save, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -21,6 +22,16 @@ interface ConfigData {
   anticipacion_minima_reserva_min: number;
 }
 
+type FieldKey = keyof ConfigData;
+
+type FieldDef = {
+  key: FieldKey;
+  label: string;
+  description: string;
+  options: Array<{ label: string; value: number }>;
+  customSuffix: string;
+};
+
 const DEFAULTS: ConfigData = {
   duracion_base_min: 15,
   buffer_despues_min: 5,
@@ -30,10 +41,104 @@ const DEFAULTS: ConfigData = {
   anticipacion_minima_reserva_min: 30,
 };
 
+const CUSTOM_KEY = '__custom__';
+
+const REGLAS_FIELDS: FieldDef[] = [
+  {
+    key: 'duracion_base_min',
+    label: 'Duración mínima de servicio',
+    description: 'Tiempo mínimo que cualquier servicio bloquea en la agenda.',
+    options: [
+      { label: '15 min', value: 15 },
+      { label: '20 min', value: 20 },
+      { label: '30 min', value: 30 },
+      { label: '45 min', value: 45 },
+      { label: '60 min', value: 60 },
+    ],
+    customSuffix: 'min',
+  },
+  {
+    key: 'buffer_despues_min',
+    label: 'Tiempo de espera',
+    description: 'Tiempo libre después de cada turno.',
+    options: [
+      { label: 'Sin espera', value: 0 },
+      { label: '5 min', value: 5 },
+      { label: '10 min', value: 10 },
+      { label: '15 min', value: 15 },
+      { label: '20 min', value: 20 },
+      { label: '30 min', value: 30 },
+    ],
+    customSuffix: 'min',
+  },
+  {
+    key: 'anticipacion_minima_reserva_min',
+    label: 'Anticipación mínima',
+    description: 'Tiempo mínimo entre ahora y el primer turno disponible.',
+    options: [
+      { label: 'Sin anticipacion', value: 0 },
+      { label: '15 min', value: 15 },
+      { label: '30 min', value: 30 },
+      { label: '1 h', value: 60 },
+      { label: '2 h', value: 120 },
+      { label: '4 h', value: 240 },
+      { label: '24 h', value: 1440 },
+    ],
+    customSuffix: 'min',
+  },
+  {
+    key: 'dias_anticipacion',
+    label: 'Días de anticipación',
+    description: 'Cuántos días hacia adelante se puede reservar.',
+    options: [
+      { label: '7 dias', value: 7 },
+      { label: '14 dias', value: 14 },
+      { label: '30 dias', value: 30 },
+      { label: '60 dias', value: 60 },
+      { label: '90 dias', value: 90 },
+    ],
+    customSuffix: 'dias',
+  },
+];
+
+const LIMITES_FIELDS: FieldDef[] = [
+  {
+    key: 'cancelacion_limite_hs',
+    label: 'Límite cancelación',
+    description: 'Horas mínimas de anticipación para cancelar.',
+    options: [
+      { label: '15 min', value: 0.25 },
+      { label: '30 min', value: 0.5 },
+      { label: '1 h', value: 1 },
+      { label: '2 h', value: 2 },
+      { label: '4 h', value: 4 },
+      { label: '24 h', value: 24 },
+    ],
+    customSuffix: 'h',
+  },
+  {
+    key: 'modificacion_limite_hs',
+    label: 'Límite reprogramación',
+    description: 'Horas mínimas de anticipación para reprogramar.',
+    options: [
+      { label: '15 min', value: 0.25 },
+      { label: '30 min', value: 0.5 },
+      { label: '1 h', value: 1 },
+      { label: '2 h', value: 2 },
+      { label: '4 h', value: 4 },
+      { label: '24 h', value: 24 },
+    ],
+    customSuffix: 'h',
+  },
+];
+
 export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfigSectionProps) {
   const [config, setConfig] = useState<ConfigData>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [customMode, setCustomMode] = useState<Partial<Record<FieldKey, boolean>>>({});
+  const [customDraft, setCustomDraft] = useState<Partial<Record<FieldKey, string>>>({});
+  const [customError, setCustomError] = useState<Partial<Record<FieldKey, string>>>({});
 
   const fetchConfig = useCallback(async () => {
     const { data } = await supabase
@@ -41,6 +146,7 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
       .select('*')
       .eq('sucursal_id', sucursalId)
       .maybeSingle();
+
     if (data) {
       setConfig({
         duracion_base_min: data.duracion_base_min,
@@ -54,22 +160,26 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
     setLoading(false);
   }, [sucursalId]);
 
-  useEffect(() => { fetchConfig(); }, [fetchConfig]);
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   const handleSave = async () => {
     setSaving(true);
     const { error } = await supabase
       .from('agenda_config')
-      .upsert({
-        sucursal_id: sucursalId,
-        organization_id: organizationId,
-        ...config,
-        buffer_antes_min: 0,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'sucursal_id' });
+      .upsert(
+        {
+          sucursal_id: sucursalId,
+          organization_id: organizationId,
+          ...config,
+          buffer_antes_min: 0,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'sucursal_id' },
+      );
 
     if (error) {
-      // If unique constraint doesn't exist on sucursal_id, try insert/update pattern
       const { data: existing } = await supabase
         .from('agenda_config')
         .select('id')
@@ -81,63 +191,138 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
           .from('agenda_config')
           .update({ ...config, updated_at: new Date().toISOString() })
           .eq('id', existing.id);
-        if (updateErr) { toast.error('Error al guardar configuración'); setSaving(false); return; }
+        if (updateErr) {
+          toast.error('Error al guardar configuracion');
+          setSaving(false);
+          return;
+        }
       } else {
         const { error: insertErr } = await supabase
           .from('agenda_config')
           .insert({ sucursal_id: sucursalId, organization_id: organizationId, ...config });
-        if (insertErr) { toast.error('Error al guardar configuración'); setSaving(false); return; }
+        if (insertErr) {
+          toast.error('Error al guardar configuracion');
+          setSaving(false);
+          return;
+        }
       }
     }
 
-    toast.success('Configuración guardada');
+    toast.success('Configuracion guardada');
     setSaving(false);
   };
 
-  const updateField = (field: keyof ConfigData, value: string) => {
-    const num = parseInt(value) || 0;
-    setConfig(prev => ({ ...prev, [field]: Math.max(0, num) }));
+  const updateField = (field: FieldKey, value: number) => {
+    setConfig((prev) => ({ ...prev, [field]: value < 0 ? 0 : value }));
   };
 
-  if (loading) return <div className="text-sm text-muted-foreground py-4">Cargando configuración...</div>;
+  const formatCustomValue = (field: FieldDef, value: number) => `${value} ${field.customSuffix}`;
 
-  type FieldDef = { key: keyof ConfigData; label: string; suffix: string; description: string };
+  const renderField = (field: FieldDef) => {
+    const currentValue = config[field.key];
+    const selectedOption = field.options.find((option) => option.value === currentValue);
+    const isCustom = customMode[field.key] ?? !selectedOption;
+    const selectValue = isCustom ? CUSTOM_KEY : String(selectedOption?.value ?? currentValue);
+    const draftValue = customDraft[field.key] ?? String(currentValue);
+    const errorText = customError[field.key] ?? '';
 
-  const reglas: FieldDef[] = [
-    { key: 'duracion_base_min', label: 'Duración base', suffix: 'min', description: 'Unidad mínima de tiempo para turnos' },
-    { key: 'buffer_despues_min', label: 'Tiempo de espera', suffix: 'min', description: 'Tiempo libre después de cada turno' },
-    { key: 'anticipacion_minima_reserva_min', label: 'Anticipación mínima', suffix: 'min', description: 'Tiempo mínimo entre ahora y el primer turno disponible' },
-    { key: 'dias_anticipacion', label: 'Días de anticipación', suffix: 'días', description: 'Cuántos días hacia adelante se puede reservar' },
-  ];
+    return (
+      <div key={field.key} className="space-y-2">
+        <Label className="text-xs font-medium">{field.label}</Label>
+        <Select
+          value={selectValue}
+          onValueChange={(value) => {
+            if (value === CUSTOM_KEY) {
+              setCustomMode((prev) => ({ ...prev, [field.key]: true }));
+              setCustomDraft((prev) => ({ ...prev, [field.key]: String(config[field.key]) }));
+              setCustomError((prev) => ({ ...prev, [field.key]: '' }));
+              return;
+            }
 
-  const limites: FieldDef[] = [
-    { key: 'cancelacion_limite_hs', label: 'Límite cancelación', suffix: 'hs', description: 'Horas mínimas de anticipación para cancelar' },
-    { key: 'modificacion_limite_hs', label: 'Límite reprogramación', suffix: 'hs', description: 'Horas mínimas de anticipación para reprogramar' },
-  ];
+            setCustomMode((prev) => ({ ...prev, [field.key]: false }));
+            setCustomError((prev) => ({ ...prev, [field.key]: '' }));
+            updateField(field.key, Number(value));
+          }}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {field.options.map((option) => (
+              <SelectItem key={`${field.key}-${option.value}`} value={String(option.value)}>
+                {option.label}
+              </SelectItem>
+            ))}
+            <SelectItem value={CUSTOM_KEY}>Personalizado</SelectItem>
+          </SelectContent>
+        </Select>
 
-  const renderField = (f: FieldDef) => (
-    <div key={f.key} className="space-y-1.5">
-      <Label className="text-xs font-medium">{f.label}</Label>
-      <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          value={config[f.key]}
-          onChange={e => updateField(f.key, e.target.value)}
-          className="w-24 h-8 text-sm"
-        />
-        <span className="text-xs text-muted-foreground">{f.suffix}</span>
+        {isCustom && (
+          <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 p-2">
+            <div className="flex items-center gap-2">
+              <Input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="h-8 w-24 text-sm"
+                value={draftValue}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw !== '' && !/^\d+$/.test(raw)) return;
+
+                  setCustomDraft((prev) => ({ ...prev, [field.key]: raw }));
+
+                  if (raw === '') {
+                    setCustomError((prev) => ({ ...prev, [field.key]: '' }));
+                    return;
+                  }
+
+                  const parsed = Number(raw);
+                  if (parsed > 120) {
+                    setCustomError((prev) => ({ ...prev, [field.key]: 'El valor máximo permitido es 120.' }));
+                    updateField(field.key, 120);
+                    return;
+                  }
+
+                  setCustomError((prev) => ({ ...prev, [field.key]: '' }));
+                  updateField(field.key, parsed);
+                }}
+                onBlur={() => {
+                  const raw = customDraft[field.key] ?? '';
+                  const parsed = raw === '' ? 0 : Number(raw);
+                  const normalized = Math.min(120, Math.max(0, Math.trunc(Number.isNaN(parsed) ? 0 : parsed)));
+                  setCustomDraft((prev) => ({ ...prev, [field.key]: String(normalized) }));
+                  setCustomError((prev) => ({
+                    ...prev,
+                    [field.key]: parsed > 120 ? 'El valor máximo permitido es 120.' : '',
+                  }));
+                  updateField(field.key, normalized);
+                }}
+              />
+              <span className="text-xs text-muted-foreground">{field.customSuffix}</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Ingresá un valor entre 0 y 120.</p>
+            {errorText && <p className="text-[11px] text-destructive">{errorText}</p>}
+          </div>
+        )}
+
+        <p className="text-[11px] text-muted-foreground">{field.description}</p>
+        {!selectedOption && (
+          <p className="text-[11px] text-foreground/80">
+            Personalizado actual: <span className="font-medium">{formatCustomValue(field, currentValue)}</span>
+          </p>
+        )}
       </div>
-      <p className="text-[11px] text-muted-foreground">{f.description}</p>
-    </div>
-  );
+    );
+  };
+
+  if (loading) return <div className="py-4 text-sm text-muted-foreground">Cargando configuración...</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Settings className="w-4 h-4 text-primary" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+          <Settings className="h-4 w-4 text-primary" />
         </div>
         <div>
           <h2 className="text-sm font-semibold">Configuración general</h2>
@@ -145,15 +330,13 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Reglas de reserva</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {reglas.map(renderField)}
-            </div>
+            <div className="grid grid-cols-1 gap-4">{REGLAS_FIELDS.map(renderField)}</div>
           </CardContent>
         </Card>
 
@@ -162,16 +345,14 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
             <CardTitle className="text-sm">Límites y cancelaciones</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {limites.map(renderField)}
-            </div>
+            <div className="grid grid-cols-1 gap-4">{LIMITES_FIELDS.map(renderField)}</div>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex justify-end">
         <Button size="sm" onClick={handleSave} disabled={saving}>
-          <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
+          <Save className="mr-1 h-4 w-4" /> {saving ? 'Guardando...' : 'Guardar'}
         </Button>
       </div>
     </div>

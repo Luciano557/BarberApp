@@ -1242,10 +1242,10 @@ export function useSupabaseData() {
     }
   }, [softDelete]);
 
-  // Descuentos disponibles para Cobrar (compat: filtran por active operativo)
-  const activeDiscounts = discounts.filter(d => d.active);
-  const serviceDiscounts = activeDiscounts.filter(d => d.appliesTo === 'servicios');
-  const productDiscounts = activeDiscounts.filter(d => d.appliesTo === 'productos');
+  // Descuentos disponibles para Cobrar: solo estado operativo activo normalizado en dbToDiscount.
+  const cobrarDiscounts = discounts.filter(d => d.active === true);
+  const serviceDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'servicios');
+  const productDiscounts = cobrarDiscounts.filter(d => d.appliesTo === 'productos');
 
   return {
     isLoading,
@@ -1258,6 +1258,7 @@ export function useSupabaseData() {
     barbers: barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
+    cobrarDiscounts,
     serviceDiscounts,
     productDiscounts,
     lines: lines.filter(l => l.active),
