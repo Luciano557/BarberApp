@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { perfStart, perfEvent, withTimeout, isTimeoutError } from '@/lib/perfLog';
+
+const PROFILE_ROLES_TIMEOUT_MS = 12000;
+
 
 export type AppRole = 'owner' | 'general_manager' | 'manager' | 'barber' | 'sucursal_account' | 'otros';
 
