@@ -11,12 +11,27 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { user, roles, isLoading, mustChangePassword, signOut } = useAuth();
+  const { user, roles, isLoading, authError, mustChangePassword, signOut, refreshProfile } = useAuth();
   const { organization, isLoading: orgLoading, error: orgError, refreshOrganization } = useOrganization();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
 
-  // 1. Mientras realmente se está inicializando, mostrar loader con fallback progresivo.
+  // 1a. Error explícito cargando perfil/roles → no esperar 90s, mostrar pantalla recuperable.
+  if (user && authError && !isLoading) {
+    return (
+      <RecoverableErrorScreen
+        title="Tu sesión se inició, pero no pudimos cargar tu perfil"
+        description={authError}
+        onRetry={() => refreshProfile()}
+        onSignOut={async () => {
+          await signOut();
+          window.location.href = '/login';
+        }}
+      />
+    );
+  }
+
+  // 1b. Mientras realmente se está inicializando, mostrar loader con fallback progresivo.
   if (isLoading || orgLoading) {
     return (
       <LoadingScreen
@@ -46,7 +61,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   if (!organization && orgError) {
     return (
       <RecoverableErrorScreen
-        title="No pudimos cargar tu cuenta"
+        title="Tu sesión se inició, pero no pudimos cargar los datos de tu organización"
         description={orgError}
         onRetry={() => refreshOrganization()}
         onSignOut={async () => {
@@ -56,6 +71,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
       />
     );
   }
+
 
   // 6. Validar slug en URL.
   if (orgSlug && organization && orgSlug !== organization.slug) {
