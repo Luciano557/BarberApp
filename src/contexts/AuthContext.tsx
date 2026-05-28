@@ -21,6 +21,8 @@ interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   isLoading: boolean;
+  /** Error explícito si falla la hidratación (profile/roles). Null si no hay error. */
+  authError: string | null;
   isOwner: boolean;
   isGeneralManager: boolean;
   isManager: boolean;
@@ -46,6 +48,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
