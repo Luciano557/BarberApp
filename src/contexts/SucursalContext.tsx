@@ -149,7 +149,9 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
         currentSucursal,
         isAllMode,
         isLoading: isLoading || authLoading || orgLoading,
+        error,
         setCurrentSucursal,
+
         refreshSucursales: fetchSucursales,
       }}
     >
