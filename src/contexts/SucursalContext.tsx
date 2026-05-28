@@ -2,6 +2,10 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
 import { useOrganization } from './OrganizationContext';
+import { perfStart, withTimeout, isTimeoutError } from '@/lib/perfLog';
+
+const SUCURSALES_TIMEOUT_MS = 12000;
+
 
 export interface Sucursal {
   id: string;
