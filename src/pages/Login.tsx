@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { perfEvent } from '@/lib/perfLog';
 
 const PLANS = [
   { id: 'basico',      label: 'Básico',      price: '$30.000'  },
@@ -15,6 +17,7 @@ const PLANS = [
 type PlanId = typeof PLANS[number]['id'];
 import { supabase } from '@/integrations/supabase/client';
 import { COUNTRIES } from '@/lib/dateUtils';
+
 
 export default function Login() {
   const navigate = useNavigate();
