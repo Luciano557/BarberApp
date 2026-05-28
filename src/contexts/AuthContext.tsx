@@ -195,9 +195,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    const perf = perfStart('signIn');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) perf.error(error); else perf.success();
     return { error };
   };
+
 
   const signUp = async (email: string, password: string, fullName: string, businessName?: string, country?: string, plan?: string) => {
     const { error } = await supabase.auth.signUp({
