@@ -263,6 +263,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         roles,
         isLoading,
+        authError,
+
         isOwner,
         isGeneralManager,
         isManager,
