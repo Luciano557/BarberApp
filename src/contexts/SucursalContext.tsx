@@ -22,9 +22,11 @@ interface SucursalContextType {
   currentSucursal: Sucursal | null; // null = "Todas" (only for owner)
   isAllMode: boolean;
   isLoading: boolean;
+  error: string | null;
   setCurrentSucursal: (id: string | null) => void;
   refreshSucursales: () => Promise<void>;
 }
+
 
 const SucursalContext = createContext<SucursalContextType | undefined>(undefined);
 
