@@ -36,30 +36,50 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [currentSucursal, setCurrentSucursalState] = useState<Sucursal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSucursales = useCallback(async () => {
     if (!user || !organization) {
       setSucursales([]);
       setCurrentSucursalState(null);
+      setError(null);
       setIsLoading(false);
       return;
     }
 
+    setError(null);
+    const perf = perfStart('sucursales');
+
     try {
-      const { data, error } = await supabase
-        .from('sucursales')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .eq('activa', true)
-        .order('nombre');
+      const loader = (async () => {
+        const sucRes = await supabase
+          .from('sucursales')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .eq('activa', true)
+          .order('nombre');
+        if (sucRes.error) throw sucRes.error;
 
-      if (error) {
-        console.error('Error fetching sucursales:', error);
-        setIsLoading(false);
-        return;
-      }
+        const profRes = await supabase
+          .from('profiles')
+          .select('default_sucursal_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        // No tirar error si el profile no devuelve nada; default_sucursal_id es opcional.
 
-      const mapped: Sucursal[] = (data || []).map(s => ({
+        return {
+          sucursales: sucRes.data ?? [],
+          defaultId: profRes.data?.default_sucursal_id ?? null,
+        };
+      })();
+
+      const { sucursales: data, defaultId } = await withTimeout(
+        loader,
+        SUCURSALES_TIMEOUT_MS,
+        'fetchSucursales',
+      );
+
+      const mapped: Sucursal[] = data.map(s => ({
         id: s.id,
         organization_id: s.organization_id,
         nombre: s.nombre,
@@ -71,32 +91,23 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
 
       setSucursales(mapped);
 
-      // Set default sucursal
       if (mapped.length > 0 && !currentSucursal) {
-        // Try to use the profile's default_sucursal_id
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('default_sucursal_id')
-          .eq('id', user.id)
-          .single();
-
-        const defaultId = profileData?.default_sucursal_id;
         const defaultSuc = mapped.find(s => s.id === defaultId);
-
-        if (isOwner || isGeneralManager) {
-          // Owners and GMs default to their saved preference or first sucursal
-          setCurrentSucursalState(defaultSuc || mapped[0]);
-        } else {
-          // Non-owners always get their assigned sucursal
-          setCurrentSucursalState(defaultSuc || mapped[0]);
-        }
+        setCurrentSucursalState(defaultSuc || mapped[0]);
       }
-    } catch (error) {
-      console.error('Error in fetchSucursales:', error);
+      perf.success({ count: mapped.length });
+    } catch (err) {
+      if (isTimeoutError(err)) perf.timeout(); else perf.error(err);
+      setError(
+        isTimeoutError(err)
+          ? 'La carga de sucursales está tardando demasiado. Probá reintentar.'
+          : 'No pudimos cargar tus sucursales.',
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [user, organization, isOwner, isGeneralManager]);
+  }, [user, organization, currentSucursal]);
+
 
   useEffect(() => {
     if (!authLoading && !orgLoading) {
