@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Scissors, Lock, Loader2 } from 'lucide-react';
 import { PaymentRegistration } from '@/components/PaymentRegistration';
 import { ConfigurationPanel } from '@/components/ConfigurationPanel';
@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 import { OnboardingOverlay } from '@/components/onboarding/OnboardingOverlay';
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
@@ -24,6 +25,7 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 const Index = () => {
   const isMobile = useIsMobile();
   const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { organization } = useOrganization();
   const onboarding = useOnboarding();
 
   const rolesLoaded = roles.length > 0;
@@ -38,6 +40,7 @@ const Index = () => {
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
   const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
+  const prevActiveTabRef = useRef(activeTab);
 
   // Register tab setter so onboarding can drive navigation
   useEffect(() => {
@@ -106,11 +109,33 @@ const Index = () => {
     barbers,
     allBarbers,
     discounts,
+    cobrarDiscounts,
     lines,
   } = useSupabaseData();
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
   const { currentSucursal } = useSucursal();
+
+  const goToTeamSetup = useCallback(() => {
+    if (organization?.id && currentSucursal?.id) {
+      const storageKey = `vittro:miNegocio:activeTab:${organization.id}`;
+      try {
+        localStorage.setItem(storageKey, currentSucursal.id);
+      } catch {
+        // Ignore storage errors.
+      }
+    }
+    setActiveTab('mi-negocio');
+  }, [organization?.id, currentSucursal?.id]);
+
+  // Refresca datos solo cuando se entra a Cobrar desde otra pestaña.
+  useEffect(() => {
+    const prevTab = prevActiveTabRef.current;
+    if (prevTab !== 'registro' && activeTab === 'registro') {
+      void refetchData();
+    }
+    prevActiveTabRef.current = activeTab;
+  }, [activeTab, refetchData]);
 
   const summary = getDailySummary();
 
@@ -146,11 +171,12 @@ const Index = () => {
               services={services}
               extras={extras}
               barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
-              discounts={discounts.filter(d => d.active)}
+              discounts={cobrarDiscounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
+              onNavigateToTeamSetup={goToTeamSetup}
             />
           )}
 
