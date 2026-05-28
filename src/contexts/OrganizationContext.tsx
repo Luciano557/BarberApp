@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
+import { perfStart, withTimeout, isTimeoutError } from '@/lib/perfLog';
+
+const ORGANIZATION_TIMEOUT_MS = 12000;
+
 
 interface Organization {
   id: string;
