@@ -58,66 +58,75 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(true);
-    console.info('[Org] phase=fetch:start');
+    const perf = perfStart('organization');
 
     try {
-      // 1. Resolver organization_id de forma determinística desde el profile.
-      const { data: profileRow, error: profileErr } = await supabase
-        .from('profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .maybeSingle();
+      const loader = (async () => {
+        // 1. Resolver organization_id desde el profile.
+        const { data: profileRow, error: profileErr } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (profileErr) throw profileErr;
 
-      if (profileErr) throw profileErr;
+        const orgId = profileRow?.organization_id;
+        if (!orgId) return { org: null as Organization | null, noOrg: true };
 
-      const orgId = profileRow?.organization_id;
-      if (!orgId) {
+        // 2. Cargar organización por id explícito.
+        const { data: orgData, error: orgErr } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', orgId)
+          .maybeSingle();
+        if (orgErr) throw orgErr;
+        return { org: (orgData as Organization | null) ?? null, noOrg: false };
+      })();
+
+      const { org, noOrg } = await withTimeout(loader, ORGANIZATION_TIMEOUT_MS, 'fetchOrganization');
+
+      if (noOrg) {
         setOrganization(null);
         setPlanFeatures(null);
         setError('Tu cuenta no tiene una organización asignada.');
-        console.info('[Org] phase=fetch:no-org');
+        perf.success({ result: 'no-org' });
         return;
       }
-
-      // 2. Cargar organización por id explícito.
-      const { data: orgData, error: orgErr } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', orgId)
-        .maybeSingle();
-
-      if (orgErr) throw orgErr;
-      if (!orgData) {
+      if (!org) {
         setOrganization(null);
         setPlanFeatures(null);
         setError('No pudimos cargar tu organización.');
+        perf.success({ result: 'empty' });
         return;
       }
 
-      setOrganization(orgData as Organization);
+      setOrganization(org);
+      perf.success({ result: 'ok' });
 
-      // 3. Plan features: si falla, no rompe el flujo principal.
-      try {
-        const { data: featuresData } = await supabase
-          .from('plan_features')
-          .select('*')
-          .eq('plan', (orgData as Organization).plan)
-          .maybeSingle();
-        if (featuresData) setPlanFeatures(featuresData as PlanFeatures);
-      } catch (planErr) {
-        console.warn('[Org] phase=plan_features:error', planErr);
-      }
-
-      console.info('[Org] phase=fetch:success');
+      // 3. Plan features en background: nunca bloquea ni rompe el flujo.
+      supabase
+        .from('plan_features')
+        .select('*')
+        .eq('plan', org.plan)
+        .maybeSingle()
+        .then(({ data: featuresData }) => {
+          if (featuresData) setPlanFeatures(featuresData as PlanFeatures);
+        })
+        .catch(planErr => console.warn('[Org] plan_features:error', planErr));
     } catch (err) {
-      console.error('[Org] phase=fetch:error', err);
+      if (isTimeoutError(err)) perf.timeout(); else perf.error(err);
       setOrganization(null);
       setPlanFeatures(null);
-      setError('No pudimos cargar tu organización. Reintentá en unos segundos.');
+      setError(
+        isTimeoutError(err)
+          ? 'La carga de tu organización está tardando demasiado. Probá reintentar.'
+          : 'No pudimos cargar tu organización. Reintentá en unos segundos.',
+      );
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const refreshOrganization = async () => {
     await fetchOrganization();
