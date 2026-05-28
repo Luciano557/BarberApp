@@ -104,15 +104,19 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       perf.success({ result: 'ok' });
 
       // 3. Plan features en background: nunca bloquea ni rompe el flujo.
-      supabase
-        .from('plan_features')
-        .select('*')
-        .eq('plan', org.plan)
-        .maybeSingle()
-        .then(({ data: featuresData }) => {
+      (async () => {
+        try {
+          const { data: featuresData } = await supabase
+            .from('plan_features')
+            .select('*')
+            .eq('plan', org.plan)
+            .maybeSingle();
           if (featuresData) setPlanFeatures(featuresData as PlanFeatures);
-        })
-        .catch(planErr => console.warn('[Org] plan_features:error', planErr));
+        } catch (planErr) {
+          console.warn('[Org] plan_features:error', planErr);
+        }
+      })();
+
     } catch (err) {
       if (isTimeoutError(err)) perf.timeout(); else perf.error(err);
       setOrganization(null);
