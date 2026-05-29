@@ -1,6 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { perfStart, perfEvent, withTimeout, isTimeoutError } from '@/lib/perfLog';
+
+const PROFILE_ROLES_TIMEOUT_MS = 12000;
+
 
 export type AppRole = 'owner' | 'general_manager' | 'manager' | 'barber' | 'sucursal_account' | 'otros';
 
@@ -17,6 +21,8 @@ interface AuthContextType {
   profile: Profile | null;
   roles: AppRole[];
   isLoading: boolean;
+  /** Error explícito si falla la hidratación (profile/roles). Null si no hay error. */
+  authError: string | null;
   isOwner: boolean;
   isGeneralManager: boolean;
   isManager: boolean;
@@ -43,6 +49,7 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
 }
 
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -51,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Race-guard: tracks the user.id whose hydration is in flight so duplicate
   // events for the same session don't pile up and pisar estados.
@@ -81,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setProfile(null);
       setRoles([]);
+      setAuthError(null);
       setIsLoading(false);
       console.info('[Auth] phase=hydrate:cleared');
       return;
@@ -104,29 +113,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hydratingForRef.current = nextUserId;
     setSession(nextSession);
     setUser(nextSession.user);
-    console.info('[Auth] phase=hydrate:start');
+    setAuthError(null);
+    const perf = perfStart('profileRoles');
 
     try {
-      const { profile: nextProfile, roles: nextRoles } = await fetchProfileAndRoles(nextUserId);
+      const { profile: nextProfile, roles: nextRoles } = await withTimeout(
+        fetchProfileAndRoles(nextUserId),
+        PROFILE_ROLES_TIMEOUT_MS,
+        'fetchProfileAndRoles',
+      );
+      perf.success({ rolesCount: nextRoles.length });
       // Only commit if still the active hydration target (avoid stale writes after fast switch).
       if (hydratingForRef.current === nextUserId) {
         setProfile(nextProfile);
         setRoles(nextRoles);
+        setAuthError(null);
         hydratedForRef.current = nextUserId;
-        console.info('[Auth] phase=hydrate:success');
       }
     } catch (err) {
-      console.error('[Auth] phase=hydrate:error', err);
+      if (isTimeoutError(err)) perf.timeout(); else perf.error(err);
       if (hydratingForRef.current === nextUserId) {
         // Keep user/session, clear derived data to avoid false permissions.
         setProfile(null);
         setRoles([]);
         hydratedForRef.current = null;
+        setAuthError(
+          isTimeoutError(err)
+            ? 'No pudimos cargar tu perfil. La conexión está tardando demasiado.'
+            : 'No pudimos cargar tu perfil y permisos. Reintentá en unos segundos.',
+        );
       }
     } finally {
-      if (hydratingForRef.current === nextUserId) {
-        hydratingForRef.current = null;
-      }
+      // Liberar SIEMPRE el ref, no solo cuando coincide con el target activo.
+      // Evita que un hydrate colgado bloquee futuros eventos de auth.
+      hydratingForRef.current = null;
       setIsLoading(false);
     }
   };
@@ -135,9 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       // Force rehydrate by clearing the cache key.
       hydratedForRef.current = null;
+      hydratingForRef.current = null;
+      setIsLoading(true);
       await hydrateSession(session);
     }
   };
+
 
   useEffect(() => {
     // Listener FIRST (Supabase recommendation). Defer with setTimeout(0) to avoid
@@ -172,9 +195,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    const perf = perfStart('signIn');
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) perf.error(error); else perf.success();
     return { error };
   };
+
 
   const signUp = async (email: string, password: string, fullName: string, businessName?: string, country?: string, plan?: string) => {
     const { error } = await supabase.auth.signUp({
@@ -237,6 +263,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         roles,
         isLoading,
+        authError,
+
         isOwner,
         isGeneralManager,
         isManager,
