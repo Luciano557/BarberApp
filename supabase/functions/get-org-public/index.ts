@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
         .select("id, nombre, apellido, sucursal_id")
         .eq("organization_id", org.id)
         .eq("activo", true)
-        .eq("rol_equipo", "barbero")
+        .contains("roles_equipo", ["barber"])
         .not("sucursal_id", "is", null),
       supabase
         .from("servicios_sucursales")
