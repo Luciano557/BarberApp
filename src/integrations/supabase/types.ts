@@ -2674,6 +2674,7 @@ export type Database = {
           tipo: string
           titulo: string
           updated_at: string
+          vencida_at: string | null
           vencimiento_dias: number | null
         }
         Insert: {
@@ -2708,6 +2709,7 @@ export type Database = {
           tipo?: string
           titulo: string
           updated_at?: string
+          vencida_at?: string | null
           vencimiento_dias?: number | null
         }
         Update: {
@@ -2742,6 +2744,7 @@ export type Database = {
           tipo?: string
           titulo?: string
           updated_at?: string
+          vencida_at?: string | null
           vencimiento_dias?: number | null
         }
         Relationships: [
@@ -3576,6 +3579,7 @@ export type Database = {
         Returns: undefined
       }
       org_has_any_pin: { Args: never; Returns: boolean }
+      process_vencimientos_tareas: { Args: never; Returns: number }
       registrar_movimiento_stock: {
         Args: {
           _cantidad: number
