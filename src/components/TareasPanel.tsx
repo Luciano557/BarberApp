@@ -254,7 +254,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                   <RefreshCw className="h-4 w-4 mr-1" />Iniciar
                 </Button>
               )}
-              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso') && (
+              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso' || t.estado === 'vencida') && (
                 <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })}>
                   <CheckCircle className="h-4 w-4 mr-1" />Completar
                 </Button>
