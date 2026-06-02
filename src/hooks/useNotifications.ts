@@ -68,22 +68,6 @@ export interface NotificationItem {
   tarea?: Tarea;
 }
 
-interface Candidate {
-  event_key: string;
-  type: NotificationType;
-  source_module: string;
-  source_table: string;
-  source_id: string;
-  title: string;
-  notification_at: string;
-  metadata: Record<string, unknown>;
-}
-
-function toIsoFromYmd(ymd: string): string {
-  // Local midnight ISO for a YYYY-MM-DD string
-  return startOfDay(parseISO(ymd)).toISOString();
-}
-
 export function useNotifications() {
   const { user } = useAuth();
   const { organization } = useOrganization();
@@ -91,113 +75,9 @@ export function useNotifications() {
   const { preferences } = useNotificationPreferences();
   const queryClient = useQueryClient();
 
-  const tareasDias = organization?.tareas_vencimiento_dias_default ?? 1;
-  const peticionesDias = organization?.peticiones_vencimiento_dias ?? 60;
-
-  // 1. Candidatos calculados desde tareas/peticiones visibles
-  const candidates: Candidate[] = useMemo(() => {
-    if (!tareas?.length || !organization?.id) return [];
-    const out: Candidate[] = [];
-
-    for (const t of tareas) {
-      if (t.tipo === 'tarea' && t.estado !== 'completada') {
-        const venc = getTareaVencimiento(t, tareasDias);
-
-        // tarea_pendiente: ya no se genera client-side. El trigger SQL
-        // `trg_tareas_after_insert_notif` emite `tarea_asignada` /
-        // `tarea_equipo_asignada` al crear la tarea.
-
-        // tarea_vencida: helper marca vencida
-        if (venc.vencida && t.fecha_inicio) {
-          const vencDate = addDays(startOfDay(parseISO(t.fecha_inicio)), Math.max(0, tareasDias) + 1);
-          out.push({
-            event_key: `tarea:${t.id}:vencida`,
-            type: 'tarea_vencida',
-            source_module: 'tareas',
-            source_table: 'tareas',
-            source_id: t.id,
-            title: t.titulo,
-            notification_at: vencDate.toISOString(),
-            metadata: {},
-          });
-        }
-      } else if (t.tipo === 'peticion' && t.estado === 'pendiente') {
-        const venc = getPeticionVencimiento(t, peticionesDias);
-        if (venc.vencida && t.created_at) {
-          const dias = t.vencimiento_dias ?? peticionesDias ?? 60;
-          const vencDate = addDays(startOfDay(parseISO(t.created_at)), dias + 1);
-          out.push({
-            event_key: `peticion:${t.id}:vencida`,
-            type: 'peticion_vencida',
-            source_module: 'tareas',
-            source_table: 'tareas',
-            source_id: t.id,
-            title: t.titulo,
-            notification_at: vencDate.toISOString(),
-            metadata: {},
-          });
-        }
-      }
-    }
-    return out;
-  }, [tareas, tareasDias, peticionesDias, organization?.id]);
-
-  // 2. Persistir candidatos vía RPC (idempotente). Solo cuando cambia la fingerprint.
-  const candidatesFingerprint = useMemo(
-    () => candidates.map(c => `${c.event_key}|${c.title}`).join('||'),
-    [candidates],
-  );
-
-  useEffect(() => {
-    if (!organization?.id || !user?.id || candidates.length === 0) return;
-    let cancelled = false;
-    // Defer to next tick so we don't invalidate queries during the same
-    // commit phase that mounted observers (avoids React Query queue corruption).
-    const handle = setTimeout(() => {
-      (async () => {
-        try {
-          // Filtra candidatos cuyo evento esté no-implementado o desactivado por
-          // preferencia del usuario, para no crear deliveries innecesarias.
-          const filtered = candidates.filter(c => {
-            const canon = resolveNotificationEventType(c.type) ?? c.type;
-            const def = getEventDef(canon);
-            if (!def) return true; // tipo desconocido: comportamiento legacy
-            if (!def.implemented) return false;
-            const pref = preferences.get(def.eventType);
-            const enabled = pref ?? def.defaultEnabled;
-            return enabled;
-          });
-          await Promise.all(
-            filtered.map(c =>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (supabase as any).rpc('upsert_notification', {
-                _organization_id: organization.id,
-                _event_key: c.event_key,
-                _type: c.type,
-                _source_module: c.source_module,
-                _source_table: c.source_table,
-                _source_id: c.source_id,
-                _title: c.title,
-                _body: null,
-                _notification_at: c.notification_at,
-                _metadata: c.metadata,
-              }),
-            ),
-          );
-        } catch (e) {
-          console.warn('[notifications] upsert error', e);
-        }
-        if (!cancelled) {
-          queryClient.invalidateQueries({ queryKey: ['notification_deliveries'] });
-        }
-      })().catch(e => console.warn('[notifications] upsert batch error', e));
-    }, 0);
-    return () => {
-      cancelled = true;
-      clearTimeout(handle);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidatesFingerprint, organization?.id, user?.id]);
+  // Los vencimientos (tarea_vencida / peticion_vencida) se procesan 100%
+  // server-side por process_vencimientos_tareas() (cron horario). El frontend
+  // ya NO genera ni persiste candidatos: solo lee deliveries.
 
   // 3. Query principal: deliveries del usuario actual + notificacion embebida
   const { data: deliveries = [] } = useQuery({
