@@ -88,10 +88,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (filtroFecha === 'todas') return true;
     const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
+      // Estado persistido por backend (process_vencimientos_tareas).
+      if (t.estado === 'vencida') return true;
+      // Fallback visual durante la ventana <1h entre vencimiento real y cron.
       if (t.tipo === 'peticion' && t.estado === 'pendiente') {
         return getPeticionVencimiento(t).vencida;
       }
-      if (t.tipo === 'tarea' && t.estado !== 'completada') {
+      if (t.tipo === 'tarea' && t.estado === 'pendiente') {
         return getTareaVencimiento(t).vencida;
       }
       return false;
@@ -120,9 +123,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
-        const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
-        const tareaVencida = t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida;
-        if (!peticionVencida && !tareaVencida) return false;
+        if (t.estado === 'vencida') {
+          // ok
+        } else {
+          const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
+          const tareaVencida = t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida;
+          if (!peticionVencida && !tareaVencida) return false;
+        }
       } else if (t.estado !== filtroEstado) return false;
     }
     return matchesFecha(t) && matchesSucursal(t) && (t.tipo === 'peticion' || matchesResp(t));
