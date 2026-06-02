@@ -1,11 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTareas, type Tarea } from '@/hooks/useTareas';
-import { getTareaVencimiento, getPeticionVencimiento } from '@/lib/tareasVencimiento';
-import { parseISO, startOfDay, addDays } from 'date-fns';
 import { getEventDef, resolveNotificationEventType } from '@/lib/notifications/catalog';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 
