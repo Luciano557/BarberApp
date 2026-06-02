@@ -157,12 +157,16 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     id ? (sucursales.find(s => s.id === id)?.nombre ?? null) : null;
 
   const renderEstadoBadge = (t: TareaItem) => {
+    // Estado persistido por backend tiene prioridad sobre el cálculo visual.
+    if (t.estado === 'vencida') {
+      return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
+    }
     if (t.tipo === 'peticion' && t.estado === 'pendiente') {
       const { vencida, diasRestantes } = getPeticionVencimiento(t);
       if (vencida) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
       if (diasRestantes !== null && diasRestantes <= 7) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><Clock className="w-3 h-3" />Vence en {diasRestantes}d</Badge>;
     }
-    if (t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida) {
+    if (t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida) {
       return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
     }
     switch (t.estado) {
