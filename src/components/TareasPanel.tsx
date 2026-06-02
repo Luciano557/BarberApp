@@ -277,10 +277,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const PeticionCard = ({ t }: { t: TareaItem }) => {
+    const isVencida = t.estado === 'vencida';
     const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t) : null;
     const sNombre = sucursalNombre(t.sucursal_id);
+    const canAct = t.estado === 'pendiente' || isVencida;
     return (
-      <Card className={`flex flex-col ${venc?.vencida ? 'opacity-70' : ''}`}>
+      <Card className={`flex flex-col ${venc?.vencida || isVencida ? 'opacity-70' : ''}`}>
         <CardContent className="p-4 flex flex-col gap-3 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{t.titulo}</h3>
@@ -311,10 +313,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
 
-          {t.estado === 'pendiente' && (
+          {canAct && (
             <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
               <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => requestPeticionAction(t.id, 'completada')}>
-                <CheckCircle className="h-4 w-4 mr-1" />Completar
+                <CheckCircle className="h-4 w-4 mr-1" />{isVencida ? 'Aprobar' : 'Completar'}
               </Button>
               <Button size="sm" variant="ghost" className="text-destructive" onClick={() => requestPeticionAction(t.id, 'rechazada')}>
                 <XCircle className="h-4 w-4 mr-1" />Rechazar
