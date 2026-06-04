@@ -6,6 +6,36 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { calcNextDate } from '@/lib/recurrence';
 
+export interface GastoRecurrente {
+  id: string;
+  organization_id: string;
+  sucursal_id: string | null;
+  categoria: string;
+  tipo_costo: string;
+  monto: number;
+  descripcion: string | null;
+  repeat_preset: string;
+  repeat_frequency: string | null;
+  repeat_interval: number | null;
+  repeat_byweekday: number[] | null;
+  fecha_inicio: string;
+  proxima_fecha: string;
+  activo: boolean;
+  created_at: string;
+}
+
+export interface GastoRecurrenteInsert {
+  categoria: string;
+  tipo_costo: string;
+  monto: number;
+  descripcion?: string;
+  repeat_preset: string;
+  repeat_frequency?: string;
+  repeat_interval?: number;
+  repeat_byweekday?: number[];
+  fecha_inicio: string;
+}
+
 
 export function useGastosRecurrentes() {
   const { organization } = useOrganization();
