@@ -3,86 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
-import { format, addDays, addWeeks, addMonths, addYears } from 'date-fns';
+import { format } from 'date-fns';
+import { calcNextDate } from '@/lib/recurrence';
 
-export interface GastoRecurrente {
-  id: string;
-  organization_id: string;
-  sucursal_id: string | null;
-  categoria: string;
-  tipo_costo: string;
-  monto: number;
-  descripcion: string | null;
-  repeat_preset: string;
-  repeat_frequency: string | null;
-  repeat_interval: number | null;
-  repeat_byweekday: number[] | null;
-  fecha_inicio: string;
-  proxima_fecha: string;
-  activo: boolean;
-  created_at: string;
-}
-
-export interface GastoRecurrenteInsert {
-  categoria: string;
-  tipo_costo: string;
-  monto: number;
-  descripcion?: string;
-  repeat_preset: string;
-  repeat_frequency?: string;
-  repeat_interval?: number;
-  repeat_byweekday?: number[];
-  fecha_inicio: string;
-}
-
-function calcNextDate(current: Date, preset: string, frequency?: string | null, interval?: number | null, byweekday?: number[] | null): Date {
-  const n = interval || 1;
-
-  // Handle presets
-  switch (preset) {
-    case 'daily': return addDays(current, 1);
-    case 'weekdays': {
-      let next = addDays(current, 1);
-      while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
-      return next;
-    }
-    case 'weekends': {
-      let next = addDays(current, 1);
-      while (next.getDay() !== 0 && next.getDay() !== 6) next = addDays(next, 1);
-      return next;
-    }
-    case 'weekly': return addWeeks(current, 1);
-    case 'biweekly': return addWeeks(current, 2);
-    case 'monthly': return addMonths(current, 1);
-    case 'quarterly': return addMonths(current, 3);
-    case 'semiannual': return addMonths(current, 6);
-    case 'yearly': return addYears(current, 1);
-    case 'custom': {
-      const freq = frequency || 'monthly';
-      switch (freq) {
-        case 'daily': return addDays(current, n);
-        case 'weekly': {
-          if (byweekday?.length) {
-            const sorted = [...byweekday].sort((a, b) => a - b);
-            const currentDay = current.getDay();
-            const nextDay = sorted.find(d => d > currentDay);
-            if (nextDay !== undefined) {
-              return addDays(current, nextDay - currentDay);
-            }
-            // Wrap to next week cycle
-            const daysUntilFirst = 7 * (n - 1) + (7 - currentDay + sorted[0]);
-            return addDays(current, daysUntilFirst);
-          }
-          return addWeeks(current, n);
-        }
-        case 'monthly': return addMonths(current, n);
-        case 'yearly': return addYears(current, n);
-        default: return addMonths(current, n);
-      }
-    }
-    default: return addMonths(current, 1);
-  }
-}
 
 export function useGastosRecurrentes() {
   const { organization } = useOrganization();
