@@ -2663,6 +2663,7 @@ export type Database = {
           organization_id: string
           proxima_fecha: string | null
           recurrencia_dia_semana: number | null
+          recurrencia_id: string | null
           recurrencia_semana_del_mes: number | null
           recurrencia_tipo: string | null
           recurrente: boolean | null
@@ -2698,6 +2699,7 @@ export type Database = {
           organization_id: string
           proxima_fecha?: string | null
           recurrencia_dia_semana?: number | null
+          recurrencia_id?: string | null
           recurrencia_semana_del_mes?: number | null
           recurrencia_tipo?: string | null
           recurrente?: boolean | null
@@ -2733,6 +2735,7 @@ export type Database = {
           organization_id?: string
           proxima_fecha?: string | null
           recurrencia_dia_semana?: number | null
+          recurrencia_id?: string | null
           recurrencia_semana_del_mes?: number | null
           recurrencia_tipo?: string | null
           recurrente?: boolean | null
@@ -2770,7 +2773,109 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tareas_recurrencia_id_fkey"
+            columns: ["recurrencia_id"]
+            isOneToOne: false
+            referencedRelation: "tareas_recurrentes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tareas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tareas_recurrentes: {
+        Row: {
+          activo: boolean
+          asignado_a: string | null
+          asignado_nombre: string | null
+          assignment_scope: string
+          created_at: string
+          created_by: string | null
+          descripcion: string | null
+          fecha_inicio: string
+          hora: string | null
+          id: string
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string
+          sucursal_id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          asignado_a?: string | null
+          asignado_nombre?: string | null
+          assignment_scope?: string
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          fecha_inicio: string
+          hora?: string | null
+          id?: string
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          asignado_a?: string | null
+          asignado_nombre?: string | null
+          assignment_scope?: string
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          fecha_inicio?: string
+          hora?: string | null
+          id?: string
+          organization_id?: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tareas_recurrentes_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
