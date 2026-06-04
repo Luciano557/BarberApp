@@ -3530,6 +3530,16 @@ export type Database = {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
       }
+      _calc_next_tarea_date: {
+        Args: {
+          _current_date: string
+          _repeat_byweekday: number[]
+          _repeat_frequency: string
+          _repeat_interval: number
+          _repeat_preset: string
+        }
+        Returns: string
+      }
       _canon_phone_ar: { Args: { input: string }; Returns: string }
       _notif_actor_account_type: { Args: { _user: string }; Returns: string }
       _notif_actor_name: { Args: { _user: string }; Returns: string }
@@ -3684,6 +3694,7 @@ export type Database = {
         Returns: undefined
       }
       org_has_any_pin: { Args: never; Returns: boolean }
+      process_tareas_recurrentes: { Args: never; Returns: number }
       process_vencimientos_tareas: { Args: never; Returns: number }
       registrar_movimiento_stock: {
         Args: {
