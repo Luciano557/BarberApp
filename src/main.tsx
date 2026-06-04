@@ -7,8 +7,9 @@ import "./index.css";
 try {
   document.documentElement.classList.remove("dark");
   for (const key of ["theme", "vite-ui-theme"]) {
-    const v = localStorage.getItem(key);
-    if (v === "dark" || v === "system") localStorage.setItem(key, "light");
+    if (localStorage.getItem(key) !== "light") {
+      localStorage.setItem(key, "light");
+    }
   }
 } catch {
   // noop
