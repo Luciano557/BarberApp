@@ -32,6 +32,7 @@ const ESTADO_OPTIONS_TAREA = [
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
+  { value: 'vencida', label: 'Vencida' },
 ];
 
 const ESTADO_OPTIONS_PETICION = [
@@ -87,10 +88,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (filtroFecha === 'todas') return true;
     const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
+      // Estado persistido por backend (process_vencimientos_tareas).
+      if (t.estado === 'vencida') return true;
+      // Fallback visual durante la ventana <1h entre vencimiento real y cron.
       if (t.tipo === 'peticion' && t.estado === 'pendiente') {
         return getPeticionVencimiento(t).vencida;
       }
-      if (t.tipo === 'tarea' && t.estado !== 'completada') {
+      if (t.tipo === 'tarea' && t.estado === 'pendiente') {
         return getTareaVencimiento(t).vencida;
       }
       return false;
@@ -119,9 +123,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
-        const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
-        const tareaVencida = t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida;
-        if (!peticionVencida && !tareaVencida) return false;
+        if (t.estado === 'vencida') {
+          // ok
+        } else {
+          const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
+          const tareaVencida = t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida;
+          if (!peticionVencida && !tareaVencida) return false;
+        }
       } else if (t.estado !== filtroEstado) return false;
     }
     return matchesFecha(t) && matchesSucursal(t) && (t.tipo === 'peticion' || matchesResp(t));
@@ -149,12 +157,16 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     id ? (sucursales.find(s => s.id === id)?.nombre ?? null) : null;
 
   const renderEstadoBadge = (t: TareaItem) => {
+    // Estado persistido por backend tiene prioridad sobre el cálculo visual.
+    if (t.estado === 'vencida') {
+      return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
+    }
     if (t.tipo === 'peticion' && t.estado === 'pendiente') {
       const { vencida, diasRestantes } = getPeticionVencimiento(t);
       if (vencida) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
       if (diasRestantes !== null && diasRestantes <= 7) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><Clock className="w-3 h-3" />Vence en {diasRestantes}d</Badge>;
     }
-    if (t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida) {
+    if (t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida) {
       return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
     }
     switch (t.estado) {
@@ -242,7 +254,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                   <RefreshCw className="h-4 w-4 mr-1" />Iniciar
                 </Button>
               )}
-              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso') && (
+              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso' || t.estado === 'vencida') && (
                 <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })}>
                   <CheckCircle className="h-4 w-4 mr-1" />Completar
                 </Button>
@@ -265,10 +277,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const PeticionCard = ({ t }: { t: TareaItem }) => {
+    const isVencida = t.estado === 'vencida';
     const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t) : null;
     const sNombre = sucursalNombre(t.sucursal_id);
+    const canAct = t.estado === 'pendiente' || isVencida;
     return (
-      <Card className={`flex flex-col ${venc?.vencida ? 'opacity-70' : ''}`}>
+      <Card className={`flex flex-col ${venc?.vencida || isVencida ? 'opacity-70' : ''}`}>
         <CardContent className="p-4 flex flex-col gap-3 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{t.titulo}</h3>
@@ -299,10 +313,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
 
-          {t.estado === 'pendiente' && (
+          {canAct && (
             <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
               <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => requestPeticionAction(t.id, 'completada')}>
-                <CheckCircle className="h-4 w-4 mr-1" />Completar
+                <CheckCircle className="h-4 w-4 mr-1" />{isVencida ? 'Aprobar' : 'Completar'}
               </Button>
               <Button size="sm" variant="ghost" className="text-destructive" onClick={() => requestPeticionAction(t.id, 'rechazada')}>
                 <XCircle className="h-4 w-4 mr-1" />Rechazar

@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
       .eq("activo", true)
-      .eq("rol_equipo", "barbero");
+      .contains("roles_equipo", ["barber"]);
     if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
 
     // Horarios sin filtrar por dia_semana (necesitamos todos los días de la semana)

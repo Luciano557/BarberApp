@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
       .eq("activo", true)
-      .eq("rol_equipo", "barbero");
+      .contains("roles_equipo", ["barber"]);
     if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
 
     // Build horarios query — fetch ALL (base + overrides) for this day
