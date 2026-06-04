@@ -580,6 +580,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </div>
           )}
         </TabsContent>
+
+        {canViewRecurrentes && (
+          <TabsContent value="recurrentes" className="mt-4">
+            <RecurrentesPanel barbers={barbers} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
