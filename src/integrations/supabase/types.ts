@@ -2649,7 +2649,7 @@ export type Database = {
           completada_at: string | null
           completada_por_id: string | null
           completada_por_nombre: string | null
-          creado_por_id: string
+          creado_por_id: string | null
           creado_por_nombre: string | null
           created_at: string
           descripcion: string | null
@@ -2685,7 +2685,7 @@ export type Database = {
           completada_at?: string | null
           completada_por_id?: string | null
           completada_por_nombre?: string | null
-          creado_por_id: string
+          creado_por_id?: string | null
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
@@ -2721,7 +2721,7 @@ export type Database = {
           completada_at?: string | null
           completada_por_id?: string | null
           completada_por_nombre?: string | null
-          creado_por_id?: string
+          creado_por_id?: string | null
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
