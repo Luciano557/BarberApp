@@ -13,14 +13,17 @@ import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { TareaFormDialog } from './tareas/TareaFormDialog';
+import { RecurrentesPanel } from './tareas/RecurrentesPanel';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useTareasRecurrentes } from '@/hooks/useTareasRecurrentes';
 import { getTareaVencimiento as getTareaVencHelper, getPeticionVencimiento as getPeticionVencHelper } from '@/lib/tareasVencimiento';
 import { toast } from 'sonner';
+
 
 interface TareasPanelProps {
   barbers: Barber[];
@@ -53,14 +56,18 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
+  const { recetas } = useTareasRecurrentes();
+  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount, profile } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
   const requirePinForAction = useRequirePinForAction();
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
+  const canViewRecurrentes = canManageTareas || isSucursalAccount;
+  const recetasActivasCount = recetas.filter(r => r.activo).length;
   const tareasDiasDefault = organization?.tareas_vencimiento_dias_default ?? 1;
   const peticionesDiasDefault = organization?.peticiones_vencimiento_dias ?? 60;
+
 
   const [showForm, setShowForm] = useState(false);
   const [editingTarea, setEditingTarea] = useState<TareaItem | null>(null);
