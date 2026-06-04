@@ -81,6 +81,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
   const isTareasTab = activeTab === 'tareas';
+  const isRecurrentesTab = activeTab === 'recurrentes';
+
   const showSucursalFilter = !currentSucursal && sucursales.length > 1;
   const activeBarbers = barbers.filter(b => b.active);
   const myBarberoId = profile?.barbero_id ?? null;
