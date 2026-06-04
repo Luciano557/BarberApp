@@ -1,84 +1,168 @@
-## Objetivo
+# Plan corregido — Migración `tareas_recurrentes`
 
-Que el `PhoneInput` sea realmente universal y multi-país en Equipo, Clientes, Nueva cita y Sucursales, con selector de país funcional y validación E.164 por país.
+## Confirmación de funciones auxiliares
+- `public.get_user_barbero_id(_user_id uuid)` — definida en `supabase/migrations/20260109143656_e112717a-9844-4e18-8157-4bb409c26781.sql:42`.
+- `public.update_updated_at_column()` — definida en `supabase/migrations/20260108144448_13ab8691-72e2-4c75-8310-39d7c1352ddf.sql:43`.
 
-## Diagnóstico
+Ambas se usan extensivamente en el resto del esquema, son seguras de invocar.
 
-Causa raíz única detrás de los tres bugs reportados:
+## Cambios respecto a la versión anterior
+1. `asignado_a` → ahora FK a `public.barberos(id) ON DELETE SET NULL` (antes apuntaba a `auth.users`).
+2. Política `Barber view scoped tareas_recurrentes` → compara `asignado_a = public.get_user_barbero_id(auth.uid())` (antes `= auth.uid()`).
+3. Agregado `updated_at timestamptz NOT NULL DEFAULT now()` + trigger `update_tareas_recurrentes_updated_at` con `public.update_updated_at_column()`.
+4. Sin cambios en estructura, índices, GRANTs, resto de RLS, FKs de org/sucursal, CHECK de `assignment_scope`, ni en la política de `sucursal_account` (queda permitiendo `individual` y `team`).
 
-- Todos los consumidores actuales pasan `allowedCountries={['AR']}`.
-- En `phone-input.tsx`, eso activa la rama `singleCountry = allowedCountries.length <= 1`, que renderiza el chip de país como botón deshabilitado (sin ChevronDown, sin Popover).
-- Resultado: en Clientes, Equipo y Sucursales el selector está visualmente presente pero no se puede abrir. En Sucursales además visualmente parece "input viejo" porque el chip aparece sin el indicador desplegable.
+## Archivo SQL completo y corregido
 
-Sucursales ya usa `PhoneInput` (en `SucursalesConfig.tsx` línea 365 y `MiNegocioPanel.tsx` línea 471) — no quedó input libre. El problema es el mismo: `allowedCountries={['AR']}` lo bloquea.
+Ruta: `supabase/migrations/<timestamp>_tareas_recurrentes.sql`
 
-`src/lib/phone.ts` ya soporta multi-país vía `libphonenumber-js` cuando `defaultCountry !== 'AR'`. No requiere cambios estructurales, solo asegurar que `canonicalizePhone` con país no-AR no aplique reglas AR.
+```sql
+-- =========================================================================
+-- Etapa: Tareas recurrentes (motor real de recurrencia)
+-- Crea la tabla tareas_recurrentes (receta/plantilla) y vincula tareas
+-- generadas via columna recurrencia_id. Replica el patrón de
+-- gastos_recurrentes y las RLS vigentes sobre public.tareas.
+-- NO modifica datos. NO crea cron ni funciones de generación.
+-- =========================================================================
 
-## Cambios
+-- ---------- 1. Tabla tareas_recurrentes ----------
+CREATE TABLE public.tareas_recurrentes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  sucursal_id uuid NOT NULL REFERENCES public.sucursales(id) ON DELETE CASCADE,
+  titulo text NOT NULL,
+  descripcion text,
+  assignment_scope text NOT NULL DEFAULT 'individual'
+    CHECK (assignment_scope IN ('individual','team')),
+  asignado_a uuid REFERENCES public.barberos(id) ON DELETE SET NULL,
+  asignado_nombre text,
+  hora text,
+  repeat_preset text NOT NULL DEFAULT 'never',
+  repeat_frequency text,
+  repeat_interval integer DEFAULT 1,
+  repeat_byweekday integer[],
+  fecha_inicio date NOT NULL,
+  proxima_fecha date NOT NULL,
+  activo boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
 
-### 1. `src/components/ui/phone-input.tsx`
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.tareas_recurrentes TO authenticated;
+GRANT ALL ON public.tareas_recurrentes TO service_role;
 
-- Cambiar el default de `allowedCountries` a `['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']`.
-- Eliminar el "lock" visual cuando hay un solo país permitido: el chip siempre muestra bandera + nombre/dial + ChevronDown, pero el Popover solo se abre si `allowedCountries.length > 1`. Si es 1, el chip queda informativo (no clickeable, sin chevron).
-- Asegurar que al cambiar de país desde el Popover se re-emita el valor canonicalizado con el nuevo `defaultCountry` (ya está vía `handleCountryChange` → `emit(raw, next)`; verificar que `formatPhoneDisplay` y `stripDialPrefix` toleren países no-AR usando `pn.formatInternational()` y el `dial` del `COUNTRY_META`).
-- En `handleBlur`, para países no-AR re-hidratar `raw` desde el número nacional formateado por `libphonenumber-js` (no aplicar reglas AR).
-- Ajustar el helper text inferior para que muestre el placeholder del país activo (ya lo hace) y no mencione "móvil o fijo" en países donde `mode='any'` no aplica reglas AR.
+-- ---------- 2. Trigger updated_at ----------
+CREATE TRIGGER update_tareas_recurrentes_updated_at
+  BEFORE UPDATE ON public.tareas_recurrentes
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
-### 2. Consumidores — quitar `allowedCountries={['AR']}`
+-- ---------- 3. Alter tareas: enlace a la receta ----------
+ALTER TABLE public.tareas
+  ADD COLUMN IF NOT EXISTS recurrencia_id uuid
+    REFERENCES public.tareas_recurrentes(id) ON DELETE SET NULL;
 
-Reemplazar en estos archivos por la lista multi-país (o dejar el default del componente):
+-- ---------- 4. Índices ----------
+CREATE INDEX IF NOT EXISTS idx_tareas_recurrentes_org_suc_activo
+  ON public.tareas_recurrentes (organization_id, sucursal_id, activo);
 
-- `src/components/clientes/NuevoClienteDialog.tsx` (línea ~143)
-- `src/components/clientes/ClienteDetailDialog.tsx` (línea ~382)
-- `src/components/agenda/NewAppointmentDialog.tsx` (línea ~394)
-- `src/components/config/EquipoUnificado.tsx` (línea ~1215)
-- `src/components/config/StaffConfig.tsx` (línea ~107)
-- `src/components/config/SucursalesConfig.tsx` (línea ~365) — `mode="any"`
-- `src/components/MiNegocioPanel.tsx` (línea ~471) — `mode="any"` para sucursal
+CREATE INDEX IF NOT EXISTS idx_tareas_recurrentes_proxima_fecha_activo
+  ON public.tareas_recurrentes (proxima_fecha)
+  WHERE activo = true;
 
-Uso final estándar:
+CREATE INDEX IF NOT EXISTS idx_tareas_recurrencia_id
+  ON public.tareas (recurrencia_id)
+  WHERE recurrencia_id IS NOT NULL;
 
-```tsx
-<PhoneInput
-  mode="mobile"  // "any" sólo en Sucursales/MiNegocio sucursal
-  defaultCountry="AR"
-  allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-  value={...}
-  onChange={...}
-/>
+-- ---------- 5. RLS ----------
+ALTER TABLE public.tareas_recurrentes ENABLE ROW LEVEL SECURITY;
+
+-- Owner / General Manager / Manager: ver
+CREATE POLICY "Owner GM Manager view org tareas_recurrentes"
+ON public.tareas_recurrentes FOR SELECT TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND (
+    public.has_role(auth.uid(), 'owner'::app_role)
+    OR public.has_role(auth.uid(), 'general_manager'::app_role)
+    OR public.has_role(auth.uid(), 'manager'::app_role)
+  )
+);
+
+-- Owner / Manager: insert / update / delete (mismo criterio que tareas)
+CREATE POLICY "Owner/Manager can insert tareas_recurrentes"
+ON public.tareas_recurrentes FOR INSERT TO authenticated
+WITH CHECK (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND (public.has_role(auth.uid(), 'owner'::app_role)
+       OR public.has_role(auth.uid(), 'manager'::app_role))
+);
+
+CREATE POLICY "Owner/Manager can update tareas_recurrentes"
+ON public.tareas_recurrentes FOR UPDATE TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND (public.has_role(auth.uid(), 'owner'::app_role)
+       OR public.has_role(auth.uid(), 'manager'::app_role))
+);
+
+CREATE POLICY "Owner/Manager can delete tareas_recurrentes"
+ON public.tareas_recurrentes FOR DELETE TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND (public.has_role(auth.uid(), 'owner'::app_role)
+       OR public.has_role(auth.uid(), 'manager'::app_role))
+);
+
+-- Barber: ve recetas que le generan tareas (individual a su barbero
+-- o team de su sucursal). No puede modificar.
+CREATE POLICY "Barber view scoped tareas_recurrentes"
+ON public.tareas_recurrentes FOR SELECT TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND public.has_role(auth.uid(), 'barber'::app_role)
+  AND (
+    (assignment_scope = 'individual'
+      AND asignado_a = public.get_user_barbero_id(auth.uid()))
+    OR (assignment_scope = 'team'
+      AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid())))
+  )
+);
+
+-- Sucursal account: ve / crea / edita recetas de su sucursal
+-- (permite individual y team, confirmado)
+CREATE POLICY "Sucursal account view tareas_recurrentes"
+ON public.tareas_recurrentes FOR SELECT TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND public.is_sucursal_account(auth.uid())
+  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
+);
+
+CREATE POLICY "Sucursal account insert tareas_recurrentes"
+ON public.tareas_recurrentes FOR INSERT TO authenticated
+WITH CHECK (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND public.is_sucursal_account(auth.uid())
+  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
+);
+
+CREATE POLICY "Sucursal account update tareas_recurrentes"
+ON public.tareas_recurrentes FOR UPDATE TO authenticated
+USING (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND public.is_sucursal_account(auth.uid())
+  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
+)
+WITH CHECK (
+  organization_id = public.get_user_organization_id(auth.uid())
+  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
+);
 ```
 
-### 3. Persistencia / defensa final
+## Inconsistencias nuevas detectadas
+- **Alineación con `tareas.asignado_a_id`**: ahora `tareas_recurrentes.asignado_a` y `tareas.asignado_a_id` apuntan ambos a `barberos(id)`, pero los nombres de columna difieren. Es consistente con el brief original, pero cuando se construya el motor conviene mapear `asignado_a → asignado_a_id` al generar la tarea hija. Solo a tener en cuenta, no requiere cambio en la migración.
+- **Sucursal account y scope `team`**: confirmado por vos. Sin cambio. Si más adelante quisieras restringirlo, se hace con una policy adicional.
+- **No se incluye trigger de notificaciones** para la nueva tabla (la receta no es una tarea visible; las notificaciones deberían dispararse desde el motor cuando se genere la tarea hija). Confirmar cuando armemos el motor.
 
-- En cada `handleSave`, seguir guardando `phoneOut.e164` cuando `phoneOut.isValid`. Si el país elegido no es AR, ya viene en E.164 internacional desde `canonicalizePhone`.
-- En `useSupabaseData.ts` (`safeBarberPhone`) y wrappers de clientes/sucursales: aceptar cualquier E.164 válido (no solo `+549...`). Si el valor empieza con `+` y tiene 8–15 dígitos, se persiste como vino del componente; sólo se rechaza texto crudo o E.164 inválido según `parsePhoneNumberFromString`.
-
-### 4. Display
-
-- `formatPhoneDisplay` ya cubre AR móvil, AR fijo y otros países (usa `pn.formatInternational()`). No requiere cambios.
-- Verificar listados de barberos, clientes y sucursales: usan `formatPhoneDisplay`, por lo que números MX/ES/etc. se mostrarán con formato internacional automáticamente.
-
-## Fuera de alcance
-
-- Edge functions y `supabase/functions/_shared/phone.ts` (siguen sin tocarse en esta fase).
-- Migraciones de datos legacy.
-- Auth/OTP, WhatsApp real, portal público, importaciones.
-
-## QA manual
-
-Por cada formulario (Nuevo cliente, Editar cliente, Nueva cita > nuevo cliente, Nuevo barbero, Editar barbero, Nueva sucursal, Editar sucursal y Mi Negocio sucursal):
-
-1. Abrir selector → debe listar AR, UY, CL, CO, MX, ES, BR con buscador.
-2. Elegir UY, tipear `99 123 456` → guarda `+59899123456`, muestra `+598 99 123 456`.
-3. Elegir MX, tipear `55 1234 5678` → guarda `+525512345678`.
-4. Elegir AR, tipear `11 2516 2528` (mode `mobile`) → guarda `+5491125162528`.
-5. Elegir AR en Sucursal (mode `any`), tipear `11 4555 1234` → guarda `+541145551234` (fijo, sin 9).
-6. Pegar `+34 612 34 56 78` → auto-detecta ES y guarda `+34612345678`.
-7. Pegar `*ABC*` → no persiste, muestra error.
-8. Dejar vacío en campo opcional → guarda NULL sin error.
-
-## Entrega
-
-- Archivos modificados: `phone-input.tsx`, 7 consumidores listados, `useSupabaseData.ts` (defensa final).
-- Confirmación: selector visible y funcional en los 4 flujos, sin inputs libres.
-- DB guarda E.164 por país; AR móvil `+549...`, AR fijo `+54...` solo en Sucursales.
+Esperando tu aprobación para pasar a build mode y aplicar la migración.
