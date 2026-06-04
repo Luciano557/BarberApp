@@ -439,7 +439,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
           </p>
         </div>
-        {isTareasTab ? (
+        {isRecurrentesTab ? null : isTareasTab ? (
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
             {canManageTareas && !showCompletedHistory && (
               <Button onClick={handleNuevaTarea}>
@@ -465,6 +465,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         )}
       </div>
 
+
       <TareaFormDialog
         open={showForm}
         onOpenChange={(o) => { setShowForm(o); if (!o) setEditingTarea(null); }}
@@ -485,51 +486,57 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
+          {canViewRecurrentes && (
+            <TabsTrigger value="recurrentes">Recurrentes ({recetasActivasCount})</TabsTrigger>
+          )}
         </TabsList>
 
         {/* Filters bar */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {!(isTareasTab && showCompletedHistory) && (
-            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
+        {!isRecurrentesTab && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {!(isTareasTab && showCompletedHistory) && (
+              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
 
-          {isTareasTab && (
-            <Select value={filtroResp} onValueChange={setFiltroResp}>
-              <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos los responsables</SelectItem>
-                <SelectItem value="__team__">Todo el equipo</SelectItem>
-                {activeBarbers.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+            {isTareasTab && (
+              <Select value={filtroResp} onValueChange={setFiltroResp}>
+                <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los responsables</SelectItem>
+                  <SelectItem value="__team__">Todo el equipo</SelectItem>
+                  {activeBarbers.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-          {!(isTareasTab && showCompletedHistory) && (
-            <Select value={filtroFecha} onValueChange={setFiltroFecha}>
-              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
+            {!(isTareasTab && showCompletedHistory) && (
+              <Select value={filtroFecha} onValueChange={setFiltroFecha}>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
 
-          {showSucursalFilter && (
-            <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
-              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas las sucursales</SelectItem>
-                {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+            {showSucursalFilter && (
+              <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
+                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las sucursales</SelectItem>
+                  {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
+
 
         <TabsContent value="tareas" className="mt-4">
           {showCompletedHistory ? (
