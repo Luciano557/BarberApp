@@ -159,12 +159,12 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex w-full">
+    <div className="h-screen overflow-hidden bg-background flex w-full">
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       <OnboardingOverlay />
       <OnboardingTooltip />
 
-      <main className={cn("min-h-screen min-w-0 flex-1 overflow-auto")}>
+      <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
         <div className={cn("mx-auto px-4 py-16 sm:px-6 sm:py-6 md:px-8 md:py-8", activeTab === 'tareas' ? "max-w-4xl lg:max-w-6xl" : "max-w-4xl")}>
           {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration

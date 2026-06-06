@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -118,6 +118,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   );
 
   const currentStepIndex = STEPS.indexOf(currentStep);
+
+  // Dirección de navegación entre pasos, para la animación de entrada del paso.
+  // Se calcula en render comparando con el índice previo (ref estable entre renders
+  // del mismo paso, así no se re-dispara la animación al re-renderizar sin cambiar de paso).
+  const prevStepIndexRef = useRef(currentStepIndex);
+  const stepDirectionRef = useRef<'forward' | 'back'>('forward');
+  if (currentStepIndex !== prevStepIndexRef.current) {
+    stepDirectionRef.current = currentStepIndex >= prevStepIndexRef.current ? 'forward' : 'back';
+    prevStepIndexRef.current = currentStepIndex;
+  }
+  const stepDirection = stepDirectionRef.current;
+
   const service = useMemo(() => services.find(s => s.id === selectedService), [services, selectedService]);
   const barber = useMemo(() => barbers.find(b => b.uid === selectedBarber), [barbers, selectedBarber]);
   const selectedExtrasData = useMemo(() =>
@@ -675,7 +687,10 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </div>
 
       {/* Step Content */}
-      <div className="min-h-[320px]">
+      <div
+        key={currentStep}
+        className={`min-h-[320px] ${stepDirection === 'back' ? 'animate-step-in-back' : 'animate-step-in-forward'}`}
+      >
         {/* Barber Step */}
         {currentStep === 'barber' && (
           <div className="space-y-6">
@@ -704,7 +719,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     <button
                       key={barber.uid}
                       onClick={() => handleSelectBarber(barber.uid)}
-                      className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                      className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                         isSelected
                           ? 'border-secondary bg-secondary/5'
                           : 'border-border bg-card hover:bg-muted/50'
@@ -726,7 +741,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   <button
                     type="button"
                     onClick={handleSelectNoBarber}
-                    className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                    className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                       productSaleAssignment === 'no_barber'
                         ? 'border-secondary bg-secondary/5'
                         : 'border-dashed border-border bg-card hover:bg-muted/50'
@@ -777,6 +792,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="transition-transform active:scale-[0.98]"
                     onClick={() => setPickerOpen(true)}
                     disabled={!sucursalId}
                   >
@@ -788,7 +804,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   {cart.map((it) => (
                     <div
                       key={it.producto_sucursal_id}
-                      className="flex flex-col gap-3 rounded-md border border-border bg-background p-2.5 sm:flex-row sm:items-center"
+                      className="animate-item-in flex flex-col gap-3 rounded-md border border-border bg-background p-2.5 sm:flex-row sm:items-center"
                     >
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
                         <Package className="h-3.5 w-3.5 text-muted-foreground" />
@@ -830,7 +846,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className="w-full transition-transform active:scale-[0.98]"
                     onClick={() => setPickerOpen(true)}
                   >
                     <Plus className="h-4 w-4 mr-1" /> Agregar más productos
@@ -945,7 +961,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   <button
                     key={extra.id}
                     onClick={() => handleToggleExtra(extra.id)}
-                    className={`relative p-4 rounded-lg border transition-colors hover:border-secondary ${
+                    className={`relative p-4 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                       selectedExtras.includes(extra.id)
                         ? 'border-secondary bg-secondary/5'
                         : 'border-border bg-card hover:bg-muted/50'
@@ -955,7 +971,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       {index + 1}
                     </span>
                     {selectedExtras.includes(extra.id) && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
+                      <div className="animate-pop-in absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
                         <Check className="h-3 w-3" />
                       </div>
                     )}
@@ -1002,7 +1018,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
             <button
               key="none"
               onClick={() => handleSelectDiscount('none')}
-              className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+              className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                 selectedDiscount === 'none'
                   ? 'border-secondary bg-secondary/5'
                   : 'border-border bg-card hover:bg-muted/50'
@@ -1029,7 +1045,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 <button
                   key={discount.id}
                   onClick={() => handleSelectDiscount(discount.id)}
-                  className={`relative p-6 rounded-lg border transition-colors hover:border-secondary ${
+                  className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                     selectedDiscount === discount.id
                       ? 'border-secondary bg-secondary/5'
                       : 'border-border bg-card hover:bg-muted/50'
@@ -1280,12 +1296,12 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 </div>
                 {selectedDiscountData && selectedDiscountData.value > 0 && (
                   isDiscountValidForPayment ? (
-                    <div className="flex items-start justify-between gap-4 text-success">
+                    <div className="animate-fade-in flex items-start justify-between gap-4 text-success">
                       <span>Descuento ({selectedDiscountData.type === 'fixed' ? `$${selectedDiscountData.value.toLocaleString()}` : `${selectedDiscountData.value}%`})</span>
-                      <span className="shrink-0 text-right font-medium">-${discountAmount.toLocaleString()}</span>
+                      <span key={discountAmount} className="animate-value-change shrink-0 text-right font-medium">-${discountAmount.toLocaleString()}</span>
                     </div>
                   ) : (
-                    <div className="flex items-start justify-between gap-4 text-destructive">
+                    <div className="animate-fade-in flex items-start justify-between gap-4 text-destructive">
                       <span className="text-xs">Descuento no aplica a este método</span>
                       <span className="shrink-0 text-right font-medium line-through text-muted-foreground">-${
                         selectedDiscountData.type === 'fixed' 
@@ -1301,14 +1317,14 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                 {recargoTotal > 0 && (
                   <div className="flex items-start justify-between gap-4 text-foreground">
                     <span className="text-muted-foreground">{recargoLabel}</span>
-                    <span className="shrink-0 text-right font-medium">+${recargoTotal.toLocaleString()}</span>
+                    <span key={recargoTotal} className="animate-value-change shrink-0 text-right font-medium">+${recargoTotal.toLocaleString()}</span>
                   </div>
                 )}
               </div>
 
               <div className="mt-4 flex flex-col gap-1 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-lg font-medium">Total a cobrar</span>
-                <span className="self-end text-3xl font-bold text-foreground sm:self-auto">${totalACobrar.toLocaleString()}</span>
+                <span key={totalACobrar} className="animate-value-change self-end text-3xl font-bold text-foreground sm:self-auto">${totalACobrar.toLocaleString()}</span>
               </div>
 
               <Button
