@@ -116,6 +116,7 @@ const Index = () => {
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
   const { currentSucursal } = useSucursal();
+  const { barbers: cobrarBarbers, refetch: refetchCobrarBarbers } = useCobrarBarbers();
 
   const goToTeamSetup = useCallback(() => {
     if (organization?.id && currentSucursal?.id) {
@@ -134,9 +135,10 @@ const Index = () => {
     const prevTab = prevActiveTabRef.current;
     if (prevTab !== 'registro' && activeTab === 'registro') {
       void refetchData();
+      void refetchCobrarBarbers();
     }
     prevActiveTabRef.current = activeTab;
-  }, [activeTab, refetchData]);
+  }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
 
@@ -171,7 +173,7 @@ const Index = () => {
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
+              barbers={cobrarBarbers}
               discounts={cobrarDiscounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
