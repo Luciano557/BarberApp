@@ -3538,6 +3538,7 @@ export type Database = {
           nombre: string | null
           organization_id: string | null
           rol_equipo: string | null
+          roles_equipo: string[] | null
           sucursal_id: string | null
           updated_at: string | null
         }
@@ -3549,6 +3550,7 @@ export type Database = {
           nombre?: string | null
           organization_id?: string | null
           rol_equipo?: string | null
+          roles_equipo?: string[] | null
           sucursal_id?: string | null
           updated_at?: string | null
         }
@@ -3560,6 +3562,7 @@ export type Database = {
           nombre?: string | null
           organization_id?: string | null
           rol_equipo?: string | null
+          roles_equipo?: string[] | null
           sucursal_id?: string | null
           updated_at?: string | null
         }

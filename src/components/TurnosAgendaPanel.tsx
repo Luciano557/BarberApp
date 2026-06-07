@@ -59,7 +59,7 @@ export function TurnosAgendaPanel() {
     if (isBarber && !isOwner && !isGeneralManager && !isManager) {
       const { data } = await supabase
         .from('barberos_safe')
-        .select('id, nombre, apellido, activo, organization_id, sucursal_id, rol_equipo')
+        .select('id, nombre, apellido, activo, organization_id, sucursal_id, rol_equipo, roles_equipo')
         .eq('organization_id', organization.id)
         .eq('activo', true)
         .order('nombre');
