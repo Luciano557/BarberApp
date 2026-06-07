@@ -12,6 +12,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -115,6 +116,7 @@ const Index = () => {
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
   const { currentSucursal } = useSucursal();
+  const { barbers: cobrarBarbers, refetch: refetchCobrarBarbers } = useCobrarBarbers();
 
   const goToTeamSetup = useCallback(() => {
     if (organization?.id && currentSucursal?.id) {
@@ -133,9 +135,10 @@ const Index = () => {
     const prevTab = prevActiveTabRef.current;
     if (prevTab !== 'registro' && activeTab === 'registro') {
       void refetchData();
+      void refetchCobrarBarbers();
     }
     prevActiveTabRef.current = activeTab;
-  }, [activeTab, refetchData]);
+  }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
 
@@ -170,7 +173,7 @@ const Index = () => {
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
+              barbers={cobrarBarbers}
               discounts={cobrarDiscounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
