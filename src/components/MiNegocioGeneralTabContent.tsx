@@ -34,6 +34,13 @@ interface MiNegocioGeneralTabContentProps {
   onDeleteService: (id: string) => void;
   onDeleteExtra: (id: string) => void;
   onDeleteLine: (id: string) => void;
+  // Equipo General
+  organizationId: string;
+  allBarbers: Barber[];
+  allSucursales: { id: string; nombre: string; activa: boolean }[];
+  onAddBarberToSucursal: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
+  onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
+  onRefreshBarbers?: () => Promise<void> | void;
 }
 
 /**
