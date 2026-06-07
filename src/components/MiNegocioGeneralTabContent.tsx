@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Settings2 } from 'lucide-react';
-import { Service, Extra, Discount, Line } from '@/types/barbershop';
+import { Service, Extra, Discount, Line, Barber } from '@/types/barbershop';
 import { ServicesConfig } from './config/ServicesConfig';
 import { ExtrasConfig } from './config/ExtrasConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
@@ -10,6 +10,8 @@ import { LinesConfig } from './config/LinesConfig';
 import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { CuentasSucursalConfig } from './config/CuentasSucursalConfig';
+import { EquipoGeneralConfig } from './config/EquipoGeneralConfig';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface MiNegocioGeneralTabContentProps {
