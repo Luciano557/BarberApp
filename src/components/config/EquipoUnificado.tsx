@@ -709,7 +709,7 @@ export function EquipoUnificado({
       setEditingId(null);
     } else {
       const teamRole: TeamRole = rolEquipo;
-      onAddBarber({
+      const payload = {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
         compensationType: data.compensationType,
@@ -717,8 +717,22 @@ export function EquipoUnificado({
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
         rolesEquipo: data.roles,
-      });
+      };
+      if (isGeneralMode) {
+        if (!addPrincipalSucursalId) {
+          toast.error('Elegí la sucursal principal antes de guardar.');
+          return;
+        }
+        if (!onAddBarberToSucursal) {
+          toast.error('Configuración inválida (general mode sin handler).');
+          return;
+        }
+        onAddBarberToSucursal(payload, addPrincipalSucursalId);
+      } else {
+        onAddBarber(payload);
+      }
       setIsAdding(false);
+      setAddPrincipalSucursalId('');
     }
     resetForm();
   };
