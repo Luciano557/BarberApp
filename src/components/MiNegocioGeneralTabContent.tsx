@@ -59,7 +59,11 @@ export function MiNegocioGeneralTabContent({
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onDeleteService, onDeleteExtra, onDeleteLine,
+  organizationId, allBarbers, allSucursales,
+  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers,
 }: MiNegocioGeneralTabContentProps) {
+  const { isOwner, isGeneralManager } = useAuth();
+  const canManageEquipo = isOwner || isGeneralManager;
 
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
