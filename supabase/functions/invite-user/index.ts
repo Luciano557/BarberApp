@@ -190,20 +190,35 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // For barbers without explicit sucursalId, assign them to the barbero's sucursal
+    // For barbers without explicit sucursalId, assign them to the barbero's principal sucursal
+    // (from barberos_sucursales tipo='principal'); fallback to legacy barberos.sucursal_id for safety.
     if (!sucursalId && barberoId) {
-      const { data: barbero } = await supabaseAdmin
-        .from("barberos")
+      const { data: principalRow } = await supabaseAdmin
+        .from("barberos_sucursales")
         .select("sucursal_id")
-        .eq("id", barberoId)
-        .single();
+        .eq("organization_id", organizationId)
+        .eq("barbero_id", barberoId)
+        .eq("tipo", "principal")
+        .maybeSingle();
 
-      if (barbero?.sucursal_id) {
+      let resolvedSucursalId: string | null = principalRow?.sucursal_id ?? null;
+
+      if (!resolvedSucursalId) {
+        const { data: barbero } = await supabaseAdmin
+          .from("barberos")
+          .select("sucursal_id")
+          .eq("id", barberoId)
+          .eq("organization_id", organizationId)
+          .single();
+        resolvedSucursalId = barbero?.sucursal_id ?? null;
+      }
+
+      if (resolvedSucursalId) {
         const { data: existing } = await supabaseAdmin
           .from("user_sucursales")
           .select("id")
           .eq("user_id", userId)
-          .eq("sucursal_id", barbero.sucursal_id)
+          .eq("sucursal_id", resolvedSucursalId)
           .maybeSingle();
 
         if (!existing) {
@@ -211,7 +226,7 @@ serve(async (req: Request): Promise<Response> => {
             .from("user_sucursales")
             .insert({
               user_id: userId,
-              sucursal_id: barbero.sucursal_id,
+              sucursal_id: resolvedSucursalId,
               organization_id: organizationId,
             });
         }
@@ -219,7 +234,7 @@ serve(async (req: Request): Promise<Response> => {
         // Update default_sucursal_id on profile
         await supabaseAdmin
           .from("profiles")
-          .update({ default_sucursal_id: barbero.sucursal_id })
+          .update({ default_sucursal_id: resolvedSucursalId })
           .eq("id", userId);
       }
     }
