@@ -287,6 +287,8 @@ export function EquipoUnificado({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
     compensationType: 'comision' as CompensationType, fixedSalary: '', payDay: '1',
   });
+  // En general mode, sucursal principal a usar al crear un nuevo barbero.
+  const [addPrincipalSucursalId, setAddPrincipalSucursalId] = useState<string>('');
 
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
