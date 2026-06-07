@@ -236,7 +236,10 @@ interface ToggleConfirm {
 
 export function EquipoUnificado({
   sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
+  mode = 'sucursal', sucursalesActivas, onAddBarberToSucursal,
 }: EquipoUnificadoProps) {
+  const isGeneralMode = mode === 'general';
+  const sucursalesForSection = sucursalesActivas ?? sucursales;
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
