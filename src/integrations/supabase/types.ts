@@ -232,6 +232,68 @@ export type Database = {
           },
         ]
       }
+      barberos_sucursales: {
+        Row: {
+          barbero_id: string
+          created_at: string
+          disponible: boolean
+          id: string
+          organization_id: string
+          sucursal_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          barbero_id: string
+          created_at?: string
+          disponible?: boolean
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          created_at?: string
+          disponible?: boolean
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barberos_sucursales_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bloqueos_agenda: {
         Row: {
           barbero_id: string | null
