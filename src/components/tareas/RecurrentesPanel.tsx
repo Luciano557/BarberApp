@@ -105,18 +105,16 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Recetas que generan tareas automáticamente en la frecuencia que definas.
-          </p>
-        </div>
-        {canManageTareas && (
-          <Button onClick={handleNueva} className="self-start sm:self-auto">
-            <Plus className="h-4 w-4 mr-2" />Nueva recurrencia
-          </Button>
-        )}
-      </div>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />Volver a tareas
+        </button>
+      )}
+
 
       {showSucursalFilter && (
         <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
