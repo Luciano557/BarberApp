@@ -156,7 +156,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       return getCustomRepeatLabel(t.repeat_frequency, t.repeat_interval, t.repeat_byweekday);
     }
     if (t.repeat_preset) return getRepeatLabel(t.repeat_preset);
-    if (t.recurrencia_tipo === 'dias') return `Cada ${t.frecuencia_dias} días`;
     return 'Recurrente';
   };
 
