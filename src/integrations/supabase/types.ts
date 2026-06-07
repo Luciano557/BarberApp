@@ -236,30 +236,42 @@ export type Database = {
         Row: {
           barbero_id: string
           created_at: string
+          dias_semana: number[] | null
           disponible: boolean
+          fecha_fin: string | null
+          fecha_inicio: string | null
           id: string
           organization_id: string
           sucursal_id: string
+          tipo: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           barbero_id: string
           created_at?: string
+          dias_semana?: number[] | null
           disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           organization_id: string
           sucursal_id: string
+          tipo?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           barbero_id?: string
           created_at?: string
+          dias_semana?: number[] | null
           disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
           id?: string
           organization_id?: string
           sucursal_id?: string
+          tipo?: string
           updated_at?: string
           updated_by?: string | null
         }
