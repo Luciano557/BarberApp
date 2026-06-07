@@ -256,15 +256,10 @@ export function SucursalTabContent({
       <div className={isInactive ? 'opacity-50 pointer-events-none select-none' : ''}>
         {/* Equipo unificado */}
         <div data-onboarding-id="equipo-section">
-          <EquipoUnificado
+          <EquipoSucursalPanel
             sucursalId={sucursal.id}
+            sucursalNombre={sucursal.nombre}
             organizationId={organization?.id || ''}
-            barbers={barbers}
-            allBarbers={allBarbers}
-            sucursales={allSucursales}
-            onAddBarber={onAddBarber}
-            onUpdateBarber={onUpdateBarber}
-            onRefreshBarbers={onRefreshBarbers}
           />
         </div>
 
