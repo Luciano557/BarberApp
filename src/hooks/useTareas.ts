@@ -19,12 +19,7 @@ export interface Tarea {
   assignment_scope: 'individual' | 'team';
   sucursal_id: string | null;
   recurrente: boolean;
-  frecuencia_dias: number | null;
-  recurrencia_tipo: string | null;
-  recurrencia_dia_semana: number | null;
-  recurrencia_semana_del_mes: number | null;
-  dias_para_limite: number | null;
-  proxima_fecha: string | null;
+
   fecha_inicio: string | null;
   fecha_limite: string | null;
   hora: string | null;
