@@ -480,64 +480,72 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); setShowRecurrencias(false); }}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
-          {canViewRecurrentes && (
-            <TabsTrigger value="recurrentes">Recurrentes ({recetasActivasCount})</TabsTrigger>
-          )}
         </TabsList>
 
         {/* Filters bar */}
-        {!isRecurrentesTab && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {!(isTareasTab && showCompletedHistory) && (
-              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
-            {isTareasTab && (
-              <Select value={filtroResp} onValueChange={setFiltroResp}>
-                <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los responsables</SelectItem>
-                  <SelectItem value="__team__">Todo el equipo</SelectItem>
-                  {activeBarbers.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          {!showRecurrencias && isTareasTab && (
+            <Select value={filtroResp} onValueChange={setFiltroResp}>
+              <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los responsables</SelectItem>
+                <SelectItem value="__team__">Todo el equipo</SelectItem>
+                {activeBarbers.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-            {!(isTareasTab && showCompletedHistory) && (
-              <Select value={filtroFecha} onValueChange={setFiltroFecha}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroFecha} onValueChange={setFiltroFecha}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
-            {showSucursalFilter && (
-              <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas las sucursales</SelectItem>
-                  {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
+          {!showRecurrencias && showSucursalFilter && (
+            <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las sucursales</SelectItem>
+                {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
+          {isTareasTab && canViewRecurrentes && (
+            <Button
+              variant={showRecurrencias ? 'default' : 'outline'}
+              size="sm"
+              className="h-9"
+              onClick={() => setShowRecurrencias(v => !v)}
+            >
+              <Repeat className="h-4 w-4 mr-2" />Recurrencias
+            </Button>
+          )}
+        </div>
 
 
         <TabsContent value="tareas" className="mt-4">
-          {showCompletedHistory ? (
+          {showRecurrencias ? (
+            <RecurrentesPanel barbers={barbers} onClose={() => setShowRecurrencias(false)} />
+          ) : showCompletedHistory ? (
             <div className="space-y-3">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-lg font-semibold text-foreground">Tareas completadas</h2>
@@ -578,12 +586,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </div>
           )}
         </TabsContent>
-
-        {canViewRecurrentes && (
-          <TabsContent value="recurrentes" className="mt-4">
-            <RecurrentesPanel barbers={barbers} />
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );
