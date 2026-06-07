@@ -166,7 +166,13 @@ Deno.serve(async (req) => {
     const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
     const sucursalesActivas = sucursalesRes.data || [];
     const sucursales = sucursalesActivas.filter((s: any) => sucursalesConServicios.has(s.id));
-    const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
+    const barberosById = new Map(barberosData.map((b) => [b.id, b]));
+    const barberos = bsRows
+      .filter((r) => barberosById.has(r.barbero_id) && sucursalesConServicios.has(r.sucursal_id))
+      .map((r) => {
+        const b = barberosById.get(r.barbero_id)!;
+        return { id: b.id, nombre: b.nombre, apellido: b.apellido, sucursal_id: r.sucursal_id };
+      });
 
     const responseBody: Record<string, unknown> = {
       organization: { id: org.id, name: org.name, logo_url: org.logo_url },
