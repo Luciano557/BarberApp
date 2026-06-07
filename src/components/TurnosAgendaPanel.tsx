@@ -19,6 +19,7 @@ function dbToBarber(row: any): Barber {
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     teamRole: row.rol_equipo || 'barbero',
+    rolesEquipo: row.roles_equipo || [],
     dni: row.dni || undefined,
     active: row.activo,
   };
@@ -129,8 +130,7 @@ export function TurnosAgendaPanel() {
                 organizationId={organization?.id || ''}
                 barbers={allBarbers.filter(b => {
                   if (b.sucursalId !== s.id) return false;
-                  const role = (b.teamRole || '').toString().toLowerCase();
-                  return role !== 'otros';
+                  return (b.rolesEquipo ?? []).includes('barber');
                 })}
               />
             </TabsContent>
