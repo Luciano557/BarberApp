@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { EquipoUnificado } from './config/EquipoUnificado';
+import { EquipoSucursalPanel } from './config/EquipoSucursalPanel';
 import { CobrarConfig } from './config/CobrarConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 
