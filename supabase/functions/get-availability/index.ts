@@ -36,15 +36,14 @@ Deno.serve(async (req) => {
     const jsDow = dateObj.getUTCDay();
     const dbDow = jsDow === 0 ? 7 : jsDow;
 
-    // Build barberos query
-    let barberosQuery = supabase
-      .from("barberos")
-      .select("id")
+    // Disponibilidad por sucursal (Fase 3) — corre en paralelo
+    let bsQuery = supabase
+      .from("barberos_sucursales")
+      .select("barbero_id")
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
-      .eq("activo", true)
-      .contains("roles_equipo", ["barber"]);
-    if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
+      .eq("disponible", true);
+    if (barbero_id) bsQuery = bsQuery.eq("barbero_id", barbero_id);
 
     // Build horarios query — fetch ALL (base + overrides) for this day
     let horariosQuery = supabase
@@ -58,7 +57,7 @@ Deno.serve(async (req) => {
       horariosQuery = horariosQuery.or(`barbero_id.eq.${barbero_id},barbero_id.is.null`);
     }
 
-    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, barberosRes] = await Promise.all([
+    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, bsRes] = await Promise.all([
       supabase
         .from("agenda_config")
         .select("duracion_base_min, buffer_antes_min, buffer_despues_min, dias_anticipacion, anticipacion_minima_reserva_min")
@@ -89,8 +88,23 @@ Deno.serve(async (req) => {
         if (exclude_turno_id) q = q.neq("id", exclude_turno_id);
         return q;
       })(),
-      barberosQuery,
+      bsQuery,
     ]);
+
+    const disponibleIds: string[] = (bsRes.data || []).map((r: any) => r.barbero_id);
+    if (disponibleIds.length === 0) {
+      return new Response(JSON.stringify({ slots: [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: barberosData } = await supabase
+      .from("barberos")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .in("id", disponibleIds)
+      .eq("activo", true)
+      .contains("roles_equipo", ["barber"]);
 
     const config: any = configRes.data || {
       duracion_base_min: 30,
@@ -136,7 +150,7 @@ Deno.serve(async (req) => {
     const allHorarios = horariosRes.data || [];
     const bloqueos = bloqueosRes.data || [];
     const turnos = turnosRes.data || [];
-    const activeBarberos: string[] = (barberosRes.data || []).map((b: any) => b.id);
+    const activeBarberos: string[] = (barberosData || []).map((b: any) => b.id);
 
     if (activeBarberos.length === 0) {
       return new Response(JSON.stringify({ slots: [] }), {

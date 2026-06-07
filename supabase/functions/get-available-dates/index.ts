@@ -38,15 +38,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ── Consultas paralelas (una sola ronda para todo el rango) ──────────────
-    let barberosQuery = supabase
-      .from("barberos")
-      .select("id")
+    // Disponibilidad por sucursal (Fase 3) — corre en paralelo
+    let bsQuery = supabase
+      .from("barberos_sucursales")
+      .select("barbero_id")
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
-      .eq("activo", true)
-      .contains("roles_equipo", ["barber"]);
-    if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
+      .eq("disponible", true);
+    if (barbero_id) bsQuery = bsQuery.eq("barbero_id", barbero_id);
 
     // Horarios sin filtrar por dia_semana (necesitamos todos los días de la semana)
     let horariosQuery = supabase
@@ -59,7 +58,7 @@ Deno.serve(async (req) => {
       horariosQuery = horariosQuery.or(`barbero_id.eq.${barbero_id},barbero_id.is.null`);
     }
 
-    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, barberosRes, sucTzRes] =
+    const [configRes, servicioRes, horariosRes, bloqueosRes, turnosRes, bsRes, sucTzRes] =
       await Promise.all([
         supabase
           .from("agenda_config")
@@ -92,7 +91,7 @@ Deno.serve(async (req) => {
           .gte("fecha", from_date)
           .lte("fecha", to_date)
           .in("estado", ["pendiente", "confirmado", "en_curso"]),
-        barberosQuery,
+        bsQuery,
         supabase
           .from("sucursales")
           .select("timezone, organization_id")
@@ -127,7 +126,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const activeBarberos: string[] = (barberosRes.data || []).map((b: any) => b.id);
+    const disponibleIds: string[] = (bsRes.data || []).map((r: any) => r.barbero_id);
+    if (disponibleIds.length === 0) {
+      return new Response(
+        JSON.stringify({ available_dates: [], max_date: from_date }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: barberosData } = await supabase
+      .from("barberos")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .in("id", disponibleIds)
+      .eq("activo", true)
+      .contains("roles_equipo", ["barber"]);
+
+    const activeBarberos: string[] = (barberosData || []).map((b: any) => b.id);
     if (activeBarberos.length === 0) {
       return new Response(
         JSON.stringify({ available_dates: [], max_date: from_date }),

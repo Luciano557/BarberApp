@@ -94,6 +94,26 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Disponibilidad del barbero en la sucursal (Fase 3)
+    const { data: bsRow } = await supabase
+      .from("barberos_sucursales")
+      .select("barbero_id")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
+      .eq("barbero_id", barbero_id)
+      .eq("disponible", true)
+      .maybeSingle();
+
+    if (!bsRow) {
+      return new Response(
+        JSON.stringify({
+          error: "barber_not_available_in_sucursal",
+          message: "Este barbero ya no está disponible en esta sucursal. Elegí otro barbero.",
+        }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: servicio } = await supabase
       .from("servicios")
       .select("duracion_min, nombre")
