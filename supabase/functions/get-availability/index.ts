@@ -36,15 +36,14 @@ Deno.serve(async (req) => {
     const jsDow = dateObj.getUTCDay();
     const dbDow = jsDow === 0 ? 7 : jsDow;
 
-    // Build barberos query
-    let barberosQuery = supabase
-      .from("barberos")
-      .select("id")
+    // Disponibilidad por sucursal (Fase 3) — corre en paralelo
+    let bsQuery = supabase
+      .from("barberos_sucursales")
+      .select("barbero_id")
       .eq("organization_id", organization_id)
       .eq("sucursal_id", sucursal_id)
-      .eq("activo", true)
-      .contains("roles_equipo", ["barber"]);
-    if (barbero_id) barberosQuery = barberosQuery.eq("id", barbero_id);
+      .eq("disponible", true);
+    if (barbero_id) bsQuery = bsQuery.eq("barbero_id", barbero_id);
 
     // Build horarios query — fetch ALL (base + overrides) for this day
     let horariosQuery = supabase
