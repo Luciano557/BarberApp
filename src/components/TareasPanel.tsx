@@ -437,14 +437,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
           </p>
         </div>
-        {isRecurrentesTab ? null : isTareasTab ? (
+        {isTareasTab ? (
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-            {canManageTareas && !showCompletedHistory && (
+            {canManageTareas && !showCompletedHistory && !showRecurrencias && (
               <Button onClick={handleNuevaTarea}>
                 <Plus className="h-4 w-4 mr-2" />Nueva tarea
               </Button>
             )}
-            {showCompletedHistory ? (
+            {!showRecurrencias && (showCompletedHistory ? (
               <Button variant="outline" onClick={() => setShowCompletedHistory(false)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />Volver a tareas activas
               </Button>
@@ -452,7 +452,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
                 <ChartSpline className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
-            )}
+            ))}
           </div>
         ) : (
           !isBarber && (
