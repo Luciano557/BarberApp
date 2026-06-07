@@ -3683,6 +3683,7 @@ export type Database = {
           id: string
         }[]
       }
+      bs_recompute_disponibles: { Args: never; Returns: undefined }
       cerrar_ventas_generales_sucursal: {
         Args: { _fecha: string; _sucursal_id: string }
         Returns: number
