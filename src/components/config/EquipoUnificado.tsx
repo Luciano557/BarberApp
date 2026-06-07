@@ -19,6 +19,7 @@ import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BarberSucursalesGeneralSection } from './BarberSucursalesGeneralSection';
 
 // --- Role utilities ---
 const ROLE_HIERARCHY: Record<AppRole, number> = {
@@ -217,6 +218,16 @@ interface EquipoUnificadoProps {
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
+  /**
+   * 'sucursal' (default): comportamiento histórico — administra el equipo de una
+   * sucursal específica. 'general': panel global del negocio, agrega gestión de
+   * sucursal principal (doble escritura) y secundarias recurrentes por barbero.
+   */
+  mode?: 'sucursal' | 'general';
+  /** En mode='general', sucursales activas para los selects internos. */
+  sucursalesActivas?: { id: string; nombre: string }[];
+  /** En mode='general', requerido para crear nuevos barberos (sucursal principal). */
+  onAddBarberToSucursal?: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
 }
 
 interface ToggleConfirm {
@@ -226,7 +237,10 @@ interface ToggleConfirm {
 
 export function EquipoUnificado({
   sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
+  mode = 'sucursal', sucursalesActivas, onAddBarberToSucursal,
 }: EquipoUnificadoProps) {
+  const isGeneralMode = mode === 'general';
+  const sucursalesForSection = sucursalesActivas ?? sucursales;
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
@@ -274,6 +288,8 @@ export function EquipoUnificado({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
     compensationType: 'comision' as CompensationType, fixedSalary: '', payDay: '1',
   });
+  // En general mode, sucursal principal a usar al crear un nuevo barbero.
+  const [addPrincipalSucursalId, setAddPrincipalSucursalId] = useState<string>('');
 
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
@@ -694,7 +710,7 @@ export function EquipoUnificado({
       setEditingId(null);
     } else {
       const teamRole: TeamRole = rolEquipo;
-      onAddBarber({
+      const payload = {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
         compensationType: data.compensationType,
@@ -702,8 +718,22 @@ export function EquipoUnificado({
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
         rolesEquipo: data.roles,
-      });
+      };
+      if (isGeneralMode) {
+        if (!addPrincipalSucursalId) {
+          toast.error('Elegí la sucursal principal antes de guardar.');
+          return;
+        }
+        if (!onAddBarberToSucursal) {
+          toast.error('Configuración inválida (general mode sin handler).');
+          return;
+        }
+        onAddBarberToSucursal(payload, addPrincipalSucursalId);
+      } else {
+        onAddBarber(payload);
+      }
       setIsAdding(false);
+      setAddPrincipalSucursalId('');
     }
     resetForm();
   };
@@ -824,6 +854,16 @@ export function EquipoUnificado({
                 />
               );
             })()}
+
+            {/* Sucursales (sólo Equipo General) */}
+            {isGeneralMode && (
+              <BarberSucursalesGeneralSection
+                barberoId={barber.id}
+                organizationId={organizationId}
+                sucursales={sucursalesForSection}
+                onPrincipalChanged={onRefreshBarbers}
+              />
+            )}
 
             {/* Acceso al sistema */}
             {!isOwner && (() => {
@@ -949,7 +989,7 @@ export function EquipoUnificado({
     <>
       <Card className="border border-border bg-card">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-medium">Equipo</CardTitle>
+          <CardTitle className="text-base font-medium">{isGeneralMode ? 'Equipo General' : 'Equipo'}</CardTitle>
           {!isAdding && !editingId && activeSubTab === 'active' && (
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
@@ -964,7 +1004,27 @@ export function EquipoUnificado({
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
-                <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                <div className="space-y-3">
+                  {isGeneralMode && (
+                    <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+                      <label className="text-xs font-medium text-foreground">Sucursal principal</label>
+                      <Select value={addPrincipalSucursalId} onValueChange={setAddPrincipalSucursalId}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Elegí la sucursal principal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sucursalesForSection.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
+                      </p>
+                    </div>
+                  )}
+                  <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                </div>
               )}
               {sortedActive.map(renderBarberItem)}
               {sortedActive.length === 0 && !isAdding && (

@@ -406,6 +406,12 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onDeleteService={deleteService}
                 onDeleteExtra={deleteExtra}
                 onDeleteLine={deleteLine}
+                organizationId={organization?.id || ''}
+                allBarbers={allBarbers}
+                allSucursales={allSucursales}
+                onAddBarberToSucursal={(barber, sucId) => addBarberToSucursal(sucId, barber)}
+                onUpdateBarber={updateBarberFn}
+                onRefreshBarbers={fetchAllBarbers}
               />
             </TabsContent>
           )}

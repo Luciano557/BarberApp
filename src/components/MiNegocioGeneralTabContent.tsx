@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Settings2 } from 'lucide-react';
-import { Service, Extra, Discount, Line } from '@/types/barbershop';
+import { Service, Extra, Discount, Line, Barber } from '@/types/barbershop';
 import { ServicesConfig } from './config/ServicesConfig';
 import { ExtrasConfig } from './config/ExtrasConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
@@ -10,6 +10,8 @@ import { LinesConfig } from './config/LinesConfig';
 import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { CuentasSucursalConfig } from './config/CuentasSucursalConfig';
+import { EquipoGeneralConfig } from './config/EquipoGeneralConfig';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface MiNegocioGeneralTabContentProps {
@@ -32,6 +34,13 @@ interface MiNegocioGeneralTabContentProps {
   onDeleteService: (id: string) => void;
   onDeleteExtra: (id: string) => void;
   onDeleteLine: (id: string) => void;
+  // Equipo General
+  organizationId: string;
+  allBarbers: Barber[];
+  allSucursales: { id: string; nombre: string; activa: boolean }[];
+  onAddBarberToSucursal: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
+  onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
+  onRefreshBarbers?: () => Promise<void> | void;
 }
 
 /**
@@ -50,7 +59,11 @@ export function MiNegocioGeneralTabContent({
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onDeleteService, onDeleteExtra, onDeleteLine,
+  organizationId, allBarbers, allSucursales,
+  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers,
 }: MiNegocioGeneralTabContentProps) {
+  const { isOwner, isGeneralManager } = useAuth();
+  const canManageEquipo = isOwner || isGeneralManager;
 
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
@@ -153,6 +166,24 @@ export function MiNegocioGeneralTabContent({
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Equipo General (solo owner/GM) */}
+        {canManageEquipo && (
+          <div className="mt-8 space-y-4">
+            <h3 className="text-base font-medium text-foreground">Equipo</h3>
+            <p className="text-xs text-muted-foreground">
+              Gestioná el equipo del negocio: alta, cargos, acceso, PIN y en qué sucursales trabaja cada uno.
+            </p>
+            <EquipoGeneralConfig
+              organizationId={organizationId}
+              allBarbers={allBarbers}
+              allSucursales={allSucursales}
+              onAddBarberToSucursal={onAddBarberToSucursal}
+              onUpdateBarber={onUpdateBarber}
+              onRefreshBarbers={onRefreshBarbers}
+            />
+          </div>
+        )}
 
         {/* Métodos de pago generales */}
         <div className="mt-8 space-y-4">
