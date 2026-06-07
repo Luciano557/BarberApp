@@ -2653,19 +2653,13 @@ export type Database = {
           creado_por_nombre: string | null
           created_at: string
           descripcion: string | null
-          dias_para_limite: number | null
           estado: string
           fecha_inicio: string | null
           fecha_limite: string | null
-          frecuencia_dias: number | null
           hora: string | null
           id: string
           organization_id: string
-          proxima_fecha: string | null
-          recurrencia_dia_semana: number | null
           recurrencia_id: string | null
-          recurrencia_semana_del_mes: number | null
-          recurrencia_tipo: string | null
           recurrente: boolean | null
           repeat_byweekday: number[] | null
           repeat_frequency: string | null
@@ -2689,19 +2683,13 @@ export type Database = {
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
-          dias_para_limite?: number | null
           estado?: string
           fecha_inicio?: string | null
           fecha_limite?: string | null
-          frecuencia_dias?: number | null
           hora?: string | null
           id?: string
           organization_id: string
-          proxima_fecha?: string | null
-          recurrencia_dia_semana?: number | null
           recurrencia_id?: string | null
-          recurrencia_semana_del_mes?: number | null
-          recurrencia_tipo?: string | null
           recurrente?: boolean | null
           repeat_byweekday?: number[] | null
           repeat_frequency?: string | null
@@ -2725,19 +2713,13 @@ export type Database = {
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
-          dias_para_limite?: number | null
           estado?: string
           fecha_inicio?: string | null
           fecha_limite?: string | null
-          frecuencia_dias?: number | null
           hora?: string | null
           id?: string
           organization_id?: string
-          proxima_fecha?: string | null
-          recurrencia_dia_semana?: number | null
           recurrencia_id?: string | null
-          recurrencia_semana_del_mes?: number | null
-          recurrencia_tipo?: string | null
           recurrente?: boolean | null
           repeat_byweekday?: number[] | null
           repeat_frequency?: string | null
