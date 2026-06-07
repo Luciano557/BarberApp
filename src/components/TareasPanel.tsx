@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useTareasRecurrentes } from '@/hooks/useTareasRecurrentes';
+
 import { getTareaVencimiento as getTareaVencHelper, getPeticionVencimiento as getPeticionVencHelper } from '@/lib/tareasVencimiento';
 import { toast } from 'sonner';
 
