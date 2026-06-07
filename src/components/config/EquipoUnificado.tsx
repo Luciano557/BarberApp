@@ -217,6 +217,16 @@ interface EquipoUnificadoProps {
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
+  /**
+   * 'sucursal' (default): comportamiento histórico — administra el equipo de una
+   * sucursal específica. 'general': panel global del negocio, agrega gestión de
+   * sucursal principal (doble escritura) y secundarias recurrentes por barbero.
+   */
+  mode?: 'sucursal' | 'general';
+  /** En mode='general', sucursales activas para los selects internos. */
+  sucursalesActivas?: { id: string; nombre: string }[];
+  /** En mode='general', requerido para crear nuevos barberos (sucursal principal). */
+  onAddBarberToSucursal?: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
 }
 
 interface ToggleConfirm {
