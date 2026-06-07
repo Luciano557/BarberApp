@@ -56,7 +56,6 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { recetas } = useTareasRecurrentes();
   const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount, profile } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
@@ -64,7 +63,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
   const canViewRecurrentes = canManageTareas || isSucursalAccount;
-  const recetasActivasCount = recetas.filter(r => r.activo).length;
   const tareasDiasDefault = organization?.tareas_vencimiento_dias_default ?? 1;
   const peticionesDiasDefault = organization?.peticiones_vencimiento_dias ?? 60;
 
@@ -77,11 +75,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);
+  const [showRecurrencias, setShowRecurrencias] = useState(false);
 
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
   const isTareasTab = activeTab === 'tareas';
-  const isRecurrentesTab = activeTab === 'recurrentes';
 
   const showSucursalFilter = !currentSucursal && sucursales.length > 1;
   const activeBarbers = barbers.filter(b => b.active);
