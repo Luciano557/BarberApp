@@ -993,7 +993,27 @@ export function EquipoUnificado({
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
-                <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                <div className="space-y-3">
+                  {isGeneralMode && (
+                    <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+                      <label className="text-xs font-medium text-foreground">Sucursal principal</label>
+                      <Select value={addPrincipalSucursalId} onValueChange={setAddPrincipalSucursalId}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Elegí la sucursal principal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sucursalesForSection.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
+                      </p>
+                    </div>
+                  )}
+                  <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                </div>
               )}
               {sortedActive.map(renderBarberItem)}
               {sortedActive.length === 0 && !isAdding && (
