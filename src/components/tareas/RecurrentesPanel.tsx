@@ -17,7 +17,7 @@ interface Props {
   onClose?: () => void;
 }
 
-export function RecurrentesPanel({ barbers }: Props) {
+export function RecurrentesPanel({ barbers, onClose }: Props) {
   const { isOwner, isGeneralManager, isManager, isSucursalAccount } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
   const { recetas, isLoading, addReceta, updateReceta, toggleActivo, deleteReceta } = useTareasRecurrentes();
