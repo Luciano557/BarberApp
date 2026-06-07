@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useTareasRecurrentes } from '@/hooks/useTareasRecurrentes';
+
 import { getTareaVencimiento as getTareaVencHelper, getPeticionVencimiento as getPeticionVencHelper } from '@/lib/tareasVencimiento';
 import { toast } from 'sonner';
 
@@ -56,7 +56,6 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { recetas } = useTareasRecurrentes();
   const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount, profile } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
@@ -64,7 +63,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
   const canViewRecurrentes = canManageTareas || isSucursalAccount;
-  const recetasActivasCount = recetas.filter(r => r.activo).length;
   const tareasDiasDefault = organization?.tareas_vencimiento_dias_default ?? 1;
   const peticionesDiasDefault = organization?.peticiones_vencimiento_dias ?? 60;
 
@@ -77,11 +75,11 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);
+  const [showRecurrencias, setShowRecurrencias] = useState(false);
 
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
   const isTareasTab = activeTab === 'tareas';
-  const isRecurrentesTab = activeTab === 'recurrentes';
 
   const showSucursalFilter = !currentSucursal && sucursales.length > 1;
   const activeBarbers = barbers.filter(b => b.active);
@@ -439,14 +437,14 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
           </p>
         </div>
-        {isRecurrentesTab ? null : isTareasTab ? (
+        {isTareasTab ? (
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-            {canManageTareas && !showCompletedHistory && (
+            {canManageTareas && !showCompletedHistory && !showRecurrencias && (
               <Button onClick={handleNuevaTarea}>
                 <Plus className="h-4 w-4 mr-2" />Nueva tarea
               </Button>
             )}
-            {showCompletedHistory ? (
+            {!showRecurrencias && (showCompletedHistory ? (
               <Button variant="outline" onClick={() => setShowCompletedHistory(false)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />Volver a tareas activas
               </Button>
@@ -454,7 +452,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
                 <ChartSpline className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
-            )}
+            ))}
           </div>
         ) : (
           !isBarber && (
@@ -482,64 +480,72 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); setShowRecurrencias(false); }}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
-          {canViewRecurrentes && (
-            <TabsTrigger value="recurrentes">Recurrentes ({recetasActivasCount})</TabsTrigger>
-          )}
         </TabsList>
 
         {/* Filters bar */}
-        {!isRecurrentesTab && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {!(isTareasTab && showCompletedHistory) && (
-              <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+        <div className="flex flex-wrap gap-2 mt-4">
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {estadoOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
-            {isTareasTab && (
-              <Select value={filtroResp} onValueChange={setFiltroResp}>
-                <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos los responsables</SelectItem>
-                  <SelectItem value="__team__">Todo el equipo</SelectItem>
-                  {activeBarbers.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          {!showRecurrencias && isTareasTab && (
+            <Select value={filtroResp} onValueChange={setFiltroResp}>
+              <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los responsables</SelectItem>
+                <SelectItem value="__team__">Todo el equipo</SelectItem>
+                {activeBarbers.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{getBarberDisplayName(b)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-            {!(isTareasTab && showCompletedHistory) && (
-              <Select value={filtroFecha} onValueChange={setFiltroFecha}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
+            <Select value={filtroFecha} onValueChange={setFiltroFecha}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FECHA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
 
-            {showSucursalFilter && (
-              <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
-                <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas las sucursales</SelectItem>
-                  {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
+          {!showRecurrencias && showSucursalFilter && (
+            <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
+              <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las sucursales</SelectItem>
+                {sucursales.map(s => <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+
+          {isTareasTab && canViewRecurrentes && (
+            <Button
+              variant={showRecurrencias ? 'default' : 'outline'}
+              size="sm"
+              className="h-9"
+              onClick={() => setShowRecurrencias(v => !v)}
+            >
+              <Repeat className="h-4 w-4 mr-2" />Recurrencias
+            </Button>
+          )}
+        </div>
 
 
         <TabsContent value="tareas" className="mt-4">
-          {showCompletedHistory ? (
+          {showRecurrencias ? (
+            <RecurrentesPanel barbers={barbers} onClose={() => setShowRecurrencias(false)} />
+          ) : showCompletedHistory ? (
             <div className="space-y-3">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-lg font-semibold text-foreground">Tareas completadas</h2>
@@ -580,12 +586,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </div>
           )}
         </TabsContent>
-
-        {canViewRecurrentes && (
-          <TabsContent value="recurrentes" className="mt-4">
-            <RecurrentesPanel barbers={barbers} />
-          </TabsContent>
-        )}
       </Tabs>
     </div>
   );

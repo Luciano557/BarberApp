@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Repeat } from 'lucide-react';
+import { ArrowLeft, Repeat } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useTareasRecurrentes, TareaRecurrente } from '@/hooks/useTareasRecurrentes';
@@ -14,9 +14,10 @@ import { CountdownConfirm } from '@/components/CountdownConfirm';
 
 interface Props {
   barbers: Barber[];
+  onClose?: () => void;
 }
 
-export function RecurrentesPanel({ barbers }: Props) {
+export function RecurrentesPanel({ barbers, onClose }: Props) {
   const { isOwner, isGeneralManager, isManager, isSucursalAccount } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
   const { recetas, isLoading, addReceta, updateReceta, toggleActivo, deleteReceta } = useTareasRecurrentes();
@@ -43,10 +44,6 @@ export function RecurrentesPanel({ barbers }: Props) {
   const activas = filtered.filter(r => r.activo);
   const pausadas = filtered.filter(r => !r.activo);
 
-  const handleNueva = () => {
-    setEditingReceta(null);
-    setShowForm(true);
-  };
 
   const handleEdit = (r: TareaRecurrente) => {
     setEditingReceta(r);
@@ -108,18 +105,16 @@ export function RecurrentesPanel({ barbers }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Recetas que generan tareas automáticamente en la frecuencia que definas.
-          </p>
-        </div>
-        {canManageTareas && (
-          <Button onClick={handleNueva} className="self-start sm:self-auto">
-            <Plus className="h-4 w-4 mr-2" />Nueva recurrencia
-          </Button>
-        )}
-      </div>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />Volver a tareas
+        </button>
+      )}
+
 
       {showSucursalFilter && (
         <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
