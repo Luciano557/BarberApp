@@ -167,6 +167,24 @@ export function MiNegocioGeneralTabContent({
           </Tabs>
         </div>
 
+        {/* Equipo General (solo owner/GM) */}
+        {canManageEquipo && (
+          <div className="mt-8 space-y-4">
+            <h3 className="text-base font-medium text-foreground">Equipo</h3>
+            <p className="text-xs text-muted-foreground">
+              Gestioná el equipo del negocio: alta, cargos, acceso, PIN y en qué sucursales trabaja cada uno.
+            </p>
+            <EquipoGeneralConfig
+              organizationId={organizationId}
+              allBarbers={allBarbers}
+              allSucursales={allSucursales}
+              onAddBarberToSucursal={onAddBarberToSucursal}
+              onUpdateBarber={onUpdateBarber}
+              onRefreshBarbers={onRefreshBarbers}
+            />
+          </div>
+        )}
+
         {/* Métodos de pago generales */}
         <div className="mt-8 space-y-4">
           <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
