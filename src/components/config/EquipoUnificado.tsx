@@ -855,6 +855,16 @@ export function EquipoUnificado({
               );
             })()}
 
+            {/* Sucursales (sólo Equipo General) */}
+            {isGeneralMode && (
+              <BarberSucursalesGeneralSection
+                barberoId={barber.id}
+                organizationId={organizationId}
+                sucursales={sucursalesForSection}
+                onPrincipalChanged={onRefreshBarbers}
+              />
+            )}
+
             {/* Acceso al sistema */}
             {!isOwner && (() => {
               const persistedEmail = accessEmails[barber.id] ?? null;
