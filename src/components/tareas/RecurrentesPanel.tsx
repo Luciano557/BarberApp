@@ -44,10 +44,6 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
   const activas = filtered.filter(r => r.activo);
   const pausadas = filtered.filter(r => !r.activo);
 
-  const handleNueva = () => {
-    setEditingReceta(null);
-    setShowForm(true);
-  };
 
   const handleEdit = (r: TareaRecurrente) => {
     setEditingReceta(r);
