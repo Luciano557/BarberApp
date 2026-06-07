@@ -19,6 +19,7 @@ import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BarberSucursalesGeneralSection } from './BarberSucursalesGeneralSection';
 
 // --- Role utilities ---
 const ROLE_HIERARCHY: Record<AppRole, number> = {
