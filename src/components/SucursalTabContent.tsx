@@ -79,6 +79,10 @@ export function SucursalTabContent({
   });
   const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
+  const [fechaDesactivacion, setFechaDesactivacion] = useState<string | null>(null);
+  const [futureTurnosCount, setFutureTurnosCount] = useState<number | null>(null);
+  const [showToggleDialog, setShowToggleDialog] = useState(false);
+  const [reactivateInfo, setReactivateInfo] = useState<string | null>(null);
 
   useEffect(() => {
     setInfoForm({
@@ -87,7 +91,22 @@ export function SucursalTabContent({
       telefono: sucursal.telefono || '',
     });
     setIsEditingInfo(false);
+    setReactivateInfo(null);
   }, [sucursal.id]);
+
+  // Cargar fecha_desactivacion para esta sucursal
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('sucursales')
+        .select('fecha_desactivacion')
+        .eq('id', sucursal.id)
+        .maybeSingle();
+      if (!cancelled) setFechaDesactivacion((data as any)?.fecha_desactivacion ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [sucursal.id, sucursal.activa]);
 
   const handleSaveInfo = async () => {
     setIsSavingInfo(true);
