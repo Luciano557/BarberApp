@@ -122,5 +122,11 @@ export function useCobrarBarbers() {
     void fetchBarbers();
   }, [fetchBarbers]);
 
+  useBarberosSucursalesRealtime({
+    orgId,
+    sucursalId,
+    onChange: () => { void fetchBarbers(); },
+  });
+
   return { barbers, isLoading, error, refetch: fetchBarbers };
 }
