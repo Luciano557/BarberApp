@@ -135,7 +135,6 @@ export function SucursalTabContent({
   };
 
   const openToggleDialog = async () => {
-    setReactivateInfo(null);
     setFutureTurnosCount(null);
     setShowToggleDialog(true);
     if (sucursal.activa) {
