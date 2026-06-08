@@ -475,6 +475,9 @@ serve(async (req: Request): Promise<Response> => {
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
       if (typeof emailToPersist === "string" && emailToPersist && emailToPersist !== linkedProfile?.email?.toLowerCase()) {
+        // Fase 7: reject if email already belongs to a different auth.users user
+        const conflict = await checkEmailConflict(admin, emailToPersist, targetUserId, organizationId);
+        if (conflict) return jsonResponse(conflict.status, conflict.body);
         const { error: eErr } = await admin.auth.admin.updateUserById(targetUserId, { email: emailToPersist, email_confirm: true });
         if (eErr) return jsonResponse(500, { error: `Auth email: ${eErr.message}` });
         await admin.from("profiles").update({ email: emailToPersist, full_name: fullName }).eq("id", targetUserId);
