@@ -381,6 +381,11 @@ export function SucursalesConfig() {
                   <div>
                     <p className="font-medium text-foreground">{suc.nombre}</p>
                     {suc.direccion && <p className="text-sm text-muted-foreground">{suc.direccion}</p>}
+                    {!suc.activa && fechaDesactMap[suc.id] && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Desactivada el {formatFechaDDMMYYYY(fechaDesactMap[suc.id])}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -398,9 +403,15 @@ export function SucursalesConfig() {
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(suc)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleToggleActive(suc)}>
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openToggleDialog(suc)}
+                    title={suc.activa ? 'Desactivar sucursal' : 'Reactivar sucursal'}
+                  >
+                    <Power className={`h-4 w-4 ${suc.activa ? 'text-destructive' : 'text-muted-foreground'}`} />
                   </Button>
+
                 </div>
               </div>
             </CardContent>
