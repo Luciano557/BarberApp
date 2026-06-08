@@ -752,6 +752,54 @@ export function EquipoUnificado({
     setToggleConfirm(null);
   };
 
+  // --- Finalizar actividad: abre dialog y consulta turnos futuros ---
+  const openFinalizarDialog = async (barber: Barber) => {
+    setFinalizarTarget({ barber, motivo: '', futureTurnos: null, loading: true, submitting: false });
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('barbero_id', barber.id)
+        .eq('organization_id', organizationId)
+        .gte('fecha', today)
+        .not('estado', 'in', '("cancelado","completado")');
+      setFinalizarTarget(prev => prev && prev.barber.id === barber.id
+        ? { ...prev, futureTurnos: count ?? 0, loading: false }
+        : prev);
+    } catch (e: any) {
+      setFinalizarTarget(prev => prev && prev.barber.id === barber.id
+        ? { ...prev, futureTurnos: 0, loading: false }
+        : prev);
+    }
+  };
+
+  const handleConfirmFinalizar = async () => {
+    if (!finalizarTarget) return;
+    setFinalizarTarget(prev => prev ? { ...prev, submitting: true } : prev);
+    try {
+      const { data, error } = await supabase.functions.invoke('deactivate-barber', {
+        body: {
+          barberoId: finalizarTarget.barber.id,
+          organizationId,
+          motivo: finalizarTarget.motivo.trim() || null,
+        },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || 'No se pudo finalizar la actividad');
+        setFinalizarTarget(prev => prev ? { ...prev, submitting: false } : prev);
+        return;
+      }
+      toast.success('Actividad finalizada');
+      setFinalizarTarget(null);
+      if (onRefreshBarbers) await onRefreshBarbers();
+      await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo finalizar la actividad');
+      setFinalizarTarget(prev => prev ? { ...prev, submitting: false } : prev);
+    }
+  };
+
   // StaffForm is declared at module level (see bottom of file) so its identity
   // remains stable across parent re-renders. This prevents the form from
   // unmounting/remounting (which would reset checkbox state) when the parent
