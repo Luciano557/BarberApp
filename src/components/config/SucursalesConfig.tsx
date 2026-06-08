@@ -18,7 +18,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Plus, Edit2, Power, Users, UserCheck, Shield, Scissors, KeyRound, AlertTriangle } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, Power, Users, UserCheck, Shield, Scissors, KeyRound, AlertTriangle } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { CuentaSucursalBlock } from './CuentaSucursalBlock';
 import { toast } from 'sonner';
