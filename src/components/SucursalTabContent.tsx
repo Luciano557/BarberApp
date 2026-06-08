@@ -11,7 +11,6 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -79,6 +78,9 @@ export function SucursalTabContent({
   });
   const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
+  const [fechaDesactivacion, setFechaDesactivacion] = useState<string | null>(null);
+  const [futureTurnosCount, setFutureTurnosCount] = useState<number | null>(null);
+  const [showToggleDialog, setShowToggleDialog] = useState(false);
 
   useEffect(() => {
     setInfoForm({
@@ -88,6 +90,20 @@ export function SucursalTabContent({
     });
     setIsEditingInfo(false);
   }, [sucursal.id]);
+
+  // Cargar fecha_desactivacion para esta sucursal
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('sucursales')
+        .select('fecha_desactivacion')
+        .eq('id', sucursal.id)
+        .maybeSingle();
+      if (!cancelled) setFechaDesactivacion((data as any)?.fecha_desactivacion ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [sucursal.id, sucursal.activa]);
 
   const handleSaveInfo = async () => {
     setIsSavingInfo(true);
@@ -109,23 +125,56 @@ export function SucursalTabContent({
     setIsSavingInfo(false);
   };
 
-  const handleToggleActive = async () => {
-    setIsTogglingActive(true);
-    const newState = !sucursal.activa;
-    const { error } = await supabase
-      .from('sucursales')
-      .update({ activa: newState })
-      .eq('id', sucursal.id);
-    if (error) {
-      toast.error('Error al cambiar el estado');
-    } else {
-      toast.success(newState ? 'Sucursal activada' : 'Sucursal desactivada');
-      onSucursalUpdated();
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const openToggleDialog = async () => {
+    setFutureTurnosCount(null);
+    setShowToggleDialog(true);
+    if (sucursal.activa) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('sucursal_id', sucursal.id)
+        .gte('fecha', today)
+        .in('estado', ['pendiente', 'confirmado', 'en_curso']);
+      setFutureTurnosCount(count ?? 0);
     }
-    setIsTogglingActive(false);
+  };
+
+  const handleToggleActive = async () => {
+    if (!organization?.id) return;
+    setIsTogglingActive(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-sucursal', {
+        body: { sucursalId: sucursal.id, organizationId: organization.id },
+      });
+      if (error) throw new Error(error.message || 'Error al cambiar el estado');
+      const action = (data as any)?.action as 'deactivated' | 'reactivated' | undefined;
+      const restored = !!(data as any)?.restored;
+      const reason = (data as any)?.reason as string | undefined;
+      toast.success(action === 'deactivated' ? 'Sucursal desactivada' : 'Sucursal reactivada');
+      if (action === 'reactivated' && !restored && reason === 'manual_changes_detected') {
+        toast.message('Hubo cambios en el equipo mientras la sucursal estuvo inactiva. Revisá la disponibilidad de los barberos manualmente.');
+      }
+      setShowToggleDialog(false);
+      onSucursalUpdated();
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al cambiar el estado');
+    } finally {
+      setIsTogglingActive(false);
+    }
   };
 
   const isInactive = !sucursal.activa;
+
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
@@ -161,34 +210,53 @@ export function SucursalTabContent({
                   <Edit2 className="h-4 w-4 mr-1" /> Editar
                 </Button>
               )}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
-                    disabled={isTogglingActive}
-                  >
-                    <Power className="h-4 w-4 mr-1" />
-                    {isInactive ? 'Activar' : 'Desactivar'}
-                  </Button>
-                </AlertDialogTrigger>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
+                disabled={isTogglingActive}
+                onClick={openToggleDialog}
+              >
+                <Power className="h-4 w-4 mr-1" />
+                {isInactive ? 'Reactivar' : 'Desactivar'}
+              </Button>
+              <AlertDialog
+                open={showToggleDialog}
+                onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
+              >
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>
-                      {isInactive ? 'Activar sucursal' : 'Desactivar sucursal'}
+                      {isInactive
+                        ? `Reactivar ${sucursal.nombre}`
+                        : `Desactivar ${sucursal.nombre}`}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       {isInactive
-                        ? `¿Querés volver a activar "${sucursal.nombre}"? Se habilitarán nuevamente todas sus secciones.`
-                        : `¿Estás seguro de que querés desactivar "${sucursal.nombre}"? Las secciones de equipo, servicios y agenda quedarán inhabilitadas hasta que la reactives.`
-                      }
+                        ? 'La sucursal volverá a estar operativa.'
+                        : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+
+                  {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <p>
+                        Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
+                      </p>
+                    </div>
+                  )}
+
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleToggleActive}>
-                      {isInactive ? 'Activar' : 'Desactivar'}
+                    <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
+                      disabled={isTogglingActive}
+                      className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                    >
+                      {isTogglingActive
+                        ? 'Procesando...'
+                        : (isInactive ? 'Reactivar' : 'Desactivar')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -246,9 +314,16 @@ export function SucursalTabContent({
       {isInactive && (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
-          <p className="text-sm text-destructive">
-            Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones.
-          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-destructive">
+              Esta sucursal está desactivada. Reactivala para gestionar estas secciones.
+            </p>
+            {fechaDesactivacion && (
+              <p className="text-xs text-destructive/80">
+                Desactivada el {formatFechaDDMMYYYY(fechaDesactivacion)}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
