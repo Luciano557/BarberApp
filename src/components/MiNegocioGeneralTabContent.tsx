@@ -76,6 +76,10 @@ export function MiNegocioGeneralTabContent({
     };
   }, [isReady]);
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
       {/* Header */}
@@ -102,13 +106,37 @@ export function MiNegocioGeneralTabContent({
         </div>
       )}
 
+      {/* Anchor nav — solo desktop */}
+      <nav className="hidden md:flex items-center gap-1 sticky top-0 z-10 bg-background border-b border-border/50 py-2 overflow-x-auto">
+        <button onClick={() => scrollTo('seccion-cuentas')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Cuentas de sucursal
+        </button>
+        <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Equipo
+        </button>
+        <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Servicios
+        </button>
+        <button onClick={() => scrollTo('seccion-productos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Productos
+        </button>
+        <button onClick={() => scrollTo('seccion-descuentos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Descuentos
+        </button>
+        <button onClick={() => scrollTo('seccion-metodos-pago')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Métodos de pago
+        </button>
+      </nav>
+
       <div className={!isReady ? 'opacity-60 pointer-events-none select-none' : ''}>
         {/* Cuentas de sucursal */}
-        <CuentasSucursalConfig />
+        <div id="seccion-cuentas">
+          <CuentasSucursalConfig />
+        </div>
 
         {/* Equipo General (solo owner/GM) */}
         {canManageEquipo && (
-          <div className="mt-8 space-y-4">
+          <div id="seccion-equipo" className="mt-8 space-y-4">
             <h3 className="text-base font-medium text-foreground">Equipo</h3>
             <p className="text-xs text-muted-foreground">
               Gestioná el equipo del negocio: alta, cargos, acceso, PIN y en qué sucursales trabaja cada uno.
@@ -125,16 +153,17 @@ export function MiNegocioGeneralTabContent({
           </div>
         )}
 
-        {/* Catálogo */}
-        <div className="space-y-4 mt-8">
-          <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
+        {/* Servicios */}
+        <section id="seccion-servicios" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Servicios</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Nombre, duración y categoría. Los precios se configuran en cada sucursal.</p>
+          </div>
           <Tabs defaultValue="services" className="w-full">
             <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               <TabsTrigger value="services" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Servicios</TabsTrigger>
-              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Líneas de servicio</TabsTrigger>
+              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Categorías</TabsTrigger>
               <TabsTrigger value="extras" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Extras</TabsTrigger>
-              <TabsTrigger value="productos" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Productos</TabsTrigger>
-              <TabsTrigger value="discounts" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Descuentos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="services" className="mt-4 space-y-6 sm:mt-6">
@@ -169,26 +198,36 @@ export function MiNegocioGeneralTabContent({
                 onDelete={guarded(onDeleteExtra)}
               />
             </TabsContent>
-
-            <TabsContent value="productos" className="mt-4 sm:mt-6">
-              <ProductosGlobalConfig />
-            </TabsContent>
-
-            <TabsContent value="discounts" className="mt-4 sm:mt-6">
-              <DiscountsConfig
-                mode="global"
-                discounts={discounts}
-                onAdd={guarded(onAddDiscount)}
-                onUpdate={guarded(onUpdateDiscount)}
-                onDelete={guarded(onDeleteDiscount)}
-                onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
-              />
-            </TabsContent>
           </Tabs>
-        </div>
+        </section>
+
+        {/* Productos */}
+        <section id="seccion-productos" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Productos</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Catálogo de productos para reventa. Stock y precios se gestionan por sucursal.</p>
+          </div>
+          <ProductosGlobalConfig />
+        </section>
+
+        {/* Descuentos */}
+        <section id="seccion-descuentos" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Descuentos</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Reglas de descuento para el cobro. Se activan por sucursal.</p>
+          </div>
+          <DiscountsConfig
+            mode="global"
+            discounts={discounts}
+            onAdd={guarded(onAddDiscount)}
+            onUpdate={guarded(onUpdateDiscount)}
+            onDelete={guarded(onDeleteDiscount)}
+            onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
+          />
+        </section>
 
         {/* Métodos de pago generales */}
-        <div className="mt-8 space-y-4">
+        <div id="seccion-metodos-pago" className="mt-8 space-y-4">
           <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
           <PaymentMethodsConfig sucursalId={null} />
         </div>

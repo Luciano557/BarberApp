@@ -20,7 +20,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EquipoSucursalPanel } from './config/EquipoSucursalPanel';
 import { CobrarConfig } from './config/CobrarConfig';
+import { DiscountsConfig } from './config/DiscountsConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
+import { ProductosConfig } from '@/components/productos/ProductosConfig';
 
 interface SucursalTabContentProps {
   sucursal: Sucursal;
@@ -199,6 +201,9 @@ export function SucursalTabContent({
 
   const isInactive = !sucursal.activa;
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
@@ -351,10 +356,29 @@ export function SucursalTabContent({
         </div>
       )}
 
+      {/* Anchor nav — solo desktop */}
+      <nav className="hidden md:flex items-center gap-1 sticky top-0 z-10 bg-background border-b border-border/50 py-2 overflow-x-auto">
+        <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Equipo
+        </button>
+        <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Servicios
+        </button>
+        <button onClick={() => scrollTo('seccion-productos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Productos
+        </button>
+        <button onClick={() => scrollTo('seccion-descuentos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Descuentos
+        </button>
+        <button onClick={() => scrollTo('seccion-metodos-pago')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          Métodos de pago
+        </button>
+      </nav>
+
       {/* Secciones inhabilitadas si la sucursal está inactiva */}
       <div className={isInactive ? 'opacity-50 pointer-events-none select-none' : ''}>
         {/* Equipo unificado */}
-        <div data-onboarding-id="equipo-section">
+        <div id="seccion-equipo" data-onboarding-id="equipo-section">
           <EquipoSucursalPanel
             sucursalId={sucursal.id}
             sucursalNombre={sucursal.nombre}
@@ -363,25 +387,48 @@ export function SucursalTabContent({
           />
         </div>
 
-        {/* Catálogo de Servicios */}
-        <div className="space-y-4 mt-6" data-onboarding-id="catalogo-section">
-          <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
+        {/* Servicios */}
+        <section id="seccion-servicios" className="border-t pt-6 mt-6" data-onboarding-id="catalogo-section">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Servicios</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Configurá precios y activá los servicios disponibles en esta sucursal.</p>
+          </div>
           <CobrarConfig
-            sucursalId={sucursal.id}
-            services={services} extras={extras} discounts={discounts} lines={lines}
+            services={services} extras={extras} lines={lines}
             onAddService={onAddService} onUpdateService={onUpdateService}
             onAddExtra={onAddExtra} onUpdateExtra={onUpdateExtra}
-            onAddDiscount={onAddDiscount} onUpdateDiscount={onUpdateDiscount}
-            onDeleteDiscount={onDeleteDiscount}
-            onToggleDiscountActive={onToggleDiscountActive}
             onAddLine={onAddLine} onUpdateLine={onUpdateLine}
             canCreateServices={canManageServiceStructure}
             canEditServiceStructure={canManageServiceStructure}
           />
-        </div>
+        </section>
+
+        {/* Productos */}
+        <section id="seccion-productos" className="border-t pt-6 mt-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Productos</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Precios, stock y comisiones para esta sucursal.</p>
+          </div>
+          <ProductosConfig sucursalId={sucursal.id} />
+        </section>
+
+        {/* Descuentos */}
+        <section id="seccion-descuentos" className="border-t pt-6 mt-6">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Descuentos</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Activá los descuentos disponibles en esta sucursal.</p>
+          </div>
+          <DiscountsConfig
+            discounts={discounts}
+            onAdd={onAddDiscount}
+            onUpdate={onUpdateDiscount}
+            onDelete={onDeleteDiscount}
+            onToggleActive={onToggleDiscountActive}
+          />
+        </section>
 
         {/* Métodos de pago y recargos (override por sucursal) */}
-        <div className="mt-6" data-onboarding-id="metodos-pago-section">
+        <div id="seccion-metodos-pago" className="mt-6" data-onboarding-id="metodos-pago-section">
           <PaymentMethodsConfig sucursalId={sucursal.id} onGoToGeneral={onGoToGeneralConfig} />
         </div>
 
