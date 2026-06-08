@@ -156,6 +156,14 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse(403, { error: "Miembro de otra organización" });
     }
 
+    // Guard: la ficha del dueño no se administra desde esta función.
+    const targetIsOwnerHard =
+      barbero.rol_equipo === "owner" ||
+      (Array.isArray(barbero.roles_equipo) && barbero.roles_equipo.includes("owner"));
+    if (targetIsOwnerHard) {
+      return jsonResponse(403, { error: "La ficha del dueño no se administra desde acá" });
+    }
+
     const { data: linkedProfile } = await admin
       .from("profiles").select("id, email").eq("barbero_id", barberoId).maybeSingle();
     const targetUserId: string | null = linkedProfile?.id ?? null;

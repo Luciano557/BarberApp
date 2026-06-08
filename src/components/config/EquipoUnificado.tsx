@@ -758,6 +758,8 @@ export function EquipoUnificado({
     const assignableRoles = displayRoles.filter(r => r !== 'owner');
     const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
     const hasSystemAccess = linkedRoles.some(r => r !== 'otros');
+    const callerIsOwner = callerRoles.includes('owner');
+    const ownerReadOnly = isOwner && !callerIsOwner;
 
     return (
       <div key={barber.id}>
@@ -941,41 +943,44 @@ export function EquipoUnificado({
             })()}
 
 
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
-                setEditingId(barber.id);
-                setFormData({
-                  firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
-                  commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-                  roles: displayRoles.length > 0 ? displayRoles : ['barber'],
-                  compensationType: barber.compensationType || 'comision',
-                  fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
-                  payDay: barber.payDay != null ? String(barber.payDay) : '1',
-                });
-              }}>
-                <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
-              </Button>
-
-              {linkedUser && hasSystemAccess && (
-                <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
-                  onClick={() => setPinDialogBarber(barber)}>
-                  <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
+            {!ownerReadOnly && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
+                  setEditingId(barber.id);
+                  setFormData({
+                    firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
+                    commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
+                    roles: displayRoles.length > 0 ? displayRoles : ['barber'],
+                    compensationType: barber.compensationType || 'comision',
+                    fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
+                    payDay: barber.payDay != null ? String(barber.payDay) : '1',
+                  });
+                }}>
+                  <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
-              )}
 
-
-              <Button variant="ghost" size="sm" className="h-8 text-xs"
-                onClick={() => setToggleConfirm({
-                  barber,
-                  action: barber.active ? 'deactivate' : 'activate',
-                })}>
-                {barber.active ? (
-                  <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Desactivar</span></>
-                ) : (
-                  <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Activar</span></>
+                {linkedUser && hasSystemAccess && (
+                  <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
+                    onClick={() => setPinDialogBarber(barber)}>
+                    <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
+                  </Button>
                 )}
-              </Button>
-            </div>
+
+                {!isOwner && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs"
+                    onClick={() => setToggleConfirm({
+                      barber,
+                      action: barber.active ? 'deactivate' : 'activate',
+                    })}>
+                    {barber.active ? (
+                      <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Desactivar</span></>
+                    ) : (
+                      <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Activar</span></>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
