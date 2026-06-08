@@ -4,6 +4,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber, TeamRole } from '@/types/barbershop';
 import type { AppRole } from '@/contexts/AuthContext';
+import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 /**
  * Lectura propia de "barberos disponibles para Cobrar".
