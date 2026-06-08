@@ -64,7 +64,12 @@ export function BarberSucursalesGeneralSection({
   useEffect(() => { fetchRows(); }, [fetchRows]);
 
   const principal = rows.find(r => r.tipo === 'principal');
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
   const recurrentes = rows.filter(r => r.tipo === 'recurrente');
+  const recurrentesVigentes = recurrentes.filter(r =>
+    !r.fecha_fin || new Date(r.fecha_fin) >= hoy
+  );
 
   const handleChangePrincipal = async (newSucursalId: string) => {
     if (!newSucursalId || newSucursalId === principal?.sucursal_id) return;
