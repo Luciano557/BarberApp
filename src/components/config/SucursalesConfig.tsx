@@ -114,6 +114,9 @@ export function SucursalesConfig() {
         timezone: s.timezone,
         activa: s.activa,
       })));
+      const fMap: Record<string, string | null> = {};
+      data.forEach((s: any) => { fMap[s.id] = s.fecha_desactivacion ?? null; });
+      setFechaDesactMap(fMap);
     }
   };
 
