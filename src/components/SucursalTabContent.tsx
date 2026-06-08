@@ -128,23 +128,57 @@ export function SucursalTabContent({
     setIsSavingInfo(false);
   };
 
-  const handleToggleActive = async () => {
-    setIsTogglingActive(true);
-    const newState = !sucursal.activa;
-    const { error } = await supabase
-      .from('sucursales')
-      .update({ activa: newState })
-      .eq('id', sucursal.id);
-    if (error) {
-      toast.error('Error al cambiar el estado');
-    } else {
-      toast.success(newState ? 'Sucursal activada' : 'Sucursal desactivada');
-      onSucursalUpdated();
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const openToggleDialog = async () => {
+    setReactivateInfo(null);
+    setFutureTurnosCount(null);
+    setShowToggleDialog(true);
+    if (sucursal.activa) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('sucursal_id', sucursal.id)
+        .gte('fecha', today)
+        .in('estado', ['pendiente', 'confirmado', 'en_curso']);
+      setFutureTurnosCount(count ?? 0);
     }
-    setIsTogglingActive(false);
+  };
+
+  const handleToggleActive = async () => {
+    if (!organization?.id) return;
+    setIsTogglingActive(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-sucursal', {
+        body: { sucursalId: sucursal.id, organizationId: organization.id },
+      });
+      if (error) throw new Error(error.message || 'Error al cambiar el estado');
+      const action = (data as any)?.action as 'deactivated' | 'reactivated' | undefined;
+      const restored = !!(data as any)?.restored;
+      const reason = (data as any)?.reason as string | undefined;
+      toast.success(action === 'deactivated' ? 'Sucursal desactivada' : 'Sucursal reactivada');
+      if (action === 'reactivated' && !restored && reason === 'manual_changes_detected') {
+        toast.message('Hubo cambios en el equipo mientras la sucursal estuvo inactiva. Revisá la disponibilidad de los barberos manualmente.');
+      }
+      setShowToggleDialog(false);
+      onSucursalUpdated();
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al cambiar el estado');
+    } finally {
+      setIsTogglingActive(false);
+    }
   };
 
   const isInactive = !sucursal.activa;
+
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
