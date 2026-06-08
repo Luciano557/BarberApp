@@ -87,13 +87,11 @@ serve(async (req: Request): Promise<Response> => {
       .from("profiles").select("id").eq("barbero_id", barberoId).maybeSingle();
     const targetUserId: string | null = linkedProfile?.id ?? null;
 
-    // Ban the auth user (if any) so they can't log in
+    // Delete the auth user (if any). Irreversible.
     if (targetUserId) {
-      const { error: banErr } = await (admin.auth.admin as any).updateUserById(targetUserId, {
-        ban_duration: "876000h",
-      });
-      if (banErr) {
-        return jsonResponse(500, { error: `No se pudo bloquear el acceso: ${banErr.message}` });
+      const { error: delErr } = await (admin.auth.admin as any).deleteUser(targetUserId);
+      if (delErr) {
+        return jsonResponse(500, { error: `No se pudo eliminar la cuenta de acceso: ${delErr.message}` });
       }
     }
 
@@ -109,14 +107,31 @@ serve(async (req: Request): Promise<Response> => {
       .eq("organization_id", organizationId);
 
     if (updErr) {
-      // Rollback: unban
-      if (targetUserId) {
-        await (admin.auth.admin as any).updateUserById(targetUserId, { ban_duration: "none" });
-      }
-      return jsonResponse(500, { error: `No se pudo finalizar la actividad: ${updErr.message}` });
+      // Auth user deletion is irreversible; report and abort.
+      return jsonResponse(500, {
+        error: `No se pudo finalizar la actividad: ${updErr.message}`,
+        authDeleted: !!targetUserId,
+      });
+    }
+
+    // Cascade: marcar todas las filas de barberos_sucursales como no disponibles.
+    const { error: bsErr } = await admin
+      .from("barberos_sucursales")
+      .update({ disponible: false })
+      .eq("barbero_id", barberoId)
+      .eq("organization_id", organizationId);
+
+    if (bsErr) {
+      // Auth user ya fue eliminado (irreversible) y barberos quedó en activo=false.
+      // No es posible rollback completo; reportamos el estado parcial.
+      return jsonResponse(500, {
+        error: `Baja registrada pero no se pudo actualizar la disponibilidad por sucursal: ${bsErr.message}`,
+        partial: true,
+      });
     }
 
     return jsonResponse(200, { ok: true });
+
   } catch (e: any) {
     return jsonResponse(500, { error: e?.message || "Error interno" });
   }
