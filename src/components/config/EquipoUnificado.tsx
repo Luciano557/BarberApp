@@ -1024,14 +1024,17 @@ export function EquipoUnificado({
 
                 {!isOwner && (
                   <Button variant="ghost" size="sm" className="h-8 text-xs"
-                    onClick={() => setToggleConfirm({
-                      barber,
-                      action: barber.active ? 'deactivate' : 'activate',
-                    })}>
+                    onClick={() => {
+                      if (barber.active) {
+                        openFinalizarDialog(barber);
+                      } else {
+                        setInviteBarber(barber);
+                      }
+                    }}>
                     {barber.active ? (
-                      <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Desactivar</span></>
+                      <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Finalizar actividad</span></>
                     ) : (
-                      <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Activar</span></>
+                      <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Reincorporar</span></>
                     )}
                   </Button>
                 )}
