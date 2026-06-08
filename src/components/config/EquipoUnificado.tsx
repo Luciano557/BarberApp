@@ -1196,9 +1196,14 @@ export function EquipoUnificado({
               )}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-3">
-              {sortedInactive.map(renderBarberItem)}
+              {sortedInactive.map(b => (
+                <div key={`hist-${b.id}`}>
+                  {renderBarberItem(b)}
+                  {renderHistorialBarbero(b.id)}
+                </div>
+              ))}
               {sortedInactive.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros inactivos</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros en el historial</p>
               )}
             </TabsContent>
           </Tabs>
