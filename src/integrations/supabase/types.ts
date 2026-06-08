@@ -2661,6 +2661,74 @@ export type Database = {
         }
         Relationships: []
       }
+      sucursal_barberos_snapshot: {
+        Row: {
+          barbero_id: string
+          dias_semana: number[] | null
+          disponible: boolean
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          organization_id: string
+          snapshotted_at: string
+          sucursal_id: string
+          tipo: string
+        }
+        Insert: {
+          barbero_id: string
+          dias_semana?: number[] | null
+          disponible: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id: string
+          snapshotted_at?: string
+          sucursal_id: string
+          tipo: string
+        }
+        Update: {
+          barbero_id?: string
+          dias_semana?: number[] | null
+          disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id?: string
+          snapshotted_at?: string
+          sucursal_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sucursal_payment_settings: {
         Row: {
           created_at: string
@@ -2747,6 +2815,7 @@ export type Database = {
           activa: boolean
           created_at: string
           direccion: string | null
+          fecha_desactivacion: string | null
           id: string
           nombre: string
           organization_id: string
@@ -2758,6 +2827,7 @@ export type Database = {
           activa?: boolean
           created_at?: string
           direccion?: string | null
+          fecha_desactivacion?: string | null
           id?: string
           nombre: string
           organization_id: string
@@ -2769,6 +2839,7 @@ export type Database = {
           activa?: boolean
           created_at?: string
           direccion?: string | null
+          fecha_desactivacion?: string | null
           id?: string
           nombre?: string
           organization_id?: string
