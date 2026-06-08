@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   useBarberosSucursales,
@@ -32,6 +33,8 @@ interface Props {
   sucursalId: string;
   sucursalNombre: string;
   organizationId: string;
+  /** Id de barbero a resaltar al montar (navegación desde Equipo General). */
+  highlightBarberoId?: string;
 }
 
 interface BarberoMini {
@@ -54,11 +57,35 @@ const ROLE_LABELS: Record<string, string> = {
  * Panel de "Equipo de la sucursal" — solo gestiona disponibilidad operativa.
  * NO administra payroll, cargos, acceso, ni PIN (eso vive en Equipo General).
  */
-export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId }: Props) {
+export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId, highlightBarberoId }: Props) {
   const { isOwner, isGeneralManager, isManager } = useAuth();
   const canCreateRecurrente = isOwner || isGeneralManager;
   const canCreateTemporal = isOwner || isGeneralManager || isManager;
   const canDeleteRecurrente = isOwner || isGeneralManager;
+
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const flagKey = `vittro:miNegocio:highlightBarbero:${organizationId}`;
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(flagKey); } catch { /* ignore */ }
+    const effectiveId = stored || highlightBarberoId || null;
+    if (!effectiveId) return;
+
+    if (stored) {
+      try { localStorage.removeItem(flagKey); } catch { /* ignore */ }
+    }
+    setHighlightedId(effectiveId);
+
+    const el = document.querySelector('[data-onboarding-id="equipo-section"]');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    highlightTimeoutRef.current = setTimeout(() => setHighlightedId(null), 2000);
+    return () => {
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+    };
+  }, [organizationId, highlightBarberoId]);
 
   const bs = useBarberosSucursales(organizationId);
 
@@ -233,7 +260,13 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
             const role = barbero?.rol_equipo ? ROLE_LABELS[barbero.rol_equipo] ?? barbero.rol_equipo : null;
 
             return (
-              <div key={barberoId} className="rounded-lg border border-border bg-muted/20 p-4">
+              <div
+                key={barberoId}
+                className={cn(
+                  "rounded-lg border border-border bg-muted/20 p-4 transition-shadow duration-700",
+                  highlightedId === barberoId && "ring-2 ring-primary/40"
+                )}
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">

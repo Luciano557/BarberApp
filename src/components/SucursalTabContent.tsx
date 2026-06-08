@@ -46,6 +46,7 @@ interface SucursalTabContentProps {
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
   onSucursalUpdated: () => void;
   onGoToGeneralConfig?: () => void;
+  highlightBarberoId?: string;
 }
 
 export function SucursalTabContent({
@@ -58,6 +59,7 @@ export function SucursalTabContent({
   onAddLine, onUpdateLine,
   onSucursalUpdated,
   onGoToGeneralConfig,
+  highlightBarberoId,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
   const { isOwner, isGeneralManager, isManager } = useAuth();
@@ -68,6 +70,28 @@ export function SucursalTabContent({
     isGeneralManager ||
     (isManager && sucursalesAsignadas.some((s) => s.id === sucursal.id));
   const [cuentaOpen, setCuentaOpen] = useState(false);
+
+  // Captura el flag de highlight al renderizar (antes de que el efecto del hijo lo borre).
+  // Los efectos de los hijos se ejecutan antes que los del padre en React, por lo que
+  // leer aquí —en lazy init— garantiza que tenemos el valor antes de que desaparezca.
+  const [shouldScrollToEquipo] = useState(() => {
+    if (typeof window === 'undefined' || !organization?.id) return false;
+    try {
+      return !!localStorage.getItem(`vittro:miNegocio:highlightBarbero:${organization.id}`);
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    if (!shouldScrollToEquipo) return;
+    const timeout = setTimeout(() => {
+      const el = document.querySelector('[data-onboarding-id="equipo-section"]');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+    return () => clearTimeout(timeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -335,6 +359,7 @@ export function SucursalTabContent({
             sucursalId={sucursal.id}
             sucursalNombre={sucursal.nombre}
             organizationId={organization?.id || ''}
+            highlightBarberoId={highlightBarberoId}
           />
         </div>
 

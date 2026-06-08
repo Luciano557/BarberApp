@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Trash2, MapPin, Loader2, Repeat } from 'lucide-react';
+import { Plus, Trash2, MapPin, Loader2, Repeat, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,8 @@ interface Props {
   sucursales: { id: string; nombre: string }[];
   /** Notificar al padre cuando cambia la sucursal principal para refrescar listas. */
   onPrincipalChanged?: () => void | Promise<void>;
+  /** Navegar a Mi Negocio > sucursal > sección equipo para este barbero. */
+  onVerConfig?: (sucursalId: string, barberoId: string) => void;
 }
 
 /**
@@ -36,13 +38,14 @@ interface Props {
  * y las asignaciones recurrentes a otras sucursales.
  */
 export function BarberSucursalesGeneralSection({
-  barberoId, organizationId, sucursales, onPrincipalChanged,
+  barberoId, organizationId, sucursales, onPrincipalChanged, onVerConfig,
 }: Props) {
   const { isOwner, isGeneralManager } = useAuth();
   const canManageRecurrentes = isOwner || isGeneralManager;
   const bs = useBarberosSucursales(organizationId);
 
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [rows, setRows] = useState<BarberoSucursalRow[]>([]);
   const [savingPrincipal, setSavingPrincipal] = useState(false);
   const [recurrenteOpen, setRecurrenteOpen] = useState(false);
@@ -51,11 +54,13 @@ export function BarberSucursalesGeneralSection({
   const fetchRows = useCallback(async () => {
     if (!organizationId || !barberoId) return;
     setLoading(true);
+    setFetchError(false);
     try {
       const list = await bs.listByBarbero(barberoId);
       setRows(list);
     } catch (e: any) {
       console.error('BarberSucursalesGeneralSection fetch error', e);
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -101,7 +106,7 @@ export function BarberSucursalesGeneralSection({
   const sucursalName = (id: string) => sucursales.find(s => s.id === id)?.nombre || '—';
 
   return (
-    <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-3">
+    <div className="pt-3 mt-3 border-t border-border/50 space-y-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
         <MapPin className="h-3.5 w-3.5" /> Sucursales
       </div>
@@ -110,11 +115,21 @@ export function BarberSucursalesGeneralSection({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
         </div>
+      ) : fetchError ? (
+        <div className="flex items-center gap-2 py-2">
+          <p className="text-xs text-destructive flex-1">No se pudo cargar la información · </p>
+          <button
+            onClick={() => { setFetchError(false); void fetchRows(); }}
+            className="text-xs text-primary hover:underline"
+          >
+            Reintentar
+          </button>
+        </div>
       ) : (
         <>
           {/* Principal */}
           <div className="space-y-1.5">
-            <Label className="text-[11px] text-muted-foreground">Sucursal principal</Label>
+            <Label className="text-xs text-muted-foreground">Sucursal principal</Label>
             <Select
               value={principal?.sucursal_id ?? ''}
               onValueChange={handleChangePrincipal}
@@ -124,17 +139,34 @@ export function BarberSucursalesGeneralSection({
                 <SelectValue placeholder="Sin asignar" />
               </SelectTrigger>
               <SelectContent>
-                {sucursales.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                ))}
+                {sucursales.length === 0 ? (
+                  <SelectItem value="__empty__" disabled>Sin sucursales configuradas</SelectItem>
+                ) : (
+                  sucursales.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
+            {principal?.sucursal_id && sucursales.some(s => s.id === principal.sucursal_id) && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">Principal</Badge>
+                {onVerConfig && (
+                  <button
+                    className="flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2"
+                    onClick={() => onVerConfig(principal.sucursal_id, barberoId)}
+                  >
+                    Ver config <ArrowRight className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Recurrentes */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-[11px] text-muted-foreground">
+              <Label className="text-xs text-muted-foreground">
                 Sucursales secundarias (recurrentes)
               </Label>
               {canManageRecurrentes && (
@@ -145,13 +177,13 @@ export function BarberSucursalesGeneralSection({
             </div>
 
             {recurrentesVigentes.length === 0 ? (
-              <p className="text-[11px] text-muted-foreground italic">Sin asignaciones recurrentes.</p>
+              <p className="text-xs text-muted-foreground italic">Sin asignaciones recurrentes.</p>
             ) : (
               <div className="space-y-1.5">
                 {recurrentesVigentes.map(r => (
                   <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-xs">
                         <Repeat className="h-3 w-3 mr-1" /> {sucursalName(r.sucursal_id)}
                       </Badge>
                       <span className="text-muted-foreground">
@@ -159,6 +191,14 @@ export function BarberSucursalesGeneralSection({
                         {r.fecha_inicio && ` · desde ${formatShortDate(r.fecha_inicio)}`}
                         {r.fecha_fin && ` · hasta ${formatShortDate(r.fecha_fin)}`}
                       </span>
+                      {onVerConfig && sucursales.some(s => s.id === r.sucursal_id) && (
+                        <button
+                          className="flex items-center gap-0.5 text-xs text-primary hover:underline underline-offset-2"
+                          onClick={() => onVerConfig(r.sucursal_id, barberoId)}
+                        >
+                          Ver config <ArrowRight className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                     {canManageRecurrentes && (
                       <Button

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(impeccable)",
+      "Skill(impeccable:*)",
+      "Bash(node .claude/skills/impeccable/scripts/context.mjs)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

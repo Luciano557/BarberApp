@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, ChevronUp, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -191,7 +191,7 @@ const RoleCard: React.FC<RoleCardProps> = ({ icon, title, description, selected,
         </span>
         <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
         {auxiliaryLabel && (
-          <span className="block text-[11px] text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
+          <span className="block text-xs text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
         )}
       </span>
     </button>
@@ -229,6 +229,8 @@ interface EquipoUnificadoProps {
   sucursalesActivas?: { id: string; nombre: string }[];
   /** En mode='general', requerido para crear nuevos barberos (sucursal principal). */
   onAddBarberToSucursal?: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
+  /** En mode='general', navega a Mi Negocio > sucursal > sección equipo para este barbero. */
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
 }
 
 interface ToggleConfirm {
@@ -238,7 +240,7 @@ interface ToggleConfirm {
 
 export function EquipoUnificado({
   sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
-  mode = 'sucursal', sucursalesActivas, onAddBarberToSucursal,
+  mode = 'sucursal', sucursalesActivas, onAddBarberToSucursal, onNavigateToMiNegocio,
 }: EquipoUnificadoProps) {
   const isGeneralMode = mode === 'general';
   const sucursalesForSection = sucursalesActivas ?? sucursales;
@@ -248,6 +250,15 @@ export function EquipoUnificado({
   type HistorialPeriodo = { fecha_inicio: string; fecha_fin: string | null; motivo_egreso: string | null; sucursal_nombre: string | null };
   const [historialMap, setHistorialMap] = useState<Record<string, HistorialPeriodo[]>>({});
   const [bajaInfoMap, setBajaInfoMap] = useState<Record<string, { fecha_baja: string | null; motivo_baja: string | null }>>({});
+  const [mostrarTodosActivos, setMostrarTodosActivos] = useState(false);
+  const [expandedHistIds, setExpandedHistIds] = useState<Set<string>>(new Set());
+  const toggleHistItem = (id: string) => {
+    setExpandedHistIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
@@ -357,53 +368,13 @@ export function EquipoUnificado({
     return `${m[3]}/${m[2]}/${m[1]}`;
   };
 
-  const renderHistorialBarbero = (barberId: string) => {
-    const baja = bajaInfoMap[barberId];
-    const periodos = historialMap[barberId] || [];
-    return (
-      <div className="mt-2 rounded-md border border-border bg-muted/30 p-3 space-y-2">
-        {baja?.fecha_baja && (
-          <p className="text-xs text-foreground">
-            <span className="font-medium">Fecha de baja:</span> {formatFechaDDMMYYYY(baja.fecha_baja)}
-          </p>
-        )}
-        {baja?.motivo_baja && (
-          <p className="text-xs text-foreground">
-            <span className="font-medium">Motivo:</span> {baja.motivo_baja}
-          </p>
-        )}
-        <div className="pt-1">
-          <p className="text-xs font-medium text-foreground mb-1">Historial de actividad</p>
-          {periodos.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Sin historial registrado.</p>
-          ) : (
-            <ul className="space-y-2">
-              {periodos.map((p, idx) => (
-                <li key={idx} className="rounded-sm border border-border/60 bg-background p-2 text-xs space-y-0.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground">
-                      {p.sucursal_nombre || 'Sin sucursal asignada'}
-                    </span>
-                    {p.fecha_fin === null && (
-                      <Badge variant="secondary" className="text-[10px]">Activo</Badge>
-                    )}
-                  </div>
-                  <p className="text-muted-foreground">
-                    Desde: {formatFechaDDMMYYYY(p.fecha_inicio)}
-                    {p.fecha_fin && <> · Hasta: {formatFechaDDMMYYYY(p.fecha_fin)}</>}
-                  </p>
-                  {p.motivo_egreso && (
-                    <p className="text-muted-foreground">Motivo: {p.motivo_egreso}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    );
+  const formatFechaBaja = (iso: string | null | undefined): string => {
+    if (!iso) return '—';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return '—';
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `Baja: ${m[3]} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
   };
-
 
   // Fetch PIN status
   const fetchPinStatus = useCallback(async () => {
@@ -905,6 +876,81 @@ export function EquipoUnificado({
   // unmounting/remounting (which would reset checkbox state) when the parent
   // re-fetches data while the user is editing.
 
+  // --- Render compact collapsible row for inactive members ---
+  const renderHistorialItem = (barber: Barber) => {
+    const baja = bajaInfoMap[barber.id];
+    const linkedUser = getLinkedUser(barber.id);
+    const displayRoles = getDisplayRoles(barber);
+    const rolesLabel = displayRoles.length > 0
+      ? displayRoles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(getRoleLabel).join(' · ')
+      : 'Sin cargo';
+    const isExpanded = expandedHistIds.has(barber.id);
+    const email = linkedUser?.email;
+    const phone = barber.phone ? formatPhoneDisplay(barber.phone) : null;
+
+    return (
+      <>
+        <div
+          onClick={() => toggleHistItem(barber.id)}
+          className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+        >
+          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center flex-shrink-0">
+            {barber.firstName.charAt(0).toUpperCase()}{barber.lastName.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {barber.firstName} {barber.lastName}
+            </p>
+            <p className="text-xs text-muted-foreground">{rolesLabel}</p>
+          </div>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
+            {formatFechaBaja(baja?.fecha_baja)}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 border-t border-border/50 bg-muted/20">
+            <div className="grid grid-cols-2 gap-3 pt-3 mb-4">
+              {email && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                  <p className="text-sm break-all">{email}</p>
+                </div>
+              )}
+              {phone && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Teléfono</p>
+                  <p className="text-sm">{phone}</p>
+                </div>
+              )}
+              {barber.dni && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">DNI</p>
+                  <p className="text-sm">{barber.dni}</p>
+                </div>
+              )}
+              {baja?.motivo_baja && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Motivo de baja</p>
+                  <p className="text-sm">{baja.motivo_baja}</p>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setInviteBarber(barber); }}
+              className="text-xs px-3 py-1.5 rounded-md border border-primary/30 bg-primary/5 text-primary font-medium hover:bg-primary/10 transition-colors flex items-center gap-1.5"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Reincorporar
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
+
   // --- Render a barber item ---
   const renderBarberItem = (barber: Barber) => {
     const linkedUser = getLinkedUser(barber.id);
@@ -916,6 +962,7 @@ export function EquipoUnificado({
     const hasSystemAccess = linkedRoles.some(r => r !== 'otros');
     const callerIsOwner = callerRoles.includes('owner');
     const ownerReadOnly = isOwner && !callerIsOwner;
+    const tieneContacto = !!linkedUser || !!(barber.phone && formatPhoneDisplay(barber.phone)) || !!barber.address || !!barber.dni;
 
     return (
       <div key={barber.id}>
@@ -956,47 +1003,42 @@ export function EquipoUnificado({
             </div>
 
             {/* Contact info */}
-            <div className="text-xs text-muted-foreground space-y-1 mb-3">
-              {linkedUser && (
-                <div className="flex items-start gap-1.5">
-                  <Mail className="mt-0.5 h-3 w-3 shrink-0" />
-                  <span className="break-all">{linkedUser.email}</span>
-                </div>
-              )}
-              {barber.phone && formatPhoneDisplay(barber.phone) && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
-                  <span className="break-words">{formatPhoneDisplay(barber.phone)}</span>
-                </div>
-              )}
-              {barber.address && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Dir</span>
-                  <span className="break-words">{barber.address}</span>
-                </div>
-              )}
-              {barber.dni && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">DNI</span>
-                  <span className="break-words">{barber.dni}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Cargos: badges visuales no editables. Edición vía botón Editar. */}
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
-              {(() => {
-                const allRoles: AppRole[] = isOwner
-                  ? Array.from(new Set<AppRole>(['owner', ...displayRoles]))
-                  : displayRoles;
-                return allRoles.map(role => (
-                  <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
-                    {getRoleIcon(role)} {getRoleLabel(role)}
-                  </Badge>
-                ));
-              })()}
-            </div>
+            {tieneContacto && (
+              <div className="pt-3 mt-3 border-t border-border/50 mb-3 space-y-1">
+                {linkedUser && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground break-all">{linkedUser.email}</span>
+                  </div>
+                )}
+                {barber.phone && formatPhoneDisplay(barber.phone) && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground">{formatPhoneDisplay(barber.phone)}</span>
+                  </div>
+                )}
+                {barber.address && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground break-words">{barber.address}</span>
+                  </div>
+                )}
+                {barber.dni && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground">{barber.dni}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Extras de compensación — only for managers/GMs */}
             {(() => {
@@ -1020,6 +1062,7 @@ export function EquipoUnificado({
                 organizationId={organizationId}
                 sucursales={sucursalesForSection}
                 onPrincipalChanged={onRefreshBarbers}
+                onVerConfig={onNavigateToMiNegocio}
               />
             )}
 
@@ -1040,12 +1083,12 @@ export function EquipoUnificado({
               else if (hasPersistedEmail) { stateLabel = 'Email cargado — acceso pendiente'; stateClass = 'text-primary'; }
 
               return (
-                <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-2">
+                <div className="pt-3 mt-3 border-t border-border/50 space-y-2">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                       <KeyRound className="h-3.5 w-3.5" /> Acceso al sistema
                     </span>
-                    <span className={`text-[11px] ${stateClass}`}>{stateLabel}</span>
+                    <span className={`text-xs ${stateClass}`}>{stateLabel}</span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Input
@@ -1075,7 +1118,7 @@ export function EquipoUnificado({
                   </div>
                   {code && (
                     <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/30 space-y-1">
-                      <p className="text-[11px] text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
+                      <p className="text-xs text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="text-xs">
                           <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{code.email}</span></div>
@@ -1182,7 +1225,7 @@ export function EquipoUnificado({
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-[11px] text-muted-foreground">
+                      <p className="text-xs text-muted-foreground">
                         Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
                       </p>
                     </div>
@@ -1190,16 +1233,41 @@ export function EquipoUnificado({
                   <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
                 </div>
               )}
-              {sortedActive.map(renderBarberItem)}
-              {sortedActive.length === 0 && !isAdding && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros activos</p>
-              )}
+              {(() => {
+                const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
+                return (
+                  <>
+                    {visiblesActivos.map(renderBarberItem)}
+                    {sortedActive.length === 0 && !isAdding && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No hay miembros activos</p>
+                    )}
+                    {sortedActive.length > 1 && (
+                      mostrarTodosActivos ? (
+                        <button
+                          onClick={() => setMostrarTodosActivos(false)}
+                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                          Ver menos
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setMostrarTodosActivos(true)}
+                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                          Ver más ({sortedActive.length - 1})
+                        </button>
+                      )
+                    )}
+                  </>
+                );
+              })()}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-3">
               {sortedInactive.map(b => (
-                <div key={`hist-${b.id}`}>
-                  {renderBarberItem(b)}
-                  {renderHistorialBarbero(b.id)}
+                <div key={`hist-${b.id}`} className="bg-card border border-border/60 rounded-lg overflow-hidden mb-2">
+                  {renderHistorialItem(b)}
                 </div>
               ))}
               {sortedInactive.length === 0 && (
@@ -1294,7 +1362,7 @@ export function EquipoUnificado({
                     className="min-h-[72px] text-sm"
                     disabled={finalizarTarget?.submitting}
                   />
-                  <div className="text-right text-[11px] text-muted-foreground">
+                  <div className="text-right text-xs text-muted-foreground">
                     {(finalizarTarget?.motivo.length ?? 0)}/240
                   </div>
                 </div>

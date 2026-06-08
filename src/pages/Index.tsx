@@ -5,7 +5,7 @@ import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
-import { MiNegocioPanel } from '@/components/MiNegocioPanel';
+import { MiNegocioPanel, type MiNegocioPanelHandle } from '@/components/MiNegocioPanel';
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -42,6 +42,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState(getDefaultTab);
   const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
   const prevActiveTabRef = useRef(activeTab);
+  const miNegocioPanelRef = useRef<MiNegocioPanelHandle>(null);
 
   // Register tab setter so onboarding can drive navigation
   useEffect(() => {
@@ -129,6 +130,20 @@ const Index = () => {
     }
     setActiveTab('mi-negocio');
   }, [organization?.id, currentSucursal?.id]);
+
+  const navigateToMiNegocioEquipo = useCallback((sucursalId: string, barberoId: string) => {
+    if (activeTab === 'mi-negocio') {
+      miNegocioPanelRef.current?.navigateToSucursalEquipo(sucursalId, barberoId);
+    } else {
+      if (organization?.id) {
+        try {
+          localStorage.setItem(`vittro:miNegocio:activeTab:${organization.id}`, sucursalId);
+          localStorage.setItem(`vittro:miNegocio:highlightBarbero:${organization.id}`, barberoId);
+        } catch { }
+      }
+      setActiveTab('mi-negocio');
+    }
+  }, [activeTab, organization?.id]);
 
   // Refresca datos solo cuando se entra a Cobrar desde otra pestaña.
   useEffect(() => {
@@ -240,7 +255,11 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
+            <MiNegocioPanel
+              ref={miNegocioPanelRef}
+              onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined}
+              onNavigateToMiNegocio={navigateToMiNegocioEquipo}
+            />
           )}
 
           {activeTab === 'config' && canViewConfig && (

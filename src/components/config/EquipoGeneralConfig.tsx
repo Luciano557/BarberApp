@@ -8,6 +8,7 @@ interface EquipoGeneralConfigProps {
   onAddBarberToSucursal: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
 }
 
 /**
@@ -18,7 +19,7 @@ interface EquipoGeneralConfigProps {
  */
 export function EquipoGeneralConfig({
   organizationId, allBarbers, allSucursales,
-  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers,
+  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers, onNavigateToMiNegocio,
 }: EquipoGeneralConfigProps) {
   const sucursalesActivas = allSucursales
     .filter(s => s.activa)
@@ -38,6 +39,7 @@ export function EquipoGeneralConfig({
       onAddBarberToSucursal={onAddBarberToSucursal}
       onUpdateBarber={onUpdateBarber}
       onRefreshBarbers={onRefreshBarbers}
+      onNavigateToMiNegocio={onNavigateToMiNegocio}
     />
   );
 }

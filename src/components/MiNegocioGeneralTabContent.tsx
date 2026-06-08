@@ -41,6 +41,7 @@ interface MiNegocioGeneralTabContentProps {
   onAddBarberToSucursal: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
 }
 
 /**
@@ -60,7 +61,7 @@ export function MiNegocioGeneralTabContent({
   onAddLine, onUpdateLine,
   onDeleteService, onDeleteExtra, onDeleteLine,
   organizationId, allBarbers, allSucursales,
-  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers,
+  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers, onNavigateToMiNegocio,
 }: MiNegocioGeneralTabContentProps) {
   const { isOwner, isGeneralManager } = useAuth();
   const canManageEquipo = isOwner || isGeneralManager;
@@ -104,6 +105,25 @@ export function MiNegocioGeneralTabContent({
       <div className={!isReady ? 'opacity-60 pointer-events-none select-none' : ''}>
         {/* Cuentas de sucursal */}
         <CuentasSucursalConfig />
+
+        {/* Equipo General (solo owner/GM) */}
+        {canManageEquipo && (
+          <div className="mt-8 space-y-4">
+            <h3 className="text-base font-medium text-foreground">Equipo</h3>
+            <p className="text-xs text-muted-foreground">
+              Gestioná el equipo del negocio: alta, cargos, acceso, PIN y en qué sucursales trabaja cada uno.
+            </p>
+            <EquipoGeneralConfig
+              organizationId={organizationId}
+              allBarbers={allBarbers}
+              allSucursales={allSucursales}
+              onAddBarberToSucursal={onAddBarberToSucursal}
+              onUpdateBarber={onUpdateBarber}
+              onRefreshBarbers={onRefreshBarbers}
+              onNavigateToMiNegocio={onNavigateToMiNegocio}
+            />
+          </div>
+        )}
 
         {/* Catálogo */}
         <div className="space-y-4 mt-8">
@@ -166,24 +186,6 @@ export function MiNegocioGeneralTabContent({
             </TabsContent>
           </Tabs>
         </div>
-
-        {/* Equipo General (solo owner/GM) */}
-        {canManageEquipo && (
-          <div className="mt-8 space-y-4">
-            <h3 className="text-base font-medium text-foreground">Equipo</h3>
-            <p className="text-xs text-muted-foreground">
-              Gestioná el equipo del negocio: alta, cargos, acceso, PIN y en qué sucursales trabaja cada uno.
-            </p>
-            <EquipoGeneralConfig
-              organizationId={organizationId}
-              allBarbers={allBarbers}
-              allSucursales={allSucursales}
-              onAddBarberToSucursal={onAddBarberToSucursal}
-              onUpdateBarber={onUpdateBarber}
-              onRefreshBarbers={onRefreshBarbers}
-            />
-          </div>
-        )}
 
         {/* Métodos de pago generales */}
         <div className="mt-8 space-y-4">

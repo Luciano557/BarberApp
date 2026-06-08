@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -60,9 +60,15 @@ function dbToBarberWithSucursal(row: any): BarberWithSucursal {
 
 interface MiNegocioPanelProps {
   onGoToGeneralConfig?: () => void;
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
 }
 
-export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}) {
+export interface MiNegocioPanelHandle {
+  navigateToSucursalEquipo(sucursalId: string, barberoId: string): void;
+}
+
+export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelProps>(
+  function MiNegocioPanel({ onGoToGeneralConfig, onNavigateToMiNegocio }, ref) {
   const { organization } = useOrganization();
   const { currentSucursal, refreshSucursales, setCurrentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, user } = useAuth();
@@ -84,6 +90,8 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
   const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+  const [pendingHighlightBarberoId, setPendingHighlightBarberoId] = useState<string | null>(null);
+  const [pendingHighlightSucursalId, setPendingHighlightSucursalId] = useState<string | null>(null);
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
@@ -222,6 +230,23 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       onb.notifyEvent('mi-negocio:sucursal-selected');
     }
   }, [storageKey, currentSucursal?.id, setCurrentSucursal, onb]);
+
+  useImperativeHandle(ref, () => ({
+    navigateToSucursalEquipo(sucursalId: string, barberoId: string) {
+      handleTabChange(sucursalId);
+      setPendingHighlightBarberoId(barberoId);
+      setPendingHighlightSucursalId(sucursalId);
+    },
+  }), [handleTabChange]);
+
+  useEffect(() => {
+    if (!pendingHighlightBarberoId) return;
+    const t = setTimeout(() => {
+      setPendingHighlightBarberoId(null);
+      setPendingHighlightSucursalId(null);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [pendingHighlightBarberoId]);
 
   // Registrar sub-tab setter para el onboarding
   useEffect(() => {
@@ -412,6 +437,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onAddBarberToSucursal={(barber, sucId) => addBarberToSucursal(sucId, barber)}
                 onUpdateBarber={updateBarberFn}
                 onRefreshBarbers={fetchAllBarbers}
+                onNavigateToMiNegocio={onNavigateToMiNegocio}
               />
             </TabsContent>
           )}
@@ -443,6 +469,7 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
                 onUpdateLine={updateLine}
                 onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
                 onGoToGeneralConfig={onGoToGeneralConfig}
+                highlightBarberoId={pendingHighlightSucursalId === s.id ? pendingHighlightBarberoId ?? undefined : undefined}
               />
             </TabsContent>
           ))}
@@ -493,4 +520,5 @@ export function MiNegocioPanel({ onGoToGeneralConfig }: MiNegocioPanelProps = {}
       </Dialog>
     </div>
   );
-}
+  }
+);
