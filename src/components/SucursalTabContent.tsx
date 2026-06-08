@@ -11,7 +11,6 @@ import { useSucursal } from '@/contexts/SucursalContext';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Sucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
