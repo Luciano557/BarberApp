@@ -578,6 +578,52 @@ export function SucursalesConfig() {
           {cuentaSucursal && <CuentaSucursalBlock sucursal={cuentaSucursal} />}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!toggleTarget}
+        onOpenChange={(o) => { if (!o && !toggleTarget?.submitting) setToggleTarget(null); }}
+      >
+        <AlertDialogContent>
+          {toggleTarget && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {toggleTarget.isDeactivating
+                    ? `Desactivar ${toggleTarget.suc.nombre}`
+                    : `Reactivar ${toggleTarget.suc.nombre}`}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {toggleTarget.isDeactivating
+                    ? 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'
+                    : 'La sucursal volverá a estar operativa.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              {toggleTarget.isDeactivating && toggleTarget.futureTurnos !== null && toggleTarget.futureTurnos > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Esta sucursal tiene {toggleTarget.futureTurnos} turno{toggleTarget.futureTurnos === 1 ? '' : 's'} futuro{toggleTarget.futureTurnos === 1 ? '' : 's'} que quedará{toggleTarget.futureTurnos === 1 ? '' : 'n'} sin atender.
+                  </p>
+                </div>
+              )}
+
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={toggleTarget.submitting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => { e.preventDefault(); confirmToggle(); }}
+                  disabled={toggleTarget.submitting || toggleTarget.loadingPrecheck}
+                  className={toggleTarget.isDeactivating ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                >
+                  {toggleTarget.submitting
+                    ? 'Procesando...'
+                    : toggleTarget.isDeactivating ? 'Desactivar' : 'Reactivar'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
