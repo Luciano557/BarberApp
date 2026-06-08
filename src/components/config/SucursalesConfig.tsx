@@ -212,16 +212,63 @@ export function SucursalesConfig() {
     }
   };
 
-  const handleToggleActive = async (suc: Sucursal) => {
-    const { error } = await supabase.from('sucursales').update({ activa: !suc.activa }).eq('id', suc.id);
-    if (error) {
-      toast.error('Error al actualizar');
-    } else {
-      toast.success(suc.activa ? 'Sucursal desactivada' : 'Sucursal activada');
-      await fetchAllSucursales();
-      await refreshSucursales();
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const openToggleDialog = async (suc: Sucursal) => {
+    const isDeactivating = suc.activa;
+    setToggleTarget({
+      suc,
+      isDeactivating,
+      loadingPrecheck: isDeactivating,
+      futureTurnos: null,
+      submitting: false,
+      info: null,
+    });
+    if (isDeactivating) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('sucursal_id', suc.id)
+        .gte('fecha', today)
+        .in('estado', ['pendiente', 'confirmado', 'en_curso']);
+      setToggleTarget(prev => prev && prev.suc.id === suc.id
+        ? { ...prev, loadingPrecheck: false, futureTurnos: count ?? 0 }
+        : prev);
     }
   };
+
+  const confirmToggle = async () => {
+    if (!toggleTarget || !organization?.id) return;
+    setToggleTarget(prev => prev ? { ...prev, submitting: true } : prev);
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-sucursal', {
+        body: { sucursalId: toggleTarget.suc.id, organizationId: organization.id },
+      });
+      if (error) throw new Error(error.message || 'Error al cambiar el estado');
+      const action = (data as any)?.action as 'deactivated' | 'reactivated' | undefined;
+      const restored = !!(data as any)?.restored;
+      const reason = (data as any)?.reason as string | undefined;
+      toast.success(action === 'deactivated' ? 'Sucursal desactivada' : 'Sucursal reactivada');
+      await fetchAllSucursales();
+      await refreshSucursales();
+      if (action === 'reactivated' && !restored && reason === 'manual_changes_detected') {
+        toast.message('Hubo cambios en el equipo mientras la sucursal estuvo inactiva. Revisá la disponibilidad de los barberos manualmente.');
+      }
+      setToggleTarget(null);
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al cambiar el estado');
+      setToggleTarget(prev => prev ? { ...prev, submitting: false } : prev);
+    }
+  };
+
 
   // --- User assignment ---
   const handleOpenAssign = async (suc: Sucursal) => {
