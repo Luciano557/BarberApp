@@ -317,9 +317,16 @@ export function SucursalTabContent({
       {isInactive && (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
           <AlertTriangle className="h-5 w-5 shrink-0 text-destructive" />
-          <p className="text-sm text-destructive">
-            Esta sucursal está desactivada. Activala nuevamente para gestionar estas secciones.
-          </p>
+          <div className="space-y-1">
+            <p className="text-sm text-destructive">
+              Esta sucursal está desactivada. Reactivala para gestionar estas secciones.
+            </p>
+            {fechaDesactivacion && (
+              <p className="text-xs text-destructive/80">
+                Desactivada el {formatFechaDDMMYYYY(fechaDesactivacion)}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
