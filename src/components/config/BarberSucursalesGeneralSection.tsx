@@ -64,7 +64,12 @@ export function BarberSucursalesGeneralSection({
   useEffect(() => { fetchRows(); }, [fetchRows]);
 
   const principal = rows.find(r => r.tipo === 'principal');
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
   const recurrentes = rows.filter(r => r.tipo === 'recurrente');
+  const recurrentesVigentes = recurrentes.filter(r =>
+    !r.fecha_fin || new Date(r.fecha_fin) >= hoy
+  );
 
   const handleChangePrincipal = async (newSucursalId: string) => {
     if (!newSucursalId || newSucursalId === principal?.sucursal_id) return;
@@ -139,11 +144,11 @@ export function BarberSucursalesGeneralSection({
               )}
             </div>
 
-            {recurrentes.length === 0 ? (
+            {recurrentesVigentes.length === 0 ? (
               <p className="text-[11px] text-muted-foreground italic">Sin asignaciones recurrentes.</p>
             ) : (
               <div className="space-y-1.5">
-                {recurrentes.map(r => (
+                {recurrentesVigentes.map(r => (
                   <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-[10px]">
