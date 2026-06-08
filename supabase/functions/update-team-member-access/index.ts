@@ -413,8 +413,15 @@ serve(async (req: Request): Promise<Response> => {
       tempPassword = generatePassword();
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
-      const { data: list } = await admin.auth.admin.listUsers();
+      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const existing = list?.users?.find(u => u.email?.toLowerCase() === finalEmail.toLowerCase());
+
+      // Fase 7: if email exists and belongs to a DIFFERENT user, reject
+      if (existing && existing.id !== targetUserId) {
+        const conflict = await checkEmailConflict(admin, finalEmail, targetUserId, organizationId);
+        if (conflict) return jsonResponse(conflict.status, conflict.body);
+      }
+
 
       if (existing) {
         const { error: upErr } = await admin.auth.admin.updateUserById(existing.id, {
