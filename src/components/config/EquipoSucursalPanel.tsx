@@ -78,6 +78,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           .from('barberos')
           .select('id, nombre, apellido, rol_equipo, activo')
           .eq('organization_id', organizationId)
+          .eq('activo', true)
           .in('id', ids);
         if (error) throw error;
         const map: Record<string, BarberoMini> = {};
@@ -86,6 +87,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       } else {
         setBarberos({});
       }
+
     } catch (e: any) {
       console.error('EquipoSucursalPanel fetch error', e);
       toast.error('No se pudo cargar el equipo de la sucursal');
