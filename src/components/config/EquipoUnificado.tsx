@@ -245,6 +245,9 @@ export function EquipoUnificado({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  type HistorialPeriodo = { fecha_inicio: string; fecha_fin: string | null; motivo_egreso: string | null; sucursal_nombre: string | null };
+  const [historialMap, setHistorialMap] = useState<Record<string, HistorialPeriodo[]>>({});
+  const [bajaInfoMap, setBajaInfoMap] = useState<Record<string, { fecha_baja: string | null; motivo_baja: string | null }>>({});
   const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
