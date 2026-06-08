@@ -1141,22 +1141,69 @@ export function EquipoUnificado({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
+      {/* Finalizar actividad */}
+      <AlertDialog
+        open={!!finalizarTarget}
+        onOpenChange={(open) => {
+          if (!open && finalizarTarget && !finalizarTarget.submitting) setFinalizarTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {toggleConfirm?.action === 'deactivate' ? 'Desactivar miembro' : 'Activar miembro'}
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserX className="h-4 w-4 text-destructive" />
+              Finalizar actividad
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {toggleConfirm?.action === 'deactivate'
-                ? `¿Estás seguro de que querés desactivar a ${toggleConfirm?.barber.firstName} ${toggleConfirm?.barber.lastName}? No aparecerá en el listado activo.`
-                : `¿Querés volver a activar a ${toggleConfirm?.barber.firstName} ${toggleConfirm?.barber.lastName}?`}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  {finalizarTarget && (
+                    <>
+                      Vas a finalizar la actividad de{' '}
+                      <strong className="text-foreground">
+                        {finalizarTarget.barber.firstName} {finalizarTarget.barber.lastName}
+                      </strong>
+                      . Dejará de aparecer en el equipo activo, perderá el acceso al sistema y se registrará la fecha de baja en su historial.
+                    </>
+                  )}
+                </p>
+                {finalizarTarget?.loading ? (
+                  <p className="text-xs">Verificando turnos futuros…</p>
+                ) : finalizarTarget && finalizarTarget.futureTurnos !== null && finalizarTarget.futureTurnos > 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span>
+                      Tiene <strong>{finalizarTarget.futureTurnos}</strong> turno{finalizarTarget.futureTurnos === 1 ? '' : 's'} futuro{finalizarTarget.futureTurnos === 1 ? '' : 's'} agendado{finalizarTarget.futureTurnos === 1 ? '' : 's'}. Al finalizar la actividad esos turnos quedarán asignados a este barbero. Reasignalos o cancelalos antes si corresponde.
+                    </span>
+                  </div>
+                ) : null}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Motivo (opcional)</label>
+                  <Textarea
+                    placeholder="Ej: renunció, cambio de rubro, traslado…"
+                    maxLength={240}
+                    value={finalizarTarget?.motivo ?? ''}
+                    onChange={(e) =>
+                      setFinalizarTarget(prev => prev ? { ...prev, motivo: e.target.value } : prev)
+                    }
+                    className="min-h-[72px] text-sm"
+                    disabled={finalizarTarget?.submitting}
+                  />
+                  <div className="text-right text-[11px] text-muted-foreground">
+                    {(finalizarTarget?.motivo.length ?? 0)}/240
+                  </div>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
-              {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            <AlertDialogCancel disabled={finalizarTarget?.submitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmFinalizar(); }}
+              disabled={finalizarTarget?.submitting || finalizarTarget?.loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {finalizarTarget?.submitting ? 'Finalizando…' : 'Finalizar actividad'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
