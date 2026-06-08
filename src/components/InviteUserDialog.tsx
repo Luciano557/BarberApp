@@ -122,16 +122,32 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
         },
       });
 
+      // Parse structured error from edge function (supabase-js wraps non-2xx as error)
+      const parsedErr: any = response.error
+        ? (() => {
+            const ctx: any = (response.error as any)?.context;
+            return ctx?.body || null;
+          })()
+        : null;
+      const errCode: string | undefined = parsedErr?.code ?? response.data?.code;
+      const errMsg: string | undefined = parsedErr?.error ?? response.data?.error ?? (response.error?.message);
+
+      if (errCode === 'EMAIL_BELONGS_TO_OWNER' || errCode === 'EMAIL_ALREADY_REGISTERED') {
+        setErrors(prev => ({
+          ...prev,
+          email: errCode === 'EMAIL_BELONGS_TO_OWNER'
+            ? 'Este email pertenece al dueño de la organización.'
+            : 'Este email ya está registrado en el sistema.',
+        }));
+        return;
+      }
+
       if (response.error) {
-        throw new Error(response.error.message);
+        throw new Error(errMsg || response.error.message);
       }
 
       if (response.data?.error) {
-        // Handle specific error messages
-        if (response.data.error.includes('Ya existe un usuario') || response.data.error.includes('already been registered')) {
-          throw new Error('Ya existe una cuenta con ese email. El usuario puede iniciar sesión directamente.');
-        }
-        throw new Error(response.data.error);
+        throw new Error(errMsg || response.data.error);
       }
 
       // Show credentials on screen

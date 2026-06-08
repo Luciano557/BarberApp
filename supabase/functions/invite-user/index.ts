@@ -76,57 +76,60 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error("Invalid role");
     }
 
+    // Normalize email
+    const emailNorm = email.trim().toLowerCase();
+
+    // Guard: reject if email already exists in auth.users (Fase 7)
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === emailNorm);
+
+    if (existingUser) {
+      const { data: ownerRow } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", existingUser.id)
+        .eq("role", "owner")
+        .maybeSingle();
+      const { data: existingProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", existingUser.id)
+        .maybeSingle();
+      const isOrgOwner = !!ownerRow && existingProfile?.organization_id === organizationId;
+
+      return new Response(
+        JSON.stringify({
+          error: isOrgOwner
+            ? "Este email pertenece al dueño de la organización."
+            : "Este email ya está registrado en el sistema.",
+          code: isOrgOwner ? "EMAIL_BELONGS_TO_OWNER" : "EMAIL_ALREADY_REGISTERED",
+        }),
+        { status: 409, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Generate temporary password
     const tempPassword = generatePassword();
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
-    
-    let userId: string;
-    let isExistingUser = false;
-    
-    if (existingUser) {
-      // User exists - update their password
-      isExistingUser = true;
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        existingUser.id,
-        { 
-          password: tempPassword,
-          user_metadata: {
-            ...existingUser.user_metadata,
-            must_change_password: true,
-          }
-        }
-      );
-      
-      if (updateError) {
-        console.error("Update user error:", updateError);
-        throw new Error(updateError.message || "Error actualizando usuario");
-      }
-      
-      userId = existingUser.id;
-      console.log("Password reset for existing user:", existingUser.email);
-    } else {
-      // Create new user
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: fullName,
-          must_change_password: true,
-          invited_by: requestingUser.id,
-        },
-      });
+    // Create new user (email guaranteed not to exist at this point)
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: emailNorm,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        must_change_password: true,
+        invited_by: requestingUser.id,
+      },
+    });
 
-      if (createError || !newUser.user) {
-        console.error("Create user error:", createError);
-        throw new Error(createError?.message || "Error creating user");
-      }
-      
-      userId = newUser.user.id;
+    if (createError || !newUser.user) {
+      console.error("Create user error:", createError);
+      throw new Error(createError?.message || "Error creating user");
     }
+
+    const userId: string = newUser.user.id;
+    const isExistingUser = false;
 
     // Update profile with organization_id and barbero_id
     const { error: profileError } = await supabaseAdmin
