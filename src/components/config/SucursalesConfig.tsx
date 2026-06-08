@@ -79,6 +79,15 @@ export function SucursalesConfig() {
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
+  const [fechaDesactMap, setFechaDesactMap] = useState<Record<string, string | null>>({});
+  const [toggleTarget, setToggleTarget] = useState<{
+    suc: Sucursal;
+    isDeactivating: boolean;
+    loadingPrecheck: boolean;
+    futureTurnos: number | null;
+    submitting: boolean;
+    info: string | null;
+  } | null>(null);
 
   // Users assignment dialog
   const [showAssignDialog, setShowAssignDialog] = useState(false);
