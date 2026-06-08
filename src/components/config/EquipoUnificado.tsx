@@ -745,11 +745,8 @@ export function EquipoUnificado({
     resetForm();
   };
 
-  const handleConfirmToggle = () => {
-    if (!toggleConfirm) return;
-    onUpdateBarber(toggleConfirm.barber.id, { active: toggleConfirm.action === 'activate' });
-    setToggleConfirm(null);
-  };
+
+
 
   // --- Finalizar actividad: abre dialog y consulta turnos futuros ---
   const openFinalizarDialog = async (barber: Barber) => {
