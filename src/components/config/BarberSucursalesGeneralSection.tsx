@@ -144,11 +144,11 @@ export function BarberSucursalesGeneralSection({
               )}
             </div>
 
-            {recurrentes.length === 0 ? (
+            {recurrentesVigentes.length === 0 ? (
               <p className="text-[11px] text-muted-foreground italic">Sin asignaciones recurrentes.</p>
             ) : (
               <div className="space-y-1.5">
-                {recurrentes.map(r => (
+                {recurrentesVigentes.map(r => (
                   <div key={r.id} className="flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className="text-[10px]">
