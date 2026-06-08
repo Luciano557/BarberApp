@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { AgendaManagement } from './config/AgendaManagement';
+import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 function dbToBarber(row: any): Barber {
   return {
@@ -89,6 +90,13 @@ export function TurnosAgendaPanel() {
     fetchAllBarbers();
     fetchManagerSucursales();
   }, [fetchAllSucursales, fetchAllBarbers, fetchManagerSucursales]);
+
+  // Realtime: refrescar lista de barberos cuando cambia su disponibilidad en cualquier sucursal de la org.
+  useBarberosSucursalesRealtime({
+    orgId: organization?.id ?? null,
+    sucursalId: null,
+    onChange: () => { void fetchAllBarbers(); },
+  });
 
   const visibleSucursales = isManagerOnly
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
