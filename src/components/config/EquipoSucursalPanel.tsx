@@ -26,6 +26,7 @@ import {
   type BarberoSucursalRow,
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
+import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 interface Props {
   sucursalId: string;
@@ -94,6 +95,13 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   }, [bs, organizationId, sucursalId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Realtime: invalidar cuando cambia disponibilidad en esta sucursal.
+  useBarberosSucursalesRealtime({
+    orgId: organizationId,
+    sucursalId,
+    onChange: () => { void fetchAll(); },
+  });
 
   // Agrupar filas por barbero.
   const grouped = useMemo(() => {
