@@ -81,7 +81,6 @@ export function SucursalTabContent({
   const [fechaDesactivacion, setFechaDesactivacion] = useState<string | null>(null);
   const [futureTurnosCount, setFutureTurnosCount] = useState<number | null>(null);
   const [showToggleDialog, setShowToggleDialog] = useState(false);
-  const [reactivateInfo, setReactivateInfo] = useState<string | null>(null);
 
   useEffect(() => {
     setInfoForm({
@@ -90,7 +89,6 @@ export function SucursalTabContent({
       telefono: sucursal.telefono || '',
     });
     setIsEditingInfo(false);
-    setReactivateInfo(null);
   }, [sucursal.id]);
 
   // Cargar fecha_desactivacion para esta sucursal
