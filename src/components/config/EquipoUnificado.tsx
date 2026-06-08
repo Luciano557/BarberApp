@@ -245,6 +245,9 @@ export function EquipoUnificado({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  type HistorialPeriodo = { fecha_inicio: string; fecha_fin: string | null; motivo_egreso: string | null; sucursal_nombre: string | null };
+  const [historialMap, setHistorialMap] = useState<Record<string, HistorialPeriodo[]>>({});
+  const [bajaInfoMap, setBajaInfoMap] = useState<Record<string, { fecha_baja: string | null; motivo_baja: string | null }>>({});
   const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
@@ -300,6 +303,107 @@ export function EquipoUnificado({
 
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
+
+  // Fetch historial + datos de baja para barberos inactivos (pestaña Historial)
+  const inactiveIdsKey = inactiveBarbers.map(b => b.id).sort().join(',');
+  useEffect(() => {
+    if (!organizationId || inactiveBarbers.length === 0) {
+      setHistorialMap({});
+      setBajaInfoMap({});
+      return;
+    }
+    const ids = inactiveBarbers.map(b => b.id);
+    let cancelled = false;
+    (async () => {
+      const [{ data: histRows }, { data: barberRows }] = await Promise.all([
+        supabase
+          .from('barbero_historial')
+          .select('barbero_id, fecha_inicio, fecha_fin, motivo_egreso, sucursal_id, sucursales:sucursal_id(nombre)')
+          .eq('organization_id', organizationId)
+          .in('barbero_id', ids)
+          .order('fecha_inicio', { ascending: false }),
+        supabase
+          .from('barberos')
+          .select('id, fecha_baja, motivo_baja')
+          .eq('organization_id', organizationId)
+          .in('id', ids),
+      ]);
+      if (cancelled) return;
+      const hMap: Record<string, HistorialPeriodo[]> = {};
+      (histRows || []).forEach((r: any) => {
+        const list = hMap[r.barbero_id] || (hMap[r.barbero_id] = []);
+        list.push({
+          fecha_inicio: r.fecha_inicio,
+          fecha_fin: r.fecha_fin,
+          motivo_egreso: r.motivo_egreso,
+          sucursal_nombre: r.sucursales?.nombre ?? null,
+        });
+      });
+      setHistorialMap(hMap);
+      const bMap: Record<string, { fecha_baja: string | null; motivo_baja: string | null }> = {};
+      (barberRows || []).forEach((r: any) => {
+        bMap[r.id] = { fecha_baja: r.fecha_baja ?? null, motivo_baja: r.motivo_baja ?? null };
+      });
+      setBajaInfoMap(bMap);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, inactiveIdsKey]);
+
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
+
+  const renderHistorialBarbero = (barberId: string) => {
+    const baja = bajaInfoMap[barberId];
+    const periodos = historialMap[barberId] || [];
+    return (
+      <div className="mt-2 rounded-md border border-border bg-muted/30 p-3 space-y-2">
+        {baja?.fecha_baja && (
+          <p className="text-xs text-foreground">
+            <span className="font-medium">Fecha de baja:</span> {formatFechaDDMMYYYY(baja.fecha_baja)}
+          </p>
+        )}
+        {baja?.motivo_baja && (
+          <p className="text-xs text-foreground">
+            <span className="font-medium">Motivo:</span> {baja.motivo_baja}
+          </p>
+        )}
+        <div className="pt-1">
+          <p className="text-xs font-medium text-foreground mb-1">Historial de actividad</p>
+          {periodos.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Sin historial registrado.</p>
+          ) : (
+            <ul className="space-y-2">
+              {periodos.map((p, idx) => (
+                <li key={idx} className="rounded-sm border border-border/60 bg-background p-2 text-xs space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground">
+                      {p.sucursal_nombre || 'Sin sucursal asignada'}
+                    </span>
+                    {p.fecha_fin === null && (
+                      <Badge variant="secondary" className="text-[10px]">Activo</Badge>
+                    )}
+                  </div>
+                  <p className="text-muted-foreground">
+                    Desde: {formatFechaDDMMYYYY(p.fecha_inicio)}
+                    {p.fecha_fin && <> · Hasta: {formatFechaDDMMYYYY(p.fecha_fin)}</>}
+                  </p>
+                  {p.motivo_egreso && (
+                    <p className="text-muted-foreground">Motivo: {p.motivo_egreso}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  };
+
 
   // Fetch PIN status
   const fetchPinStatus = useCallback(async () => {
@@ -1060,7 +1164,7 @@ export function EquipoUnificado({
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
               <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveBarbers.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial ({inactiveBarbers.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
@@ -1092,9 +1196,14 @@ export function EquipoUnificado({
               )}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-3">
-              {sortedInactive.map(renderBarberItem)}
+              {sortedInactive.map(b => (
+                <div key={`hist-${b.id}`}>
+                  {renderBarberItem(b)}
+                  {renderHistorialBarbero(b.id)}
+                </div>
+              ))}
               {sortedInactive.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros inactivos</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros en el historial</p>
               )}
             </TabsContent>
           </Tabs>
