@@ -214,34 +214,53 @@ export function SucursalTabContent({
                   <Edit2 className="h-4 w-4 mr-1" /> Editar
                 </Button>
               )}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
-                    disabled={isTogglingActive}
-                  >
-                    <Power className="h-4 w-4 mr-1" />
-                    {isInactive ? 'Activar' : 'Desactivar'}
-                  </Button>
-                </AlertDialogTrigger>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
+                disabled={isTogglingActive}
+                onClick={openToggleDialog}
+              >
+                <Power className="h-4 w-4 mr-1" />
+                {isInactive ? 'Reactivar' : 'Desactivar'}
+              </Button>
+              <AlertDialog
+                open={showToggleDialog}
+                onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
+              >
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>
-                      {isInactive ? 'Activar sucursal' : 'Desactivar sucursal'}
+                      {isInactive
+                        ? `Reactivar ${sucursal.nombre}`
+                        : `Desactivar ${sucursal.nombre}`}
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                       {isInactive
-                        ? `¿Querés volver a activar "${sucursal.nombre}"? Se habilitarán nuevamente todas sus secciones.`
-                        : `¿Estás seguro de que querés desactivar "${sucursal.nombre}"? Las secciones de equipo, servicios y agenda quedarán inhabilitadas hasta que la reactives.`
-                      }
+                        ? 'La sucursal volverá a estar operativa.'
+                        : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+
+                  {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <p>
+                        Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
+                      </p>
+                    </div>
+                  )}
+
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleToggleActive}>
-                      {isInactive ? 'Activar' : 'Desactivar'}
+                    <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
+                      disabled={isTogglingActive}
+                      className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                    >
+                      {isTogglingActive
+                        ? 'Procesando...'
+                        : (isInactive ? 'Reactivar' : 'Desactivar')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
