@@ -154,6 +154,71 @@ export type Database = {
         }
         Relationships: []
       }
+      barbero_historial: {
+        Row: {
+          barbero_id: string
+          created_at: string
+          created_by: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          motivo_egreso: string | null
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          barbero_id: string
+          created_at?: string
+          created_by?: string | null
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          motivo_egreso?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          created_at?: string
+          created_by?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          motivo_egreso?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barbero_historial_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barberos: {
         Row: {
           access_email: string | null
@@ -162,8 +227,10 @@ export type Database = {
           comision: number
           created_at: string
           dni: string | null
+          fecha_baja: string | null
           fecha_cobro_dia: number
           id: string
+          motivo_baja: string | null
           nombre: string
           organization_id: string | null
           pin_hash: string | null
@@ -182,8 +249,10 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_baja?: string | null
           fecha_cobro_dia?: number
           id?: string
+          motivo_baja?: string | null
           nombre: string
           organization_id?: string | null
           pin_hash?: string | null
@@ -202,8 +271,10 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_baja?: string | null
           fecha_cobro_dia?: number
           id?: string
+          motivo_baja?: string | null
           nombre?: string
           organization_id?: string | null
           pin_hash?: string | null
