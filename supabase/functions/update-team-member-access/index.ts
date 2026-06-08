@@ -85,6 +85,35 @@ function jsonResponse(status: number, body: unknown) {
   });
 }
 
+// Fase 7: reject if email already belongs to a different auth.users user
+async function checkEmailConflict(
+  admin: any,
+  email: string,
+  ignoreUserId: string | null,
+  organizationId: string,
+): Promise<{ status: number; body: any } | null> {
+  const e = email.trim().toLowerCase();
+  if (!e) return null;
+  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const existing = list?.users?.find((u: any) => u.email?.toLowerCase() === e);
+  if (!existing) return null;
+  if (ignoreUserId && existing.id === ignoreUserId) return null;
+  const { data: ownerRow } = await admin
+    .from("user_roles").select("role").eq("user_id", existing.id).eq("role", "owner").maybeSingle();
+  const { data: prof } = await admin
+    .from("profiles").select("organization_id").eq("id", existing.id).maybeSingle();
+  const isOrgOwner = !!ownerRow && prof?.organization_id === organizationId;
+  return {
+    status: 409,
+    body: {
+      error: isOrgOwner
+        ? "Este email pertenece al dueño de la organización."
+        : "Este email ya está registrado en el sistema.",
+      code: isOrgOwner ? "EMAIL_BELONGS_TO_OWNER" : "EMAIL_ALREADY_REGISTERED",
+    },
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
