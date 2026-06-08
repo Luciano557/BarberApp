@@ -249,6 +249,13 @@ export function EquipoUnificado({
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+  const [finalizarTarget, setFinalizarTarget] = useState<{
+    barber: Barber;
+    motivo: string;
+    futureTurnos: number | null;
+    loading: boolean;
+    submitting: boolean;
+  } | null>(null);
 
   const { roles: callerRoles } = useAuth();
   const callerCanReplaceManager = callerRoles.includes('owner') || callerRoles.includes('general_manager');
