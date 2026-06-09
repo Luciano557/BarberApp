@@ -57,6 +57,7 @@ export function SucursalProvider({ children }: { children: ReactNode }) {
           .select('*')
           .eq('organization_id', organization.id)
           .eq('activa', true)
+          .is('deleted_at', null)
           .order('nombre');
         if (sucRes.error) throw sucRes.error;
 

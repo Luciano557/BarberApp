@@ -63,12 +63,15 @@ serve(async (req: Request): Promise<Response> => {
     // Verify sucursal exists in org
     const { data: suc, error: sErr } = await admin
       .from("sucursales")
-      .select("id, organization_id, activa")
+      .select("id, organization_id, activa, deleted_at")
       .eq("id", sucursalId)
       .maybeSingle();
     if (sErr || !suc) return jsonResponse(404, { error: "Sucursal no encontrada" });
     if (suc.organization_id !== organizationId) {
       return jsonResponse(403, { error: "Sucursal de otra organización" });
+    }
+    if (suc.deleted_at) {
+      return jsonResponse(409, { error: "Esta sucursal fue eliminada y no se puede reactivar." });
     }
 
     if (suc.activa) {
