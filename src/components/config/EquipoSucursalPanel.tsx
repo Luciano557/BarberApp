@@ -399,7 +399,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
             <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipo…
@@ -415,99 +415,37 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
             </p>
           </div>
         ) : (
-          orderedBarberoIds.map(barberoId => {
-            const list = grouped[barberoId] ?? [];
-            const barbero = barberos[barberoId];
-            const vigente = pickVigenteHoy(list);
-            const principal = list.find(r => r.tipo === 'principal');
-            const temporales = list.filter(r => r.tipo === 'temporal');
-            const recurrentes = list.filter(r => r.tipo === 'recurrente');
-            const role = barbero?.rol_equipo ? ROLE_LABELS[barbero.rol_equipo] ?? barbero.rol_equipo : null;
-
-            return (
-              <div
-                key={barberoId}
-                className={cn(
-                  "rounded-lg border border-border bg-muted/20 p-4 transition-shadow duration-700",
-                  highlightedId === barberoId && "ring-2 ring-primary/40"
-                )}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-foreground">
-                        {barbero?.nombre} {barbero?.apellido}
-                      </span>
-                      {role && (
-                        <Badge variant="outline" className="text-xs">{role}</Badge>
-                      )}
-                      {vigente ? (
-                        <Badge variant="secondary" className="text-xs">
-                          {vigente.tipo === 'principal' && 'Principal'}
-                          {vigente.tipo === 'recurrente' && `Recurrente (${formatDiasSemana(vigente.dias_semana)})`}
-                          {vigente.tipo === 'temporal' && `Temporal hasta ${formatShortDate(vigente.fecha_fin)}`}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">Sin asignación vigente hoy</Badge>
-                      )}
-                    </div>
-                  </div>
-                  {vigente && (
-                    <div className="flex items-center gap-2 self-start">
-                      <Label className="text-xs text-muted-foreground" htmlFor={`disp-${vigente.id}`}>
-                        Disponible
-                      </Label>
-                      <Switch
-                        id={`disp-${vigente.id}`}
-                        checked={vigente.disponible}
-                        disabled={togglingId === vigente.id}
-                        onCheckedChange={() => handleToggleDisponible(vigente.id, vigente.disponible)}
-                      />
-                    </div>
-                  )}
+          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Activos ({activeIds.length})
+              </TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Inactivos ({inactiveIds.length})
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="active" className="mt-4 space-y-3">
+              {activeIds.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No hay miembros activos en esta sucursal hoy.</p>
                 </div>
-
-                {/* Detalle de asignaciones */}
-                <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                  {principal && (
-                    <div className="flex items-center justify-between gap-2">
-                      <span>Principal de esta sucursal.</span>
-                    </div>
-                  )}
-                  {recurrentes.map(r => (
-                    <div key={r.id} className="flex items-center justify-between gap-2">
-                      <span>
-                        Recurrente · {formatDiasSemana(r.dias_semana)}
-                        {r.fecha_inicio && ` · desde ${formatShortDate(r.fecha_inicio)}`}
-                        {r.fecha_fin && ` · hasta ${formatShortDate(r.fecha_fin)}`}
-                      </span>
-                      {canDeleteRecurrente && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {temporales.map(r => (
-                    <div key={r.id} className="flex items-center justify-between gap-2">
-                      <span>
-                        Temporal · {formatShortDate(r.fecha_inicio)} → {formatShortDate(r.fecha_fin)}
-                      </span>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
+              ) : (
+                activeIds.map(id => renderBarberoCard(id, true))
+              )}
+            </TabsContent>
+            <TabsContent value="inactive" className="mt-4 space-y-3">
+              {inactiveIds.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No hay miembros inactivos en esta sucursal.</p>
                 </div>
-
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Se recalcula cada noche automáticamente según las asignaciones.
-                </p>
-              </div>
-            );
-          })
+              ) : (
+                inactiveIds.map(id => renderBarberoCard(id, false))
+              )}
+            </TabsContent>
+          </Tabs>
         )}
       </CardContent>
+
 
       {/* Sheets */}
       <TemporalSheet
