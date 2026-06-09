@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Clock, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Clock, Trash2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -97,9 +97,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   ];
 
   const flagFor = (s: Service) => isGlobal ? (s.globalActive ?? s.active) : s.active;
-  const activeServices = services.filter(s => flagFor(s));
-  const inactiveServices = services.filter(s => !flagFor(s));
   const activeLines = lines.filter(l => l.active);
+  const activeServices = services.filter(s => flagFor(s)).sort((a, b) => {
+    const lineA = activeLines.find(l => l.id === a.lineId)?.name ?? null;
+    const lineB = activeLines.find(l => l.id === b.lineId)?.name ?? null;
+    if (lineA === null && lineB !== null) return 1;
+    if (lineA !== null && lineB === null) return -1;
+    if (lineA !== null && lineB !== null) {
+      const cmp = lineA.localeCompare(lineB, 'es');
+      if (cmp !== 0) return cmp;
+    }
+    if (!isGlobal) return (b.price ?? 0) - (a.price ?? 0);
+    return a.name.localeCompare(b.name, 'es');
+  });
+  const inactiveServices = services.filter(s => !flagFor(s));
 
   const handleAdd = () => {
     const nameErr = validateName(newName);
@@ -311,7 +322,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             </Button>
           )}
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {isGlobal && (
             <p className="text-xs text-muted-foreground">
               Los precios de los servicios se configuran por sucursal.
@@ -378,7 +389,20 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
               )}
               {activeServices.map(renderServiceItem)}
               {activeServices.length === 0 && !isAdding && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay servicios activos</p>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                  <Scissors className="h-8 w-8 text-muted-foreground/50" />
+                  <div>
+                    <p className="text-sm font-medium">No hay servicios activos</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Agregá el primer servicio para que aparezca en el cobro.
+                    </p>
+                  </div>
+                  {canCreate && (
+                    <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                      Agregar servicio
+                    </Button>
+                  )}
+                </div>
               )}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-2">

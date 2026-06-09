@@ -1211,7 +1211,7 @@ export function EquipoUnificado({
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
-                <div className="space-y-3">
+                <div className="space-y-3 animate-step-in-forward">
                   {isGeneralMode && (
                     <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
                       <label className="text-xs font-medium text-foreground">Sucursal principal</label>
@@ -1237,9 +1237,26 @@ export function EquipoUnificado({
                 const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
                 return (
                   <>
-                    {visiblesActivos.map(renderBarberItem)}
+                    {visiblesActivos.map((b, idx) => {
+                      const item = renderBarberItem(b);
+                      if (!mostrarTodosActivos || idx === 0) return item;
+                      return <div key={`w-${b.id}`} className="animate-item-in">{item}</div>;
+                    })}
                     {sortedActive.length === 0 && !isAdding && (
-                      <p className="text-sm text-muted-foreground text-center py-4">No hay miembros activos</p>
+                      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                        <Users className="h-8 w-8 text-muted-foreground/50" />
+                        <div>
+                          <p className="text-sm font-medium">Todavía no hay miembros en el equipo</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Agregá el primer miembro para gestionar roles, compensación y acceso al sistema.
+                          </p>
+                        </div>
+                        {!editingId && (
+                          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                            Agregar miembro
+                          </Button>
+                        )}
+                      </div>
                     )}
                     {sortedActive.length > 1 && (
                       mostrarTodosActivos ? (
@@ -1430,7 +1447,7 @@ export function EquipoUnificado({
                 resolvingReplaceDialogRef.current = false;
               }
             }}>
-              Confirmar reemplazo
+              Confirmar cambio
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1447,14 +1464,14 @@ export function EquipoUnificado({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
-              Inconsistencia detectada
+              Corregir encargado de sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>
               {staleMgrDialog && (
                 <>
-                  Detectamos una inconsistencia: <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'un usuario'}</strong> figura
-                  como Encargado en permisos reales, pero no aparece como Encargado en el equipo.
-                  Para continuar, Vittro debe corregir esa sincronización.
+                  <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'Un usuario'}</strong> aparece
+                  como Encargado de sucursal en el sistema, pero no está registrado en el equipo.
+                  Vittro necesita corregir esto antes de continuar.
                 </>
               )}
             </AlertDialogDescription>
@@ -1679,6 +1696,11 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
                   </React.Fragment>
                 ))}
               </div>
+              {localData.roles.length === 1 && localData.roles[0] === 'otros' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Este rol no puede combinarse con otros rangos.
+                </p>
+              )}
             </div>
           </div>
         );

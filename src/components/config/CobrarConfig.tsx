@@ -36,10 +36,7 @@ export function CobrarConfig({
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="services" className="mt-4 sm:mt-6">
-        <p className="text-xs text-muted-foreground mb-4">
-          Las categorías se administran desde la vista general del negocio.
-        </p>
+      <TabsContent value="services" className="mt-4 sm:mt-6 animate-fade-in">
         <ServicesConfig
           services={services}
           lines={lines}
@@ -51,7 +48,7 @@ export function CobrarConfig({
         />
       </TabsContent>
 
-      <TabsContent value="extras" className="mt-4 sm:mt-6">
+      <TabsContent value="extras" className="mt-4 sm:mt-6 animate-fade-in">
         <p className="text-xs text-muted-foreground mb-4">
           Para crear o eliminar extras, usá la vista general del negocio.
         </p>

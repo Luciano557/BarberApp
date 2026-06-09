@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, PowerOff, Power, Trash2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -197,7 +197,18 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
               )}
               {active.map(renderLine)}
               {active.length === 0 && !isAdding && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay líneas activas</p>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                  <Tag className="h-8 w-8 text-muted-foreground/50" />
+                  <div>
+                    <p className="text-sm font-medium">No hay categorías activas</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Las categorías agrupan tus servicios en la pantalla de cobro.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
+                    Agregar categoría
+                  </Button>
+                </div>
               )}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-2">

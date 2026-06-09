@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle, KeyRound } from 'lucide-react';
+import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { CuentaSucursalBlock } from '@/components/config/CuentaSucursalBlock';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -207,137 +207,173 @@ export function SucursalTabContent({
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
+      {/* Banner contextual de la vista Sucursal */}
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-6">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+        <p>
+          En esta sección configurás todo lo que aplica específicamente a esta sucursal: precios, stock, disponibilidad del equipo y métodos de pago. El catálogo base, los cargos y la compensación se definen desde la vista General.
+        </p>
+      </div>
+
+      <h2 className="text-lg font-medium text-foreground mb-2">{sucursal.nombre}</h2>
+
+      {/* Anchor nav — solo desktop */}
+      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <button onClick={() => scrollTo('seccion-informacion')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Información
+          </button>
+          <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Equipo
+          </button>
+          <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Servicios
+          </button>
+          <button onClick={() => scrollTo('seccion-productos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Productos
+          </button>
+          <button onClick={() => scrollTo('seccion-descuentos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Descuentos
+          </button>
+          <button onClick={() => scrollTo('seccion-metodos-pago')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Métodos de pago
+          </button>
+        </div>
+      </nav>
+
       {/* Información de la sucursal */}
-      <Card data-onboarding-id="info-sucursal-card">
-        <CardHeader>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                <Building2 className="w-5 h-5 text-primary" />
+      <div id="seccion-informacion">
+        <Card data-onboarding-id="info-sucursal-card">
+          <CardHeader>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Building2 className="w-5 h-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="min-w-0 text-base leading-tight">{sucursal.nombre}</CardTitle>
+                </div>
               </div>
-              <CardTitle className="min-w-0 text-base leading-tight">Información de la sucursal</CardTitle>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              {canManageCuentaSucursal && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                {canManageCuentaSucursal && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCuentaOpen(true)}
+                    data-onboarding-id="cuenta-sucursal-button"
+                    className="w-full justify-center sm:w-auto"
+                  >
+                    <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
+                  </Button>
+                )}
+                {!isEditingInfo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingInfo(true)}
+                    className="w-full justify-center sm:w-auto"
+                  >
+                    <Edit2 className="h-4 w-4 mr-1" /> Editar
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCuentaOpen(true)}
-                  data-onboarding-id="cuenta-sucursal-button"
-                  className="w-full justify-center sm:w-auto"
+                  className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
+                  disabled={isTogglingActive}
+                  onClick={openToggleDialog}
                 >
-                  <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
+                  <Power className="h-4 w-4 mr-1" />
+                  {isInactive ? 'Reactivar' : 'Desactivar'}
                 </Button>
-              )}
-              {!isEditingInfo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsEditingInfo(true)}
-                  className="w-full justify-center sm:w-auto"
+                <AlertDialog
+                  open={showToggleDialog}
+                  onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
                 >
-                  <Edit2 className="h-4 w-4 mr-1" /> Editar
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
-                disabled={isTogglingActive}
-                onClick={openToggleDialog}
-              >
-                <Power className="h-4 w-4 mr-1" />
-                {isInactive ? 'Reactivar' : 'Desactivar'}
-              </Button>
-              <AlertDialog
-                open={showToggleDialog}
-                onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
-              >
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {isInactive
-                        ? `Reactivar ${sucursal.nombre}`
-                        : `Desactivar ${sucursal.nombre}`}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {isInactive
-                        ? 'La sucursal volverá a estar operativa.'
-                        : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        {isInactive
+                          ? `Reactivar ${sucursal.nombre}`
+                          : `Desactivar ${sucursal.nombre}`}
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {isInactive
+                          ? 'La sucursal volverá a estar operativa.'
+                          : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
 
-                  {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
-                    <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <p>
-                        Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
-                      </p>
-                    </div>
-                  )}
+                    {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
+                      <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p>
+                          Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
+                        </p>
+                      </div>
+                    )}
 
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
-                      disabled={isTogglingActive}
-                      className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-                    >
-                      {isTogglingActive
-                        ? 'Procesando...'
-                        : (isInactive ? 'Reactivar' : 'Desactivar')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isEditingInfo ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nombre</Label>
-                <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Dirección</Label>
-                <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" />
-              </div>
-              <div className="space-y-2">
-                <Label>Teléfono</Label>
-                <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
-              </div>
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }} disabled={isSavingInfo}>
-                  <X className="h-4 w-4 mr-1" /> Cancelar
-                </Button>
-                <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveInfo} disabled={isSavingInfo || !infoForm.nombre.trim()}>
-                  <Save className="h-4 w-4 mr-1" /> {isSavingInfo ? 'Guardando...' : 'Guardar'}
-                </Button>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
+                        disabled={isTogglingActive}
+                        className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                      >
+                        {isTogglingActive
+                          ? 'Procesando...'
+                          : (isInactive ? 'Reactivar' : 'Desactivar')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-start gap-2">
-                <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 break-words font-medium">{sucursal.nombre}</span>
-                <Badge variant={sucursal.activa ? 'default' : 'secondary'} className="sm:ml-2">
-                  {sucursal.activa ? 'Activa' : 'Inactiva'}
-                </Badge>
+          </CardHeader>
+          <CardContent>
+            {isEditingInfo ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nombre</Label>
+                  <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dirección</Label>
+                  <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Teléfono</Label>
+                  <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }} disabled={isSavingInfo}>
+                    <X className="h-4 w-4 mr-1" /> Cancelar
+                  </Button>
+                  <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveInfo} disabled={isSavingInfo || !infoForm.nombre.trim()}>
+                    <Save className="h-4 w-4 mr-1" /> {isSavingInfo ? 'Guardando...' : 'Guardar'}
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
+            ) : (
+              <div className="space-y-2">
+                <div>
+                  <Badge key={String(sucursal.activa)} variant={sucursal.activa ? 'default' : 'secondary'} className="animate-pop-in">
+                    {sucursal.activa ? 'Activa' : 'Inactiva'}
+                  </Badge>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Banner de sucursal inactiva */}
       {isInactive && (
@@ -356,25 +392,6 @@ export function SucursalTabContent({
         </div>
       )}
 
-      {/* Anchor nav — solo desktop */}
-      <nav className="hidden md:flex items-center gap-1 sticky top-0 z-10 bg-background border-b border-border/50 py-2 overflow-x-auto">
-        <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          Equipo
-        </button>
-        <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          Servicios
-        </button>
-        <button onClick={() => scrollTo('seccion-productos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          Productos
-        </button>
-        <button onClick={() => scrollTo('seccion-descuentos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          Descuentos
-        </button>
-        <button onClick={() => scrollTo('seccion-metodos-pago')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          Métodos de pago
-        </button>
-      </nav>
-
       {/* Secciones inhabilitadas si la sucursal está inactiva */}
       <div className={isInactive ? 'opacity-50 pointer-events-none select-none' : ''}>
         {/* Equipo unificado */}
@@ -391,7 +408,6 @@ export function SucursalTabContent({
         <section id="seccion-servicios" className="border-t pt-6 mt-6" data-onboarding-id="catalogo-section">
           <div className="mb-4">
             <h3 className="text-sm font-semibold">Servicios</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Configurá precios y activá los servicios disponibles en esta sucursal.</p>
           </div>
           <CobrarConfig
             services={services} extras={extras} lines={lines}
@@ -407,7 +423,6 @@ export function SucursalTabContent({
         <section id="seccion-productos" className="border-t pt-6 mt-6">
           <div className="mb-4">
             <h3 className="text-sm font-semibold">Productos</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Precios, stock y comisiones para esta sucursal.</p>
           </div>
           <ProductosConfig sucursalId={sucursal.id} />
         </section>
@@ -416,7 +431,6 @@ export function SucursalTabContent({
         <section id="seccion-descuentos" className="border-t pt-6 mt-6">
           <div className="mb-4">
             <h3 className="text-sm font-semibold">Descuentos</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Activá los descuentos disponibles en esta sucursal.</p>
           </div>
           <DiscountsConfig
             discounts={discounts}
@@ -439,7 +453,7 @@ export function SucursalTabContent({
           <SheetHeader className="mb-4">
             <SheetTitle>Cuenta de sucursal — {sucursal.nombre}</SheetTitle>
             <SheetDescription>
-              Acceso operativo y reglas de PIN específicas para esta sucursal.
+              Cuenta operativa generada automáticamente para operar desde caja o recepción sin usar cuentas personales del equipo.
             </SheetDescription>
           </SheetHeader>
           <CuentaSucursalBlock sucursal={sucursal} />

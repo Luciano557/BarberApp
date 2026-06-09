@@ -69,7 +69,7 @@ export function CuentasSucursalConfig() {
           <div className="space-y-1 flex-1 min-w-0">
             <CardTitle className="text-base">Cuentas de sucursal</CardTitle>
             <p className="text-sm text-muted-foreground leading-snug">
-              Accesos operativos para usar Vittro desde caja, recepción o un dispositivo compartido.
+              Accesos operativos generados automáticamente para operar desde caja o recepción.
             </p>
           </div>
         </div>

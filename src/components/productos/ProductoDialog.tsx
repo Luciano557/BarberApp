@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,9 +47,13 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
   const [comisionPct, setComisionPct] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('datos');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setActiveTab('datos');
+    setSubmitAttempted(false);
     if (producto) {
       setNombre(producto.producto.nombre);
       setDescripcion(producto.producto.descripcion || '');
@@ -82,10 +87,38 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
     return ((v - c) / c) * 100;
   }, [precioCosto, precioVenta]);
 
+  const tabErrors = useMemo(() => ({
+    datos: nombre.trim().length === 0,
+    precio: parseFloat(precioVenta) < 0 || isNaN(parseFloat(precioVenta)),
+    comision: comisionModo === 'personalizada' && (
+      isNaN(parseFloat(comisionPct)) ||
+      parseFloat(comisionPct) < 0 ||
+      parseFloat(comisionPct) > 100
+    ),
+  }), [nombre, precioVenta, comisionModo, comisionPct]);
+
   const canSave = nombre.trim().length > 0 && parseFloat(precioVenta) >= 0 && !saving;
 
   const handleSave = async () => {
     if (!orgId) return;
+    setSubmitAttempted(true);
+
+    if (tabErrors.datos) {
+      setActiveTab('datos');
+      toast.error('Completá el nombre del producto.');
+      return;
+    }
+    if (tabErrors.precio) {
+      setActiveTab('precio');
+      toast.error('Completá el precio de venta.');
+      return;
+    }
+    if (tabErrors.comision) {
+      setActiveTab('comision');
+      toast.error('Revisá la configuración de comisión.');
+      return;
+    }
+
     // Validación de comisión personalizada
     let comision_porcentaje: number | null = null;
     if (comisionModo === 'personalizada') {
@@ -210,12 +243,38 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
           <DialogDescription>
             Los datos generales se aplican a toda la organización. Los precios y stock son por sucursal.
           </DialogDescription>
+          <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2 mt-2">
+            <div>
+              <p className="text-sm font-medium">Activo en esta sucursal</p>
+              <p className="text-xs text-muted-foreground">Si está inactivo, no aparecerá en el cobro.</p>
+            </div>
+            <Switch checked={activoSucursal} onCheckedChange={setActivoSucursal} />
+          </div>
         </DialogHeader>
 
-        <div className="space-y-5">
-          {/* Datos generales */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Datos generales</h4>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="datos" className="relative">
+              Datos
+              {submitAttempted && tabErrors.datos && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="precio" className="relative">
+              Precio y stock
+              {submitAttempted && tabErrors.precio && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="comision" className="relative">
+              Comisión
+              {submitAttempted && tabErrors.comision && (
+                <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="datos" className="space-y-3 mt-4">
             <div className="space-y-2">
               <Label>Nombre</Label>
               <Input
@@ -259,18 +318,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
               />
               <p className="text-xs text-muted-foreground text-right">{descripcion.length}/240</p>
             </div>
-          </div>
+          </TabsContent>
 
-          {/* Configuración por sucursal */}
-          <div className="space-y-3 border-t border-border pt-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Configuración en esta sucursal</h4>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="activo-suc" className="text-xs">Activo</Label>
-                <Switch id="activo-suc" checked={activoSucursal} onCheckedChange={setActivoSucursal} />
-              </div>
-            </div>
-
+          <TabsContent value="precio" className="space-y-3 mt-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Precio costo</Label>
@@ -281,7 +331,6 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
                 <CurrencyInput value={precioVenta} onChange={setPrecioVenta} placeholder="0" />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Margen estimado</Label>
@@ -299,8 +348,7 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
                 />
               </div>
             </div>
-
-            {isNew || !producto?.sucursal ? (
+            {(isNew || !producto?.sucursal) ? (
               <div className="space-y-2">
                 <Label>Stock inicial <span className="text-muted-foreground font-normal">(opcional)</span></Label>
                 <Input
@@ -314,11 +362,9 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
                 </p>
               </div>
             ) : null}
-          </div>
+          </TabsContent>
 
-          {/* Compensación por venta */}
-          <div className="space-y-3 border-t border-border pt-4">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Compensación por venta</h4>
+          <TabsContent value="comision" className="space-y-3 mt-4">
             <p className="text-xs text-muted-foreground">
               Define cómo genera comisión este producto cuando lo vende un barbero. La comisión se calcula sobre la ganancia (precio de venta − precio de costo).
             </p>
@@ -344,11 +390,11 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
             )}
             {comisionModo !== 'ninguna' && !precioCosto && (
               <p className="text-xs text-amber-600 dark:text-amber-500">
-                Sin precio de costo cargado: el producto no podrá generar comisión.
+                Falta el precio de costo. Completalo en la pestaña Precio y stock para que el producto genere comisión.
               </p>
             )}
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>

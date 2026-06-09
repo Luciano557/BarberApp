@@ -217,7 +217,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
         <div className="min-w-0">
           <CardTitle className="text-base font-medium">Equipo de la sucursal</CardTitle>
           <p className="mt-1 text-xs text-muted-foreground">
-            Acá controlás quién está trabajando hoy en esta sucursal. Las asignaciones temporales se revierten solas al vencer.
+            Gestioná quién está disponible hoy y creá asignaciones temporales o recurrentes.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">

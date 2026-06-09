@@ -218,7 +218,18 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
               )}
               {activeExtras.map(renderExtraItem)}
               {activeExtras.length === 0 && !isAdding && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay extras activos</p>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                  <Plus className="h-8 w-8 text-muted-foreground/50" />
+                  <div>
+                    <p className="text-sm font-medium">No hay extras activos</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Agregá extras para cobrarlos junto a un servicio.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                    Agregar extra
+                  </Button>
+                </div>
               )}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-2">

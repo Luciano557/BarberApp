@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -477,10 +477,23 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       )}
 
       {visibleSucursales.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">
-            {isManagerOnly ? 'No tenés sucursales asignadas.' : 'No hay sucursales. Creá una para empezar.'}
-          </p>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+          <Building2 className="h-8 w-8 text-muted-foreground/50" />
+          <div>
+            <p className="text-sm font-medium">
+              {isManagerOnly ? 'No tenés sucursales asignadas.' : 'No tenés sucursales todavía'}
+            </p>
+            {!isManagerOnly && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Creá la primera para empezar a configurar el negocio.
+              </p>
+            )}
+          </div>
+          {canCreateSucursal && (
+            <Button variant="outline" size="sm" onClick={() => setShowDialog(true)}>
+              Nueva sucursal
+            </Button>
+          )}
         </div>
       )}
 
@@ -493,11 +506,11 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Nombre</Label>
-              <Input value={formData.nombre} onChange={(e) => setFormData(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" />
+              <Input value={formData.nombre} onChange={(e) => setFormData(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" maxLength={80} />
             </div>
             <div className="space-y-2">
               <Label>Dirección</Label>
-              <Input value={formData.direccion} onChange={(e) => setFormData(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" />
+              <Input value={formData.direccion} onChange={(e) => setFormData(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
             </div>
             <div className="space-y-2">
               <Label>Teléfono</Label>
