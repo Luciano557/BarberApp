@@ -13,14 +13,17 @@ import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { TareaFormDialog } from './tareas/TareaFormDialog';
+import { RecurrentesPanel } from './tareas/RecurrentesPanel';
 import { getRepeatLabel } from './tareas/RepeatPicker';
 import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useSucursal } from '@/contexts/SucursalContext';
+
 import { getTareaVencimiento as getTareaVencHelper, getPeticionVencimiento as getPeticionVencHelper } from '@/lib/tareasVencimiento';
 import { toast } from 'sonner';
+
 
 interface TareasPanelProps {
   barbers: Barber[];
@@ -32,6 +35,7 @@ const ESTADO_OPTIONS_TAREA = [
   { value: 'todos', label: 'Todos los estados' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'en_progreso', label: 'En progreso' },
+  { value: 'vencida', label: 'Vencida' },
 ];
 
 const ESTADO_OPTIONS_PETICION = [
@@ -52,14 +56,16 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
-  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, profile } = useAuth();
+  const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount, profile } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
   const requirePinForAction = useRequirePinForAction();
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
+  const canViewRecurrentes = canManageTareas || isSucursalAccount;
   const tareasDiasDefault = organization?.tareas_vencimiento_dias_default ?? 1;
   const peticionesDiasDefault = organization?.peticiones_vencimiento_dias ?? 60;
+
 
   const [showForm, setShowForm] = useState(false);
   const [editingTarea, setEditingTarea] = useState<TareaItem | null>(null);
@@ -69,10 +75,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const [filtroFecha, setFiltroFecha] = useState('todas');
   const [filtroSucursal, setFiltroSucursal] = useState('todas');
   const [showCompletedHistory, setShowCompletedHistory] = useState(false);
+  const [showRecurrencias, setShowRecurrencias] = useState(false);
 
   const [peticionCreador, setPeticionCreador] = useState<{ nombre: string; barberoId: string } | null>(null);
 
   const isTareasTab = activeTab === 'tareas';
+
   const showSucursalFilter = !currentSucursal && sucursales.length > 1;
   const activeBarbers = barbers.filter(b => b.active);
   const myBarberoId = profile?.barbero_id ?? null;
@@ -87,10 +95,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (filtroFecha === 'todas') return true;
     const fechaRef = t.fecha_inicio ?? t.fecha_limite;
     if (filtroFecha === 'vencida') {
+      // Estado persistido por backend (process_vencimientos_tareas).
+      if (t.estado === 'vencida') return true;
+      // Fallback visual durante la ventana <1h entre vencimiento real y cron.
       if (t.tipo === 'peticion' && t.estado === 'pendiente') {
         return getPeticionVencimiento(t).vencida;
       }
-      if (t.tipo === 'tarea' && t.estado !== 'completada') {
+      if (t.tipo === 'tarea' && t.estado === 'pendiente') {
         return getTareaVencimiento(t).vencida;
       }
       return false;
@@ -119,9 +130,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     if (t.tipo === 'tarea' && t.estado === 'completada') return false;
     if (filtroEstado !== 'todos') {
       if (filtroEstado === 'vencida') {
-        const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
-        const tareaVencida = t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida;
-        if (!peticionVencida && !tareaVencida) return false;
+        if (t.estado === 'vencida') {
+          // ok
+        } else {
+          const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
+          const tareaVencida = t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida;
+          if (!peticionVencida && !tareaVencida) return false;
+        }
       } else if (t.estado !== filtroEstado) return false;
     }
     return matchesFecha(t) && matchesSucursal(t) && (t.tipo === 'peticion' || matchesResp(t));
@@ -141,7 +156,6 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       return getCustomRepeatLabel(t.repeat_frequency, t.repeat_interval, t.repeat_byweekday);
     }
     if (t.repeat_preset) return getRepeatLabel(t.repeat_preset);
-    if (t.recurrencia_tipo === 'dias') return `Cada ${t.frecuencia_dias} días`;
     return 'Recurrente';
   };
 
@@ -149,12 +163,16 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     id ? (sucursales.find(s => s.id === id)?.nombre ?? null) : null;
 
   const renderEstadoBadge = (t: TareaItem) => {
+    // Estado persistido por backend tiene prioridad sobre el cálculo visual.
+    if (t.estado === 'vencida') {
+      return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
+    }
     if (t.tipo === 'peticion' && t.estado === 'pendiente') {
       const { vencida, diasRestantes } = getPeticionVencimiento(t);
       if (vencida) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
       if (diasRestantes !== null && diasRestantes <= 7) return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><Clock className="w-3 h-3" />Vence en {diasRestantes}d</Badge>;
     }
-    if (t.tipo === 'tarea' && t.estado !== 'completada' && getTareaVencimiento(t).vencida) {
+    if (t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida) {
       return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
     }
     switch (t.estado) {
@@ -242,7 +260,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                   <RefreshCw className="h-4 w-4 mr-1" />Iniciar
                 </Button>
               )}
-              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso') && (
+              {canComplete && (t.estado === 'pendiente' || t.estado === 'en_progreso' || t.estado === 'vencida') && (
                 <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => updateTarea.mutate({ id: t.id, estado: 'completada' })}>
                   <CheckCircle className="h-4 w-4 mr-1" />Completar
                 </Button>
@@ -265,10 +283,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   };
 
   const PeticionCard = ({ t }: { t: TareaItem }) => {
+    const isVencida = t.estado === 'vencida';
     const venc = t.estado === 'pendiente' ? getPeticionVencimiento(t) : null;
     const sNombre = sucursalNombre(t.sucursal_id);
+    const canAct = t.estado === 'pendiente' || isVencida;
     return (
-      <Card className={`flex flex-col ${venc?.vencida ? 'opacity-70' : ''}`}>
+      <Card className={`flex flex-col ${venc?.vencida || isVencida ? 'opacity-70' : ''}`}>
         <CardContent className="p-4 flex flex-col gap-3 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{t.titulo}</h3>
@@ -299,10 +319,10 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             )}
           </div>
 
-          {t.estado === 'pendiente' && (
+          {canAct && (
             <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
               <Button size="sm" variant="ghost" className="text-status-success-foreground" onClick={() => requestPeticionAction(t.id, 'completada')}>
-                <CheckCircle className="h-4 w-4 mr-1" />Completar
+                <CheckCircle className="h-4 w-4 mr-1" />{isVencida ? 'Aprobar' : 'Completar'}
               </Button>
               <Button size="sm" variant="ghost" className="text-destructive" onClick={() => requestPeticionAction(t.id, 'rechazada')}>
                 <XCircle className="h-4 w-4 mr-1" />Rechazar
@@ -418,12 +438,12 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
         </div>
         {isTareasTab ? (
           <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-            {canManageTareas && !showCompletedHistory && (
+            {canManageTareas && !showCompletedHistory && !showRecurrencias && (
               <Button onClick={handleNuevaTarea}>
                 <Plus className="h-4 w-4 mr-2" />Nueva tarea
               </Button>
             )}
-            {showCompletedHistory ? (
+            {!showRecurrencias && (showCompletedHistory ? (
               <Button variant="outline" onClick={() => setShowCompletedHistory(false)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />Volver a tareas activas
               </Button>
@@ -431,7 +451,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               <Button variant="outline" onClick={() => setShowCompletedHistory(true)}>
                 <ChartSpline className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
-            )}
+            ))}
           </div>
         ) : (
           !isBarber && (
@@ -441,6 +461,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
           )
         )}
       </div>
+
 
       <TareaFormDialog
         open={showForm}
@@ -458,7 +479,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       />
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); }}>
+      <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); setShowRecurrencias(false); }}>
         <TabsList>
           <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
           <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
@@ -466,7 +487,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
         {/* Filters bar */}
         <div className="flex flex-wrap gap-2 mt-4">
-          {!(isTareasTab && showCompletedHistory) && (
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
             <Select value={filtroEstado} onValueChange={setFiltroEstado}>
               <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -475,7 +496,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </Select>
           )}
 
-          {isTareasTab && (
+          {!showRecurrencias && isTareasTab && (
             <Select value={filtroResp} onValueChange={setFiltroResp}>
               <SelectTrigger className="w-[200px] h-9"><SelectValue placeholder="Responsable" /></SelectTrigger>
               <SelectContent>
@@ -488,7 +509,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </Select>
           )}
 
-          {!(isTareasTab && showCompletedHistory) && (
+          {!showRecurrencias && !(isTareasTab && showCompletedHistory) && (
             <Select value={filtroFecha} onValueChange={setFiltroFecha}>
               <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -497,7 +518,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
             </Select>
           )}
 
-          {showSucursalFilter && (
+          {!showRecurrencias && showSucursalFilter && (
             <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
               <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -506,10 +527,24 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               </SelectContent>
             </Select>
           )}
+
+          {isTareasTab && canViewRecurrentes && (
+            <Button
+              variant={showRecurrencias ? 'default' : 'outline'}
+              size="sm"
+              className="h-9"
+              onClick={() => setShowRecurrencias(v => !v)}
+            >
+              <Repeat className="h-4 w-4 mr-2" />Recurrencias
+            </Button>
+          )}
         </div>
 
+
         <TabsContent value="tareas" className="mt-4">
-          {showCompletedHistory ? (
+          {showRecurrencias ? (
+            <RecurrentesPanel barbers={barbers} onClose={() => setShowRecurrencias(false)} />
+          ) : showCompletedHistory ? (
             <div className="space-y-3">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-lg font-semibold text-foreground">Tareas completadas</h2>

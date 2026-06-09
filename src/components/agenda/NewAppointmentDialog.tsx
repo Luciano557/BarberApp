@@ -14,7 +14,7 @@ import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
 import { Search, UserPlus, Zap, ArrowLeft, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { canonicalizePhoneAR, formatPhoneDisplay } from '@/lib/phone';
+import { formatPhoneDisplay } from '@/lib/phone';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 
 interface NewAppointmentDialogProps {
@@ -61,7 +61,7 @@ export function NewAppointmentDialog({
   const [results, setResults] = useState<ClienteLite[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // new / quick
+  // new client
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
@@ -78,7 +78,6 @@ export function NewAppointmentDialog({
 
   const activeBarbers = useMemo(() => barbers.filter(b => b.active), [barbers]);
 
-  // sync defaults when dialog opens
   useEffect(() => {
     if (open) {
       setBarberoId(defaultBarberId || '');
@@ -90,12 +89,18 @@ export function NewAppointmentDialog({
   const reset = () => {
     setMode('existing');
     setSelectedCliente(null);
-    setQuery(''); setResults([]); setSearchOpen(false);
-    setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail('');
-    setServicioId(''); setNotas('');
+    setQuery('');
+    setResults([]);
+    setSearchOpen(false);
+    setNombre('');
+    setApellido('');
+    setTelefono('');
+    setPhoneOut(null);
+    setEmail('');
+    setServicioId('');
+    setNotas('');
   };
 
-  // debounced search
   const tokenRef = useRef(0);
   useEffect(() => {
     if (!searchOpen) return;
@@ -113,9 +118,7 @@ export function NewAppointmentDialog({
           .limit(20);
         if (q.length > 0) {
           const safe = q.replace(/[%,]/g, ' ');
-          req = req.or(
-            `nombre.ilike.%${safe}%,apellido.ilike.%${safe}%,telefono.ilike.%${safe}%,email.ilike.%${safe}%`
-          );
+          req = req.or(`nombre.ilike.%${safe}%,apellido.ilike.%${safe}%,telefono.ilike.%${safe}%,email.ilike.%${safe}%`);
         }
         const [{ data: cliData }, { data: linkData }] = await Promise.all([
           req,
@@ -126,14 +129,11 @@ export function NewAppointmentDialog({
             .eq('sucursal_id', sucursalId),
         ]);
         if (myToken !== tokenRef.current) return;
-        const localIds = new Set((linkData || []).map(l => l.cliente_id));
-        const list: ClienteLite[] = (cliData || []).map(c => ({
-          ...c,
-          inSucursal: localIds.has(c.id),
-        }));
+        const localIds = new Set((linkData || []).map((l) => l.cliente_id));
+        const list: ClienteLite[] = (cliData || []).map((c) => ({ ...c, inSucursal: localIds.has(c.id) }));
         list.sort((a, b) => Number(b.inSucursal) - Number(a.inSucursal));
         setResults(list);
-      } catch (e) {
+      } catch {
         if (myToken === tokenRef.current) setResults([]);
       } finally {
         if (myToken === tokenRef.current) setSearching(false);
@@ -143,22 +143,22 @@ export function NewAppointmentDialog({
   }, [query, searchOpen, organizationId, sucursalId]);
 
   const validateCommon = () => {
-    if (!barberoId) { toast.error('Seleccioná un barbero'); return false; }
-    if (!servicioId) { toast.error('Seleccioná un servicio'); return false; }
-    if (!fecha) { toast.error('Seleccioná una fecha'); return false; }
-    if (!horaInicio) { toast.error('Seleccioná una hora'); return false; }
+    if (!barberoId) { toast.error('Selecciona un barbero'); return false; }
+    if (!servicioId) { toast.error('Selecciona un servicio'); return false; }
+    if (!fecha) { toast.error('Selecciona una fecha'); return false; }
+    if (!horaInicio) { toast.error('Selecciona una hora'); return false; }
     return true;
   };
 
-  const validateClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
-    if (!nombre.trim()) { toast.error('Ingresá el nombre'); return { ok: false, phoneCanonical: null }; }
-    if (!apellido.trim()) { toast.error('Ingresá el apellido'); return { ok: false, phoneCanonical: null }; }
+  const validateNewClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
+    if (!nombre.trim()) { toast.error('Ingresa el nombre'); return { ok: false, phoneCanonical: null }; }
+    if (!apellido.trim()) { toast.error('Ingresa el apellido'); return { ok: false, phoneCanonical: null }; }
     if (!phoneOut?.e164 || !phoneOut.isValid) {
-      toast.error('Ingresá un teléfono válido. Ejemplo: 11 2516-2528.');
+      toast.error('Ingresa un telefono valido');
       return { ok: false, phoneCanonical: null };
     }
     if (email.trim() && !EMAIL_RE.test(email.trim())) {
-      toast.error('Email inválido');
+      toast.error('Email invalido');
       return { ok: false, phoneCanonical: null };
     }
     return { ok: true, phoneCanonical: phoneOut.e164 };
@@ -174,28 +174,28 @@ export function NewAppointmentDialog({
       .maybeSingle();
     if (selErr) throw selErr;
     if (existing) return;
-    const { error: insErr } = await supabase
-      .from('clientes_sucursales')
-      .insert({
-        organization_id: organizationId,
-        cliente_id: clienteId,
-        sucursal_id: sucursalId,
-        origen_relacion: 'manual',
-      } as any);
+    const { error: insErr } = await supabase.from('clientes_sucursales').insert({
+      organization_id: organizationId,
+      cliente_id: clienteId,
+      sucursal_id: sucursalId,
+      origen_relacion: 'manual',
+    } as any);
     if (insErr) throw insErr;
   };
 
   const handleSubmit = async () => {
-    const servicio = servicios.find(s => s.id === servicioId);
+    const servicio = servicios.find((s) => s.id === servicioId);
 
     let telefonoCanonical: string | null = null;
     if (mode === 'existing') {
-      if (!selectedCliente) { toast.error('Seleccioná un cliente'); return; }
+      if (!selectedCliente) { toast.error('Selecciona un cliente'); return; }
       if (!validateCommon() || !servicio) return;
-    } else {
-      const v = validateClienteFields();
+    } else if (mode === 'new') {
+      const v = validateNewClienteFields();
       if (!v.ok) return;
       telefonoCanonical = v.phoneCanonical;
+      if (!validateCommon() || !servicio) return;
+    } else {
       if (!validateCommon() || !servicio) return;
     }
 
@@ -234,11 +234,10 @@ export function NewAppointmentDialog({
         snapTelefono = telefonoCanonical;
         snapEmail = email.trim() || null;
       } else {
-        // quick
         clienteId = null;
-        snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        snapTelefono = telefonoCanonical;
-        snapEmail = email.trim() || null;
+        snapNombre = 'Cita rápida';
+        snapTelefono = null;
+        snapEmail = null;
       }
 
       const horaFin = minutesToTime(timeToMinutes(horaInicio) + servicio.duracion_min);
@@ -279,11 +278,7 @@ export function NewAppointmentDialog({
           <Label className="text-xs">Cliente</Label>
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-between font-normal"
-              >
+              <Button type="button" variant="outline" className="w-full justify-between font-normal">
                 {selectedCliente ? (
                   <span className="flex items-center gap-2 truncate">
                     <span className="truncate">{fullName(selectedCliente)}</span>
@@ -292,13 +287,10 @@ export function NewAppointmentDialog({
                     )}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">Buscar por nombre, apellido, teléfono o email</span>
+                  <span className="text-muted-foreground">Buscar por nombre, apellido, telefono o email</span>
                 )}
                 {selectedCliente ? (
-                  <X
-                    className="h-4 w-4 opacity-60 hover:opacity-100"
-                    onClick={(e) => { e.stopPropagation(); setSelectedCliente(null); }}
-                  />
+                  <X className="h-4 w-4 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); setSelectedCliente(null); }} />
                 ) : (
                   <Search className="h-4 w-4 opacity-60" />
                 )}
@@ -311,35 +303,35 @@ export function NewAppointmentDialog({
                   autoFocus
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar por nombre, apellido, teléfono o email"
+                  placeholder="Buscar por nombre, apellido, telefono o email"
                   className="flex h-10 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
                   maxLength={80}
                 />
               </div>
               <div className="max-h-64 overflow-y-auto py-1">
                 {searching && (
-                  <div className="px-3 py-3 text-xs text-muted-foreground">Buscando…</div>
+                  <div className="px-3 py-3 text-xs text-muted-foreground">Buscando...</div>
                 )}
                 {!searching && results.length === 0 && (
                   <div className="px-3 py-3 text-xs text-muted-foreground">
-                    Sin resultados. Probá con otro término o creá un cliente nuevo.
+                    Sin resultados. Proba con otro termino o crea un cliente nuevo.
                   </div>
                 )}
-                {!searching && results.map(c => (
+                {!searching && results.map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => { setSelectedCliente(c); setSearchOpen(false); }}
                     className={cn(
-                      "w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2",
-                      selectedCliente?.id === c.id && "bg-accent"
+                      'w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2',
+                      selectedCliente?.id === c.id && 'bg-accent',
                     )}
                   >
-                    <Check className={cn("h-4 w-4 mt-0.5 shrink-0", selectedCliente?.id === c.id ? "opacity-100" : "opacity-0")} />
+                    <Check className={cn('h-4 w-4 mt-0.5 shrink-0', selectedCliente?.id === c.id ? 'opacity-100' : 'opacity-0')} />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium truncate">{fullName(c)}</div>
                       <div className="text-xs text-muted-foreground truncate">
-                        {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '—'}
+                        {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '-'}
                       </div>
                     </div>
                     {!c.inSucursal && (
@@ -356,41 +348,62 @@ export function NewAppointmentDialog({
       );
     }
 
-    // new / quick share fields
+    if (mode === 'quick') {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Cita rápida sin cliente</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              onClick={() => setMode('existing')}
+            >
+              <ArrowLeft className="h-3 w-3 mr-1" /> Volver
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Se crea con nombre "Cita rápida", sin telefono/email y sin alta en CRM.
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">
-            {mode === 'new' ? 'Datos del nuevo cliente' : 'Datos para la cita rápida'}
-          </Label>
+          <Label className="text-xs">Datos del nuevo cliente</Label>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-xs"
-            onClick={() => { setMode('existing'); setNombre(''); setApellido(''); setTelefono(''); setPhoneOut(null); setEmail(''); }}
+            onClick={() => {
+              setMode('existing');
+              setNombre('');
+              setApellido('');
+              setTelefono('');
+              setPhoneOut(null);
+              setEmail('');
+            }}
           >
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
         </div>
-        {mode === 'quick' && (
-          <p className="text-xs text-muted-foreground -mt-1">
-            No se guarda en el listado de clientes.
-          </p>
-        )}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Nombre *</Label>
-            <Input value={nombre} onChange={e => setNombre(e.target.value)} maxLength={80} />
+            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Apellido *</Label>
-            <Input value={apellido} onChange={e => setApellido(e.target.value)} maxLength={80} />
+            <Input value={apellido} onChange={(e) => setApellido(e.target.value)} maxLength={80} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs">Teléfono *</Label>
+            <Label className="text-xs">Telefono *</Label>
             <PhoneInput
               value={phoneOut?.e164 ?? null}
               onChange={(o) => { setPhoneOut(o); setTelefono(o.e164 ?? ''); }}
@@ -402,7 +415,7 @@ export function NewAppointmentDialog({
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Email (opcional)</Label>
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} maxLength={120} />
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
           </div>
         </div>
       </div>
@@ -434,7 +447,15 @@ export function NewAppointmentDialog({
                 variant="ghost"
                 size="sm"
                 className="h-8 px-2 text-xs"
-                onClick={() => { setMode('quick'); setSelectedCliente(null); }}
+                onClick={() => {
+                  setMode('quick');
+                  setSelectedCliente(null);
+                  setNombre('');
+                  setApellido('');
+                  setTelefono('');
+                  setPhoneOut(null);
+                  setEmail('');
+                }}
               >
                 <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
               </Button>
@@ -447,7 +468,7 @@ export function NewAppointmentDialog({
               <Select value={barberoId} onValueChange={setBarberoId}>
                 <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
                 <SelectContent>
-                  {activeBarbers.map(b => (
+                  {activeBarbers.map((b) => (
                     <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
                   ))}
                 </SelectContent>
@@ -458,7 +479,7 @@ export function NewAppointmentDialog({
               <Select value={servicioId} onValueChange={setServicioId}>
                 <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
                 <SelectContent>
-                  {servicios.map(s => (
+                  {servicios.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
                   ))}
                 </SelectContent>
@@ -468,21 +489,21 @@ export function NewAppointmentDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
+              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Hora inicio</Label>
-              <Input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
+              <Input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Notas (opcional)</Label>
-            <Textarea value={notas} onChange={e => setNotas(e.target.value)} maxLength={1500} rows={2} />
+            <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={1500} rows={2} />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={saving}>{saving ? 'Guardando…' : 'Crear cita'}</Button>
+          <Button onClick={handleSubmit} disabled={saving}>{saving ? 'Guardando...' : 'Crear cita'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

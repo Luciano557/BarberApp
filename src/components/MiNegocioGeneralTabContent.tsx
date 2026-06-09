@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Settings2 } from 'lucide-react';
-import { Service, Extra, Discount, Line } from '@/types/barbershop';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, ChevronDown, Info } from 'lucide-react';
+import { Service, Extra, Discount, Line, Barber } from '@/types/barbershop';
 import { ServicesConfig } from './config/ServicesConfig';
 import { ExtrasConfig } from './config/ExtrasConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
@@ -10,6 +10,10 @@ import { LinesConfig } from './config/LinesConfig';
 import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { CuentasSucursalConfig } from './config/CuentasSucursalConfig';
+import { EquipoGeneralConfig } from './config/EquipoGeneralConfig';
+import { SucursalesInactivasCollapsible } from './config/SucursalesInactivasCollapsible';
+import type { Sucursal } from '@/contexts/SucursalContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface MiNegocioGeneralTabContentProps {
@@ -32,6 +36,20 @@ interface MiNegocioGeneralTabContentProps {
   onDeleteService: (id: string) => void;
   onDeleteExtra: (id: string) => void;
   onDeleteLine: (id: string) => void;
+  // Equipo General
+  organizationId: string;
+  allBarbers: Barber[];
+  allSucursales: { id: string; nombre: string; activa: boolean }[];
+  onAddBarberToSucursal: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
+  onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
+  onRefreshBarbers?: () => Promise<void> | void;
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
+  /** Sucursales desactivadas (activa=false, deleted_at IS NULL) que se muestran en el bloque colapsable al final. */
+  sucursalesInactivas?: Array<Sucursal & { fecha_desactivacion: string | null }>;
+  /** Callback para "Ver" — navega a la tab de esa sucursal. */
+  onVerSucursalInactiva?: (sucursalId: string) => void;
+  /** Callback luego de eliminar una sucursal — refresca la lista en el padre. */
+  onAfterDeleteSucursal?: () => Promise<void> | void;
 }
 
 /**
@@ -50,7 +68,13 @@ export function MiNegocioGeneralTabContent({
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
   onAddLine, onUpdateLine,
   onDeleteService, onDeleteExtra, onDeleteLine,
+  organizationId, allBarbers, allSucursales,
+  onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers, onNavigateToMiNegocio,
+  sucursalesInactivas, onVerSucursalInactiva, onAfterDeleteSucursal,
 }: MiNegocioGeneralTabContentProps) {
+  const { isOwner, isGeneralManager } = useAuth();
+  const canManageEquipo = isOwner || isGeneralManager;
+  const [cuentasOpen, setCuentasOpen] = useState(false);
 
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
@@ -62,49 +86,98 @@ export function MiNegocioGeneralTabContent({
     };
   }, [isReady]);
 
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
-      {/* Header */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <Settings2 className="w-5 h-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <CardTitle className="text-base">Configuración general del negocio</CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Datos globales que aplican a todas las sucursales. Cada sucursal puede activar y configurar precios por su cuenta.
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-2">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+        <p>
+          Acá definís la base de tu negocio: el catálogo de servicios, el equipo, los descuentos y los métodos de pago que aplican a todas las sucursales. Cada sucursal puede después activar y ajustar lo que necesite por su cuenta.
+        </p>
+      </div>
 
-      {!isReady && (
-        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Sincronizando vista general…
+      <div className={`flex items-center gap-2 rounded-md border border-border bg-muted/60 px-3 text-sm text-muted-foreground transition-all duration-300 ease-out ${isReady ? 'max-h-0 opacity-0 overflow-hidden py-0 border-0' : 'max-h-16 py-2'}`}>
+        <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+        <span>Cargando configuración…</span>
+      </div>
+
+      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">Configuración general</h2>
+
+      {/* Anchor nav — solo desktop */}
+      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          <button onClick={() => { setCuentasOpen(true); scrollTo('seccion-cuentas'); }} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Cuentas de sucursal
+          </button>
+          <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Equipo
+          </button>
+          <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Servicios
+          </button>
+          <button onClick={() => scrollTo('seccion-productos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Productos
+          </button>
+          <button onClick={() => scrollTo('seccion-descuentos')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Descuentos
+          </button>
+          <button onClick={() => scrollTo('seccion-metodos-pago')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+            Métodos de pago
+          </button>
         </div>
-      )}
+      </nav>
 
-      <div className={!isReady ? 'opacity-60 pointer-events-none select-none' : ''}>
-        {/* Cuentas de sucursal */}
-        <CuentasSucursalConfig />
+      <div className={!isReady ? 'opacity-80 pointer-events-none select-none' : ''} aria-disabled={!isReady || undefined}>
+        {/* Cuentas de sucursal — colapsado por defecto */}
+        <div id="seccion-cuentas">
+          <Collapsible open={cuentasOpen} onOpenChange={setCuentasOpen}>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full rounded-lg border border-border bg-muted/20 px-4 py-3 hover:bg-muted/40 transition-colors text-left">
+                <div>
+                  <p className="text-sm font-medium">Cuentas de sucursal</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Accesos operativos generados automáticamente para operar desde caja o recepción.</p>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 ml-3 transition-transform duration-200 ${cuentasOpen ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <CuentasSucursalConfig />
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
 
-        {/* Catálogo */}
-        <div className="space-y-4 mt-8">
-          <h3 className="text-base font-medium text-foreground">Catálogo de Servicios</h3>
+        {/* Equipo General (solo owner/GM) */}
+        {canManageEquipo && (
+          <div id="seccion-equipo" className="mt-8 space-y-4">
+            <h3 className="text-base font-medium text-foreground">Equipo</h3>
+            <EquipoGeneralConfig
+              organizationId={organizationId}
+              allBarbers={allBarbers}
+              allSucursales={allSucursales}
+              onAddBarberToSucursal={onAddBarberToSucursal}
+              onUpdateBarber={onUpdateBarber}
+              onRefreshBarbers={onRefreshBarbers}
+              onNavigateToMiNegocio={onNavigateToMiNegocio}
+            />
+          </div>
+        )}
+
+        {/* Servicios */}
+        <section id="seccion-servicios" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Servicios</h3>
+          </div>
           <Tabs defaultValue="services" className="w-full">
             <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               <TabsTrigger value="services" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Servicios</TabsTrigger>
-              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Líneas de servicio</TabsTrigger>
+              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Categorías</TabsTrigger>
               <TabsTrigger value="extras" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Extras</TabsTrigger>
-              <TabsTrigger value="productos" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Productos</TabsTrigger>
-              <TabsTrigger value="discounts" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Descuentos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="services" className="mt-4 space-y-6 sm:mt-6">
+            <TabsContent value="services" className="mt-4 space-y-6 sm:mt-6 animate-fade-in">
               <ServicesConfig
                 mode="global"
                 services={services}
@@ -118,7 +191,7 @@ export function MiNegocioGeneralTabContent({
               />
             </TabsContent>
 
-            <TabsContent value="lines" className="mt-4 sm:mt-6">
+            <TabsContent value="lines" className="mt-4 sm:mt-6 animate-fade-in">
               <LinesConfig
                 lines={lines}
                 onAdd={onAddLine}
@@ -127,7 +200,7 @@ export function MiNegocioGeneralTabContent({
               />
             </TabsContent>
 
-            <TabsContent value="extras" className="mt-4 sm:mt-6">
+            <TabsContent value="extras" className="mt-4 sm:mt-6 animate-fade-in">
               <ExtrasConfig
                 mode="global"
                 extras={extras}
@@ -136,29 +209,46 @@ export function MiNegocioGeneralTabContent({
                 onDelete={guarded(onDeleteExtra)}
               />
             </TabsContent>
-
-            <TabsContent value="productos" className="mt-4 sm:mt-6">
-              <ProductosGlobalConfig />
-            </TabsContent>
-
-            <TabsContent value="discounts" className="mt-4 sm:mt-6">
-              <DiscountsConfig
-                mode="global"
-                discounts={discounts}
-                onAdd={guarded(onAddDiscount)}
-                onUpdate={guarded(onUpdateDiscount)}
-                onDelete={guarded(onDeleteDiscount)}
-                onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
-              />
-            </TabsContent>
           </Tabs>
-        </div>
+        </section>
+
+        {/* Productos */}
+        <section id="seccion-productos" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Productos</h3>
+          </div>
+          <ProductosGlobalConfig />
+        </section>
+
+        {/* Descuentos */}
+        <section id="seccion-descuentos" className="border-t pt-6 mt-8">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold">Descuentos</h3>
+          </div>
+          <DiscountsConfig
+            mode="global"
+            discounts={discounts}
+            onAdd={guarded(onAddDiscount)}
+            onUpdate={guarded(onUpdateDiscount)}
+            onDelete={guarded(onDeleteDiscount)}
+            onToggleActive={onToggleDiscountActive ? guarded(onToggleDiscountActive) : undefined}
+          />
+        </section>
 
         {/* Métodos de pago generales */}
-        <div className="mt-8 space-y-4">
+        <div id="seccion-metodos-pago" className="mt-8 space-y-4">
           <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
           <PaymentMethodsConfig sucursalId={null} />
         </div>
+
+        {/* Sucursales desactivadas — siempre como último bloque de la pestaña General */}
+        {sucursalesInactivas && sucursalesInactivas.length > 0 && (
+          <SucursalesInactivasCollapsible
+            sucursalesInactivas={sucursalesInactivas}
+            onVerSucursal={(id) => onVerSucursalInactiva?.(id)}
+            onAfterDelete={async () => { await onAfterDeleteSucursal?.(); }}
+          />
+        )}
       </div>
     </div>
   );

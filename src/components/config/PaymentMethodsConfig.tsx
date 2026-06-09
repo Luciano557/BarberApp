@@ -4,6 +4,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, Wallet, Building2, Info, ArrowRight, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -35,6 +36,7 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
     usePaymentMethodsConfig({ sucursalId });
 
   const [usarGeneral, setUsarGeneral] = useState(true);
+  const [confirmRevert, setConfirmRevert] = useState(false);
   const [state, setState] = useState<Record<PaymentMethod, MethodState>>(() =>
     PAYMENT_METHODS.reduce((acc, m) => {
       acc[m] = { activo: true, recargoPct: '0' };
@@ -146,6 +148,7 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
       : 'Esta sucursal tiene configuración propia';
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -167,7 +170,13 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
                 <Switch
                   id="use-general"
                   checked={usarGeneral}
-                  onCheckedChange={handleToggleUsarGeneral}
+                  onCheckedChange={(next) => {
+                    if (editingOverride && next) {
+                      setConfirmRevert(true);
+                    } else {
+                      handleToggleUsarGeneral(next);
+                    }
+                  }}
                   disabled={saving || loading}
                 />
               </div>
@@ -220,19 +229,9 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
             {editingOverride && (
               <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3 mb-3">
                 <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                <div className="flex-1 text-sm">
-                  <p className="text-foreground">
-                    Esta sucursal tiene configuración propia. Los cambios acá NO afectan a las demás sucursales.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleUsarGeneral(true)}
-                    disabled={saving}
-                    className="mt-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    Volver a usar la configuración general
-                  </button>
-                </div>
+                <p className="flex-1 text-sm text-foreground">
+                  Esta sucursal tiene configuración propia. Los cambios acá NO afectan a las demás sucursales.
+                </p>
               </div>
             )}
             {PAYMENT_METHODS.map((m) => {
@@ -287,5 +286,23 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
         )}
       </CardContent>
     </Card>
+
+      <AlertDialog open={confirmRevert} onOpenChange={setConfirmRevert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Volver a configuración general</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la configuración propia de esta sucursal. Los métodos de pago volverán a seguir la configuración general del negocio.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmRevert(false); handleToggleUsarGeneral(true); }}>
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Tag, History, Search } from 'lucide-react';
+import { Plus, Tag, History, Search, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -120,20 +120,25 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base font-medium">Productos</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Gestioná tu catálogo de productos, precios y stock por sucursal.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setMarcasDialog(true)}>
-              <Tag className="h-4 w-4 mr-1" /> Marcas
-            </Button>
-            <Button size="sm" className="w-full sm:w-auto" onClick={() => setProductoDialog({ open: true, producto: null })}>
-              <Plus className="h-4 w-4 mr-1" /> Nuevo producto
-            </Button>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-md bg-muted p-2">
+                <Package className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Productos de esta sucursal</CardTitle>
+                <CardDescription>Activá productos, configurá precios, costos y gestioná el stock.</CardDescription>
+              </div>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setMarcasDialog(true)}>
+                <Tag className="h-4 w-4 mr-1" /> Marcas
+              </Button>
+              <Button size="sm" className="w-full sm:w-auto" onClick={() => setProductoDialog({ open: true, producto: null })}>
+                <Plus className="h-4 w-4 mr-1" /> Nuevo producto
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -151,10 +156,10 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
               <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos en sucursal ({activeCount})
+                Activos ({activeCount})
               </TabsTrigger>
               <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos / no configurados ({inactiveCount})
+                Inactivos ({inactiveCount})
               </TabsTrigger>
             </TabsList>
 

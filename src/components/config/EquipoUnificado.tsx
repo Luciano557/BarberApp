@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
+import { Plus, Edit2, Save, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, ChevronUp, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 import { formatPhoneDisplay } from '@/lib/phone';
@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
 import { AppRole, useAuth } from '@/contexts/AuthContext';
 
@@ -19,6 +20,7 @@ import { ExtrasCompensacion } from './ExtrasCompensacion';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { BarberSucursalesGeneralSection } from './BarberSucursalesGeneralSection';
 
 // --- Role utilities ---
 const ROLE_HIERARCHY: Record<AppRole, number> = {
@@ -189,7 +191,7 @@ const RoleCard: React.FC<RoleCardProps> = ({ icon, title, description, selected,
         </span>
         <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
         {auxiliaryLabel && (
-          <span className="block text-[11px] text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
+          <span className="block text-xs text-muted-foreground mt-1 italic">{auxiliaryLabel}</span>
         )}
       </span>
     </button>
@@ -217,6 +219,18 @@ interface EquipoUnificadoProps {
   onAddBarber: (barber: Omit<Barber, 'id' | 'uid'>) => void;
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
+  /**
+   * 'sucursal' (default): comportamiento histórico — administra el equipo de una
+   * sucursal específica. 'general': panel global del negocio, agrega gestión de
+   * sucursal principal (doble escritura) y secundarias recurrentes por barbero.
+   */
+  mode?: 'sucursal' | 'general';
+  /** En mode='general', sucursales activas para los selects internos. */
+  sucursalesActivas?: { id: string; nombre: string }[];
+  /** En mode='general', requerido para crear nuevos barberos (sucursal principal). */
+  onAddBarberToSucursal?: (barber: Omit<Barber, 'id' | 'uid'>, sucursalId: string) => void;
+  /** En mode='general', navega a Mi Negocio > sucursal > sección equipo para este barbero. */
+  onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
 }
 
 interface ToggleConfirm {
@@ -226,14 +240,35 @@ interface ToggleConfirm {
 
 export function EquipoUnificado({
   sucursalId, organizationId, barbers, allBarbers, sucursales = [], onAddBarber, onUpdateBarber, onRefreshBarbers,
+  mode = 'sucursal', sucursalesActivas, onAddBarberToSucursal, onNavigateToMiNegocio,
 }: EquipoUnificadoProps) {
+  const isGeneralMode = mode === 'general';
+  const sucursalesForSection = sucursalesActivas ?? sucursales;
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+  type HistorialPeriodo = { fecha_inicio: string; fecha_fin: string | null; motivo_egreso: string | null; sucursal_nombre: string | null };
+  const [historialMap, setHistorialMap] = useState<Record<string, HistorialPeriodo[]>>({});
+  const [bajaInfoMap, setBajaInfoMap] = useState<Record<string, { fecha_baja: string | null; motivo_baja: string | null }>>({});
+  const [mostrarTodosActivos, setMostrarTodosActivos] = useState(false);
+  const [expandedHistIds, setExpandedHistIds] = useState<Set<string>>(new Set());
+  const toggleHistItem = (id: string) => {
+    setExpandedHistIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const [inviteBarber, setInviteBarber] = useState<Barber | null>(null);
   const [pinDialogBarber, setPinDialogBarber] = useState<Barber | null>(null);
   const [barberPinStatus, setBarberPinStatus] = useState<Record<string, boolean>>({});
-  const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
+  const [finalizarTarget, setFinalizarTarget] = useState<{
+    barber: Barber;
+    motivo: string;
+    futureTurnos: number | null;
+    loading: boolean;
+    submitting: boolean;
+  } | null>(null);
 
   const { roles: callerRoles } = useAuth();
   const callerCanReplaceManager = callerRoles.includes('owner') || callerRoles.includes('general_manager');
@@ -274,9 +309,72 @@ export function EquipoUnificado({
     firstName: '', lastName: '', phone: '', commission: '40', address: '', dni: '', roles: ['barber'] as AppRole[],
     compensationType: 'comision' as CompensationType, fixedSalary: '', payDay: '1',
   });
+  // En general mode, sucursal principal a usar al crear un nuevo barbero.
+  const [addPrincipalSucursalId, setAddPrincipalSucursalId] = useState<string>('');
 
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
+
+  // Fetch historial + datos de baja para barberos inactivos (pestaña Historial)
+  const inactiveIdsKey = inactiveBarbers.map(b => b.id).sort().join(',');
+  useEffect(() => {
+    if (!organizationId || inactiveBarbers.length === 0) {
+      setHistorialMap({});
+      setBajaInfoMap({});
+      return;
+    }
+    const ids = inactiveBarbers.map(b => b.id);
+    let cancelled = false;
+    (async () => {
+      const [{ data: histRows }, { data: barberRows }] = await Promise.all([
+        supabase
+          .from('barbero_historial')
+          .select('barbero_id, fecha_inicio, fecha_fin, motivo_egreso, sucursal_id, sucursales:sucursal_id(nombre)')
+          .eq('organization_id', organizationId)
+          .in('barbero_id', ids)
+          .order('fecha_inicio', { ascending: false }),
+        supabase
+          .from('barberos')
+          .select('id, fecha_baja, motivo_baja')
+          .eq('organization_id', organizationId)
+          .in('id', ids),
+      ]);
+      if (cancelled) return;
+      const hMap: Record<string, HistorialPeriodo[]> = {};
+      (histRows || []).forEach((r: any) => {
+        const list = hMap[r.barbero_id] || (hMap[r.barbero_id] = []);
+        list.push({
+          fecha_inicio: r.fecha_inicio,
+          fecha_fin: r.fecha_fin,
+          motivo_egreso: r.motivo_egreso,
+          sucursal_nombre: r.sucursales?.nombre ?? null,
+        });
+      });
+      setHistorialMap(hMap);
+      const bMap: Record<string, { fecha_baja: string | null; motivo_baja: string | null }> = {};
+      (barberRows || []).forEach((r: any) => {
+        bMap[r.id] = { fecha_baja: r.fecha_baja ?? null, motivo_baja: r.motivo_baja ?? null };
+      });
+      setBajaInfoMap(bMap);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, inactiveIdsKey]);
+
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return iso;
+    return `${m[3]}/${m[2]}/${m[1]}`;
+  };
+
+  const formatFechaBaja = (iso: string | null | undefined): string => {
+    if (!iso) return '—';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (!m) return '—';
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `Baja: ${m[3]} ${months[parseInt(m[2], 10) - 1]} ${m[1]}`;
+  };
 
   // Fetch PIN status
   const fetchPinStatus = useCallback(async () => {
@@ -694,7 +792,7 @@ export function EquipoUnificado({
       setEditingId(null);
     } else {
       const teamRole: TeamRole = rolEquipo;
-      onAddBarber({
+      const payload = {
         firstName: data.firstName, lastName: data.lastName, phone: data.phone,
         commission: Number(data.commission), address: data.address || undefined, dni: data.dni || undefined, active: true,
         compensationType: data.compensationType,
@@ -702,22 +800,156 @@ export function EquipoUnificado({
         payDay: data.compensationType === 'fijo' ? Number(data.payDay) || 1 : undefined,
         teamRole,
         rolesEquipo: data.roles,
-      });
+      };
+      if (isGeneralMode) {
+        if (!addPrincipalSucursalId) {
+          toast.error('Elegí la sucursal principal antes de guardar.');
+          return;
+        }
+        if (!onAddBarberToSucursal) {
+          toast.error('Configuración inválida (general mode sin handler).');
+          return;
+        }
+        onAddBarberToSucursal(payload, addPrincipalSucursalId);
+      } else {
+        onAddBarber(payload);
+      }
       setIsAdding(false);
+      setAddPrincipalSucursalId('');
     }
     resetForm();
   };
 
-  const handleConfirmToggle = () => {
-    if (!toggleConfirm) return;
-    onUpdateBarber(toggleConfirm.barber.id, { active: toggleConfirm.action === 'activate' });
-    setToggleConfirm(null);
+
+
+
+  // --- Finalizar actividad: abre dialog y consulta turnos futuros ---
+  const openFinalizarDialog = async (barber: Barber) => {
+    setFinalizarTarget({ barber, motivo: '', futureTurnos: null, loading: true, submitting: false });
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('barbero_id', barber.id)
+        .eq('organization_id', organizationId)
+        .gte('fecha', today)
+        .not('estado', 'in', '("cancelado","completado")');
+      setFinalizarTarget(prev => prev && prev.barber.id === barber.id
+        ? { ...prev, futureTurnos: count ?? 0, loading: false }
+        : prev);
+    } catch (e: any) {
+      setFinalizarTarget(prev => prev && prev.barber.id === barber.id
+        ? { ...prev, futureTurnos: 0, loading: false }
+        : prev);
+    }
+  };
+
+  const handleConfirmFinalizar = async () => {
+    if (!finalizarTarget) return;
+    setFinalizarTarget(prev => prev ? { ...prev, submitting: true } : prev);
+    try {
+      const { data, error } = await supabase.functions.invoke('deactivate-barber', {
+        body: {
+          barberoId: finalizarTarget.barber.id,
+          organizationId,
+          motivo: finalizarTarget.motivo.trim() || null,
+        },
+      });
+      if (error || (data as any)?.error) {
+        toast.error((data as any)?.error || error?.message || 'No se pudo finalizar la actividad');
+        setFinalizarTarget(prev => prev ? { ...prev, submitting: false } : prev);
+        return;
+      }
+      toast.success('Actividad finalizada');
+      setFinalizarTarget(null);
+      if (onRefreshBarbers) await onRefreshBarbers();
+      await Promise.all([fetchOrgUsers(), fetchUserRoles(), fetchAccessEmails()]);
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo finalizar la actividad');
+      setFinalizarTarget(prev => prev ? { ...prev, submitting: false } : prev);
+    }
   };
 
   // StaffForm is declared at module level (see bottom of file) so its identity
   // remains stable across parent re-renders. This prevents the form from
   // unmounting/remounting (which would reset checkbox state) when the parent
   // re-fetches data while the user is editing.
+
+  // --- Render compact collapsible row for inactive members ---
+  const renderHistorialItem = (barber: Barber) => {
+    const baja = bajaInfoMap[barber.id];
+    const linkedUser = getLinkedUser(barber.id);
+    const displayRoles = getDisplayRoles(barber);
+    const rolesLabel = displayRoles.length > 0
+      ? displayRoles.sort((a, b) => ROLE_HIERARCHY[a] - ROLE_HIERARCHY[b]).map(getRoleLabel).join(' · ')
+      : 'Sin cargo';
+    const isExpanded = expandedHistIds.has(barber.id);
+    const email = linkedUser?.email;
+    const phone = barber.phone ? formatPhoneDisplay(barber.phone) : null;
+
+    return (
+      <>
+        <div
+          onClick={() => toggleHistItem(barber.id)}
+          className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+        >
+          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center flex-shrink-0">
+            {barber.firstName.charAt(0).toUpperCase()}{barber.lastName.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {barber.firstName} {barber.lastName}
+            </p>
+            <p className="text-xs text-muted-foreground">{rolesLabel}</p>
+          </div>
+          <span className="text-xs text-muted-foreground flex-shrink-0">
+            {formatFechaBaja(baja?.fecha_baja)}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+
+        {isExpanded && (
+          <div className="px-4 pb-4 border-t border-border/50 bg-muted/20">
+            <div className="grid grid-cols-2 gap-3 pt-3 mb-4">
+              {email && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                  <p className="text-sm break-all">{email}</p>
+                </div>
+              )}
+              {phone && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Teléfono</p>
+                  <p className="text-sm">{phone}</p>
+                </div>
+              )}
+              {barber.dni && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">DNI</p>
+                  <p className="text-sm">{barber.dni}</p>
+                </div>
+              )}
+              {baja?.motivo_baja && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Motivo de baja</p>
+                  <p className="text-sm">{baja.motivo_baja}</p>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setInviteBarber(barber); }}
+              className="text-xs px-3 py-1.5 rounded-md border border-primary/30 bg-primary/5 text-primary font-medium hover:bg-primary/10 transition-colors flex items-center gap-1.5"
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Reincorporar
+            </button>
+          </div>
+        )}
+      </>
+    );
+  };
 
   // --- Render a barber item ---
   const renderBarberItem = (barber: Barber) => {
@@ -728,6 +960,9 @@ export function EquipoUnificado({
     const assignableRoles = displayRoles.filter(r => r !== 'owner');
     const isOwner = displayRoles.includes('owner') || linkedRoles.includes('owner');
     const hasSystemAccess = linkedRoles.some(r => r !== 'otros');
+    const callerIsOwner = callerRoles.includes('owner');
+    const ownerReadOnly = isOwner && !callerIsOwner;
+    const tieneContacto = !!linkedUser || !!(barber.phone && formatPhoneDisplay(barber.phone)) || !!barber.address || !!barber.dni;
 
     return (
       <div key={barber.id}>
@@ -768,47 +1003,42 @@ export function EquipoUnificado({
             </div>
 
             {/* Contact info */}
-            <div className="text-xs text-muted-foreground space-y-1 mb-3">
-              {linkedUser && (
-                <div className="flex items-start gap-1.5">
-                  <Mail className="mt-0.5 h-3 w-3 shrink-0" />
-                  <span className="break-all">{linkedUser.email}</span>
-                </div>
-              )}
-              {barber.phone && formatPhoneDisplay(barber.phone) && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Tel</span>
-                  <span className="break-words">{formatPhoneDisplay(barber.phone)}</span>
-                </div>
-              )}
-              {barber.address && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">Dir</span>
-                  <span className="break-words">{barber.address}</span>
-                </div>
-              )}
-              {barber.dni && (
-                <div className="flex items-start gap-1.5">
-                  <span className="flex h-3 w-3 shrink-0 items-center justify-center text-[10px]">DNI</span>
-                  <span className="break-words">{barber.dni}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Cargos: badges visuales no editables. Edición vía botón Editar. */}
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Cargos:</span>
-              {(() => {
-                const allRoles: AppRole[] = isOwner
-                  ? Array.from(new Set<AppRole>(['owner', ...displayRoles]))
-                  : displayRoles;
-                return allRoles.map(role => (
-                  <Badge key={role} variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
-                    {getRoleIcon(role)} {getRoleLabel(role)}
-                  </Badge>
-                ));
-              })()}
-            </div>
+            {tieneContacto && (
+              <div className="pt-3 mt-3 border-t border-border/50 mb-3 space-y-1">
+                {linkedUser && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground break-all">{linkedUser.email}</span>
+                  </div>
+                )}
+                {barber.phone && formatPhoneDisplay(barber.phone) && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground">{formatPhoneDisplay(barber.phone)}</span>
+                  </div>
+                )}
+                {barber.address && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground break-words">{barber.address}</span>
+                  </div>
+                )}
+                {barber.dni && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-4 flex items-center justify-center flex-shrink-0">
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="text-sm text-muted-foreground">{barber.dni}</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Extras de compensación — only for managers/GMs */}
             {(() => {
@@ -824,6 +1054,17 @@ export function EquipoUnificado({
                 />
               );
             })()}
+
+            {/* Sucursales (sólo Equipo General) */}
+            {isGeneralMode && (
+              <BarberSucursalesGeneralSection
+                barberoId={barber.id}
+                organizationId={organizationId}
+                sucursales={sucursalesForSection}
+                onPrincipalChanged={onRefreshBarbers}
+                onVerConfig={onNavigateToMiNegocio}
+              />
+            )}
 
             {/* Acceso al sistema */}
             {!isOwner && (() => {
@@ -842,12 +1083,12 @@ export function EquipoUnificado({
               else if (hasPersistedEmail) { stateLabel = 'Email cargado — acceso pendiente'; stateClass = 'text-primary'; }
 
               return (
-                <div className="mt-3 mb-3 p-3 rounded-md bg-background/60 border border-border space-y-2">
+                <div className="pt-3 mt-3 border-t border-border/50 space-y-2">
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                       <KeyRound className="h-3.5 w-3.5" /> Acceso al sistema
                     </span>
-                    <span className={`text-[11px] ${stateClass}`}>{stateLabel}</span>
+                    <span className={`text-xs ${stateClass}`}>{stateLabel}</span>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Input
@@ -877,7 +1118,7 @@ export function EquipoUnificado({
                   </div>
                   {code && (
                     <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/30 space-y-1">
-                      <p className="text-[11px] text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
+                      <p className="text-xs text-muted-foreground">Mostrá este código una sola vez. No quedará guardado.</p>
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="text-xs">
                           <div><span className="text-muted-foreground">Email:</span> <span className="font-mono">{code.email}</span></div>
@@ -901,41 +1142,47 @@ export function EquipoUnificado({
             })()}
 
 
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
-                setEditingId(barber.id);
-                setFormData({
-                  firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
-                  commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-                  roles: displayRoles.length > 0 ? displayRoles : ['barber'],
-                  compensationType: barber.compensationType || 'comision',
-                  fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
-                  payDay: barber.payDay != null ? String(barber.payDay) : '1',
-                });
-              }}>
-                <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
-              </Button>
-
-              {linkedUser && hasSystemAccess && (
-                <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
-                  onClick={() => setPinDialogBarber(barber)}>
-                  <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
+            {!ownerReadOnly && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => {
+                  setEditingId(barber.id);
+                  setFormData({
+                    firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
+                    commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
+                    roles: displayRoles.length > 0 ? displayRoles : ['barber'],
+                    compensationType: barber.compensationType || 'comision',
+                    fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
+                    payDay: barber.payDay != null ? String(barber.payDay) : '1',
+                  });
+                }}>
+                  <Edit2 className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
-              )}
 
-
-              <Button variant="ghost" size="sm" className="h-8 text-xs"
-                onClick={() => setToggleConfirm({
-                  barber,
-                  action: barber.active ? 'deactivate' : 'activate',
-                })}>
-                {barber.active ? (
-                  <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Desactivar</span></>
-                ) : (
-                  <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Activar</span></>
+                {linkedUser && hasSystemAccess && (
+                  <Button variant="ghost" size="sm" className={`h-8 text-xs ${barberPinStatus[barber.id] ? 'text-primary' : ''}`}
+                    onClick={() => setPinDialogBarber(barber)}>
+                    <Lock className="h-3.5 w-3.5 mr-1" /> {barberPinStatus[barber.id] ? 'Editar PIN' : 'Configurar PIN'}
+                  </Button>
                 )}
-              </Button>
-            </div>
+
+                {!isOwner && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs"
+                    onClick={() => {
+                      if (barber.active) {
+                        openFinalizarDialog(barber);
+                      } else {
+                        setInviteBarber(barber);
+                      }
+                    }}>
+                    {barber.active ? (
+                      <><UserX className="h-3.5 w-3.5 mr-1 text-destructive" /> <span className="text-destructive">Finalizar actividad</span></>
+                    ) : (
+                      <><UserCheck className="h-3.5 w-3.5 mr-1 text-success" /> <span className="text-success">Reincorporar</span></>
+                    )}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -948,33 +1195,114 @@ export function EquipoUnificado({
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-medium">Equipo</CardTitle>
-          {!isAdding && !editingId && activeSubTab === 'active' && (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Agregar
-            </Button>
-          )}
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-md bg-muted p-2">
+                <Users className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">
+                  {isGeneralMode ? 'Miembros del negocio' : 'Equipo'}
+                </CardTitle>
+                {isGeneralMode && (
+                  <CardDescription>Cargos, compensación y acceso al sistema para todo el equipo.</CardDescription>
+                )}
+              </div>
+            </div>
+            {!isAdding && !editingId && activeSubTab === 'active' && (
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
               <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveBarbers.length})</TabsTrigger>
+              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial ({inactiveBarbers.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {isAdding && (
-                <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                <div className="space-y-3 animate-step-in-forward">
+                  {isGeneralMode && (
+                    <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+                      <label className="text-xs font-medium text-foreground">Sucursal principal</label>
+                      <Select value={addPrincipalSucursalId} onValueChange={setAddPrincipalSucursalId}>
+                        <SelectTrigger className="h-9 text-sm">
+                          <SelectValue placeholder="Elegí la sucursal principal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sucursalesForSection.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
+                      </p>
+                    </div>
+                  )}
+                  <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
+                </div>
               )}
-              {sortedActive.map(renderBarberItem)}
-              {sortedActive.length === 0 && !isAdding && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros activos</p>
-              )}
+              {(() => {
+                const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
+                return (
+                  <>
+                    {visiblesActivos.map((b, idx) => {
+                      const item = renderBarberItem(b);
+                      if (!mostrarTodosActivos || idx === 0) return item;
+                      return <div key={`w-${b.id}`} className="animate-item-in">{item}</div>;
+                    })}
+                    {sortedActive.length === 0 && !isAdding && (
+                      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                        <Users className="h-8 w-8 text-muted-foreground/50" />
+                        <div>
+                          <p className="text-sm font-medium">Todavía no hay miembros en el equipo</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Agregá el primer miembro para gestionar roles, compensación y acceso al sistema.
+                          </p>
+                        </div>
+                        {!editingId && (
+                          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                            Agregar miembro
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {sortedActive.length > 1 && (
+                      mostrarTodosActivos ? (
+                        <button
+                          onClick={() => setMostrarTodosActivos(false)}
+                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                          Ver menos
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setMostrarTodosActivos(true)}
+                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                          Ver más ({sortedActive.length - 1})
+                        </button>
+                      )
+                    )}
+                  </>
+                );
+              })()}
             </TabsContent>
             <TabsContent value="inactive" className="mt-4 space-y-3">
-              {sortedInactive.map(renderBarberItem)}
+              {sortedInactive.map(b => (
+                <div key={`hist-${b.id}`} className="bg-card border border-border/60 rounded-lg overflow-hidden mb-2">
+                  {renderHistorialItem(b)}
+                </div>
+              ))}
               {sortedInactive.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros inactivos</p>
+                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros en el historial</p>
               )}
             </TabsContent>
           </Tabs>
@@ -1017,22 +1345,69 @@ export function EquipoUnificado({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
+      {/* Finalizar actividad */}
+      <AlertDialog
+        open={!!finalizarTarget}
+        onOpenChange={(open) => {
+          if (!open && finalizarTarget && !finalizarTarget.submitting) setFinalizarTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {toggleConfirm?.action === 'deactivate' ? 'Desactivar miembro' : 'Activar miembro'}
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserX className="h-4 w-4 text-destructive" />
+              Finalizar actividad
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {toggleConfirm?.action === 'deactivate'
-                ? `¿Estás seguro de que querés desactivar a ${toggleConfirm?.barber.firstName} ${toggleConfirm?.barber.lastName}? No aparecerá en el listado activo.`
-                : `¿Querés volver a activar a ${toggleConfirm?.barber.firstName} ${toggleConfirm?.barber.lastName}?`}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  {finalizarTarget && (
+                    <>
+                      Vas a finalizar la actividad de{' '}
+                      <strong className="text-foreground">
+                        {finalizarTarget.barber.firstName} {finalizarTarget.barber.lastName}
+                      </strong>
+                      . Dejará de aparecer en el equipo activo, perderá el acceso al sistema y se registrará la fecha de baja en su historial.
+                    </>
+                  )}
+                </p>
+                {finalizarTarget?.loading ? (
+                  <p className="text-xs">Verificando turnos futuros…</p>
+                ) : finalizarTarget && finalizarTarget.futureTurnos !== null && finalizarTarget.futureTurnos > 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span>
+                      Tiene <strong>{finalizarTarget.futureTurnos}</strong> turno{finalizarTarget.futureTurnos === 1 ? '' : 's'} futuro{finalizarTarget.futureTurnos === 1 ? '' : 's'} agendado{finalizarTarget.futureTurnos === 1 ? '' : 's'}. Al finalizar la actividad esos turnos quedarán asignados a este barbero. Reasignalos o cancelalos antes si corresponde.
+                    </span>
+                  </div>
+                ) : null}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">Motivo (opcional)</label>
+                  <Textarea
+                    placeholder="Ej: renunció, cambio de rubro, traslado…"
+                    maxLength={240}
+                    value={finalizarTarget?.motivo ?? ''}
+                    onChange={(e) =>
+                      setFinalizarTarget(prev => prev ? { ...prev, motivo: e.target.value } : prev)
+                    }
+                    className="min-h-[72px] text-sm"
+                    disabled={finalizarTarget?.submitting}
+                  />
+                  <div className="text-right text-xs text-muted-foreground">
+                    {(finalizarTarget?.motivo.length ?? 0)}/240
+                  </div>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
-              {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
+            <AlertDialogCancel disabled={finalizarTarget?.submitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmFinalizar(); }}
+              disabled={finalizarTarget?.submitting || finalizarTarget?.loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {finalizarTarget?.submitting ? 'Finalizando…' : 'Finalizar actividad'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1086,7 +1461,7 @@ export function EquipoUnificado({
                 resolvingReplaceDialogRef.current = false;
               }
             }}>
-              Confirmar reemplazo
+              Confirmar cambio
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1103,14 +1478,14 @@ export function EquipoUnificado({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
-              Inconsistencia detectada
+              Corregir encargado de sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>
               {staleMgrDialog && (
                 <>
-                  Detectamos una inconsistencia: <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'un usuario'}</strong> figura
-                  como Encargado en permisos reales, pero no aparece como Encargado en el equipo.
-                  Para continuar, Vittro debe corregir esa sincronización.
+                  <strong>{staleMgrDialog.conflictName || staleMgrDialog.conflictEmail || 'Un usuario'}</strong> aparece
+                  como Encargado de sucursal en el sistema, pero no está registrado en el equipo.
+                  Vittro necesita corregir esto antes de continuar.
                 </>
               )}
             </AlertDialogDescription>
@@ -1335,6 +1710,11 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
                   </React.Fragment>
                 ))}
               </div>
+              {localData.roles.length === 1 && localData.roles[0] === 'otros' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Este rol no puede combinarse con otros rangos.
+                </p>
+              )}
             </div>
           </div>
         );

@@ -5,13 +5,14 @@ import { ConfigurationPanel } from '@/components/ConfigurationPanel';
 import { DailySummary } from '@/components/DailySummary';
 import { FinanzasPanel } from '@/components/FinanzasPanel';
 import { TareasPanel } from '@/components/TareasPanel';
-import { MiNegocioPanel } from '@/components/MiNegocioPanel';
+import { MiNegocioPanel, type MiNegocioPanelHandle } from '@/components/MiNegocioPanel';
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -41,6 +42,7 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState(getDefaultTab);
   const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
   const prevActiveTabRef = useRef(activeTab);
+  const miNegocioPanelRef = useRef<MiNegocioPanelHandle>(null);
 
   // Register tab setter so onboarding can drive navigation
   useEffect(() => {
@@ -115,6 +117,7 @@ const Index = () => {
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
   const { currentSucursal } = useSucursal();
+  const { barbers: cobrarBarbers, refetch: refetchCobrarBarbers } = useCobrarBarbers();
 
   const goToTeamSetup = useCallback(() => {
     if (organization?.id && currentSucursal?.id) {
@@ -128,14 +131,29 @@ const Index = () => {
     setActiveTab('mi-negocio');
   }, [organization?.id, currentSucursal?.id]);
 
+  const navigateToMiNegocioEquipo = useCallback((sucursalId: string, barberoId: string) => {
+    if (activeTab === 'mi-negocio') {
+      miNegocioPanelRef.current?.navigateToSucursalEquipo(sucursalId, barberoId);
+    } else {
+      if (organization?.id) {
+        try {
+          localStorage.setItem(`vittro:miNegocio:activeTab:${organization.id}`, sucursalId);
+          localStorage.setItem(`vittro:miNegocio:highlightBarbero:${organization.id}`, barberoId);
+        } catch { }
+      }
+      setActiveTab('mi-negocio');
+    }
+  }, [activeTab, organization?.id]);
+
   // Refresca datos solo cuando se entra a Cobrar desde otra pestaña.
   useEffect(() => {
     const prevTab = prevActiveTabRef.current;
     if (prevTab !== 'registro' && activeTab === 'registro') {
       void refetchData();
+      void refetchCobrarBarbers();
     }
     prevActiveTabRef.current = activeTab;
-  }, [activeTab, refetchData]);
+  }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
 
@@ -159,18 +177,18 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex w-full">
+    <div className="h-screen overflow-hidden bg-background flex w-full">
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       <OnboardingOverlay />
       <OnboardingTooltip />
 
-      <main className={cn("min-h-screen min-w-0 flex-1 overflow-auto")}>
+      <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
         <div className={cn("mx-auto px-4 py-16 sm:px-6 sm:py-6 md:px-8 md:py-8", activeTab === 'tareas' ? "max-w-4xl lg:max-w-6xl" : "max-w-4xl")}>
           {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}
               extras={extras}
-              barbers={barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') || b.teamRole === 'barbero')}
+              barbers={cobrarBarbers}
               discounts={cobrarDiscounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}
@@ -237,7 +255,11 @@ const Index = () => {
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
-            <MiNegocioPanel onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined} />
+            <MiNegocioPanel
+              ref={miNegocioPanelRef}
+              onGoToGeneralConfig={canManageConfig ? goToGeneralConfig : undefined}
+              onNavigateToMiNegocio={navigateToMiNegocioEquipo}
+            />
           )}
 
           {activeTab === 'config' && canViewConfig && (

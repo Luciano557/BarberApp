@@ -262,6 +262,8 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         open={!!detailTurno}
         onOpenChange={(v) => { if (!v) setDetailTurno(null); }}
         turno={detailTurno}
+        organizationId={organizationId}
+        sucursalId={sucursalId}
         barbers={barbers}
         servicios={servicios}
         onChanged={refetch}

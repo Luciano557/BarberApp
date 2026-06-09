@@ -13,8 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Plus, Edit2, Trash2, Users, UserCheck, Shield, Scissors, KeyRound } from 'lucide-react';
+import { MapPin, Plus, Edit2, Trash2, Power, Users, UserCheck, Shield, Scissors, KeyRound, AlertTriangle } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { CuentaSucursalBlock } from './CuentaSucursalBlock';
 import { toast } from 'sonner';
@@ -75,6 +79,15 @@ export function SucursalesConfig() {
   const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
+  const [fechaDesactMap, setFechaDesactMap] = useState<Record<string, string | null>>({});
+  const [toggleTarget, setToggleTarget] = useState<{
+    suc: Sucursal;
+    isDeactivating: boolean;
+    loadingPrecheck: boolean;
+    futureTurnos: number | null;
+    submitting: boolean;
+    info: string | null;
+  } | null>(null);
 
   // Users assignment dialog
   const [showAssignDialog, setShowAssignDialog] = useState(false);
@@ -101,6 +114,9 @@ export function SucursalesConfig() {
         timezone: s.timezone,
         activa: s.activa,
       })));
+      const fMap: Record<string, string | null> = {};
+      data.forEach((s: any) => { fMap[s.id] = s.fecha_desactivacion ?? null; });
+      setFechaDesactMap(fMap);
     }
   };
 
@@ -196,16 +212,63 @@ export function SucursalesConfig() {
     }
   };
 
-  const handleToggleActive = async (suc: Sucursal) => {
-    const { error } = await supabase.from('sucursales').update({ activa: !suc.activa }).eq('id', suc.id);
-    if (error) {
-      toast.error('Error al actualizar');
-    } else {
-      toast.success(suc.activa ? 'Sucursal desactivada' : 'Sucursal activada');
-      await fetchAllSucursales();
-      await refreshSucursales();
+  const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  };
+
+  const openToggleDialog = async (suc: Sucursal) => {
+    const isDeactivating = suc.activa;
+    setToggleTarget({
+      suc,
+      isDeactivating,
+      loadingPrecheck: isDeactivating,
+      futureTurnos: null,
+      submitting: false,
+      info: null,
+    });
+    if (isDeactivating) {
+      const today = new Date().toISOString().slice(0, 10);
+      const { count } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('sucursal_id', suc.id)
+        .gte('fecha', today)
+        .in('estado', ['pendiente', 'confirmado', 'en_curso']);
+      setToggleTarget(prev => prev && prev.suc.id === suc.id
+        ? { ...prev, loadingPrecheck: false, futureTurnos: count ?? 0 }
+        : prev);
     }
   };
+
+  const confirmToggle = async () => {
+    if (!toggleTarget || !organization?.id) return;
+    setToggleTarget(prev => prev ? { ...prev, submitting: true } : prev);
+    try {
+      const { data, error } = await supabase.functions.invoke('toggle-sucursal', {
+        body: { sucursalId: toggleTarget.suc.id, organizationId: organization.id },
+      });
+      if (error) throw new Error(error.message || 'Error al cambiar el estado');
+      const action = (data as any)?.action as 'deactivated' | 'reactivated' | undefined;
+      const restored = !!(data as any)?.restored;
+      const reason = (data as any)?.reason as string | undefined;
+      toast.success(action === 'deactivated' ? 'Sucursal desactivada' : 'Sucursal reactivada');
+      await fetchAllSucursales();
+      await refreshSucursales();
+      if (action === 'reactivated' && !restored && reason === 'manual_changes_detected') {
+        toast.message('Hubo cambios en el equipo mientras la sucursal estuvo inactiva. Revisá la disponibilidad de los barberos manualmente.');
+      }
+      setToggleTarget(null);
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al cambiar el estado');
+      setToggleTarget(prev => prev ? { ...prev, submitting: false } : prev);
+    }
+  };
+
 
   // --- User assignment ---
   const handleOpenAssign = async (suc: Sucursal) => {
@@ -318,6 +381,11 @@ export function SucursalesConfig() {
                   <div>
                     <p className="font-medium text-foreground">{suc.nombre}</p>
                     {suc.direccion && <p className="text-sm text-muted-foreground">{suc.direccion}</p>}
+                    {!suc.activa && fechaDesactMap[suc.id] && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Desactivada el {formatFechaDDMMYYYY(fechaDesactMap[suc.id])}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -335,9 +403,15 @@ export function SucursalesConfig() {
                   <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(suc)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleToggleActive(suc)}>
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => openToggleDialog(suc)}
+                    title={suc.activa ? 'Desactivar sucursal' : 'Reactivar sucursal'}
+                  >
+                    <Power className={`h-4 w-4 ${suc.activa ? 'text-destructive' : 'text-muted-foreground'}`} />
                   </Button>
+
                 </div>
               </div>
             </CardContent>
@@ -504,6 +578,52 @@ export function SucursalesConfig() {
           {cuentaSucursal && <CuentaSucursalBlock sucursal={cuentaSucursal} />}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!toggleTarget}
+        onOpenChange={(o) => { if (!o && !toggleTarget?.submitting) setToggleTarget(null); }}
+      >
+        <AlertDialogContent>
+          {toggleTarget && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {toggleTarget.isDeactivating
+                    ? `Desactivar ${toggleTarget.suc.nombre}`
+                    : `Reactivar ${toggleTarget.suc.nombre}`}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {toggleTarget.isDeactivating
+                    ? 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'
+                    : 'La sucursal volverá a estar operativa.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+
+              {toggleTarget.isDeactivating && toggleTarget.futureTurnos !== null && toggleTarget.futureTurnos > 0 && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Esta sucursal tiene {toggleTarget.futureTurnos} turno{toggleTarget.futureTurnos === 1 ? '' : 's'} futuro{toggleTarget.futureTurnos === 1 ? '' : 's'} que quedará{toggleTarget.futureTurnos === 1 ? '' : 'n'} sin atender.
+                  </p>
+                </div>
+              )}
+
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={toggleTarget.submitting}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => { e.preventDefault(); confirmToggle(); }}
+                  disabled={toggleTarget.submitting || toggleTarget.loadingPrecheck}
+                  className={toggleTarget.isDeactivating ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+                >
+                  {toggleTarget.submitting
+                    ? 'Procesando...'
+                    : toggleTarget.isDeactivating ? 'Desactivar' : 'Reactivar'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

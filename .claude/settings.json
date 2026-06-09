@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(impeccable)",
+      "Skill(impeccable:*)",
+      "Bash(node .claude/skills/impeccable/scripts/context.mjs)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const l = require\\('c:/Users/Sebastian Tello/proyectos/pixel-perfect-replica/node_modules/lucide-react'\\); const icons = ['KeyRound','Users','Scissors','Plus','Tag','BadgePercent','Package','CalendarCheck']; icons.forEach\\(i => console.log\\(i, l[i] ? 'OK' : 'MISSING'\\)\\);\")"
+    ]
+  }
+}

@@ -44,19 +44,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [sucursalesRes, barberosRes, serviciosRes, portalRes] = await Promise.all([
+    const [sucursalesRes, bsRes, serviciosRes, portalRes] = await Promise.all([
       supabase
         .from("sucursales")
         .select("id, nombre")
         .eq("organization_id", org.id)
-        .eq("activa", true),
+        .eq("activa", true)
+        .is("deleted_at", null),
+      // Fase 3: disponibilidad por sucursal (incluye organization_id)
       supabase
-        .from("barberos")
-        .select("id, nombre, apellido, sucursal_id")
+        .from("barberos_sucursales")
+        .select("barbero_id, sucursal_id")
         .eq("organization_id", org.id)
-        .eq("activo", true)
-        .eq("rol_equipo", "barbero")
-        .not("sucursal_id", "is", null),
+        .eq("disponible", true),
       supabase
         .from("servicios_sucursales")
         .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, eliminado)")
@@ -71,6 +71,21 @@ Deno.serve(async (req) => {
         .eq("organization_id", org.id)
         .maybeSingle(),
     ]);
+
+    const bsRows: { barbero_id: string; sucursal_id: string }[] = bsRes.data || [];
+    const disponibleIds = Array.from(new Set(bsRows.map((r) => r.barbero_id)));
+
+    let barberosData: { id: string; nombre: string; apellido: string | null }[] = [];
+    if (disponibleIds.length > 0) {
+      const { data } = await supabase
+        .from("barberos")
+        .select("id, nombre, apellido")
+        .eq("organization_id", org.id)
+        .in("id", disponibleIds)
+        .eq("activo", true)
+        .contains("roles_equipo", ["barber"]);
+      barberosData = data || [];
+    }
 
     const clampPos = (n: any): number => {
       const v = typeof n === 'number' ? n : Number(n);
@@ -152,7 +167,13 @@ Deno.serve(async (req) => {
     const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
     const sucursalesActivas = sucursalesRes.data || [];
     const sucursales = sucursalesActivas.filter((s: any) => sucursalesConServicios.has(s.id));
-    const barberos = (barberosRes.data || []).filter((b: any) => sucursalesConServicios.has(b.sucursal_id));
+    const barberosById = new Map(barberosData.map((b) => [b.id, b]));
+    const barberos = bsRows
+      .filter((r) => barberosById.has(r.barbero_id) && sucursalesConServicios.has(r.sucursal_id))
+      .map((r) => {
+        const b = barberosById.get(r.barbero_id)!;
+        return { id: b.id, nombre: b.nombre, apellido: b.apellido, sucursal_id: r.sucursal_id };
+      });
 
     const responseBody: Record<string, unknown> = {
       organization: { id: org.id, name: org.name, logo_url: org.logo_url },

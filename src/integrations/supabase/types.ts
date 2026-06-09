@@ -154,6 +154,71 @@ export type Database = {
         }
         Relationships: []
       }
+      barbero_historial: {
+        Row: {
+          barbero_id: string
+          created_at: string
+          created_by: string | null
+          fecha_fin: string | null
+          fecha_inicio: string
+          id: string
+          motivo_egreso: string | null
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          barbero_id: string
+          created_at?: string
+          created_by?: string | null
+          fecha_fin?: string | null
+          fecha_inicio: string
+          id?: string
+          motivo_egreso?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          created_at?: string
+          created_by?: string | null
+          fecha_fin?: string | null
+          fecha_inicio?: string
+          id?: string
+          motivo_egreso?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barbero_historial_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barbero_historial_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       barberos: {
         Row: {
           access_email: string | null
@@ -162,8 +227,10 @@ export type Database = {
           comision: number
           created_at: string
           dni: string | null
+          fecha_baja: string | null
           fecha_cobro_dia: number
           id: string
+          motivo_baja: string | null
           nombre: string
           organization_id: string | null
           pin_hash: string | null
@@ -182,8 +249,10 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_baja?: string | null
           fecha_cobro_dia?: number
           id?: string
+          motivo_baja?: string | null
           nombre: string
           organization_id?: string | null
           pin_hash?: string | null
@@ -202,8 +271,10 @@ export type Database = {
           comision?: number
           created_at?: string
           dni?: string | null
+          fecha_baja?: string | null
           fecha_cobro_dia?: number
           id?: string
+          motivo_baja?: string | null
           nombre?: string
           organization_id?: string | null
           pin_hash?: string | null
@@ -225,6 +296,80 @@ export type Database = {
           },
           {
             foreignKeyName: "barberos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      barberos_sucursales: {
+        Row: {
+          barbero_id: string
+          created_at: string
+          dias_semana: number[] | null
+          disponible: boolean
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          organization_id: string
+          sucursal_id: string
+          tipo: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          barbero_id: string
+          created_at?: string
+          dias_semana?: number[] | null
+          disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id: string
+          sucursal_id: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          barbero_id?: string
+          created_at?: string
+          dias_semana?: number[] | null
+          disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id?: string
+          sucursal_id?: string
+          tipo?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "barberos_sucursales_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "barberos_sucursales_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
@@ -2516,6 +2661,74 @@ export type Database = {
         }
         Relationships: []
       }
+      sucursal_barberos_snapshot: {
+        Row: {
+          barbero_id: string
+          dias_semana: number[] | null
+          disponible: boolean
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          organization_id: string
+          snapshotted_at: string
+          sucursal_id: string
+          tipo: string
+        }
+        Insert: {
+          barbero_id: string
+          dias_semana?: number[] | null
+          disponible: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id: string
+          snapshotted_at?: string
+          sucursal_id: string
+          tipo: string
+        }
+        Update: {
+          barbero_id?: string
+          dias_semana?: number[] | null
+          disponible?: boolean
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          organization_id?: string
+          snapshotted_at?: string
+          sucursal_id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_barbero_id_fkey"
+            columns: ["barbero_id"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_barberos_snapshot_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sucursal_payment_settings: {
         Row: {
           created_at: string
@@ -2601,7 +2814,9 @@ export type Database = {
         Row: {
           activa: boolean
           created_at: string
+          deleted_at: string | null
           direccion: string | null
+          fecha_desactivacion: string | null
           id: string
           nombre: string
           organization_id: string
@@ -2612,7 +2827,9 @@ export type Database = {
         Insert: {
           activa?: boolean
           created_at?: string
+          deleted_at?: string | null
           direccion?: string | null
+          fecha_desactivacion?: string | null
           id?: string
           nombre: string
           organization_id: string
@@ -2623,7 +2840,9 @@ export type Database = {
         Update: {
           activa?: boolean
           created_at?: string
+          deleted_at?: string | null
           direccion?: string | null
+          fecha_desactivacion?: string | null
           id?: string
           nombre?: string
           organization_id?: string
@@ -2649,22 +2868,17 @@ export type Database = {
           completada_at: string | null
           completada_por_id: string | null
           completada_por_nombre: string | null
-          creado_por_id: string
+          creado_por_id: string | null
           creado_por_nombre: string | null
           created_at: string
           descripcion: string | null
-          dias_para_limite: number | null
           estado: string
           fecha_inicio: string | null
           fecha_limite: string | null
-          frecuencia_dias: number | null
           hora: string | null
           id: string
           organization_id: string
-          proxima_fecha: string | null
-          recurrencia_dia_semana: number | null
-          recurrencia_semana_del_mes: number | null
-          recurrencia_tipo: string | null
+          recurrencia_id: string | null
           recurrente: boolean | null
           repeat_byweekday: number[] | null
           repeat_frequency: string | null
@@ -2674,6 +2888,7 @@ export type Database = {
           tipo: string
           titulo: string
           updated_at: string
+          vencida_at: string | null
           vencimiento_dias: number | null
         }
         Insert: {
@@ -2683,22 +2898,17 @@ export type Database = {
           completada_at?: string | null
           completada_por_id?: string | null
           completada_por_nombre?: string | null
-          creado_por_id: string
+          creado_por_id?: string | null
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
-          dias_para_limite?: number | null
           estado?: string
           fecha_inicio?: string | null
           fecha_limite?: string | null
-          frecuencia_dias?: number | null
           hora?: string | null
           id?: string
           organization_id: string
-          proxima_fecha?: string | null
-          recurrencia_dia_semana?: number | null
-          recurrencia_semana_del_mes?: number | null
-          recurrencia_tipo?: string | null
+          recurrencia_id?: string | null
           recurrente?: boolean | null
           repeat_byweekday?: number[] | null
           repeat_frequency?: string | null
@@ -2708,6 +2918,7 @@ export type Database = {
           tipo?: string
           titulo: string
           updated_at?: string
+          vencida_at?: string | null
           vencimiento_dias?: number | null
         }
         Update: {
@@ -2717,22 +2928,17 @@ export type Database = {
           completada_at?: string | null
           completada_por_id?: string | null
           completada_por_nombre?: string | null
-          creado_por_id?: string
+          creado_por_id?: string | null
           creado_por_nombre?: string | null
           created_at?: string
           descripcion?: string | null
-          dias_para_limite?: number | null
           estado?: string
           fecha_inicio?: string | null
           fecha_limite?: string | null
-          frecuencia_dias?: number | null
           hora?: string | null
           id?: string
           organization_id?: string
-          proxima_fecha?: string | null
-          recurrencia_dia_semana?: number | null
-          recurrencia_semana_del_mes?: number | null
-          recurrencia_tipo?: string | null
+          recurrencia_id?: string | null
           recurrente?: boolean | null
           repeat_byweekday?: number[] | null
           repeat_frequency?: string | null
@@ -2742,6 +2948,7 @@ export type Database = {
           tipo?: string
           titulo?: string
           updated_at?: string
+          vencida_at?: string | null
           vencimiento_dias?: number | null
         }
         Relationships: [
@@ -2767,7 +2974,109 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tareas_recurrencia_id_fkey"
+            columns: ["recurrencia_id"]
+            isOneToOne: false
+            referencedRelation: "tareas_recurrentes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tareas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tareas_recurrentes: {
+        Row: {
+          activo: boolean
+          asignado_a: string | null
+          asignado_nombre: string | null
+          assignment_scope: string
+          created_at: string
+          created_by: string | null
+          descripcion: string | null
+          fecha_inicio: string
+          hora: string | null
+          id: string
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday: number[] | null
+          repeat_frequency: string | null
+          repeat_interval: number | null
+          repeat_preset: string
+          sucursal_id: string
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          asignado_a?: string | null
+          asignado_nombre?: string | null
+          assignment_scope?: string
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          fecha_inicio: string
+          hora?: string | null
+          id?: string
+          organization_id: string
+          proxima_fecha: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id: string
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          asignado_a?: string | null
+          asignado_nombre?: string | null
+          assignment_scope?: string
+          created_at?: string
+          created_by?: string | null
+          descripcion?: string | null
+          fecha_inicio?: string
+          hora?: string | null
+          id?: string
+          organization_id?: string
+          proxima_fecha?: string
+          repeat_byweekday?: number[] | null
+          repeat_frequency?: string | null
+          repeat_interval?: number | null
+          repeat_preset?: string
+          sucursal_id?: string
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tareas_recurrentes_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "barberos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_asignado_a_fkey"
+            columns: ["asignado_a"]
+            isOneToOne: false
+            referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_recurrentes_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
@@ -3374,6 +3683,7 @@ export type Database = {
           nombre: string | null
           organization_id: string | null
           rol_equipo: string | null
+          roles_equipo: string[] | null
           sucursal_id: string | null
           updated_at: string | null
         }
@@ -3385,6 +3695,7 @@ export type Database = {
           nombre?: string | null
           organization_id?: string | null
           rol_equipo?: string | null
+          roles_equipo?: string[] | null
           sucursal_id?: string | null
           updated_at?: string | null
         }
@@ -3396,6 +3707,7 @@ export type Database = {
           nombre?: string | null
           organization_id?: string | null
           rol_equipo?: string | null
+          roles_equipo?: string[] | null
           sucursal_id?: string | null
           updated_at?: string | null
         }
@@ -3421,6 +3733,16 @@ export type Database = {
       _assert_can_write_sucursal_catalog: {
         Args: { _org_id: string; _sucursal_id: string }
         Returns: undefined
+      }
+      _calc_next_tarea_date: {
+        Args: {
+          _current_date: string
+          _repeat_byweekday: number[]
+          _repeat_frequency: string
+          _repeat_interval: number
+          _repeat_preset: string
+        }
+        Returns: string
       }
       _canon_phone_ar: { Args: { input: string }; Returns: string }
       _notif_actor_account_type: { Args: { _user: string }; Returns: string }
@@ -3509,6 +3831,7 @@ export type Database = {
           id: string
         }[]
       }
+      bs_recompute_disponibles: { Args: never; Returns: undefined }
       cerrar_ventas_generales_sucursal: {
         Args: { _fecha: string; _sucursal_id: string }
         Returns: number
@@ -3576,6 +3899,8 @@ export type Database = {
         Returns: undefined
       }
       org_has_any_pin: { Args: never; Returns: boolean }
+      process_tareas_recurrentes: { Args: never; Returns: number }
+      process_vencimientos_tareas: { Args: never; Returns: number }
       registrar_movimiento_stock: {
         Args: {
           _cantidad: number
@@ -3691,6 +4016,10 @@ export type Database = {
           _organization_id: string
           _sucursal_id: string
         }
+        Returns: boolean
+      }
+      sucursal_tiene_historial: {
+        Args: { _sucursal_id: string }
         Returns: boolean
       }
       upsert_notification: {

@@ -256,7 +256,8 @@ export function useClientes() {
     const { data: sucs } = await supabase
       .from('sucursales')
       .select('id, nombre')
-      .in('id', ids);
+      .in('id', ids)
+      .is('deleted_at', null);
     return (sucs || []).map(s => ({ sucursal_id: s.id, nombre: s.nombre }));
   }, []);
 

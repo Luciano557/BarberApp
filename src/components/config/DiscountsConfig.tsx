@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power, PowerOff, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Plus, Edit2, Save, X, Power, PowerOff, Trash2, BadgePercent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
-import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 function validateDiscountName(name: string): string | null {
   const trimmed = name.trim();
@@ -63,6 +65,7 @@ export function DiscountsConfig({
   mode = 'sucursal',
 }: DiscountsConfigProps) {
   const isGlobal = mode === 'global';
+  const [activeTab, setActiveTab] = useState<'activos' | 'inactivos'>('activos');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('todos');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -274,7 +277,7 @@ export function DiscountsConfig({
   );
 
   const renderRow = (d: Discount) => (
-    <div key={d.id}>
+    <div key={d.id} className="animate-item-in">
       {editingId === d.id ? (
         <Form isEdit id={d.id} />
       ) : (
@@ -303,6 +306,11 @@ export function DiscountsConfig({
                   Inactivo
                 </span>
               )}
+              {!isGlobal && d.globalActive === false && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Inactivo globalmente
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center justify-end gap-1 sm:justify-start">
@@ -310,15 +318,31 @@ export function DiscountsConfig({
               <Edit2 className="h-4 w-4" />
             </Button>
             {onToggleActive && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => onToggleActive(d.id, !flagFor(d))}
-                className="h-8 w-8"
-                title={flagFor(d) ? 'Desactivar' : 'Activar'}
-              >
-                {flagFor(d) ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-              </Button>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          if (!isGlobal && d.globalActive === false) return;
+                          const nextActive = !flagFor(d);
+                          onToggleActive(d.id, nextActive);
+                          toast.success(nextActive ? 'Descuento activado' : 'Descuento desactivado');
+                        }}
+                        disabled={!isGlobal && d.globalActive === false}
+                        className="h-8 w-8"
+                      >
+                        {flagFor(d) ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!isGlobal && d.globalActive === false && (
+                    <TooltipContent>Este descuento está desactivado globalmente. Activalo desde la vista General para poder usarlo acá.</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             )}
             <TooltipProvider delayDuration={200}>
               <Tooltip>
@@ -349,67 +373,120 @@ export function DiscountsConfig({
 
   return (
     <Card className="border border-border bg-card">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="text-base font-medium">Descuentos</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Creá descuentos para servicios o productos. Los inactivos no aparecen en Cobrar.
-          </p>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-muted p-2">
+              <BadgePercent className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">
+                {isGlobal ? 'Reglas de descuento' : 'Descuentos disponibles'}
+              </CardTitle>
+              <CardDescription>
+                {isGlobal
+                  ? 'Por porcentaje o monto fijo. Pueden aplicar a servicios, productos o ambos.'
+                  : 'Activá o desactivá los descuentos para esta sucursal.'}
+              </CardDescription>
+            </div>
+          </div>
+          {!isAdding && !editingId && (
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          )}
         </div>
-        {!isAdding && !editingId && (
-          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
-            <Plus className="h-4 w-4 mr-1" /> Agregar
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Filtro simple por tipo */}
-        <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
-          {([
-            { v: 'todos' as TypeFilter, label: 'Todos' },
-            { v: 'servicios' as TypeFilter, label: 'Servicios' },
-            { v: 'productos' as TypeFilter, label: 'Productos' },
-          ]).map(opt => (
-            <button
-              key={opt.v}
-              onClick={() => setTypeFilter(opt.v)}
-              className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors sm:flex-none ${
-                typeFilter === opt.v
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}>
+          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
+            <TabsTrigger value="activos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Activos ({activos.length})
+            </TabsTrigger>
+            <TabsTrigger value="inactivos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Inactivos ({inactivos.length})
+            </TabsTrigger>
+          </TabsList>
 
-        {isAdding && <Form />}
+          <TabsContent value="activos" className="mt-4 space-y-4">
+            <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
+              {([
+                { v: 'todos' as TypeFilter, label: 'Todos' },
+                { v: 'servicios' as TypeFilter, label: 'Servicios' },
+                { v: 'productos' as TypeFilter, label: 'Productos' },
+              ]).map(opt => (
+                <button
+                  key={opt.v}
+                  onClick={() => setTypeFilter(opt.v)}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors sm:flex-none ${
+                    typeFilter === opt.v
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
 
-        {activos.length === 0 && inactivos.length === 0 && !isAdding && (
-          <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No hay descuentos para mostrar.
-            </p>
-            <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={startAdd}>
-              <Plus className="h-4 w-4 mr-1" /> Crear el primero
-            </Button>
-          </div>
-        )}
+            {isAdding && <Form />}
 
-        {activos.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Activos</p>
-            {activos.map(renderRow)}
-          </div>
-        )}
+            {activos.length === 0 && inactivos.length === 0 && !isAdding ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No hay descuentos para mostrar.
+                </p>
+                <Button variant="outline" size="sm" className="mt-3 w-full sm:w-auto" onClick={startAdd}>
+                  <Plus className="h-4 w-4 mr-1" /> Crear el primero
+                </Button>
+              </div>
+            ) : activos.length === 0 && !isAdding ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No hay descuentos activos{typeFilter !== 'todos' ? ' en esta categoría' : ''}.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activos.map(renderRow)}
+              </div>
+            )}
+          </TabsContent>
 
-        {inactivos.length > 0 && (
-          <div className="space-y-2 pt-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Inactivos</p>
-            {inactivos.map(renderRow)}
-          </div>
-        )}
+          <TabsContent value="inactivos" className="mt-4 space-y-4">
+            <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
+              {([
+                { v: 'todos' as TypeFilter, label: 'Todos' },
+                { v: 'servicios' as TypeFilter, label: 'Servicios' },
+                { v: 'productos' as TypeFilter, label: 'Productos' },
+              ]).map(opt => (
+                <button
+                  key={opt.v}
+                  onClick={() => setTypeFilter(opt.v)}
+                  className={`flex-1 rounded-md px-3 py-1.5 text-sm transition-colors sm:flex-none ${
+                    typeFilter === opt.v
+                      ? 'bg-card text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {inactivos.length > 0 ? (
+              <div className="space-y-2">
+                {inactivos.map(renderRow)}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  No hay descuentos inactivos{typeFilter !== 'todos' ? ' en esta categoría' : ''}.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>

@@ -100,7 +100,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           "border-r border-sidebar-border bg-sidebar flex flex-col",
           isMobile
             ? "fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200"
-            : "sticky top-0 h-screen z-10",
+            : "h-full z-10 transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]",
           isMobile
             ? (collapsed ? "-translate-x-full" : "translate-x-0")
             : (collapsed ? "w-16" : "w-56")
@@ -108,28 +108,26 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       >
       {/* Logo & Organization */}
       <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
-        {!collapsed && (
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-              <Building2 className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="font-semibold text-sidebar-foreground text-sm block truncate">
-                {organization?.name || 'Barbería'}
-              </span>
-              {planBadge && (
-                <Badge variant={planBadge.variant} className="text-[10px] px-1.5 py-0">
-                  {planBadge.label}
-                </Badge>
-              )}
-            </div>
-          </div>
-        )}
-        {collapsed && (
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
+        <div className={cn("flex items-center gap-2 min-w-0", collapsed && "mx-auto gap-0")}>
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <Building2 className="h-4 w-4 text-primary-foreground" />
           </div>
-        )}
+          <div
+            className={cn(
+              "min-w-0 flex-1 overflow-hidden transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
+              collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
+            )}
+          >
+            <span className="font-semibold text-sidebar-foreground text-sm block truncate">
+              {organization?.name || 'Barbería'}
+            </span>
+            {planBadge && (
+              <Badge variant={planBadge.variant} className="text-[10px] px-1.5 py-0">
+                {planBadge.label}
+              </Badge>
+            )}
+          </div>
+        </div>
         {isMobile && !collapsed && (
           <Button
             variant="ghost"
@@ -171,7 +169,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 data-onboarding-id={item.id === 'mi-negocio' ? 'mi-negocio-nav' : undefined}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
-                  collapsed && "justify-center px-2",
+                  collapsed && "justify-center gap-0 px-2",
                   activeTab === item.id
                     ? "bg-accent text-primary"
                     : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent"
@@ -182,7 +180,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
                 )}
                 <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!collapsed && <span>{item.label}</span>}
+                <span
+                  className={cn(
+                    "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
+                    collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
+                  )}
+                >
+                  {item.label}
+                </span>
               </button>
             </li>
           ))}
@@ -213,7 +218,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             title={collapsed ? `Bloquear (${unlockedBy})` : undefined}
           >
             <Lock className="h-4 w-4" />
-            {!collapsed && <span className="ml-2 text-xs">Bloquear</span>}
+            <span
+              className={cn(
+                "ml-2 text-xs overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
+                collapsed ? "ml-0 max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+              )}
+            >
+              Bloquear
+            </span>
           </Button>
         )}
         <Button
@@ -226,7 +238,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           )}
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2 text-xs">Cerrar sesión</span>}
+          <span
+            className={cn(
+              "ml-2 text-xs overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
+              collapsed ? "ml-0 max-w-0 opacity-0" : "max-w-[140px] opacity-100"
+            )}
+          >
+            Cerrar sesión
+          </span>
         </Button>
         <Button
           variant="ghost"

@@ -19,12 +19,7 @@ export interface Tarea {
   assignment_scope: 'individual' | 'team';
   sucursal_id: string | null;
   recurrente: boolean;
-  frecuencia_dias: number | null;
-  recurrencia_tipo: string | null;
-  recurrencia_dia_semana: number | null;
-  recurrencia_semana_del_mes: number | null;
-  dias_para_limite: number | null;
-  proxima_fecha: string | null;
+
   fecha_inicio: string | null;
   fecha_limite: string | null;
   hora: string | null;
@@ -108,6 +103,46 @@ export function useTareas() {
         }
       }
 
+      const isRecurrente = !!tarea.repeat_preset && tarea.repeat_preset !== 'never';
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      let recurrenciaId: string | null = null;
+
+      if (isRecurrente && tarea.tipo === 'tarea') {
+        if (!sucursal_id) throw new Error('Seleccioná una sucursal para crear la recurrencia.');
+        const fechaInicio = rest.fecha_inicio && rest.fecha_inicio.length > 0 ? rest.fecha_inicio : todayStr;
+
+        const { data: receta, error: recetaErr } = await supabase
+          .from('tareas_recurrentes')
+          .insert({
+            organization_id: organization.id,
+            sucursal_id,
+            titulo: rest.titulo,
+            descripcion: rest.descripcion ?? null,
+            assignment_scope,
+            asignado_a: asignado_a_id,
+            asignado_nombre: asignado_a_nombre ?? null,
+            hora: rest.hora ?? null,
+            repeat_preset: tarea.repeat_preset!,
+            repeat_frequency: rest.repeat_frequency ?? null,
+            repeat_interval: rest.repeat_interval ?? null,
+            repeat_byweekday: rest.repeat_byweekday ?? null,
+            fecha_inicio: fechaInicio,
+            proxima_fecha: fechaInicio,
+            activo: true,
+            created_by: user.id,
+          })
+          .select('id')
+          .single();
+        if (recetaErr) throw recetaErr;
+        recurrenciaId = receta.id;
+
+        // Solo materializar la tarea de hoy si fecha_inicio es hoy.
+        if (fechaInicio !== todayStr) {
+          return;
+        }
+      }
+
       const { error } = await supabase.from('tareas').insert({
         ...rest,
         organization_id: organization.id,
@@ -117,12 +152,14 @@ export function useTareas() {
         assignment_scope,
         creado_por_id: user.id,
         creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
-        recurrente: tarea.repeat_preset && tarea.repeat_preset !== 'never' ? true : false,
+        recurrente: isRecurrente,
+        ...(recurrenciaId ? { recurrencia_id: recurrenciaId } : {}),
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas_recurrentes'] });
       toast.success('Tarea creada');
     },
     onError: (e: Error) => toast.error(e.message),

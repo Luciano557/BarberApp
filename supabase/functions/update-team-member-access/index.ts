@@ -85,6 +85,35 @@ function jsonResponse(status: number, body: unknown) {
   });
 }
 
+// Fase 7: reject if email already belongs to a different auth.users user
+async function checkEmailConflict(
+  admin: any,
+  email: string,
+  ignoreUserId: string | null,
+  organizationId: string,
+): Promise<{ status: number; body: any } | null> {
+  const e = email.trim().toLowerCase();
+  if (!e) return null;
+  const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const existing = list?.users?.find((u: any) => u.email?.toLowerCase() === e);
+  if (!existing) return null;
+  if (ignoreUserId && existing.id === ignoreUserId) return null;
+  const { data: ownerRow } = await admin
+    .from("user_roles").select("role").eq("user_id", existing.id).eq("role", "owner").maybeSingle();
+  const { data: prof } = await admin
+    .from("profiles").select("organization_id").eq("id", existing.id).maybeSingle();
+  const isOrgOwner = !!ownerRow && prof?.organization_id === organizationId;
+  return {
+    status: 409,
+    body: {
+      error: isOrgOwner
+        ? "Este email pertenece al dueño de la organización."
+        : "Este email ya está registrado en el sistema.",
+      code: isOrgOwner ? "EMAIL_BELONGS_TO_OWNER" : "EMAIL_ALREADY_REGISTERED",
+    },
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -154,6 +183,14 @@ serve(async (req: Request): Promise<Response> => {
     if (barberoErr || !barbero) return jsonResponse(404, { error: "Miembro no encontrado" });
     if (barbero.organization_id !== organizationId) {
       return jsonResponse(403, { error: "Miembro de otra organización" });
+    }
+
+    // Guard: la ficha del dueño no se administra desde esta función.
+    const targetIsOwnerHard =
+      barbero.rol_equipo === "owner" ||
+      (Array.isArray(barbero.roles_equipo) && barbero.roles_equipo.includes("owner"));
+    if (targetIsOwnerHard) {
+      return jsonResponse(403, { error: "La ficha del dueño no se administra desde acá" });
     }
 
     const { data: linkedProfile } = await admin
@@ -376,8 +413,15 @@ serve(async (req: Request): Promise<Response> => {
       tempPassword = generatePassword();
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
-      const { data: list } = await admin.auth.admin.listUsers();
+      const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
       const existing = list?.users?.find(u => u.email?.toLowerCase() === finalEmail.toLowerCase());
+
+      // Fase 7: if email exists and belongs to a DIFFERENT user, reject
+      if (existing && existing.id !== targetUserId) {
+        const conflict = await checkEmailConflict(admin, finalEmail, targetUserId, organizationId);
+        if (conflict) return jsonResponse(conflict.status, conflict.body);
+      }
+
 
       if (existing) {
         const { error: upErr } = await admin.auth.admin.updateUserById(existing.id, {
@@ -431,6 +475,9 @@ serve(async (req: Request): Promise<Response> => {
       const fullName = `${barbero.nombre} ${barbero.apellido}`.trim();
 
       if (typeof emailToPersist === "string" && emailToPersist && emailToPersist !== linkedProfile?.email?.toLowerCase()) {
+        // Fase 7: reject if email already belongs to a different auth.users user
+        const conflict = await checkEmailConflict(admin, emailToPersist, targetUserId, organizationId);
+        if (conflict) return jsonResponse(conflict.status, conflict.body);
         const { error: eErr } = await admin.auth.admin.updateUserById(targetUserId, { email: emailToPersist, email_confirm: true });
         if (eErr) return jsonResponse(500, { error: `Auth email: ${eErr.message}` });
         await admin.from("profiles").update({ email: emailToPersist, full_name: fullName }).eq("id", targetUserId);

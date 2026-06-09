@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { AgendaManagement } from './config/AgendaManagement';
+import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 function dbToBarber(row: any): Barber {
   return {
@@ -19,6 +20,7 @@ function dbToBarber(row: any): Barber {
     compensationType: row.tipo_compensacion || 'comision',
     fixedSalary: row.sueldo_fijo != null ? Number(row.sueldo_fijo) : undefined,
     teamRole: row.rol_equipo || 'barbero',
+    rolesEquipo: row.roles_equipo || [],
     dni: row.dni || undefined,
     active: row.activo,
   };
@@ -42,6 +44,7 @@ export function TurnosAgendaPanel() {
       .select('*')
       .eq('organization_id', organization.id)
       .eq('activa', true)
+      .is('deleted_at', null)
       .order('nombre');
     if (data) {
       setAllSucursales(data.map(s => ({
@@ -58,7 +61,7 @@ export function TurnosAgendaPanel() {
     if (isBarber && !isOwner && !isGeneralManager && !isManager) {
       const { data } = await supabase
         .from('barberos_safe')
-        .select('id, nombre, apellido, activo, organization_id, sucursal_id, rol_equipo')
+        .select('id, nombre, apellido, activo, organization_id, sucursal_id, rol_equipo, roles_equipo')
         .eq('organization_id', organization.id)
         .eq('activo', true)
         .order('nombre');
@@ -88,6 +91,13 @@ export function TurnosAgendaPanel() {
     fetchAllBarbers();
     fetchManagerSucursales();
   }, [fetchAllSucursales, fetchAllBarbers, fetchManagerSucursales]);
+
+  // Realtime: refrescar lista de barberos cuando cambia su disponibilidad en cualquier sucursal de la org.
+  useBarberosSucursalesRealtime({
+    orgId: organization?.id ?? null,
+    sucursalId: null,
+    onChange: () => { void fetchAllBarbers(); },
+  });
 
   const visibleSucursales = isManagerOnly
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
@@ -129,8 +139,7 @@ export function TurnosAgendaPanel() {
                 organizationId={organization?.id || ''}
                 barbers={allBarbers.filter(b => {
                   if (b.sucursalId !== s.id) return false;
-                  const role = (b.teamRole || '').toString().toLowerCase();
-                  return role !== 'otros';
+                  return (b.rolesEquipo ?? []).includes('barber');
                 })}
               />
             </TabsContent>
