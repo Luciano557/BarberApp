@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Building2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
@@ -379,108 +380,132 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Gestionar Mi Negocio</h1>
-        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-lg font-medium text-foreground">Sucursales</h2>
-            <p className="text-sm text-muted-foreground">Gestiona las sucursales de tu negocio</p>
-          </div>
-          {canCreateSucursal && (
-            <Button size="sm" className="w-full sm:w-auto" onClick={handleOpenCreate}>
-              <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
-            </Button>
-          )}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Mi Negocio</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Configuración general y gestión de sucursales.</p>
         </div>
+        {canCreateSucursal && (
+          <Button size="sm" onClick={handleOpenCreate}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
       {(showGeneralTab || visibleSucursalesActivas.length > 0) && activeTab && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          {(showGeneralTab || visibleSucursalesActivas.length > 1) && (
-            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
-              {showGeneralTab && (
-                <TabsTrigger value={GENERAL_TAB} data-onboarding-id="general-tab" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
-                  General
-                </TabsTrigger>
-              )}
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            {showGeneralTab && (
+              <button
+                data-onboarding-id="general-tab"
+                onClick={() => handleTabChange(GENERAL_TAB)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg",
+                  "text-sm font-medium transition-all duration-200",
+                  "border",
+                  activeTab === GENERAL_TAB
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                General
+              </button>
+            )}
+            {visibleSucursalesActivas.length > 0 && showGeneralTab && (
+              <div className="h-5 w-px bg-border shrink-0" aria-hidden="true" />
+            )}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-0.5 max-w-full">
               {visibleSucursalesActivas.map((s, idx) => (
-                <TabsTrigger
+                <button
                   key={s.id}
-                  value={s.id}
-                  className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm"
                   data-onboarding-id={idx === 0 ? 'sucursal-tab' : undefined}
+                  onClick={() => handleTabChange(s.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg",
+                    "text-sm font-medium transition-all duration-200",
+                    "border",
+                    activeTab === s.id
+                      ? "bg-background text-foreground border-foreground/40 shadow-sm"
+                      : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                  )}
                 >
+                  <Building2 className="h-4 w-4" />
                   {s.nombre}
-                </TabsTrigger>
+                </button>
               ))}
-            </TabsList>
-          )}
+            </div>
+          </div>
 
           {showGeneralTab && (
             <TabsContent value={GENERAL_TAB}>
-              <MiNegocioGeneralTabContent
-                isReady={generalIsReady}
-                services={allServices}
-                extras={allExtras}
-                discounts={discounts}
-                lines={allLines}
-                onAddService={addServiceGlobal}
-                onUpdateService={updateServiceGlobal}
-                onAddExtra={addExtraGlobal}
-                onUpdateExtra={updateExtraGlobal}
-                onAddDiscount={addDiscountGlobal}
-                onUpdateDiscount={updateDiscountGlobal}
-                onDeleteDiscount={deleteDiscountGlobal}
-                onToggleDiscountActive={setDiscountActiveGlobal}
-                onAddLine={addLine}
-                onUpdateLine={updateLine}
-                onDeleteService={deleteService}
-                onDeleteExtra={deleteExtra}
-                onDeleteLine={deleteLine}
-                organizationId={organization?.id || ''}
-                allBarbers={allBarbers}
-                allSucursales={allSucursales}
-                onAddBarberToSucursal={(barber, sucId) => addBarberToSucursal(sucId, barber)}
-                onUpdateBarber={updateBarberFn}
-                onRefreshBarbers={fetchAllBarbers}
-                onNavigateToMiNegocio={onNavigateToMiNegocio}
-                sucursalesInactivas={visibleSucursalesInactivas as Array<typeof visibleSucursalesInactivas[number] & { fecha_desactivacion: string | null }>}
-                onVerSucursalInactiva={(sucId) => handleTabChange(sucId)}
-                onAfterDeleteSucursal={async () => { await fetchAllSucursales(); await refreshSucursales(); }}
-              />
+              <div key={activeTab} className="animate-fade-in">
+                <MiNegocioGeneralTabContent
+                  isReady={generalIsReady}
+                  services={allServices}
+                  extras={allExtras}
+                  discounts={discounts}
+                  lines={allLines}
+                  onAddService={addServiceGlobal}
+                  onUpdateService={updateServiceGlobal}
+                  onAddExtra={addExtraGlobal}
+                  onUpdateExtra={updateExtraGlobal}
+                  onAddDiscount={addDiscountGlobal}
+                  onUpdateDiscount={updateDiscountGlobal}
+                  onDeleteDiscount={deleteDiscountGlobal}
+                  onToggleDiscountActive={setDiscountActiveGlobal}
+                  onAddLine={addLine}
+                  onUpdateLine={updateLine}
+                  onDeleteService={deleteService}
+                  onDeleteExtra={deleteExtra}
+                  onDeleteLine={deleteLine}
+                  organizationId={organization?.id || ''}
+                  allBarbers={allBarbers}
+                  allSucursales={allSucursales}
+                  onAddBarberToSucursal={(barber, sucId) => addBarberToSucursal(sucId, barber)}
+                  onUpdateBarber={updateBarberFn}
+                  onRefreshBarbers={fetchAllBarbers}
+                  onNavigateToMiNegocio={onNavigateToMiNegocio}
+                  sucursalesInactivas={visibleSucursalesInactivas as Array<typeof visibleSucursalesInactivas[number] & { fecha_desactivacion: string | null }>}
+                  onVerSucursalInactiva={(sucId) => handleTabChange(sucId)}
+                  onAfterDeleteSucursal={async () => { await fetchAllSucursales(); await refreshSucursales(); }}
+                />
+              </div>
             </TabsContent>
           )}
 
 
           {visibleSucursales.map(s => (
             <TabsContent key={s.id} value={s.id}>
-              <SucursalTabContent
-                sucursal={s}
-                barbers={allBarbers.filter(b => b.sucursalId === s.id)}
-                allBarbers={allBarbers}
-                allSucursales={allSucursales}
-                services={getServicesForSucursal(s.id)}
-                extras={getExtrasForSucursal(s.id)}
-                discounts={discounts}
-                lines={allLines}
-                onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
-                onUpdateBarber={updateBarberFn}
-                onRefreshBarbers={fetchAllBarbers}
-                onAddService={addServiceForSucursal(s.id)}
-                onUpdateService={updateService}
-                onAddExtra={addExtraForSucursal(s.id)}
-                onUpdateExtra={updateExtra}
-                onAddDiscount={addDiscount}
-                onUpdateDiscount={updateDiscount}
-                onDeleteDiscount={deleteDiscount}
-                onToggleDiscountActive={setDiscountActive}
-                onAddLine={addLine}
-                onUpdateLine={updateLine}
-                onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
-                onGoToGeneralConfig={onGoToGeneralConfig}
-                highlightBarberoId={pendingHighlightSucursalId === s.id ? pendingHighlightBarberoId ?? undefined : undefined}
-              />
+              <div key={activeTab} className="animate-fade-in">
+                <SucursalTabContent
+                  sucursal={s}
+                  barbers={allBarbers.filter(b => b.sucursalId === s.id)}
+                  allBarbers={allBarbers}
+                  allSucursales={allSucursales}
+                  services={getServicesForSucursal(s.id)}
+                  extras={getExtrasForSucursal(s.id)}
+                  discounts={discounts}
+                  lines={allLines}
+                  onAddBarber={(barber) => addBarberToSucursal(s.id, barber)}
+                  onUpdateBarber={updateBarberFn}
+                  onRefreshBarbers={fetchAllBarbers}
+                  onAddService={addServiceForSucursal(s.id)}
+                  onUpdateService={updateService}
+                  onAddExtra={addExtraForSucursal(s.id)}
+                  onUpdateExtra={updateExtra}
+                  onAddDiscount={addDiscount}
+                  onUpdateDiscount={updateDiscount}
+                  onDeleteDiscount={deleteDiscount}
+                  onToggleDiscountActive={setDiscountActive}
+                  onAddLine={addLine}
+                  onUpdateLine={updateLine}
+                  onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
+                  onGoToGeneralConfig={onGoToGeneralConfig}
+                  highlightBarberoId={pendingHighlightSucursalId === s.id ? pendingHighlightBarberoId ?? undefined : undefined}
+                />
+              </div>
             </TabsContent>
           ))}
         </Tabs>
