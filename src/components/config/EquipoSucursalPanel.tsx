@@ -273,26 +273,41 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                 Desactivar
               </Button>
             ) : (
-              (canCreateTemporal || canCreateRecurrente) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {canCreateTemporal && (
-                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
-                        <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
-                      </DropdownMenuItem>
-                    )}
-                    {canCreateRecurrente && (
-                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
-                        <Repeat className="h-4 w-4 mr-2" /> Asignación automática
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              principal && principal.sucursal_id === sucursalId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={activatingId === principal.id}
+                  onClick={() => activatePrincipal(principal)}
+                >
+                  {activatingId === principal.id ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Activando...</>
+                  ) : (
+                    'Activar'
+                  )}
+                </Button>
+              ) : (
+                (canCreateTemporal || canCreateRecurrente) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canCreateTemporal && (
+                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
+                          <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
+                        </DropdownMenuItem>
+                      )}
+                      {canCreateRecurrente && (
+                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
+                          <Repeat className="h-4 w-4 mr-2" /> Asignación automática
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
               )
             )}
           </div>
