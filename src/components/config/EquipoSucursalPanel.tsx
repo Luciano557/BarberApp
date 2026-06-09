@@ -176,6 +176,20 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
 
   // --- Activar: abre Sheet con barbero preseleccionado ---
   const [activateBarberoId, setActivateBarberoId] = useState<string | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+
+  const activatePrincipal = async (row: BarberoSucursalRow) => {
+    setActivatingId(row.id);
+    try {
+      await bs.setDisponible(row.id, true);
+      toast.success('Barbero activado en esta sucursal');
+      await fetchAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo activar');
+    } finally {
+      setActivatingId(null);
+    }
+  };
 
   const openDeactivate = async (barbero: BarberoMini, row: BarberoSucursalRow) => {
     setDeactivateTarget({ barbero, row });
