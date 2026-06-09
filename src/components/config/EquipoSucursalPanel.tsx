@@ -673,7 +673,7 @@ function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, initi
         .order('nombre');
       setBarberos((data ?? []) as BarberoMini[]);
     })();
-  }, [open, organizationId]);
+  }, [open, organizationId, initialBarberoId]);
 
   const canSave = !!barberoId && dias.length > 0 && (!fechaFin || !fechaInicio || fechaFin >= fechaInicio);
 
