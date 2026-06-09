@@ -450,17 +450,19 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       {/* Sheets */}
       <TemporalSheet
         open={temporalOpen}
-        onOpenChange={setTemporalOpen}
+        onOpenChange={(o) => { setTemporalOpen(o); if (!o) setActivateBarberoId(null); }}
         organizationId={organizationId}
         sucursalId={sucursalId}
+        initialBarberoId={activateBarberoId ?? undefined}
         onCreated={fetchAll}
       />
       {canCreateRecurrente && (
         <RecurrenteSheet
           open={recurrenteOpen}
-          onOpenChange={setRecurrenteOpen}
+          onOpenChange={(o) => { setRecurrenteOpen(o); if (!o) setActivateBarberoId(null); }}
           organizationId={organizationId}
           sucursalId={sucursalId}
+          initialBarberoId={activateBarberoId ?? undefined}
           onCreated={fetchAll}
         />
       )}
@@ -491,7 +493,51 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Desactivar confirm */}
+      <AlertDialog open={!!deactivateTarget} onOpenChange={(o) => { if (!o && !deactivating) setDeactivateTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserX className="h-4 w-4 text-destructive" />
+              Desactivar de la sucursal
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  {deactivateTarget && (
+                    <>
+                      Vas a desactivar a{' '}
+                      <strong className="text-foreground">
+                        {deactivateTarget.barbero.nombre} {deactivateTarget.barbero.apellido}
+                      </strong>
+                      {' '}en esta sucursal. Dejará de aparecer como disponible para recibir turnos hasta que lo actives de nuevo.
+                    </>
+                  )}
+                </p>
+                {deactivateFutureCount == null ? (
+                  <p className="text-xs">Verificando turnos futuros…</p>
+                ) : deactivateFutureCount > 0 ? (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    <span>
+                      Tiene <strong>{deactivateFutureCount}</strong> turno{deactivateFutureCount === 1 ? '' : 's'} futuro{deactivateFutureCount === 1 ? '' : 's'} en esta sucursal. Esos turnos pueden quedar sin barbero disponible.
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deactivating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate} disabled={deactivating || deactivateFutureCount == null}>
+              {deactivating ? 'Desactivando…' : 'Desactivar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
+
   );
 }
 
