@@ -240,6 +240,15 @@ export function MiNegocioGeneralTabContent({
           <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
           <PaymentMethodsConfig sucursalId={null} />
         </div>
+
+        {/* Sucursales desactivadas — siempre como último bloque de la pestaña General */}
+        {sucursalesInactivas && sucursalesInactivas.length > 0 && (
+          <SucursalesInactivasCollapsible
+            sucursalesInactivas={sucursalesInactivas}
+            onVerSucursal={(id) => onVerSucursalInactiva?.(id)}
+            onAfterDelete={async () => { await onAfterDeleteSucursal?.(); }}
+          />
+        )}
       </div>
     </div>
   );
