@@ -119,9 +119,8 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       setAllSucursales(data.map(s => ({
         id: s.id, organization_id: s.organization_id, nombre: s.nombre,
         direccion: s.direccion, telefono: s.telefono, timezone: s.timezone, activa: s.activa,
-        // @ts-expect-error: fecha_desactivacion exists in DB but not in Sucursal type — used only by inactive collapsible
         fecha_desactivacion: (s as any).fecha_desactivacion ?? null,
-      })));
+      } as Sucursal & { fecha_desactivacion: string | null })));
     }
   }, [organization?.id]);
 
