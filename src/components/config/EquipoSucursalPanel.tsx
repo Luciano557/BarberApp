@@ -176,6 +176,20 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
 
   // --- Activar: abre Sheet con barbero preseleccionado ---
   const [activateBarberoId, setActivateBarberoId] = useState<string | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+
+  const activatePrincipal = async (row: BarberoSucursalRow) => {
+    setActivatingId(row.id);
+    try {
+      await bs.setDisponible(row.id, true);
+      toast.success('Barbero activado en esta sucursal');
+      await fetchAll();
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo activar');
+    } finally {
+      setActivatingId(null);
+    }
+  };
 
   const openDeactivate = async (barbero: BarberoMini, row: BarberoSucursalRow) => {
     setDeactivateTarget({ barbero, row });
@@ -259,26 +273,41 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                 Desactivar
               </Button>
             ) : (
-              (canCreateTemporal || canCreateRecurrente) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {canCreateTemporal && (
-                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
-                        <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
-                      </DropdownMenuItem>
-                    )}
-                    {canCreateRecurrente && (
-                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
-                        <Repeat className="h-4 w-4 mr-2" /> Asignación automática
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              principal && principal.sucursal_id === sucursalId ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={activatingId === principal.id}
+                  onClick={() => activatePrincipal(principal)}
+                >
+                  {activatingId === principal.id ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Activando...</>
+                  ) : (
+                    'Activar'
+                  )}
+                </Button>
+              ) : (
+                (canCreateTemporal || canCreateRecurrente) && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canCreateTemporal && (
+                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
+                          <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
+                        </DropdownMenuItem>
+                      )}
+                      {canCreateRecurrente && (
+                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
+                          <Repeat className="h-4 w-4 mr-2" /> Asignación automática
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
               )
             )}
           </div>
@@ -374,27 +403,13 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   return (
     <Card className="border border-border bg-card">
       <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-md bg-muted p-2">
-              <CalendarCheck className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
-              <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-md bg-muted p-2">
+            <CalendarCheck className="h-5 w-5 text-muted-foreground" />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {canCreateTemporal && (
-              <Button variant="outline" size="sm" onClick={() => setTemporalOpen(true)}>
-                <CalendarIcon className="h-4 w-4 mr-1" /> Asignación temporal
-              </Button>
-            )}
-            {canCreateRecurrente && (
-              <Button variant="outline" size="sm" onClick={() => setRecurrenteOpen(true)}>
-                <Repeat className="h-4 w-4 mr-1" /> Asignación recurrente
-              </Button>
-            )}
+          <div>
+            <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
+            <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
           </div>
         </div>
       </CardHeader>
