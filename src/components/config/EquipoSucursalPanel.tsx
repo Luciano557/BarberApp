@@ -558,6 +558,8 @@ interface SheetBaseProps {
   organizationId: string;
   sucursalId: string;
   onCreated: () => void | Promise<void>;
+  initialBarberoId?: string;
+
 }
 
 function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, onCreated }: SheetBaseProps) {
