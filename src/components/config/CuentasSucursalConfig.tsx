@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -62,15 +62,13 @@ export function CuentasSucursalConfig() {
   return (
     <Card data-onboarding-id="cuentas-sucursal-section">
       <CardHeader>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Building2 className="w-5 h-5 text-primary" />
+        <div className="flex items-center gap-3">
+          <div className="rounded-md bg-muted p-2">
+            <KeyRound className="h-5 w-5 text-muted-foreground" />
           </div>
-          <div className="space-y-1 flex-1 min-w-0">
-            <CardTitle className="text-base">Cuentas de sucursal</CardTitle>
-            <p className="text-sm text-muted-foreground leading-snug">
-              Accesos operativos generados automáticamente para operar desde caja o recepción.
-            </p>
+          <div>
+            <CardTitle className="text-base">Acceso operativo</CardTitle>
+            <CardDescription>Cuentas generadas automáticamente para operar desde caja o recepción.</CardDescription>
           </div>
         </div>
       </CardHeader>

@@ -208,14 +208,14 @@ export function SucursalTabContent({
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
       {/* Banner contextual de la vista Sucursal */}
-      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-6">
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-2">
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
         <p>
           En esta sección configurás todo lo que aplica específicamente a esta sucursal: precios, stock, disponibilidad del equipo y métodos de pago. El catálogo base, los cargos y la compensación se definen desde la vista General.
         </p>
       </div>
 
-      <h2 className="text-lg font-medium text-foreground mb-2">{sucursal.nombre}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">{sucursal.nombre}</h2>
 
       {/* Anchor nav — solo desktop */}
       <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">

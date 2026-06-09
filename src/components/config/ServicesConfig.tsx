@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Save, X, PowerOff, Power, Clock, Trash2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -314,25 +314,31 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-medium">Servicios</CardTitle>
-          {!isAdding && activeSubTab === 'active' && canCreate && (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Agregar
-            </Button>
-          )}
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-md bg-muted p-2">
+                <Scissors className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">
+                  {isGlobal ? 'Catálogo de servicios' : 'Servicios de esta sucursal'}
+                </CardTitle>
+                <CardDescription>
+                  {isGlobal
+                    ? 'Nombre, duración y categoría. Los precios se configuran en cada sucursal.'
+                    : 'Activá los servicios disponibles y configurá el precio.'}
+                </CardDescription>
+              </div>
+            </div>
+            {!isAdding && activeSubTab === 'active' && canCreate && (
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isGlobal && (
-            <p className="text-xs text-muted-foreground">
-              Los precios de los servicios se configuran por sucursal.
-            </p>
-          )}
-          {structureLocked && (
-            <p className="text-xs text-muted-foreground">
-              Como encargado de sucursal, podés ajustar el precio y activar o desactivar servicios para tu sucursal. Para crear servicios o cambiar nombre, duración o línea, contactá al dueño o gerente general.
-            </p>
-          )}
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
               <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeServices.length})</TabsTrigger>

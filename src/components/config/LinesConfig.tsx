@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Save, X, PowerOff, Power, Trash2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -165,18 +165,23 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-base font-medium">Líneas de servicio</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Agrupá tus servicios por línea. El color elegido se refleja en todos los servicios asociados.
-            </p>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-md bg-muted p-2">
+                <Tag className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Agrupación de servicios</CardTitle>
+                <CardDescription>Organizan el menú de cobro y facilitan la búsqueda de servicios.</CardDescription>
+              </div>
+            </div>
+            {!isAdding && activeSubTab === 'active' && (
+              <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar
+              </Button>
+            )}
           </div>
-          {!isAdding && activeSubTab === 'active' && (
-            <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
-              <Plus className="h-4 w-4 mr-1" /> Agregar
-            </Button>
-          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>

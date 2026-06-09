@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin } from 'lucide-react';
+import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -213,24 +213,29 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
 
   return (
     <Card className="border border-border bg-card">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <CardTitle className="text-base font-medium">Equipo de la sucursal</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Gestioná quién está disponible hoy y creá asignaciones temporales o recurrentes.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {canCreateTemporal && (
-            <Button variant="outline" size="sm" onClick={() => setTemporalOpen(true)}>
-              <CalendarIcon className="h-4 w-4 mr-1" /> Asignación temporal
-            </Button>
-          )}
-          {canCreateRecurrente && (
-            <Button variant="outline" size="sm" onClick={() => setRecurrenteOpen(true)}>
-              <Repeat className="h-4 w-4 mr-1" /> Asignación recurrente
-            </Button>
-          )}
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-muted p-2">
+              <CalendarCheck className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
+              <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            {canCreateTemporal && (
+              <Button variant="outline" size="sm" onClick={() => setTemporalOpen(true)}>
+                <CalendarIcon className="h-4 w-4 mr-1" /> Asignación temporal
+              </Button>
+            )}
+            {canCreateRecurrente && (
+              <Button variant="outline" size="sm" onClick={() => setRecurrenteOpen(true)}>
+                <Repeat className="h-4 w-4 mr-1" /> Asignación recurrente
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
 

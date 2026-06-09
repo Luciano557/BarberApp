@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit2, Save, X, Power, PowerOff, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Save, X, Power, PowerOff, Trash2, BadgePercent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -373,26 +373,31 @@ export function DiscountsConfig({
 
   return (
     <Card className="border border-border bg-card">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="text-base font-medium">Descuentos</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Creá descuentos para servicios o productos. Los inactivos no aparecen en Cobrar.
-          </p>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-md bg-muted p-2">
+              <BadgePercent className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <CardTitle className="text-base">
+                {isGlobal ? 'Reglas de descuento' : 'Descuentos disponibles'}
+              </CardTitle>
+              <CardDescription>
+                {isGlobal
+                  ? 'Por porcentaje o monto fijo. Pueden aplicar a servicios, productos o ambos.'
+                  : 'Activá o desactivá los descuentos para esta sucursal.'}
+              </CardDescription>
+            </div>
+          </div>
+          {!isAdding && !editingId && (
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          )}
         </div>
-        {!isAdding && !editingId && (
-          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
-            <Plus className="h-4 w-4 mr-1" /> Agregar
-          </Button>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {!isGlobal && (
-          <p className="text-xs text-muted-foreground">
-            En esta vista solo podés activar o desactivar descuentos para esta sucursal. Para crear, editar o eliminar un descuento, usá la vista General.
-          </p>
-        )}
-
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}>
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
             <TabsTrigger value="activos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">

@@ -83,7 +83,7 @@ export function MiNegocioGeneralTabContent({
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
-      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-6">
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-2">
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
         <p>
           Acá definís la base de tu negocio: el catálogo de servicios, el equipo, los descuentos y los métodos de pago que aplican a todas las sucursales. Cada sucursal puede después activar y ajustar lo que necesite por su cuenta.
@@ -95,7 +95,7 @@ export function MiNegocioGeneralTabContent({
         <span>Cargando configuración…</span>
       </div>
 
-      <h2 className="text-lg font-medium text-foreground mb-2">Configuración general</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">Configuración general</h2>
 
       {/* Anchor nav — solo desktop */}
       <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">

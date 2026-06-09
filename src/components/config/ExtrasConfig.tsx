@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Edit2, Save, X, PowerOff, Power, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -176,13 +176,29 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
   return (
     <>
       <Card className="border border-border bg-card">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-base font-medium">Extras</CardTitle>
-          {!isAdding && activeSubTab === 'active' && (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Agregar
-            </Button>
-          )}
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-md bg-muted p-2">
+                <Plus className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">
+                  {isGlobal ? 'Complementos de cobro' : 'Extras de esta sucursal'}
+                </CardTitle>
+                <CardDescription>
+                  {isGlobal
+                    ? 'Ítems opcionales que se suman al cobro. Los precios se configuran en cada sucursal.'
+                    : 'Activá los extras disponibles y configurá el precio.'}
+                </CardDescription>
+              </div>
+            </div>
+            {!isAdding && activeSubTab === 'active' && (
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Agregar
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {isGlobal && (
