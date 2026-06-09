@@ -112,12 +112,15 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       .from('sucursales')
       .select('*')
       .eq('organization_id', organization.id)
+      .is('deleted_at', null)
+      .order('activa', { ascending: false })
       .order('nombre');
     if (data) {
       setAllSucursales(data.map(s => ({
         id: s.id, organization_id: s.organization_id, nombre: s.nombre,
         direccion: s.direccion, telefono: s.telefono, timezone: s.timezone, activa: s.activa,
-      })));
+        fecha_desactivacion: (s as any).fecha_desactivacion ?? null,
+      } as Sucursal & { fecha_desactivacion: string | null })));
     }
   }, [organization?.id]);
 
@@ -151,6 +154,10 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   const visibleSucursales = isManagerOnly
     ? allSucursales.filter(s => managerSucursalIds.includes(s.id))
     : allSucursales;
+
+  // Tabs solo muestran activas (deleted_at ya filtrado en fetch). Inactivas viven en bloque colapsable en General.
+  const visibleSucursalesActivas = visibleSucursales.filter(s => s.activa);
+  const visibleSucursalesInactivas = visibleSucursales.filter(s => !s.activa);
 
   // Helper: ¿es esta tab válida con el estado actual?
   const isValidTab = useCallback((tab: string) => {
@@ -388,16 +395,16 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       </div>
 
       {/* Tabs */}
-      {(showGeneralTab || visibleSucursales.length > 0) && activeTab && (
+      {(showGeneralTab || visibleSucursalesActivas.length > 0) && activeTab && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          {(showGeneralTab || visibleSucursales.length > 1) && (
+          {(showGeneralTab || visibleSucursalesActivas.length > 1) && (
             <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
               {showGeneralTab && (
                 <TabsTrigger value={GENERAL_TAB} data-onboarding-id="general-tab" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
                   General
                 </TabsTrigger>
               )}
-              {visibleSucursales.map((s, idx) => (
+              {visibleSucursalesActivas.map((s, idx) => (
                 <TabsTrigger
                   key={s.id}
                   value={s.id}
@@ -438,6 +445,9 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
                 onUpdateBarber={updateBarberFn}
                 onRefreshBarbers={fetchAllBarbers}
                 onNavigateToMiNegocio={onNavigateToMiNegocio}
+                sucursalesInactivas={visibleSucursalesInactivas as Array<typeof visibleSucursalesInactivas[number] & { fecha_desactivacion: string | null }>}
+                onVerSucursalInactiva={(sucId) => handleTabChange(sucId)}
+                onAfterDeleteSucursal={async () => { await fetchAllSucursales(); await refreshSucursales(); }}
               />
             </TabsContent>
           )}

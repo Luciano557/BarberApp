@@ -44,6 +44,7 @@ export function TurnosAgendaPanel() {
       .select('*')
       .eq('organization_id', organization.id)
       .eq('activa', true)
+      .is('deleted_at', null)
       .order('nombre');
     if (data) {
       setAllSucursales(data.map(s => ({

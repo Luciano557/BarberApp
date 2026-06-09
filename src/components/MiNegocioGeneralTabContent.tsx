@@ -11,6 +11,8 @@ import { ProductosGlobalConfig } from './productos/ProductosGlobalConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { CuentasSucursalConfig } from './config/CuentasSucursalConfig';
 import { EquipoGeneralConfig } from './config/EquipoGeneralConfig';
+import { SucursalesInactivasCollapsible } from './config/SucursalesInactivasCollapsible';
+import type { Sucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -42,6 +44,12 @@ interface MiNegocioGeneralTabContentProps {
   onUpdateBarber: (id: string, updates: Partial<Barber>) => void | Promise<void>;
   onRefreshBarbers?: () => Promise<void> | void;
   onNavigateToMiNegocio?: (sucursalId: string, barberoId: string) => void;
+  /** Sucursales desactivadas (activa=false, deleted_at IS NULL) que se muestran en el bloque colapsable al final. */
+  sucursalesInactivas?: Array<Sucursal & { fecha_desactivacion: string | null }>;
+  /** Callback para "Ver" — navega a la tab de esa sucursal. */
+  onVerSucursalInactiva?: (sucursalId: string) => void;
+  /** Callback luego de eliminar una sucursal — refresca la lista en el padre. */
+  onAfterDeleteSucursal?: () => Promise<void> | void;
 }
 
 /**
@@ -62,6 +70,7 @@ export function MiNegocioGeneralTabContent({
   onDeleteService, onDeleteExtra, onDeleteLine,
   organizationId, allBarbers, allSucursales,
   onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers, onNavigateToMiNegocio,
+  sucursalesInactivas, onVerSucursalInactiva, onAfterDeleteSucursal,
 }: MiNegocioGeneralTabContentProps) {
   const { isOwner, isGeneralManager } = useAuth();
   const canManageEquipo = isOwner || isGeneralManager;
@@ -231,6 +240,15 @@ export function MiNegocioGeneralTabContent({
           <h3 className="text-base font-medium text-foreground">Métodos de pago</h3>
           <PaymentMethodsConfig sucursalId={null} />
         </div>
+
+        {/* Sucursales desactivadas — siempre como último bloque de la pestaña General */}
+        {sucursalesInactivas && sucursalesInactivas.length > 0 && (
+          <SucursalesInactivasCollapsible
+            sucursalesInactivas={sucursalesInactivas}
+            onVerSucursal={(id) => onVerSucursalInactiva?.(id)}
+            onAfterDelete={async () => { await onAfterDeleteSucursal?.(); }}
+          />
+        )}
       </div>
     </div>
   );

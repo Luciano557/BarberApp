@@ -49,7 +49,8 @@ Deno.serve(async (req) => {
         .from("sucursales")
         .select("id, nombre")
         .eq("organization_id", org.id)
-        .eq("activa", true),
+        .eq("activa", true)
+        .is("deleted_at", null),
       // Fase 3: disponibilidad por sucursal (incluye organization_id)
       supabase
         .from("barberos_sucursales")

@@ -36,10 +36,11 @@ serve(async (req) => {
     // Load sucursal + org
     const { data: suc, error: sucErr } = await admin
       .from("sucursales")
-      .select("id, nombre, organization_id")
+      .select("id, nombre, organization_id, deleted_at")
       .eq("id", sucursalId)
       .maybeSingle();
     if (sucErr || !suc) throw new Error("Sucursal no encontrada");
+    if ((suc as any).deleted_at) throw new Error("Sucursal archivada");
 
     // Already exists?
     const { data: existing } = await admin

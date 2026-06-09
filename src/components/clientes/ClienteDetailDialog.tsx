@@ -132,7 +132,7 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
             ? supabase.from('servicios').select('id, nombre').in('id', servicioIds)
             : Promise.resolve({ data: [] as any[] }),
           sucIds.length
-            ? supabase.from('sucursales').select('id, nombre').in('id', sucIds)
+            ? supabase.from('sucursales').select('id, nombre').in('id', sucIds).is('deleted_at', null)
             : Promise.resolve({ data: [] as any[] }),
         ]);
 

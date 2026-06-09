@@ -33,7 +33,7 @@ serve(async (req) => {
 
     const { data: sucs, error: sucErr } = await admin
       .from("sucursales").select("id, nombre, organization_id")
-      .eq("organization_id", orgId).eq("activa", true);
+      .eq("organization_id", orgId).eq("activa", true).is("deleted_at", null);
     if (sucErr) throw sucErr;
 
     const { data: existing } = await admin

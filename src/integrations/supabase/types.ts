@@ -2814,6 +2814,7 @@ export type Database = {
         Row: {
           activa: boolean
           created_at: string
+          deleted_at: string | null
           direccion: string | null
           fecha_desactivacion: string | null
           id: string
@@ -2826,6 +2827,7 @@ export type Database = {
         Insert: {
           activa?: boolean
           created_at?: string
+          deleted_at?: string | null
           direccion?: string | null
           fecha_desactivacion?: string | null
           id?: string
@@ -2838,6 +2840,7 @@ export type Database = {
         Update: {
           activa?: boolean
           created_at?: string
+          deleted_at?: string | null
           direccion?: string | null
           fecha_desactivacion?: string | null
           id?: string
@@ -4013,6 +4016,10 @@ export type Database = {
           _organization_id: string
           _sucursal_id: string
         }
+        Returns: boolean
+      }
+      sucursal_tiene_historial: {
+        Args: { _sucursal_id: string }
         Returns: boolean
       }
       upsert_notification: {

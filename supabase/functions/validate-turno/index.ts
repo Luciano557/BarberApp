@@ -139,9 +139,16 @@ Deno.serve(async (req) => {
 
     const { data: sucursal } = await supabase
       .from("sucursales")
-      .select("timezone")
+      .select("timezone, deleted_at, activa")
       .eq("id", sucursal_id)
       .single();
+
+    if (!sucursal || (sucursal as any).deleted_at || (sucursal as any).activa === false) {
+      return new Response(JSON.stringify({ error: "Sucursal no disponible" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: org } = await supabase
       .from("organizations")

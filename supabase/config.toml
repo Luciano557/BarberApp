@@ -1,4 +1,7 @@
 project_id = "azqpyfoobpovqosbayvz"
+
+[functions.soft-delete-sucursal]
+verify_jwt = true
 [functions.update-team-member-access]
 verify_jwt = false
 

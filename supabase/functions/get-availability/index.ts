@@ -118,9 +118,15 @@ Deno.serve(async (req) => {
     // Resolve sucursal timezone (fallback to org, then default)
     const sucTzRes = await supabase
       .from("sucursales")
-      .select("timezone, organization_id")
+      .select("timezone, organization_id, deleted_at, activa")
       .eq("id", sucursal_id)
       .single();
+    if (!sucTzRes.data || sucTzRes.data.deleted_at || sucTzRes.data.activa === false) {
+      return new Response(JSON.stringify({ error: "Sucursal no disponible" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     let tz: string = sucTzRes.data?.timezone || "";
     if (!tz) {
       const orgTzRes = await supabase

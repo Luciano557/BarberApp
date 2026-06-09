@@ -94,10 +94,17 @@ Deno.serve(async (req) => {
         bsQuery,
         supabase
           .from("sucursales")
-          .select("timezone, organization_id")
+          .select("timezone, organization_id, deleted_at, activa")
           .eq("id", sucursal_id)
           .single(),
       ]);
+
+    if (!sucTzRes.data || (sucTzRes.data as any).deleted_at || (sucTzRes.data as any).activa === false) {
+      return new Response(JSON.stringify({ error: "Sucursal no disponible" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const config: any = configRes.data || {
       duracion_base_min: 30,

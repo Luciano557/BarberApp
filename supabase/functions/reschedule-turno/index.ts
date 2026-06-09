@@ -95,8 +95,15 @@ Deno.serve(async (req) => {
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
       supabase.from("servicios").select("duracion_min").eq("id", turno.servicio_id).single(),
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
-      supabase.from("sucursales").select("timezone").eq("id", turno.sucursal_id).single(),
+      supabase.from("sucursales").select("timezone, deleted_at, activa").eq("id", turno.sucursal_id).single(),
     ]);
+
+    if (!sucRes.data || (sucRes.data as any).deleted_at || (sucRes.data as any).activa === false) {
+      return new Response(JSON.stringify({ error: "Sucursal no disponible" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const timezone = sucRes.data?.timezone || orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
     const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
