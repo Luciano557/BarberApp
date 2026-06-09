@@ -652,7 +652,7 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initial
   );
 }
 
-function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, onCreated }: SheetBaseProps) {
+function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, initialBarberoId, onCreated }: SheetBaseProps) {
   const bs = useBarberosSucursales(organizationId);
   const [barberos, setBarberos] = useState<BarberoMini[]>([]);
   const [barberoId, setBarberoId] = useState<string>('');
@@ -663,7 +663,7 @@ function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, onCre
 
   useEffect(() => {
     if (!open) return;
-    setBarberoId(''); setDias([]); setFechaInicio(''); setFechaFin('');
+    setBarberoId(initialBarberoId ?? ''); setDias([]); setFechaInicio(''); setFechaFin('');
     (async () => {
       const { data } = await supabase
         .from('barberos')
