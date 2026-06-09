@@ -374,27 +374,13 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   return (
     <Card className="border border-border bg-card">
       <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-md bg-muted p-2">
-              <CalendarCheck className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
-              <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-md bg-muted p-2">
+            <CalendarCheck className="h-5 w-5 text-muted-foreground" />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {canCreateTemporal && (
-              <Button variant="outline" size="sm" onClick={() => setTemporalOpen(true)}>
-                <CalendarIcon className="h-4 w-4 mr-1" /> Asignación temporal
-              </Button>
-            )}
-            {canCreateRecurrente && (
-              <Button variant="outline" size="sm" onClick={() => setRecurrenteOpen(true)}>
-                <Repeat className="h-4 w-4 mr-1" /> Asignación recurrente
-              </Button>
-            )}
+          <div>
+            <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
+            <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
           </div>
         </div>
       </CardHeader>
