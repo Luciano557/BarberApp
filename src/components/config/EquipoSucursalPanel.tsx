@@ -562,7 +562,7 @@ interface SheetBaseProps {
 
 }
 
-function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, onCreated }: SheetBaseProps) {
+function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initialBarberoId, onCreated }: SheetBaseProps) {
   const bs = useBarberosSucursales(organizationId);
   const [barberos, setBarberos] = useState<BarberoMini[]>([]);
   const [barberoId, setBarberoId] = useState<string>('');
@@ -572,7 +572,7 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, onCreat
 
   useEffect(() => {
     if (!open) return;
-    setBarberoId('');
+    setBarberoId(initialBarberoId ?? '');
     setFechaInicio(todayLocalIso());
     setFechaFin('');
     (async () => {
@@ -584,9 +584,8 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, onCreat
         .order('nombre');
       setBarberos((data ?? []) as BarberoMini[]);
     })();
-  }, [open, organizationId]);
+  }, [open, organizationId, initialBarberoId]);
 
-  const canSave = !!barberoId && !!fechaInicio && !!fechaFin && fechaFin >= fechaInicio;
 
   const handleSave = async () => {
     if (!canSave) return;
