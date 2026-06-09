@@ -153,18 +153,175 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       });
   }, [grouped, barberos]);
 
-  // --- Toggle disponible ---
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-  const handleToggleDisponible = async (rowId: string, current: boolean) => {
-    setTogglingId(rowId);
+  // --- Sub-tab Activos/Inactivos ---
+  const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
+
+  const isActivoBarbero = (list: BarberoSucursalRow[]) => {
+    const v = pickVigenteHoy(list);
+    return !!v && v.disponible;
+  };
+  const activeIds = useMemo(
+    () => orderedBarberoIds.filter(id => isActivoBarbero(grouped[id] ?? [])),
+    [orderedBarberoIds, grouped]
+  );
+  const inactiveIds = useMemo(
+    () => orderedBarberoIds.filter(id => !isActivoBarbero(grouped[id] ?? [])),
+    [orderedBarberoIds, grouped]
+  );
+
+  // --- Desactivar (set disponible = false sobre la fila vigente) ---
+  const [deactivateTarget, setDeactivateTarget] = useState<{ barbero: BarberoMini; row: BarberoSucursalRow } | null>(null);
+  const [deactivateFutureCount, setDeactivateFutureCount] = useState<number | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+
+  // --- Activar: abre Sheet con barbero preseleccionado ---
+  const [activateBarberoId, setActivateBarberoId] = useState<string | null>(null);
+
+  const openDeactivate = async (barbero: BarberoMini, row: BarberoSucursalRow) => {
+    setDeactivateTarget({ barbero, row });
+    setDeactivateFutureCount(null);
     try {
-      await bs.setDisponible(rowId, !current);
+      const today = todayLocalIso();
+      const { count, error } = await supabase
+        .from('turnos')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('sucursal_id', sucursalId)
+        .eq('barbero_id', row.barbero_id)
+        .gte('fecha', today);
+      if (error) setDeactivateFutureCount(0);
+      else setDeactivateFutureCount(count ?? 0);
+    } catch {
+      setDeactivateFutureCount(0);
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await bs.setDisponible(deactivateTarget.row.id, false);
+      toast.success('Barbero desactivado en esta sucursal');
+      setDeactivateTarget(null);
       await fetchAll();
     } catch (e: any) {
-      toast.error(e?.message || 'No se pudo cambiar la disponibilidad');
+      toast.error(e?.message || 'No se pudo desactivar');
     } finally {
-      setTogglingId(null);
+      setDeactivating(false);
     }
+  };
+
+  const renderBarberoCard = (barberoId: string, isActive: boolean) => {
+    const list = grouped[barberoId] ?? [];
+    const barbero = barberos[barberoId];
+    const vigente = pickVigenteHoy(list);
+    const principal = list.find(r => r.tipo === 'principal');
+    const temporales = list.filter(r => r.tipo === 'temporal');
+    const recurrentes = list.filter(r => r.tipo === 'recurrente');
+    const role = barbero?.rol_equipo ? ROLE_LABELS[barbero.rol_equipo] ?? barbero.rol_equipo : null;
+
+    return (
+      <div
+        key={barberoId}
+        className={cn(
+          "rounded-lg border border-border bg-muted/20 p-4 transition-shadow duration-700",
+          highlightedId === barberoId && "ring-2 ring-primary/40"
+        )}
+      >
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-foreground">
+                {barbero?.nombre} {barbero?.apellido}
+              </span>
+              {role && (
+                <Badge variant="outline" className="text-xs">{role}</Badge>
+              )}
+              {vigente ? (
+                <Badge variant="secondary" className="text-xs">
+                  {vigente.tipo === 'principal' && 'Principal'}
+                  {vigente.tipo === 'recurrente' && `Recurrente (${formatDiasSemana(vigente.dias_semana)})`}
+                  {vigente.tipo === 'temporal' && `Temporal hasta ${formatShortDate(vigente.fecha_fin)}`}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs text-muted-foreground">Sin asignación vigente hoy</Badge>
+              )}
+            </div>
+          </div>
+          <div className="self-start">
+            {isActive && vigente && barbero ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => openDeactivate(barbero, vigente)}
+              >
+                Desactivar
+              </Button>
+            ) : (
+              (canCreateTemporal || canCreateRecurrente) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canCreateTemporal && (
+                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
+                        <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
+                      </DropdownMenuItem>
+                    )}
+                    {canCreateRecurrente && (
+                      <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
+                        <Repeat className="h-4 w-4 mr-2" /> Asignación automática
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Detalle de asignaciones */}
+        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+          {principal && (
+            <div className="flex items-center justify-between gap-2">
+              <span>Principal de esta sucursal.</span>
+            </div>
+          )}
+          {recurrentes.map(r => (
+            <div key={r.id} className="flex items-center justify-between gap-2">
+              <span>
+                Recurrente · {formatDiasSemana(r.dias_semana)}
+                {r.fecha_inicio && ` · desde ${formatShortDate(r.fecha_inicio)}`}
+                {r.fecha_fin && ` · hasta ${formatShortDate(r.fecha_fin)}`}
+              </span>
+              {canDeleteRecurrente && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              )}
+            </div>
+          ))}
+          {temporales.map(r => (
+            <div key={r.id} className="flex items-center justify-between gap-2">
+              <span>
+                Temporal · {formatShortDate(r.fecha_inicio)} → {formatShortDate(r.fecha_fin)}
+              </span>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Se recalcula cada noche automáticamente según las asignaciones.
+        </p>
+      </div>
+    );
   };
 
   // --- Sheets / dialogs ---
