@@ -586,6 +586,8 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initial
     })();
   }, [open, organizationId, initialBarberoId]);
 
+  const canSave = !!barberoId && !!fechaInicio && !!fechaFin && fechaFin >= fechaInicio;
+
 
   const handleSave = async () => {
     if (!canSave) return;
