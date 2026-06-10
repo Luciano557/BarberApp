@@ -101,7 +101,7 @@ export function RegenerarPasswordDialog({ open, onOpenChange, sucursalId, sucurs
               La nueva contraseña temporal se mostrará una sola vez en este diálogo. Copiala antes de cerrar.
             </p>
             <DialogFooter>
-              <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={loading}>
+              <Button variant="ghost" onClick={() => handleOpenChange(false)} disabled={loading}>
                 Cancelar
               </Button>
               <Button variant="destructive" onClick={handleConfirm} disabled={loading}>

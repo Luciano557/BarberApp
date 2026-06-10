@@ -495,7 +495,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddLineDialog(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => setShowAddLineDialog(false)}>Cancelar</Button>
             <Button onClick={handleAddNewLine} disabled={!newLineName.trim()}>Agregar</Button>
           </DialogFooter>
         </DialogContent>
