@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, Power, PowerOff, Tag } from 'lucide-react';
+import { Plus, Edit2, Power, PowerOff, Tag } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,12 +130,12 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
           ))}
         </div>
       </div>
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-between">
         <Button variant="ghost" size="sm" onClick={reset}>
-          <X className="h-4 w-4 mr-1" /> Cancelar
+          Cancelar
         </Button>
         <Button size="sm" onClick={handleSave} disabled={saving || !draftNombre.trim()}>
-          <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando...' : 'Guardar'}
+          {saving ? 'Guardando...' : 'Guardar'}
         </Button>
       </div>
     </div>

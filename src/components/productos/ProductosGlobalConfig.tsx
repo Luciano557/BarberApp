@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power, PowerOff, Search, Tag, Package } from 'lucide-react';
+import { Plus, Edit2, Power, PowerOff, Search, Tag, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -251,67 +251,68 @@ export function ProductosGlobalConfig() {
         </CardContent>
       </Card>
 
-      {/* Form dialog */}
-      <Dialog open={showDialog} onOpenChange={(o) => { if (!o) { setShowDialog(false); setEditingId(null); setForm(emptyForm); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
-            <DialogDescription>
-              Datos generales del producto. El stock y los precios se configuran por sucursal.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-              <Input
-                value={form.nombre}
-                onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
-                placeholder="Ej: Cera mate 100ml"
-                maxLength={80}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Marca</label>
-              <div className="flex gap-2">
-                <Select
-                  value={form.marca_id || 'none'}
-                  onValueChange={(v) => setForm(p => ({ ...p, marca_id: v === 'none' ? '' : v }))}
-                >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin marca</SelectItem>
-                    {activeMarcas.map(m => (
-                      <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
-                  <Tag className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Descripción</label>
-              <Textarea
-                value={form.descripcion}
-                onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
-                placeholder="Detalles internos (opcional)"
-                rows={3}
-                maxLength={240}
-              />
-              <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/240</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowDialog(false)} disabled={saving}>
-              <X className="h-4 w-4 mr-1" /> Cancelar
+      <DrawerForm
+        open={showDialog}
+        onOpenChange={(o) => { if (!o) { setShowDialog(false); setEditingId(null); setForm(emptyForm); } }}
+        title={editingId ? 'Editar producto' : 'Nuevo producto'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" disabled={saving} onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); }}>
+              Cancelar
             </Button>
             <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
-              <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando…' : 'Guardar'}
+              {saving ? 'Guardando…' : 'Guardar'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Datos generales del producto. El stock y los precios se configuran por sucursal.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <Input
+              value={form.nombre}
+              onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
+              placeholder="Ej: Cera mate 100ml"
+              maxLength={80}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Marca</label>
+            <div className="flex gap-2">
+              <Select
+                value={form.marca_id || 'none'}
+                onValueChange={(v) => setForm(p => ({ ...p, marca_id: v === 'none' ? '' : v }))}
+              >
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin marca</SelectItem>
+                  {activeMarcas.map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
+                <Tag className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Descripción</label>
+            <Textarea
+              value={form.descripcion}
+              onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
+              placeholder="Detalles internos (opcional)"
+              rows={3}
+              maxLength={240}
+            />
+            <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/240</p>
+          </div>
+        </div>
+      </DrawerForm>
 
       {/* Marcas manager */}
       <MarcasManagerDialog

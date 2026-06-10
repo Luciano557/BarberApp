@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -100,86 +100,85 @@ export function StockMovementDialog({ open, item, tipo, onClose, onSaved }: Prop
     }
   };
 
-  const Icon = cfg.icon;
-
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon className="h-4 w-4" /> {cfg.title}
-          </DialogTitle>
-          <DialogDescription>{cfg.desc}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <p className="text-sm font-medium text-foreground">{item.producto.nombre}</p>
-            {item.marca && <p className="text-xs text-muted-foreground">{item.marca.nombre}</p>}
-            <p className="text-xs text-muted-foreground mt-1">
-              Stock actual: <span className="text-foreground font-medium">{ps.stock_actual}</span>
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>{cfg.cantidadLabel}</Label>
-            <Input
-              inputMode="decimal"
-              value={cantidad}
-              onChange={(e) => setCantidad(e.target.value.replace(/[^\d.\-]/g, ''))}
-              placeholder={cfg.signo === 'libre' ? 'Ej: -3 o 5' : 'Ej: 10'}
-              autoFocus
-            />
-            {cantidadValida && (
-              <p className="text-xs text-muted-foreground">
-                Stock resultante: <span className="text-foreground font-medium">{stockProyectado}</span>
-              </p>
-            )}
-          </div>
-
-          {tipo === 'ajuste_manual' && (
-            <div className="space-y-2">
-              <Label>Motivo</Label>
-              <Textarea
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Ej: rotura, recuento físico, error de carga..."
-                maxLength={240}
-                rows={2}
-              />
-              <p className="text-xs text-muted-foreground text-right">{motivo.length}/240</p>
-            </div>
-          )}
-
-          {tipo !== 'ajuste_manual' && (
-            <div className="space-y-2">
-              <Label>Nota <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-              <Input
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Referencia, proveedor, etc."
-                maxLength={80}
-              />
-            </div>
-          )}
-
-          {seraNegativo && cantidadValida && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                El stock quedará en negativo. Está permitido pero conviene revisar el conteo físico.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+    <DrawerForm
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      title={cfg.title}
+      size="sm"
+      footer={
+        <div className="flex w-full justify-between">
+          <Button variant="ghost" disabled={saving} onClick={() => onClose()}>
+            Cancelar
+          </Button>
           <Button onClick={handleSubmit} disabled={!canSave}>
             {saving ? 'Guardando...' : cfg.cta}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-xs text-muted-foreground">{cfg.desc}</p>
+
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-sm font-medium text-foreground">{item.producto.nombre}</p>
+          {item.marca && <p className="text-xs text-muted-foreground">{item.marca.nombre}</p>}
+          <p className="text-xs text-muted-foreground mt-1">
+            Stock actual: <span className="text-foreground font-medium">{ps.stock_actual}</span>
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{cfg.cantidadLabel}</Label>
+          <Input
+            inputMode="decimal"
+            value={cantidad}
+            onChange={(e) => setCantidad(e.target.value.replace(/[^\d.\-]/g, ''))}
+            placeholder={cfg.signo === 'libre' ? 'Ej: -3 o 5' : 'Ej: 10'}
+            autoFocus
+          />
+          {cantidadValida && (
+            <p className="text-xs text-muted-foreground">
+              Stock resultante: <span className="text-foreground font-medium">{stockProyectado}</span>
+            </p>
+          )}
+        </div>
+
+        {tipo === 'ajuste_manual' && (
+          <div className="space-y-2">
+            <Label>Motivo</Label>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Ej: rotura, recuento físico, error de carga..."
+              maxLength={240}
+              rows={2}
+            />
+            <p className="text-xs text-muted-foreground text-right">{motivo.length}/240</p>
+          </div>
+        )}
+
+        {tipo !== 'ajuste_manual' && (
+          <div className="space-y-2">
+            <Label>Nota <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Referencia, proveedor, etc."
+              maxLength={80}
+            />
+          </div>
+        )}
+
+        {seraNegativo && cantidadValida && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              El stock quedará en negativo. Está permitido pero conviene revisar el conteo físico.
+            </p>
+          </div>
+        )}
+      </div>
+    </DrawerForm>
   );
 }
