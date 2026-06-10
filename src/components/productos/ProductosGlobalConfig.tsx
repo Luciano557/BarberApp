@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Power, PowerOff, Search, Tag, Package } from 'lucide-react';
+import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,9 @@ export function ProductosGlobalConfig() {
 
   const [marcasDialogOpen, setMarcasDialogOpen] = useState(false);
   const [toggleConfirm, setToggleConfirm] = useState<{ producto: Producto; next: boolean } | null>(null);
+
+  const editingProducto = editingId ? (productos.find(p => p.id === editingId) ?? null) : null;
+  const editingIsActive = editingProducto?.activo ?? false;
 
   const fetchAll = useCallback(async () => {
     if (!orgId) return;
@@ -215,35 +219,23 @@ export function ProductosGlobalConfig() {
                 return (
                   <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-foreground truncate">{p.nombre}</span>
-                        {marca && (
-                          <span
-                            className="text-xs px-2 py-0.5 rounded text-primary-foreground"
-                            style={{ backgroundColor: marca.color }}
-                          >
-                            {marca.nombre}
-                          </span>
-                        )}
-                      </div>
+                      <span className="font-medium text-foreground truncate">{p.nombre}</span>
                       {p.descripcion && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.descripcion}</p>
                       )}
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(p)} className="h-8 w-8">
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setToggleConfirm({ producto: p, next: !p.activo })}
-                      className="h-8 w-8"
-                      title={p.activo ? 'Desactivar' : 'Activar'}
-                    >
-                      {p.activo
-                        ? <PowerOff className="h-4 w-4 text-destructive" />
-                        : <Power className="h-4 w-4 text-success" />}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {marca && (
+                        <Badge variant="category">{marca.nombre}</Badge>
+                      )}
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+                        title="Opciones"
+                      >
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -258,14 +250,40 @@ export function ProductosGlobalConfig() {
         title={editingId ? 'Editar producto' : 'Nuevo producto'}
         size="sm"
         footer={
-          <div className="flex w-full justify-between">
-            <Button variant="ghost" disabled={saving} onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </Button>
-          </div>
+          editingId ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: false }); }}
+                >
+                  Desactivar
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#166534] hover:bg-muted"
+                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: true }); }}
+                >
+                  Activar
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" disabled={saving} onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); }}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
+                {saving ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </div>
+          )
         }
       >
         <div className="space-y-4">

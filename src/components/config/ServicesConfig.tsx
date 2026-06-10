@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, PowerOff, Power, Clock, Trash2, Scissors } from 'lucide-react';
+import { Plus, MoreVertical, Clock, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { LineQuickEditPopover } from './LineQuickEditPopover';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { TabBadge } from '@/components/ui/TabBadge';
+import { Badge } from '@/components/ui/badge';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -113,6 +113,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
     return a.name.localeCompare(b.name, 'es');
   });
   const inactiveServices = services.filter(s => !flagFor(s));
+  const editingService = editingId ? (services.find(s => s.id === editingId) ?? null) : null;
+  const editingIsActive = editingService ? flagFor(editingService) : false;
 
   const handleAdd = () => {
     const nameErr = validateName(newName);
@@ -207,18 +209,21 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: linkedLine.color }} />
           )}
           <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
-          {linkedLine && (
-            <span
-              className="text-xs px-2 py-0.5 rounded"
-              style={linkedLine.color
-                ? { backgroundColor: `${linkedLine.color}1A`, color: linkedLine.color }
-                : undefined}
-            >
-              {linkedLine.name}
-            </span>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
+          {linkedLine?.color && (
+            <Badge
+              variant="category"
+              className="border"
+              style={{
+                backgroundColor: `${linkedLine.color}1A`,
+                borderColor: `${linkedLine.color}40`,
+                color: linkedLine.color,
+              }}
+            >
+              {linkedLine.name}
+            </Badge>
+          )}
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />{service.durationMin || 30} min
           </span>
@@ -226,36 +231,14 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             <span className="text-muted-foreground tabular-nums">${service.price.toLocaleString('es-AR')}</span>
           )}
         </div>
-        <div className="flex items-center justify-end gap-1 sm:justify-start">
-          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
-            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-          </Button>
-          {onDelete && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={itemActive}
-                      onClick={() => !itemActive && setDeleteConfirm(service)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      title={itemActive ? undefined : 'Eliminar'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {itemActive && (
-                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
+        <div className="flex items-center justify-end">
+          <button
+            onClick={() => startEdit(service)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
+          >
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </div>
     </div>
@@ -341,10 +324,57 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
         title={isAdding ? 'Agregar servicio' : 'Editar servicio'}
         size="sm"
         footer={
-          <div className="flex w-full justify-between">
-            <Button variant="ghost" onClick={() => { setIsAdding(false); setEditingId(null); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setEditDuration('30'); setEditLineId(''); }}>Cancelar</Button>
-            <Button onClick={() => { if (isAdding) handleAdd(); else if (editingId) handleUpdate(editingId); }}>Guardar</Button>
-          </div>
+          isAdding ? (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" onClick={() => { setIsAdding(false); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); }}>Cancelar</Button>
+              <Button onClick={handleAdd}>Guardar</Button>
+            </div>
+          ) : editingService ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={() => handleUpdate(editingService.id)}>
+                Guardar cambios
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setToggleConfirm({ service: editingService, action: 'deactivate' });
+                    setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                  }}
+                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                >
+                  Desactivar
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdate(editingService.id, { active: true });
+                      toast.success('Servicio activado');
+                      setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                    }}
+                    className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  >
+                    Activar
+                  </Button>
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setDeleteConfirm(editingService);
+                        setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                      }}
+                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    >
+                      Eliminar
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null
         }
       >
         {isAdding ? (

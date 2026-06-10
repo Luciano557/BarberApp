@@ -1,9 +1,9 @@
-import { Edit2, MoreVertical, PackagePlus, Settings2, History, Power, PowerOff, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { MoreVertical, PackagePlus, Settings2, History, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ProductoConSucursal } from './types';
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   onAgregarStock: () => void;
   onAjustarStock: () => void;
   onVerHistorial: () => void;
+  onDelete?: () => void;
 }
 
 function fmtMoney(n: number | null | undefined) {
@@ -26,8 +27,12 @@ function fmtNumber(n: number) {
 }
 
 export function ProductoListItem({
-  item, onEdit, onToggleActive, onStockInicial, onAgregarStock, onAjustarStock, onVerHistorial,
+  item, onEdit, onToggleActive, onStockInicial, onAgregarStock, onAjustarStock, onVerHistorial, onDelete,
 }: Props) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [deactivateConfirm, setDeactivateConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+
   const ps = item.sucursal;
   const activeInSucursal = ps?.activo === true;
   const sinConfig = !ps;
@@ -35,111 +40,224 @@ export function ProductoListItem({
   const stockMin = ps?.stock_minimo ?? 0;
   const stockBajo = ps && stockMin > 0 && stock <= stockMin;
   const stockNegativo = stock < 0;
-  const sinMovimientoInicial = ps && stock === 0 && (ps.precio_venta || 0) === 0;
+
+  const statusLabel = sinConfig
+    ? 'No configurado en sucursal'
+    : activeInSucursal
+    ? 'Activo en sucursal'
+    : 'Inactivo en sucursal';
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:border-border hover:bg-muted/50 sm:flex-row sm:items-center">
-      {/* Color de marca */}
-      <div
-        className="h-1 w-full shrink-0 rounded-full sm:h-10 sm:w-1"
-        style={{ backgroundColor: item.marca?.color || 'hsl(var(--muted-foreground))' }}
-        aria-hidden
-      />
+    <>
+      <div className="flex flex-col gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:border-border hover:bg-muted/50 sm:flex-row sm:items-center">
+        {/* Color de marca */}
+        <div
+          className="h-1 w-full shrink-0 rounded-full sm:h-10 sm:w-1"
+          style={{ backgroundColor: item.marca?.color || 'hsl(var(--muted-foreground))' }}
+          aria-hidden
+        />
 
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-foreground truncate">{item.producto.nombre}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-foreground truncate">{item.producto.nombre}</span>
+            {!activeInSucursal && (
+              <Badge variant="secondary" className="text-xs">
+                {sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
+              </Badge>
+            )}
+            {stockNegativo && (
+              <Badge variant="destructive" className="text-xs gap-1">
+                <AlertTriangle className="h-3 w-3" /> Stock negativo
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+            {ps ? (
+              <>
+                <span>Venta: <span className="text-foreground">{fmtMoney(ps.precio_venta)}</span></span>
+                <span>Costo: {fmtMoney(ps.precio_costo)}</span>
+                {ps.margen_pct != null && <span>Margen: {fmtNumber(ps.margen_pct)}%</span>}
+                <span>Stock: <span className={stockNegativo ? 'text-destructive font-medium' : 'text-foreground'}>{fmtNumber(stock)}</span></span>
+              </>
+            ) : (
+              <span>Aún no configurado en esta sucursal.</span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 justify-end">
           {item.marca && (
-            <Badge variant="outline" className="text-xs font-normal">
-              {item.marca.nombre}
-            </Badge>
-          )}
-          {!activeInSucursal && (
-            <Badge variant="secondary" className="text-xs">
-              {sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
-            </Badge>
-          )}
-          {stockNegativo && (
-            <Badge variant="destructive" className="text-xs gap-1">
-              <AlertTriangle className="h-3 w-3" /> Stock negativo
-            </Badge>
+            <Badge variant="category">{item.marca.nombre}</Badge>
           )}
           {stockBajo && !stockNegativo && (
-            <Badge className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+            <Badge variant="category" className="bg-amber-50 text-amber-800 border border-amber-200">
               Stock bajo
             </Badge>
           )}
-        </div>
-        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-          {ps ? (
-            <>
-              <span>Venta: <span className="text-foreground">{fmtMoney(ps.precio_venta)}</span></span>
-              <span>Costo: {fmtMoney(ps.precio_costo)}</span>
-              {ps.margen_pct != null && <span>Margen: {fmtNumber(ps.margen_pct)}%</span>}
-              <span>Stock: <span className={stockNegativo ? 'text-destructive font-medium' : 'text-foreground'}>{fmtNumber(stock)}</span></span>
-            </>
-          ) : (
-            <span>Aún no configurado en esta sucursal.</span>
-          )}
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
+          >
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </div>
 
-      <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-        {ps && (
-          <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 flex-1 sm:flex-none">
-            <Edit2 className="h-4 w-4 mr-1" /> Editar
-          </Button>
-        )}
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <MoreVertical className="h-4 w-4" />
+      <DrawerForm
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        title={item.producto.nombre}
+        size="sm"
+        footer={
+          <div className="flex w-full flex-col gap-1.5">
+            <Button
+              variant="ghost"
+              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              onClick={() => { setDrawerOpen(false); onAgregarStock(); }}
+            >
+              <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {!ps && (
-              <>
-                <DropdownMenuItem onClick={onEdit}>
-                  <Edit2 className="h-4 w-4 mr-2" /> Configurar en sucursal
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            {ps && sinMovimientoInicial && (
-              <>
-                <DropdownMenuItem onClick={onStockInicial}>
-                  <PackagePlus className="h-4 w-4 mr-2" /> Cargar stock inicial
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            {ps && (
-              <>
-                <DropdownMenuItem onClick={onAgregarStock}>
-                  <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onAjustarStock}>
-                  <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onVerHistorial}>
-                  <History className="h-4 w-4 mr-2" /> Historial de movimientos
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <Button
+              variant="ghost"
+              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              onClick={() => { setDrawerOpen(false); onAjustarStock(); }}
+            >
+              <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start border border-border bg-muted/50 hover:bg-muted"
+              onClick={() => { setDrawerOpen(false); onVerHistorial(); }}
+            >
+              <History className="h-4 w-4 mr-2" /> Historial de movimientos
+            </Button>
+
+            <div className="border-t border-border my-1" />
+
+            <Button
+              variant="ghost"
+              className="w-full justify-start border border-border bg-muted/50 hover:bg-muted"
+              onClick={() => { setDrawerOpen(false); onEdit(); }}
+            >
+              Editar producto
+            </Button>
+
+            <div className="border-t border-border my-1" />
+
             {activeInSucursal ? (
-              <DropdownMenuItem onClick={() => onToggleActive(false)}>
-                <PowerOff className="h-4 w-4 mr-2 text-destructive" /> Desactivar en sucursal
-              </DropdownMenuItem>
+              <Button
+                variant="ghost"
+                className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                onClick={() => { setDrawerOpen(false); setDeactivateConfirm(true); }}
+              >
+                Desactivar en sucursal
+              </Button>
             ) : (
-              <DropdownMenuItem onClick={() => onToggleActive(true)}>
-                <Power className="h-4 w-4 mr-2 text-success" /> Activar en sucursal
-              </DropdownMenuItem>
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  onClick={() => { onToggleActive(true); setDrawerOpen(false); }}
+                >
+                  Activar en sucursal
+                </Button>
+                {onDelete && ps && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    onClick={() => { setDrawerOpen(false); setDeleteConfirm(true); }}
+                  >
+                    Eliminar
+                  </Button>
+                )}
+              </>
             )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <p className={`text-sm font-medium ${activeInSucursal ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+            {statusLabel}
+          </p>
+
+          <div className="rounded-xl bg-muted/50 p-5 text-center">
+            <div className="text-4xl font-bold tabular-nums text-foreground">
+              {ps ? fmtNumber(stock) : '—'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1.5 uppercase tracking-wide">Stock actual</div>
+            {stockBajo && !stockNegativo && (
+              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">Bajo el mínimo</div>
+            )}
+            {stockNegativo && (
+              <div className="mt-2 text-xs text-destructive font-medium">Stock negativo</div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-lg bg-muted/50 p-3">
+              <div className="text-xs text-muted-foreground">Precio venta</div>
+              <div className="font-medium text-foreground mt-0.5">{fmtMoney(ps?.precio_venta)}</div>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3">
+              <div className="text-xs text-muted-foreground">Precio costo</div>
+              <div className="font-medium text-foreground mt-0.5">{fmtMoney(ps?.precio_costo)}</div>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-3">
+              <div className="text-xs text-muted-foreground">Stock mínimo</div>
+              <div className="font-medium text-foreground mt-0.5">{ps ? fmtNumber(ps.stock_minimo ?? 0) : '—'}</div>
+            </div>
+            {item.marca && (
+              <div className="rounded-lg bg-muted/50 p-3">
+                <div className="text-xs text-muted-foreground">Marca</div>
+                <div className="font-medium text-foreground mt-0.5">{item.marca.nombre}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </DrawerForm>
+
+      <AlertDialog open={deactivateConfirm} onOpenChange={setDeactivateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desactivar en sucursal</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{item.producto.nombre}" dejará de estar disponible en esta sucursal. Podés volver a activarlo cuando quieras.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { onToggleActive(false); setDeactivateConfirm(false); }}
+              className="bg-amber-500 text-white hover:bg-amber-600"
+            >
+              Desactivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {onDelete && ps && (
+        <AlertDialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Eliminar configuración de sucursal</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se eliminará la configuración de "{item.producto.nombre}" en esta sucursal (precios y stock). El producto global seguirá existiendo. Esta acción no se puede deshacer desde la interfaz.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => { onDelete(); setDeleteConfirm(false); }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </>
   );
 }

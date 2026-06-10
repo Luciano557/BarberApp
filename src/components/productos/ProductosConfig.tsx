@@ -90,6 +90,17 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   const activeCount = items.filter(it => it.sucursal?.activo === true).length;
   const inactiveCount = items.length - activeCount;
 
+  const handleDeleteProductoSucursal = async (item: ProductoConSucursal) => {
+    if (!item.sucursal) return;
+    const { error } = await supabase
+      .from('productos_sucursal')
+      .delete()
+      .eq('id', item.sucursal.id);
+    if (error) { toast.error('No se pudo eliminar la configuración'); return; }
+    toast.success('Configuración de sucursal eliminada');
+    await fetchAll();
+  };
+
   const handleToggleActiveSucursal = async (item: ProductoConSucursal, nextActive: boolean) => {
     if (!orgId) return;
     if (item.sucursal) {
@@ -188,6 +199,7 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
                     onAgregarStock={() => setStockDialog({ open: true, producto: item, tipo: 'reposicion' })}
                     onAjustarStock={() => setStockDialog({ open: true, producto: item, tipo: 'ajuste_manual' })}
                     onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
+                    onDelete={() => handleDeleteProductoSucursal(item)}
                   />
                 ))
               )}

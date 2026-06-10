@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Plus, Edit2, PowerOff, Power, Trash2, Tag } from 'lucide-react';
+import { Plus, MoreVertical, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -53,6 +52,8 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
 
   const active = lines.filter(l => l.active);
   const inactive = lines.filter(l => !l.active);
+  const editingLine = editingId ? (lines.find(l => l.id === editingId) ?? null) : null;
+  const editingIsActive = editingLine?.active ?? false;
 
   const resetForm = () => { setName(''); setColor(''); };
 
@@ -118,41 +119,13 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
             <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: line.color }} />
           )}
           <span className="flex-1 font-medium text-foreground">{line.name}</span>
-          <Button size="icon" variant="ghost" onClick={() => startEdit(line)} className="h-8 w-8" title="Editar">
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setToggleConfirm({ line, action: line.active ? 'deactivate' : 'activate' })}
-            className="h-8 w-8"
-            title={line.active ? 'Desactivar' : 'Activar'}
+          <button
+            onClick={() => startEdit(line)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
           >
-            {line.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-          </Button>
-          {onDelete && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={line.active}
-                      onClick={() => !line.active && setDeleteConfirm(line)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      title={line.active ? undefined : 'Eliminar'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {line.active && (
-                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </div>
     );
@@ -224,15 +197,59 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
         title={isAdding ? 'Agregar categoría' : 'Editar categoría'}
         size="sm"
         footer={
-          <div className="flex w-full justify-between">
-            <Button variant="ghost" onClick={() => { setIsAdding(false); setEditingId(null); resetForm(); }}>Cancelar</Button>
-            <Button
-              disabled={isSaving}
-              onClick={() => { if (isAdding) handleAdd(); else if (editingId) handleUpdate(editingId); }}
-            >
-              {isSaving ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </div>
+          isAdding ? (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
+              <Button disabled={isSaving} onClick={handleAdd}>
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          ) : editingLine ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={() => handleUpdate(editingLine.id)}>
+                Guardar cambios
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setToggleConfirm({ line: editingLine, action: 'deactivate' });
+                    setEditingId(null); resetForm();
+                  }}
+                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                >
+                  Desactivar
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdate(editingLine.id, { active: true });
+                      toast.success('Línea activada');
+                      setEditingId(null); resetForm();
+                    }}
+                    className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  >
+                    Activar
+                  </Button>
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setDeleteConfirm(editingLine);
+                        setEditingId(null); resetForm();
+                      }}
+                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    >
+                      Eliminar
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null
         }
       >
         <div className="space-y-4">

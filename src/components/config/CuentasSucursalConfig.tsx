@@ -87,27 +87,7 @@ export function CuentasSucursalConfig() {
           </InfoRow>
         </div>
 
-        {/* Bloque destacado: Funcionamiento */}
-        <div className="rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs font-medium text-foreground mb-1">Funcionamiento</p>
-          <div className="divide-y divide-border">
-            <FactRow
-              icon={ShieldCheck}
-              label="Estado"
-              badge={<Badge variant="default" className="text-[10px] py-0 px-1.5 h-5">Activas por defecto</Badge>}
-            />
-            <FactRow
-              icon={KeyRound}
-              label="Credenciales"
-              value="Se gestionan desde cada sucursal"
-            />
-            <FactRow
-              icon={MapPin}
-              label="Alcance"
-              value="Solo opera la sucursal asignada"
-            />
-          </div>
-        </div>
+        {/* Bloque 'Funcionamiento' eliminado */}
 
         {/* Configuración avanzada */}
         <Collapsible open={open} onOpenChange={setOpen}>
