@@ -165,7 +165,7 @@ export function BarberSucursalesGeneralSection({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs text-muted-foreground">
-                Sucursales secundarias (recurrentes)
+                Sucursales secundarias 
               </Label>
               {canManageRecurrentes && (
                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setRecurrenteOpen(true)}>
@@ -175,7 +175,7 @@ export function BarberSucursalesGeneralSection({
             </div>
 
             {recurrentesVigentes.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">Sin asignaciones recurrentes.</p>
+              <p className="text-xs text-muted-foreground italic">Sin asignaciones</p>
             ) : (
               <div className="space-y-1.5">
                 {recurrentesVigentes.map(r => (

@@ -260,11 +260,9 @@ export function DiscountsConfig({
 
   const renderRow = (d: Discount) => {
     const appliesTo = d.appliesTo || 'servicios';
-    const categoryLabel = appliesTo === 'productos' ? 'Productos' : appliesTo === 'ambos' ? 'Ambos' : 'Servicios';
+    const categoryLabel = appliesTo === 'productos' ? 'Productos' : 'Servicios';
     const categoryClass = appliesTo === 'productos'
       ? 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
-      : appliesTo === 'ambos'
-      ? 'bg-[#F5F3FF] text-[#5B21B6] border border-[#DDD6FE]'
       : 'bg-[#EEF2FF] text-[#3730A3] border border-[#C7D2FE]';
     const valueLabel = d.type === 'fixed'
       ? `$${d.value.toLocaleString('es-AR')}`
