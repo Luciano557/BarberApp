@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Trash2 } from 'lucide-react';
+import { Plus, Edit2, PowerOff, Power, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Extra } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { DrawerForm } from '@/components/ui/drawer-form';
 
 interface ExtrasConfigProps {
   extras: Extra[];
@@ -111,64 +112,43 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
     const itemActive = isItemActive(extra);
     return (
     <div key={extra.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-      {editingId === extra.id ? (
-        <div className="p-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
-            <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-10' : 'sm:col-span-7'}`}>
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} />
-            </div>
-            {!isGlobal && (
-              <div className="space-y-1.5 sm:col-span-3">
-                <label className="text-xs font-medium text-muted-foreground">Precio</label>
-                <CurrencyInput value={newPrice} onChange={setNewPrice} />
-              </div>
-            )}
-            <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-2 sm:justify-end">
-              <Button size="icon" onClick={() => handleUpdate(extra.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-          <span className="min-w-0 flex-1 break-words font-medium text-foreground sm:truncate">{extra.name}</span>
-          {!isGlobal && (
-            <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
+      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <span className="min-w-0 flex-1 break-words font-medium text-foreground sm:truncate">{extra.name}</span>
+        {!isGlobal && (
+          <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
+        )}
+        <div className="flex items-center justify-end gap-1 sm:justify-start">
+          <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          </Button>
+          {onDelete && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={itemActive}
+                      onClick={() => !itemActive && setDeleteConfirm(extra)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={itemActive ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {itemActive && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
-          <div className="flex items-center justify-end gap-1 sm:justify-start">
-            <Button size="icon" variant="ghost" onClick={() => startEdit(extra)} className="h-8 w-8" title="Editar">
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ extra, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
-              {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-            </Button>
-            {onDelete && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={itemActive}
-                        onClick={() => !itemActive && setDeleteConfirm(extra)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                        title={itemActive ? undefined : 'Eliminar'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {itemActive && (
-                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
         </div>
-      )}
+      </div>
     </div>
     );
   };
@@ -193,7 +173,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                 </CardDescription>
               </div>
             </div>
-            {!isAdding && activeSubTab === 'active' && (
+            {!isAdding && !editingId && activeSubTab === 'active' && (
               <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Agregar
               </Button>
@@ -212,26 +192,6 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
               <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveExtras.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
-              {isAdding && (
-                <div className="p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
-                    <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-10' : 'sm:col-span-7'}`}>
-                      <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-                      <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Barba" />
-                    </div>
-                    {!isGlobal && (
-                      <div className="space-y-1.5 sm:col-span-3">
-                        <label className="text-xs font-medium text-muted-foreground">Precio</label>
-                        <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
-                      </div>
-                    )}
-                    <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-2 sm:justify-end">
-                      <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                </div>
-              )}
               {activeExtras.map(renderExtraItem)}
               {activeExtras.length === 0 && !isAdding && (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
@@ -257,6 +217,39 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
           </Tabs>
         </CardContent>
       </Card>
+
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsAdding(false);
+            setEditingId(null);
+            setNewName('');
+            setNewPrice('');
+          }
+        }}
+        title={isAdding ? 'Agregar extra' : 'Editar extra'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" onClick={() => { setIsAdding(false); setEditingId(null); setNewName(''); setNewPrice(''); }}>Cancelar</Button>
+            <Button onClick={() => { if (isAdding) handleAdd(); else if (editingId) handleUpdate(editingId); }}>Guardar</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Barba" />
+          </div>
+          {!isGlobal && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Precio</label>
+              <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
+            </div>
+          )}
+        </div>
+      </DrawerForm>
 
       {/* Toggle confirmation dialog */}
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>

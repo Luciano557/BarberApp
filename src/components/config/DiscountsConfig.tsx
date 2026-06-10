@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit2, Save, X, Power, PowerOff, Trash2, BadgePercent } from 'lucide-react';
+import { Plus, Edit2, Power, PowerOff, Trash2, BadgePercent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 function validateDiscountName(name: string): string | null {
@@ -176,8 +177,8 @@ export function DiscountsConfig({
   const activos = filtered.filter(d => flagFor(d));
   const inactivos = filtered.filter(d => !flagFor(d));
 
-  const Form = ({ isEdit = false, id = '' }: { isEdit?: boolean; id?: string }) => (
-    <div className="space-y-4 p-4 bg-muted rounded-lg animate-scale-in">
+  const Form = () => (
+    <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Nombre</label>
@@ -260,28 +261,12 @@ export function DiscountsConfig({
           </Select>
         </div>
       </div>
-      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full sm:w-auto"
-          onClick={() => { if (isEdit) setEditingId(null); else setIsAdding(false); resetForm(); }}
-        >
-          <X className="h-4 w-4 mr-1" /> Cancelar
-        </Button>
-        <Button size="sm" onClick={() => isEdit ? handleUpdate(id) : handleAdd()} className="w-full bg-success hover:bg-success/90 sm:w-auto">
-          <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
     </div>
   );
 
   const renderRow = (d: Discount) => (
     <div key={d.id} className="animate-item-in">
-      {editingId === d.id ? (
-        <Form isEdit id={d.id} />
-      ) : (
-        <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted sm:flex-row sm:items-center">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-foreground">{d.label}</span>
@@ -367,7 +352,6 @@ export function DiscountsConfig({
             </TooltipProvider>
           </div>
         </div>
-      )}
     </div>
   );
 
@@ -429,8 +413,6 @@ export function DiscountsConfig({
               ))}
             </div>
 
-            {isAdding && <Form />}
-
             {activos.length === 0 && inactivos.length === 0 && !isAdding ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
                 <p className="text-sm text-muted-foreground">
@@ -488,6 +470,27 @@ export function DiscountsConfig({
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsAdding(false);
+            setEditingId(null);
+            resetForm();
+          }
+        }}
+        title={isAdding ? 'Agregar descuento' : 'Editar descuento'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" onClick={() => { setIsAdding(false); setEditingId(null); resetForm(); }}>Cancelar</Button>
+            <Button onClick={() => { if (isAdding) handleAdd(); else if (editingId) handleUpdate(editingId); }}>Guardar</Button>
+          </div>
+        }
+      >
+        <Form />
+      </DrawerForm>
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <AlertDialogContent>

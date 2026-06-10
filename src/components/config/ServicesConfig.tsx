@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Clock, Trash2, Scissors } from 'lucide-react';
+import { Plus, Edit2, PowerOff, Power, Clock, Trash2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { LineQuickEditPopover } from './LineQuickEditPopover';
+import { DrawerForm } from '@/components/ui/drawer-form';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -199,114 +200,63 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
     const linkedLine = lines.find(l => l.id === service.lineId && l.active);
     return (
     <div key={service.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-      {editingId === service.id ? (
-        <div className="p-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
-            <div className="space-y-1.5 sm:col-span-4">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} disabled={structureLocked} />
-            </div>
-            {!isGlobal && (
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">Precio</label>
-                <CurrencyInput value={newPrice} onChange={setNewPrice} />
-              </div>
-            )}
-            <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground">Duración</label>
-              <div className="flex items-center gap-1">
-                <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} disabled={structureLocked} />
-                <span className="text-xs text-muted-foreground">min</span>
-              </div>
-            </div>
-            <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-4' : 'sm:col-span-3'}`}>
-              <label className="text-xs font-medium text-muted-foreground">Línea</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Select value={editLineId || 'none'} onValueChange={setEditLineId} disabled={structureLocked}>
-                  <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin línea</SelectItem>
-                    {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-                {onUpdateLine && !structureLocked && (
-                  <LineQuickEditPopover
-                    line={lines.find(l => l.id === editLineId) || null}
-                    onUpdate={onUpdateLine}
-                    onDelete={onDeleteLine}
-                    disabled={!editLineId || editLineId === 'none' || !lines.find(l => l.id === editLineId)}
-                  />
-                )}
-                {!structureLocked && (
-                  <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
-                )}
-              </div>
-            </div>
-            <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-1 sm:justify-end">
-              <Button size="icon" onClick={() => handleUpdate(service.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {linkedLine?.color && (
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: linkedLine.color }} />
-            )}
-            <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
-            {linkedLine && (
-              <span
-                className="text-xs px-2 py-0.5 rounded"
-                style={linkedLine.color
-                  ? { backgroundColor: `${linkedLine.color}1A`, color: linkedLine.color }
-                  : undefined}
-              >
-                {linkedLine.name}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />{service.durationMin || 30} min
+      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          {linkedLine?.color && (
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: linkedLine.color }} />
+          )}
+          <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
+          {linkedLine && (
+            <span
+              className="text-xs px-2 py-0.5 rounded"
+              style={linkedLine.color
+                ? { backgroundColor: `${linkedLine.color}1A`, color: linkedLine.color }
+                : undefined}
+            >
+              {linkedLine.name}
             </span>
-            {!isGlobal && (
-              <span className="text-muted-foreground tabular-nums">${service.price.toLocaleString('es-AR')}</span>
-            )}
-          </div>
-          <div className="flex items-center justify-end gap-1 sm:justify-start">
-            <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
-              {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-            </Button>
-            {onDelete && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={itemActive}
-                        onClick={() => !itemActive && setDeleteConfirm(service)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                        title={itemActive ? undefined : 'Eliminar'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {itemActive && (
-                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+          )}
         </div>
-      )}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />{service.durationMin || 30} min
+          </span>
+          {!isGlobal && (
+            <span className="text-muted-foreground tabular-nums">${service.price.toLocaleString('es-AR')}</span>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-1 sm:justify-start">
+          <Button size="icon" variant="ghost" onClick={() => startEdit(service)} className="h-8 w-8" title="Editar">
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => setToggleConfirm({ service, action: itemActive ? 'deactivate' : 'activate' })} className="h-8 w-8" title={itemActive ? 'Desactivar' : 'Activar'}>
+            {itemActive ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
+          </Button>
+          {onDelete && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      disabled={itemActive}
+                      onClick={() => !itemActive && setDeleteConfirm(service)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
+                      title={itemActive ? undefined : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {itemActive && (
+                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+      </div>
     </div>
     );
   };
@@ -331,7 +281,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                 </CardDescription>
               </div>
             </div>
-            {!isAdding && activeSubTab === 'active' && canCreate && (
+            {!isAdding && !editingId && activeSubTab === 'active' && canCreate && (
               <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Agregar
               </Button>
@@ -345,54 +295,6 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
               <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveServices.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
-              {isAdding && (
-                <div className="p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
-                    <div className="space-y-1.5 sm:col-span-4">
-                      <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-                      <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
-                    </div>
-                    {!isGlobal && (
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <label className="text-xs font-medium text-muted-foreground">Precio</label>
-                        <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
-                      </div>
-                    )}
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-xs font-medium text-muted-foreground">Duración</label>
-                      <div className="flex items-center gap-1">
-                        <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
-                        <span className="text-xs text-muted-foreground">min</span>
-                      </div>
-                    </div>
-                    <div className={`space-y-1.5 ${isGlobal ? 'sm:col-span-4' : 'sm:col-span-3'}`}>
-                      <label className="text-xs font-medium text-muted-foreground">Línea</label>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                        <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
-                          <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sin línea</SelectItem>
-                            {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
-                          </SelectContent>
-                        </Select>
-                        {onUpdateLine && (
-                          <LineQuickEditPopover
-                            line={lines.find(l => l.id === newLineId) || null}
-                            onUpdate={onUpdateLine}
-                            onDelete={onDeleteLine}
-                            disabled={!newLineId || newLineId === 'none' || !lines.find(l => l.id === newLineId)}
-                          />
-                        )}
-                        <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                    <div className="col-span-full flex items-center justify-start gap-2 sm:col-span-1 sm:justify-end">
-                      <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" onClick={() => setIsAdding(false)}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-                </div>
-              )}
               {activeServices.map(renderServiceItem)}
               {activeServices.length === 0 && !isAdding && (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
@@ -420,6 +322,116 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           </Tabs>
         </CardContent>
       </Card>
+
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsAdding(false);
+            setEditingId(null);
+            setNewName('');
+            setNewPrice('');
+            setNewDuration('30');
+            setNewLineId('');
+            setEditDuration('30');
+            setEditLineId('');
+          }
+        }}
+        title={isAdding ? 'Agregar servicio' : 'Editar servicio'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" onClick={() => { setIsAdding(false); setEditingId(null); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setEditDuration('30'); setEditLineId(''); }}>Cancelar</Button>
+            <Button onClick={() => { if (isAdding) handleAdd(); else if (editingId) handleUpdate(editingId); }}>Guardar</Button>
+          </div>
+        }
+      >
+        {isAdding ? (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
+            </div>
+            {!isGlobal && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Precio</label>
+                <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Duración</label>
+              <div className="flex items-center gap-1">
+                <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
+                <span className="text-xs text-muted-foreground">min</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Línea</label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
+                  <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin línea</SelectItem>
+                    {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+                {onUpdateLine && (
+                  <LineQuickEditPopover
+                    line={lines.find(l => l.id === newLineId) || null}
+                    onUpdate={onUpdateLine}
+                    onDelete={onDeleteLine}
+                    disabled={!newLineId || newLineId === 'none' || !lines.find(l => l.id === newLineId)}
+                  />
+                )}
+                <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} disabled={structureLocked} />
+            </div>
+            {!isGlobal && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Precio</label>
+                <CurrencyInput value={newPrice} onChange={setNewPrice} />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Duración</label>
+              <div className="flex items-center gap-1">
+                <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} disabled={structureLocked} />
+                <span className="text-xs text-muted-foreground">min</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Línea</label>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select value={editLineId || 'none'} onValueChange={setEditLineId} disabled={structureLocked}>
+                  <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin línea</SelectItem>
+                    {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+                {onUpdateLine && !structureLocked && (
+                  <LineQuickEditPopover
+                    line={lines.find(l => l.id === editLineId) || null}
+                    onUpdate={onUpdateLine}
+                    onDelete={onDeleteLine}
+                    disabled={!editLineId || editLineId === 'none' || !lines.find(l => l.id === editLineId)}
+                  />
+                )}
+                {!structureLocked && (
+                  <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </DrawerForm>
 
       {/* Toggle confirmation dialog */}
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
