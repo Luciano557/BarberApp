@@ -13,6 +13,7 @@ import { ProductoDialog } from './ProductoDialog';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
 import { StockMovementDialog } from './StockMovementDialog';
 import { StockHistoryDialog } from './StockHistoryDialog';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface ProductosConfigProps {
   sucursalId: string;
@@ -155,11 +156,11 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
 
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos ({activeCount})
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Activos<TabBadge count={activeCount} />
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos ({inactiveCount})
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Inactivos<TabBadge count={inactiveCount} />
               </TabsTrigger>
             </TabsList>
 

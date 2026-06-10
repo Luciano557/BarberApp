@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 function validateDiscountName(name: string): string | null {
   const trimmed = name.trim();
@@ -384,11 +385,11 @@ export function DiscountsConfig({
       <CardContent className="space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}>
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-            <TabsTrigger value="activos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Activos ({activos.length})
+            <TabsTrigger value="activos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Activos<TabBadge count={activos.length} />
             </TabsTrigger>
-            <TabsTrigger value="inactivos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Inactivos ({inactivos.length})
+            <TabsTrigger value="inactivos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Inactivos<TabBadge count={inactivos.length} />
             </TabsTrigger>
           </TabsList>
 

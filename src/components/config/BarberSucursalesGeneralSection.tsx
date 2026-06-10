@@ -7,9 +7,7 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
-} from '@/components/ui/sheet';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -311,48 +309,52 @@ function AgregarRecurrenteSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle>Sucursal secundaria recurrente</SheetTitle>
-          <SheetDescription>
-            Definí en qué sucursal trabaja este barbero ciertos días de la semana.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4">
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Sucursal secundaria recurrente"
+      size="sm"
+      footer={
+        <div className="flex w-full justify-between">
+          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button disabled={saving || !canSave} onClick={handleSave}>
+            {saving ? 'Guardando...' : 'Guardar'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Definí en qué sucursal trabaja este barbero ciertos días de la semana.
+        </p>
+        <div className="space-y-2">
+          <Label>Sucursal</Label>
+          <Select value={sucursalId} onValueChange={setSucursalId}>
+            <SelectTrigger><SelectValue placeholder="Elegí una sucursal" /></SelectTrigger>
+            <SelectContent>
+              {selectable.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Días de la semana</Label>
+          <WeekdayPicker value={dias} onChange={setDias} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label>Sucursal</Label>
-            <Select value={sucursalId} onValueChange={setSucursalId}>
-              <SelectTrigger><SelectValue placeholder="Elegí una sucursal" /></SelectTrigger>
-              <SelectContent>
-                {selectable.map(s => (
-                  <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Desde (opcional)</Label>
+            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Días de la semana</Label>
-            <WeekdayPicker value={dias} onChange={setDias} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Desde (opcional)</Label>
-              <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Hasta (opcional)</Label>
-              <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={!canSave || saving}>
-              {saving ? 'Guardando…' : 'Guardar'}
-            </Button>
+            <Label>Hasta (opcional)</Label>
+            <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </DrawerForm>
   );
 }

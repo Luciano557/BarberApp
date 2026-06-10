@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto } from './types';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 /**
  * Configuración global del catálogo de productos.
@@ -192,11 +193,11 @@ export function ProductosGlobalConfig() {
 
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
-                Activos ({activeCount})
+              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Activos<TabBadge count={activeCount} />
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
-                Inactivos ({inactiveCount})
+              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Inactivos<TabBadge count={inactiveCount} />
               </TabsTrigger>
             </TabsList>
 

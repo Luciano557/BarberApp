@@ -7,7 +7,7 @@ export const THEMES: Record<string, ThemePreset> = {
   default: {
     label: 'Navy',
     variables: {
-      '--primary': '234 70% 19%',
+      '--primary': '224 43% 20%',
       '--primary-foreground': '0 0% 100%',
       '--secondary': '234 50% 85%',
       '--secondary-foreground': '234 70% 19%',

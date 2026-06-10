@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, MARCA_COLORS } from './types';
 import { cn } from '@/lib/utils';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
   open: boolean;
@@ -195,11 +196,11 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
 
             <Tabs value={tab} onValueChange={(v) => setTab(v as 'active' | 'inactive')}>
               <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-                <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
-                  Activas ({active.length})
+                <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
+                  Activas<TabBadge count={active.length} />
                 </TabsTrigger>
-                <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
-                  Inactivas ({inactive.length})
+                <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
+                  Inactivas<TabBadge count={inactive.length} />
                 </TabsTrigger>
               </TabsList>
 

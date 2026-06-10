@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
-import { Plus, Edit2, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, ChevronUp, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
+import { Plus, Edit2, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
+import { TabBadge } from '@/components/ui/TabBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -1210,8 +1212,8 @@ export function EquipoUnificado({
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial ({inactiveBarbers.length})</TabsTrigger>
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeBarbers.length} /></TabsTrigger>
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial<TabBadge count={inactiveBarbers.length} /></TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
               {(() => {
@@ -1240,23 +1242,11 @@ export function EquipoUnificado({
                       </div>
                     )}
                     {sortedActive.length > 1 && (
-                      mostrarTodosActivos ? (
-                        <button
-                          onClick={() => setMostrarTodosActivos(false)}
-                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                          Ver menos
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setMostrarTodosActivos(true)}
-                          className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                          Ver más ({sortedActive.length - 1})
-                        </button>
-                      )
+                      <ShowMoreDivider
+                        count={sortedActive.length - 1}
+                        onClick={() => setMostrarTodosActivos(!mostrarTodosActivos)}
+                        expanded={mostrarTodosActivos}
+                      />
                     )}
                   </>
                 );

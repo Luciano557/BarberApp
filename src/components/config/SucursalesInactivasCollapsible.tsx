@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, MapPin, Trash2, Eye, Loader2 } from 'lucide-react';
+import { MapPin, Trash2, Eye, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 
 interface Props {
   sucursalesInactivas: Array<Sucursal & { fecha_desactivacion?: string | null }>;
@@ -76,19 +77,12 @@ export function SucursalesInactivasCollapsible({ sucursalesInactivas, onVerSucur
   return (
     <div className="mt-8">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="flex items-center justify-between w-full rounded-lg border border-border bg-muted/20 px-4 py-3 hover:bg-muted/40 transition-colors text-left">
-            <div>
-              <p className="text-sm font-medium">
-                Sucursales desactivadas ({sucursalesInactivas.length})
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Sucursales que diste de baja. Podés volver a verlas o eliminarlas definitivamente.
-              </p>
-            </div>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground shrink-0 ml-3 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-          </button>
-        </CollapsibleTrigger>
+        <ShowMoreDivider
+          count={sucursalesInactivas.length}
+          label="sucursales desactivadas"
+          onClick={() => setOpen(!open)}
+          expanded={open}
+        />
         <CollapsibleContent className="pt-3 space-y-2">
           {sucursalesInactivas.map((suc) => (
             <Card key={suc.id} className="opacity-80">

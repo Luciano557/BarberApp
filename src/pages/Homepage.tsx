@@ -275,7 +275,7 @@ function AppWindow({ activeScreen }: { activeScreen: ScreenKey }) {
         {/* Sidebar — hidden on very small screens */}
         <div className="hidden sm:flex w-36 flex-shrink-0 bg-white border-r border-slate-100 p-3 flex-col">
           <div className="flex items-center gap-1.5 mb-3 pb-3 border-b border-slate-100">
-            <div className="w-5 h-5 rounded bg-[#1e2a4a] flex items-center justify-center">
+            <div className="w-5 h-5 rounded bg-primary flex items-center justify-center">
               <Scissors size={9} className="text-white" />
             </div>
             <span className="text-xs font-semibold">Vittro</span>
@@ -284,19 +284,19 @@ function AppWindow({ activeScreen }: { activeScreen: ScreenKey }) {
           <div className="mb-2">
             <p className="text-[7px] text-slate-300 uppercase tracking-wider mb-1">Sucursal</p>
             <div className="flex items-center gap-1 text-[9px] text-slate-600 pb-2 border-b border-slate-100">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#1e2a4a]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
               Casa Central
             </div>
           </div>
           <div className="mb-3">
             <p className="text-[10px] font-medium">Sebastian Tello</p>
-            <span className="text-[7px] bg-[#1e2a4a] text-white px-1.5 py-0.5 rounded-full">● Dueño</span>
+            <span className="text-[7px] bg-primary text-white px-1.5 py-0.5 rounded-full">● Dueño</span>
           </div>
           <nav className="space-y-0.5 flex-1">
             {navItems.map(item => (
               <div
                 key={item.key}
-                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] transition-colors ${item.key === activeNav ? 'bg-[#eef0f8] text-[#1e2a4a] font-medium' : 'text-slate-400'}`}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] transition-colors ${item.key === activeNav ? 'bg-secondary text-primary font-medium' : 'text-slate-400'}`}
               >
                 {item.icon}
                 {item.label}
@@ -329,7 +329,7 @@ export default function Homepage() {
           to   { opacity: 1; transform: translateY(0); }
         }
         .gradient-text {
-          background: linear-gradient(135deg, #1e2a4a 0%, #3a5298 100%);
+          background: linear-gradient(135deg, hsl(var(--primary)) 0%, #3a5298 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
@@ -343,7 +343,7 @@ export default function Homepage() {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-[#1e2a4a] rounded-lg flex items-center justify-center">
+            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
               <Scissors size={13} className="text-white" />
             </div>
             <span className="font-semibold text-base tracking-tight">Vittro</span>
@@ -360,7 +360,7 @@ export default function Homepage() {
               </button>
             </Link>
             <Link to="/login?mode=signup">
-              <button className="text-sm bg-[#1e2a4a] text-white px-4 py-1.5 rounded-lg hover:bg-[#2a3a60] transition-colors flex items-center gap-1.5">
+              <button className="text-sm bg-primary text-white px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1.5">
                 Empezar gratis <ArrowRight size={13} />
               </button>
             </Link>
@@ -400,7 +400,7 @@ export default function Homepage() {
             style={{ animation: 'fadeSlideIn 0.5s ease 0.24s both' }}
           >
             <Link to="/login?mode=signup">
-              <button className="w-full sm:w-auto bg-[#1e2a4a] text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-[#2a3a60] transition-colors flex items-center justify-center gap-2">
+              <button className="w-full sm:w-auto bg-primary text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
                 Registrar mi barbería <ArrowRight size={15} />
               </button>
             </Link>
@@ -424,7 +424,7 @@ export default function Homepage() {
             <button
               key={k}
               onClick={() => setHeroTab(k)}
-              className={`px-3 sm:px-3.5 py-1.5 rounded-full text-xs transition-all ${heroTab === k ? 'bg-[#1e2a4a] text-white' : 'border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
+              className={`px-3 sm:px-3.5 py-1.5 rounded-full text-xs transition-all ${heroTab === k ? 'bg-primary text-white' : 'border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'}`}
             >
               {screens[k].label}
             </button>
@@ -451,7 +451,7 @@ export default function Homepage() {
                 { num: '100%', label: 'pensado para barberías' },
               ].map(s => (
                 <div key={s.label} className="text-center px-3 sm:px-8">
-                  <p className="text-xl sm:text-3xl font-semibold tracking-tight text-[#1e2a4a] mb-1">{s.num}</p>
+                  <p className="text-xl sm:text-3xl font-semibold tracking-tight text-primary mb-1">{s.num}</p>
                   <p className="text-xs sm:text-sm text-slate-400 leading-tight">{s.label}</p>
                 </div>
               ))}
@@ -510,7 +510,7 @@ export default function Homepage() {
             </div>
             <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 flex flex-col md:flex-row gap-6">
               <div className="flex-1">
-                <div className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-[#eef0f8] text-[#1e2a4a] border border-[#c7d2fe] mb-3 font-medium">
+                <div className="inline-flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-secondary text-primary border border-secondary mb-3 font-medium">
                   ✦ Vittro
                 </div>
                 <h3 className="text-base sm:text-lg font-semibold mb-2">Una herramienta que potencia tu barbería</h3>
@@ -527,7 +527,7 @@ export default function Homepage() {
                   'Agenda online sin intervención manual',
                 ].map(item => (
                   <div key={item} className="flex items-center gap-2 text-sm text-slate-600">
-                    <div className="w-4 h-4 rounded-full bg-[#1e2a4a] flex items-center justify-center flex-shrink-0">
+                    <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                       <Check size={9} className="text-white" strokeWidth={3} />
                     </div>
                     {item}
@@ -561,14 +561,14 @@ export default function Homepage() {
                 <Reveal key={f.key} delay={i * 60}>
                   <button
                     onClick={() => setFeatTab(f.key)}
-                    className={`w-full text-left px-4 py-4 rounded-xl border transition-all duration-200 ${featTab === f.key ? 'bg-white border-[#1e2a4a] shadow-sm' : 'border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
+                    className={`w-full text-left px-4 py-4 rounded-xl border transition-all duration-200 ${featTab === f.key ? 'bg-white border-primary shadow-sm' : 'border-transparent hover:bg-slate-50 hover:border-slate-200'}`}
                   >
                     <div className="flex items-center gap-3 mb-1.5">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${featTab === f.key ? 'bg-[#1e2a4a] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${featTab === f.key ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {f.icon}
                       </div>
                       <span className="font-semibold text-sm">{f.title}</span>
-                      {featTab === f.key && <ChevronRight size={14} className="ml-auto text-[#1e2a4a] flex-shrink-0" />}
+                      {featTab === f.key && <ChevronRight size={14} className="ml-auto text-primary flex-shrink-0" />}
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed pl-11">{f.desc}</p>
                   </button>
@@ -645,9 +645,9 @@ export default function Homepage() {
               },
             ].map((plan, i) => (
               <Reveal key={plan.tier} delay={i * 80}>
-                <div className={`relative bg-white rounded-xl p-5 flex flex-col h-full transition-shadow hover:shadow-md ${plan.featured ? 'border-2 border-[#1e2a4a] shadow-sm' : 'border border-slate-200'}`}>
+                <div className={`relative bg-white rounded-xl p-5 flex flex-col h-full transition-shadow hover:shadow-md ${plan.featured ? 'border-2 border-primary shadow-sm' : 'border border-slate-200'}`}>
                   {plan.featured && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#1e2a4a] text-white text-[10px] px-3 py-1 rounded-full font-medium whitespace-nowrap">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] px-3 py-1 rounded-full font-medium whitespace-nowrap">
                       Más elegido
                     </div>
                   )}
@@ -668,7 +668,7 @@ export default function Homepage() {
                     ))}
                   </ul>
                   <Link to="/login?mode=signup">
-                    <button className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${plan.featured ? 'bg-[#1e2a4a] text-white hover:bg-[#2a3a60]' : 'border border-slate-200 hover:bg-slate-50'}`}>
+                    <button className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${plan.featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-slate-200 hover:bg-slate-50'}`}>
                       {plan.cta}
                     </button>
                   </Link>
@@ -686,7 +686,7 @@ export default function Homepage() {
       </section>
 
       {/* ── CTA ─────────────────────────────────────────────────────────────── */}
-      <section className="py-20 sm:py-24 px-4 sm:px-6 bg-[#1e2a4a] relative overflow-hidden">
+      <section className="py-20 sm:py-24 px-4 sm:px-6 bg-primary relative overflow-hidden">
         <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(ellipse 70% 70% at 50% 110%, #3a5298 0%, transparent 70%)' }} />
         <div className="max-w-2xl mx-auto text-center relative">
           <Reveal>
@@ -699,7 +699,7 @@ export default function Homepage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
               <Link to="/login?mode=signup">
-                <button className="w-full sm:w-auto bg-white text-[#1e2a4a] px-6 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                <button className="w-full sm:w-auto bg-white text-primary px-6 py-3 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
                   Registrar mi barbería gratis <ArrowRight size={14} />
                 </button>
               </Link>
@@ -718,7 +718,7 @@ export default function Homepage() {
       <footer className="border-t border-slate-100 py-6 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-[#1e2a4a] rounded-md flex items-center justify-center">
+            <div className="w-6 h-6 bg-primary rounded-md flex items-center justify-center">
               <Scissors size={11} className="text-white" />
             </div>
             <span className="font-semibold text-sm">Vittro</span>

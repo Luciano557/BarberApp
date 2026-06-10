@@ -13,6 +13,7 @@ import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { LineQuickEditPopover } from './LineQuickEditPopover';
 import { DrawerForm } from '@/components/ui/drawer-form';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -291,8 +292,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
         <CardContent className="space-y-3">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeServices.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveServices.length})</TabsTrigger>
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeServices.length} /></TabsTrigger>
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos<TabBadge count={inactiveServices.length} /></TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {activeServices.map(renderServiceItem)}

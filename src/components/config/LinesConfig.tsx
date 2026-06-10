@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { DrawerForm } from '@/components/ui/drawer-form';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 const LINE_COLORS = [
   { label: 'Azul', value: '#3B82F6' },
@@ -181,8 +182,8 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activas ({active.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivas ({inactive.length})</TabsTrigger>
+              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">Activas<TabBadge count={active.length} /></TabsTrigger>
+              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">Inactivas<TabBadge count={inactive.length} /></TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {active.map(renderLine)}

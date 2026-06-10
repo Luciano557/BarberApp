@@ -9,9 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter,
-} from '@/components/ui/sheet';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -31,6 +29,7 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
   sucursalId: string;
@@ -432,11 +431,11 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
         ) : (
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos ({activeIds.length})
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Activos<TabBadge count={activeIds.length} />
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos ({inactiveIds.length})
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Inactivos<TabBadge count={inactiveIds.length} />
               </TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
@@ -625,45 +624,49 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initial
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle>Asignación temporal</SheetTitle>
-          <SheetDescription>
-            Asigná a un barbero a esta sucursal por un período concreto. Al vencer, vuelve solo a su principal.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4">
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Asignación temporal"
+      size="sm"
+      footer={
+        <div className="flex w-full justify-between">
+          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button disabled={saving || !canSave} onClick={handleSave}>
+            {saving ? 'Guardando...' : 'Crear asignación'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Asigná a un barbero a esta sucursal por un período concreto. Al vencer, vuelve solo a su principal.
+        </p>
+        <div className="space-y-2">
+          <Label>Barbero</Label>
+          <Select value={barberoId} onValueChange={setBarberoId}>
+            <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
+            <SelectContent>
+              {barberos.map(b => (
+                <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label>Barbero</Label>
-            <Select value={barberoId} onValueChange={setBarberoId}>
-              <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
-              <SelectContent>
-                {barberos.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Desde</Label>
+            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Desde</Label>
-              <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Hasta</Label>
-              <Input type="date" value={fechaFin} min={fechaInicio} onChange={(e) => setFechaFin(e.target.value)} />
-            </div>
+          <div className="space-y-2">
+            <Label>Hasta</Label>
+            <Input type="date" value={fechaFin} min={fechaInicio} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
         </div>
-        <SheetFooter className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={!canSave || saving}>
-            {saving ? 'Creando…' : 'Crear asignación'}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </DrawerForm>
   );
 }
 
@@ -714,48 +717,52 @@ function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, initi
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="mb-4">
-          <SheetTitle>Asignación recurrente</SheetTitle>
-          <SheetDescription>
-            Asigná un barbero a esta sucursal en días fijos de la semana. Sin componente horario.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="space-y-4">
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Asignación recurrente"
+      size="sm"
+      footer={
+        <div className="flex w-full justify-between">
+          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button disabled={saving || !canSave} onClick={handleSave}>
+            {saving ? 'Guardando...' : 'Crear asignación'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Asigná un barbero a esta sucursal en días fijos de la semana. Sin componente horario.
+        </p>
+        <div className="space-y-2">
+          <Label>Barbero</Label>
+          <Select value={barberoId} onValueChange={setBarberoId}>
+            <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
+            <SelectContent>
+              {barberos.map(b => (
+                <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Días de la semana</Label>
+          <WeekdayPicker value={dias} onChange={setDias} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label>Barbero</Label>
-            <Select value={barberoId} onValueChange={setBarberoId}>
-              <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
-              <SelectContent>
-                {barberos.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs text-muted-foreground">Desde (opcional)</Label>
+            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Días de la semana</Label>
-            <WeekdayPicker value={dias} onChange={setDias} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Desde (opcional)</Label>
-              <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Hasta (opcional)</Label>
-              <Input type="date" value={fechaFin} min={fechaInicio || undefined} onChange={(e) => setFechaFin(e.target.value)} />
-            </div>
+            <Label className="text-xs text-muted-foreground">Hasta (opcional)</Label>
+            <Input type="date" value={fechaFin} min={fechaInicio || undefined} onChange={(e) => setFechaFin(e.target.value)} />
           </div>
         </div>
-        <SheetFooter className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={!canSave || saving}>
-            {saving ? 'Creando…' : 'Crear asignación'}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </DrawerForm>
   );
 }

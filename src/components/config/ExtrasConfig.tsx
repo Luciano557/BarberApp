@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Extra } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { DrawerForm } from '@/components/ui/drawer-form';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface ExtrasConfigProps {
   extras: Extra[];
@@ -188,8 +189,8 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
           )}
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos ({activeExtras.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos ({inactiveExtras.length})</TabsTrigger>
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeExtras.length} /></TabsTrigger>
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos<TabBadge count={inactiveExtras.length} /></TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
               {activeExtras.map(renderExtraItem)}

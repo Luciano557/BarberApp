@@ -193,14 +193,14 @@ export default function Login() {
           outline: none;
         }
         .input-field:focus {
-          border-color: #1e2a4a;
+          border-color: hsl(var(--primary));
           box-shadow: 0 0 0 3px rgba(30,42,74,0.08);
         }
         .input-field::placeholder { color: #94a3b8; }
         .submit-btn {
           width: 100%;
           height: 44px;
-          background: #1e2a4a;
+          background: hsl(var(--primary));
           color: #fff;
           border: none;
           border-radius: 10px;
@@ -237,7 +237,7 @@ export default function Login() {
       {/* ── Left panel — branding ────────────────────────────────────────── */}
       <div
         className="hidden lg:flex flex-col justify-between w-[480px] flex-shrink-0 p-10"
-        style={{ background: '#1e2a4a' }}
+        style={{ background: 'hsl(var(--primary))' }}
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
@@ -288,7 +288,7 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
-            <div className="w-8 h-8 bg-[#1e2a4a] rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Scissors size={14} className="text-white" />
             </div>
             <span className="font-semibold text-base">Vittro</span>
@@ -380,7 +380,7 @@ export default function Login() {
 
               <p className="text-center text-xs text-slate-400">
                 ¿No tenés cuenta?{' '}
-                <button type="button" onClick={() => setMode('register')} className="text-[#1e2a4a] font-medium hover:underline">
+                <button type="button" onClick={() => setMode('register')} className="text-primary font-medium hover:underline">
                   Registrate gratis
                 </button>
               </p>
@@ -539,7 +539,7 @@ export default function Login() {
 
               <p className="text-center text-xs text-slate-400">
                 ¿Ya tenés cuenta?{' '}
-                <button type="button" onClick={() => setMode('login')} className="text-[#1e2a4a] font-medium hover:underline">
+                <button type="button" onClick={() => setMode('login')} className="text-primary font-medium hover:underline">
                   Iniciá sesión
                 </button>
               </p>
