@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Edit2, Save, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, ChevronUp, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
+import { Plus, Edit2, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, ChevronUp, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarberSucursalesGeneralSection } from './BarberSucursalesGeneralSection';
+import { DrawerForm } from '@/components/ui/drawer-form';
 
 // --- Role utilities ---
 const ROLE_HIERARCHY: Record<AppRole, number> = {
@@ -311,6 +312,8 @@ export function EquipoUnificado({
   });
   // En general mode, sucursal principal a usar al crear un nuevo barbero.
   const [addPrincipalSucursalId, setAddPrincipalSucursalId] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const formRef = useRef<StaffFormRef>(null);
 
   const activeBarbers = barbers.filter(b => b.active);
   const inactiveBarbers = barbers.filter(b => !b.active);
@@ -731,7 +734,7 @@ export function EquipoUnificado({
       compensationType: 'comision', fixedSalary: '', payDay: '1' });
   };
 
-  const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); };
+  const cancelEdit = () => { setEditingId(null); setIsAdding(false); resetForm(); setAddPrincipalSucursalId(''); };
 
   const handleFormSave = async (data: typeof formData, barberId?: string) => {
     const rolEquipo = rolesToRolEquipo(data.roles);
@@ -966,18 +969,6 @@ export function EquipoUnificado({
 
     return (
       <div key={barber.id}>
-        {editingId === barber.id ? (
-          <StaffForm isEdit={true} barberId={barber.id}
-            initialData={{
-              firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone,
-              commission: String(barber.commission), address: barber.address || '', dni: barber.dni || '',
-              roles: displayRoles.length > 0 ? displayRoles : ['barber'],
-              compensationType: barber.compensationType || 'comision',
-              fixedSalary: barber.fixedSalary != null ? String(barber.fixedSalary) : '',
-              payDay: barber.payDay != null ? String(barber.payDay) : '1',
-            }}
-            onSave={(data) => handleFormSave(data, barber.id)} onCancel={cancelEdit} />
-        ) : (
           <div className="p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
             {/* Header: Name + Role + Commission */}
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -1184,7 +1175,6 @@ export function EquipoUnificado({
               </div>
             )}
           </div>
-        )}
       </div>
     );
   };
@@ -1224,29 +1214,6 @@ export function EquipoUnificado({
               <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial ({inactiveBarbers.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-3">
-              {isAdding && (
-                <div className="space-y-3 animate-step-in-forward">
-                  {isGeneralMode && (
-                    <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
-                      <label className="text-xs font-medium text-foreground">Sucursal principal</label>
-                      <Select value={addPrincipalSucursalId} onValueChange={setAddPrincipalSucursalId}>
-                        <SelectTrigger className="h-9 text-sm">
-                          <SelectValue placeholder="Elegí la sucursal principal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sucursalesForSection.map(s => (
-                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
-                      </p>
-                    </div>
-                  )}
-                  <StaffForm isEdit={false} initialData={formData} onSave={(data) => handleFormSave(data)} onCancel={cancelEdit} />
-                </div>
-              )}
               {(() => {
                 const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
                 return (
@@ -1308,6 +1275,58 @@ export function EquipoUnificado({
           </Tabs>
         </CardContent>
       </Card>
+
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (isSubmitting) return;
+          if (!o) cancelEdit();
+        }}
+        title={isAdding ? 'Agregar integrante' : 'Editar integrante'}
+        size="md"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" disabled={isSubmitting} onClick={cancelEdit}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={isSubmitting || (isGeneralMode && isAdding && !addPrincipalSucursalId)}
+              onClick={() => formRef.current?.submit()}
+            >
+              {isSubmitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {isGeneralMode && isAdding && (
+            <div className="p-3 rounded-md border border-border bg-muted/30 space-y-2">
+              <label className="text-xs font-medium text-foreground">Sucursal principal</label>
+              <Select value={addPrincipalSucursalId} onValueChange={setAddPrincipalSucursalId}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Elegí la sucursal principal" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sucursalesForSection.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Esta sucursal queda como base del barbero. Podés agregar sucursales secundarias después.
+              </p>
+            </div>
+          )}
+          <StaffForm
+            ref={formRef}
+            isEdit={!!editingId}
+            barberId={editingId ?? undefined}
+            initialData={formData}
+            onSave={(data) => handleFormSave(data, editingId ?? undefined)}
+            onSubmittingChange={setIsSubmitting}
+          />
+        </div>
+      </DrawerForm>
 
       {/* Dialogs */}
       <InviteUserDialog open={!!inviteBarber} onOpenChange={(open) => !open && setInviteBarber(null)} barber={inviteBarber || undefined} sucursales={sucursales as any} />
@@ -1524,15 +1543,19 @@ export function EquipoUnificado({
 }
 
 // --- Staff Form (module-level so identity is stable across parent re-renders) ---
+interface StaffFormRef { submit: () => void; }
+
 interface StaffFormProps {
   isEdit: boolean;
   barberId?: string;
   initialData: StaffFormData;
   onSave: (data: StaffFormData) => void;
-  onCancel: () => void;
+  onSubmittingChange?: (v: boolean) => void;
 }
 
-const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData, onSave, onCancel }: StaffFormProps) {
+const StaffForm = React.memo(
+  React.forwardRef<StaffFormRef, StaffFormProps>(
+    function StaffForm({ isEdit, barberId, initialData, onSave, onSubmittingChange }, ref) {
   const [localData, setLocalData] = useState<StaffFormData>(initialData);
   const [localCommissionError, setLocalCommissionError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1572,16 +1595,20 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
     if (!isComision && !localData.fixedSalary) return;
     submittingRef.current = true;
     setIsSubmitting(true);
+    onSubmittingChange?.(true);
     try {
       await Promise.resolve(onSave(localData));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 
+  useImperativeHandle(ref, () => ({ submit: handleSubmit }));
+
   return (
-    <div className="space-y-3 p-4 bg-muted/30 border border-border rounded-lg animate-scale-in">
+    <div className="space-y-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
         <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
@@ -1719,13 +1746,8 @@ const StaffForm = React.memo(function StaffForm({ isEdit, barberId, initialData,
           </div>
         );
       })()}
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={onCancel} disabled={isSubmitting}><X className="h-4 w-4 mr-1" /> Cancelar</Button>
-        <Button size="sm" onClick={handleSubmit} className="w-full bg-success hover:bg-success/90 sm:w-auto"
-          disabled={isSubmitting || !localData.firstName || !localData.lastName || phoneHasInvalidContent || (isComision && commissionRequired && !localData.commission) || (!isComision && !localData.fixedSalary) || !!localCommissionError}>
-          <Save className="h-4 w-4 mr-1" /> {isSubmitting ? 'Guardando…' : (isEdit ? 'Guardar' : 'Agregar')}
-        </Button>
-      </div>
     </div>
   );
-});
+    }
+  )
+);
