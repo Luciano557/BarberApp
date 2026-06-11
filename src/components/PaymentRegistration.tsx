@@ -723,7 +723,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
 
       if (result) {
-        const summaryLabel = hasService ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
+        const isServiceSale = !!service?.id;
+        const summaryLabel = isServiceSale ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
         toast({
           title: '✅ Cobro guardado correctamente',
           description: recargoTotal > 0
@@ -742,7 +743,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       setIsSubmitting(false);
       setPendingMpPayload(null);
     }
-  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, hasService, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
+  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
 
   const StepIcon = STEP_INFO[currentStep].icon;
 
