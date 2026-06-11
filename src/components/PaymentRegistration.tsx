@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2 } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -96,8 +96,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
 
   // MercadoPago terminal flow
   const { currentSucursal } = useSucursal();
-  const { isConnected: mpConnected, getDevicesForSucursal } = useMercadoPago();
+  const { isConnected: mpConnected, getDevicesForSucursal, connect: mpConnect } = useMercadoPago();
   const [mpDialogOpen, setMpDialogOpen] = useState(false);
+  const [mpConnectModalOpen, setMpConnectModalOpen] = useState(false);
   const [pendingMpPayload, setPendingMpPayload] = useState<{
     payments: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
     primaryMethod: PaymentMethod;
@@ -566,33 +567,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
         : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
 
-      // ── MercadoPago terminal intercept ───────────────────────────────────────
-      // When the payment includes MP AND the org has connected terminals for this sucursal,
-      // open the terminal dialog instead of submitting directly.
-      const isMpPayment =
-        primaryMethod === 'mercado_pago' ||
-        (splitMode && selectedDigitalMethod === 'mercado_pago');
-
-      if (isMpPayment && mpConnected && hasMpDevicesForSucursal) {
-        // Amount to charge on terminal = the MP portion (base + recargo)
-        const mpPaymentLine = payments.find((p) => p.method === 'mercado_pago');
-        const mpAmountPesos = mpPaymentLine ? mpPaymentLine.amount : totalACobrar;
-
-        setPendingMpPayload({
-          payments,
-          primaryMethod,
-          productosPayload,
-          finalBarberId,
-          finalBarberName,
-          mpAmountPesos,
-          mpDeviceId: null, // Will be resolved by the dialog
-        });
-        setMpDialogOpen(true);
-        setIsSubmitting(false);
-        return;
-      }
-      // ─────────────────────────────────────────────────────────────────────────
-
       const result = await onSubmit({
         barberId: finalBarberId,
         barberName: finalBarberName,
@@ -745,6 +719,63 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     }
   }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
 
+  // ── "Cobrar con Terminal" explicit handler ───────────────────────────────────
+  // Called only when the user explicitly clicks the terminal button.
+  const handleCobrarConTerminal = useCallback(() => {
+    if (!mpConnected) {
+      setMpConnectModalOpen(true);
+      return;
+    }
+
+    const isMpMethod =
+      paymentMethod === 'mercado_pago' ||
+      (splitMode && selectedDigitalMethod === 'mercado_pago');
+
+    if (!isMpMethod) return;
+
+    // Build payment lines (same logic as handleSubmit)
+    let payments: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
+    let primaryMethod: PaymentMethod;
+
+    if (splitMode && selectedDigitalMethod) {
+      const recE = Math.round((splitEfectivoNum * pctEfectivo) / 100);
+      const recD = Math.round((splitMpNum * pctDigital) / 100);
+      payments = [
+        { method: 'efectivo', basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
+        { method: selectedDigitalMethod, basePago: splitMpNum, recargoPct: pctDigital, recargoMonto: recD, amount: splitMpNum + recD },
+      ];
+      primaryMethod = splitEfectivoNum >= splitMpNum ? 'efectivo' : selectedDigitalMethod;
+    } else {
+      const recargoMonto = Math.round((total * pctSimple) / 100);
+      payments = [{ method: paymentMethod as PaymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
+      primaryMethod = paymentMethod as PaymentMethod;
+    }
+
+    const mpPaymentLine = payments.find((p) => p.method === 'mercado_pago');
+    const mpAmountPesos = mpPaymentLine ? mpPaymentLine.amount : totalACobrar;
+
+    const productosPayload: ProductoCartInput[] = cart.map(it => ({
+      producto_id: it.producto_id,
+      producto_sucursal_id: it.producto_sucursal_id,
+      producto_nombre: it.nombre,
+      marca_id: it.marca_id,
+      marca_nombre: it.marca_nombre,
+      precio_unitario: it.precio_unitario,
+      cantidad: it.cantidad,
+    }));
+
+    const hasServiceLocal = !!selectedService;
+    const finalBarberId = hasServiceLocal
+      ? (barber?.id || '')
+      : (productSaleAssignment === 'barber' ? (cartBarberId || '') : '');
+    const finalBarberName = hasServiceLocal
+      ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
+      : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
+
+    setPendingMpPayload({ payments, primaryMethod, productosPayload, finalBarberId, finalBarberName, mpAmountPesos, mpDeviceId: null });
+    setMpDialogOpen(true);
+  }, [mpConnected, paymentMethod, splitMode, selectedDigitalMethod, splitEfectivoNum, splitMpNum, pctEfectivo, pctDigital, pctSimple, total, totalACobrar, cart, selectedService, barber, productSaleAssignment, cartBarberId, cartBarberName]);
+
   const StepIcon = STEP_INFO[currentStep].icon;
 
   return (
@@ -763,6 +794,24 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           }}
         />
       )}
+
+      {/* Conectar MercadoPago modal */}
+      <AlertDialog open={mpConnectModalOpen} onOpenChange={setMpConnectModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Conectar MercadoPago</AlertDialogTitle>
+            <AlertDialogDescription>
+              Para cobrar con terminal necesitás conectar tu cuenta de MercadoPago. Vas a ser redirigido a MercadoPago para autorizar la conexión. ¿Querés hacerlo ahora?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Ahora no</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setMpConnectModalOpen(false); mpConnect(); }}>
+              Conectar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Header */}
       <div>
@@ -1459,6 +1508,19 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   <><Check className="h-5 w-5 mr-2" /> Registrar Cobro</>
                 )}
               </Button>
+
+              {/* Cobrar con Terminal — visible cuando el método incluye MP */}
+              {(paymentMethod === 'mercado_pago' || (splitMode && selectedDigitalMethod === 'mercado_pago')) && (
+                <Button
+                  variant="outline"
+                  onClick={handleCobrarConTerminal}
+                  className="w-full h-12 text-base gap-2"
+                  disabled={isSubmitting || (splitMode && !splitValid)}
+                >
+                  <MonitorSmartphone className="h-5 w-5" />
+                  Cobrar con Terminal
+                </Button>
+              )}
             </div>
           </div>
         )}

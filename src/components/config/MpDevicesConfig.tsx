@@ -1,5 +1,7 @@
-import { RefreshCw, Loader2, MonitorSmartphone, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import { RefreshCw, Loader2, MonitorSmartphone, Building2, Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -10,6 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { MpDevice } from '@/hooks/useMercadoPago';
 
 interface MpDevicesConfigProps {
@@ -18,6 +22,82 @@ interface MpDevicesConfigProps {
   onSync: () => void;
   onAssign: (mpDeviceId: string, sucursalId: string | null) => Promise<void>;
   canManage: boolean;
+}
+
+function DeviceNameEditor({
+  device,
+  canManage,
+}: {
+  device: MpDevice;
+  canManage: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(device.name || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('mp_devices')
+        .update({ name: trimmed })
+        .eq('id', device.id);
+      if (error) throw error;
+      toast.success('Nombre actualizado');
+      setEditing(false);
+    } catch {
+      toast.error('No se pudo guardar el nombre');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setValue(device.name || '');
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 flex-1 min-w-0">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
+          className="h-7 text-sm"
+          placeholder="Ej: Mostrador, Sala 2..."
+          autoFocus
+        />
+        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+        </Button>
+        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={handleCancel}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-1 min-w-0 group">
+      <div className="min-w-0">
+        <p className="text-sm font-medium truncate">{device.name || device.mp_device_id}</p>
+        <p className="text-xs text-muted-foreground truncate">{device.mp_device_id}</p>
+      </div>
+      {canManage && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => setEditing(true)}
+        >
+          <Pencil className="h-3 w-3" />
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function MpDevicesConfig({
@@ -39,7 +119,7 @@ export function MpDevicesConfig({
               Terminales Point
             </CardTitle>
             <CardDescription>
-              Asigná cada terminal a una sucursal para que el sistema sepa dónde enviar los cobros.
+              Asigná cada terminal a una sucursal. Pasá el cursor sobre el nombre para editarlo.
             </CardDescription>
           </div>
           {canManage && (
@@ -83,10 +163,7 @@ export function MpDevicesConfig({
               >
                 <MonitorSmartphone className="h-5 w-5 shrink-0 text-muted-foreground" />
 
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{device.name || device.mp_device_id}</p>
-                  <p className="text-xs text-muted-foreground truncate">{device.mp_device_id}</p>
-                </div>
+                <DeviceNameEditor device={device} canManage={canManage} />
 
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge variant="outline" className="text-xs hidden sm:flex">
@@ -131,3 +208,5 @@ export function MpDevicesConfig({
     </Card>
   );
 }
+
+
