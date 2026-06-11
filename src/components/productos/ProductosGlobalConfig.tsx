@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Save, X, Power, PowerOff, Search, Tag, Package } from 'lucide-react';
+import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto } from './types';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 /**
  * Configuración global del catálogo de productos.
@@ -48,6 +50,9 @@ export function ProductosGlobalConfig() {
 
   const [marcasDialogOpen, setMarcasDialogOpen] = useState(false);
   const [toggleConfirm, setToggleConfirm] = useState<{ producto: Producto; next: boolean } | null>(null);
+
+  const editingProducto = editingId ? (productos.find(p => p.id === editingId) ?? null) : null;
+  const editingIsActive = editingProducto?.activo ?? false;
 
   const fetchAll = useCallback(async () => {
     if (!orgId) return;
@@ -192,11 +197,11 @@ export function ProductosGlobalConfig() {
 
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">
-                Activos ({activeCount})
+              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Activos<TabBadge count={activeCount} />
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">
-                Inactivos ({inactiveCount})
+              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Inactivos<TabBadge count={inactiveCount} />
               </TabsTrigger>
             </TabsList>
 
@@ -214,35 +219,23 @@ export function ProductosGlobalConfig() {
                 return (
                   <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-foreground truncate">{p.nombre}</span>
-                        {marca && (
-                          <span
-                            className="text-xs px-2 py-0.5 rounded text-primary-foreground"
-                            style={{ backgroundColor: marca.color }}
-                          >
-                            {marca.nombre}
-                          </span>
-                        )}
-                      </div>
+                      <span className="font-medium text-foreground truncate">{p.nombre}</span>
                       {p.descripcion && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.descripcion}</p>
                       )}
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(p)} className="h-8 w-8">
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setToggleConfirm({ producto: p, next: !p.activo })}
-                      className="h-8 w-8"
-                      title={p.activo ? 'Desactivar' : 'Activar'}
-                    >
-                      {p.activo
-                        ? <PowerOff className="h-4 w-4 text-destructive" />
-                        : <Power className="h-4 w-4 text-success" />}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {marca && (
+                        <Badge variant="category">{marca.nombre}</Badge>
+                      )}
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+                        title="Opciones"
+                      >
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -251,67 +244,94 @@ export function ProductosGlobalConfig() {
         </CardContent>
       </Card>
 
-      {/* Form dialog */}
-      <Dialog open={showDialog} onOpenChange={(o) => { if (!o) { setShowDialog(false); setEditingId(null); setForm(emptyForm); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
-            <DialogDescription>
-              Datos generales del producto. El stock y los precios se configuran por sucursal.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-              <Input
-                value={form.nombre}
-                onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
-                placeholder="Ej: Cera mate 100ml"
-                maxLength={80}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Marca</label>
-              <div className="flex gap-2">
-                <Select
-                  value={form.marca_id || 'none'}
-                  onValueChange={(v) => setForm(p => ({ ...p, marca_id: v === 'none' ? '' : v }))}
+      <DrawerForm
+        open={showDialog}
+        onOpenChange={(o) => { if (!o) { setShowDialog(false); setEditingId(null); setForm(emptyForm); } }}
+        title={editingId ? 'Editar producto' : 'Nuevo producto'}
+        size="sm"
+        footer={
+          editingId ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: false }); }}
                 >
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin marca</SelectItem>
-                    {activeMarcas.map(m => (
-                      <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
-                  <Tag className="h-4 w-4" />
+                  Desactivar
                 </Button>
-              </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#166534] hover:bg-muted"
+                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: true }); }}
+                >
+                  Activar
+                </Button>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Descripción</label>
-              <Textarea
-                value={form.descripcion}
-                onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
-                placeholder="Detalles internos (opcional)"
-                rows={3}
-                maxLength={240}
-              />
-              <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/240</p>
+          ) : (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" disabled={saving} onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); }}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
+                {saving ? 'Guardando…' : 'Guardar'}
+              </Button>
+            </div>
+          )
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Datos generales del producto. El stock y los precios se configuran por sucursal.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <Input
+              value={form.nombre}
+              onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
+              placeholder="Ej: Cera mate 100ml"
+              maxLength={80}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Marca</label>
+            <div className="flex gap-2">
+              <Select
+                value={form.marca_id || 'none'}
+                onValueChange={(v) => setForm(p => ({ ...p, marca_id: v === 'none' ? '' : v }))}
+              >
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin marca</SelectItem>
+                  {activeMarcas.map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
+                <Tag className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowDialog(false)} disabled={saving}>
-              <X className="h-4 w-4 mr-1" /> Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
-              <Save className="h-4 w-4 mr-1" /> {saving ? 'Guardando…' : 'Guardar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Descripción</label>
+            <Textarea
+              value={form.descripcion}
+              onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
+              placeholder="Detalles internos (opcional)"
+              rows={3}
+              maxLength={240}
+            />
+            <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/240</p>
+          </div>
+        </div>
+      </DrawerForm>
 
       {/* Marcas manager */}
       <MarcasManagerDialog

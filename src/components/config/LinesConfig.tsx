@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Plus, Edit2, Save, X, PowerOff, Power, Trash2, Tag } from 'lucide-react';
+import { Plus, MoreVertical, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 const LINE_COLORS = [
   { label: 'Azul', value: '#3B82F6' },
@@ -42,6 +43,7 @@ function validateName(name: string): string | null {
 export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
@@ -50,15 +52,22 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
 
   const active = lines.filter(l => l.active);
   const inactive = lines.filter(l => !l.active);
+  const editingLine = editingId ? (lines.find(l => l.id === editingId) ?? null) : null;
+  const editingIsActive = editingLine?.active ?? false;
 
   const resetForm = () => { setName(''); setColor(''); };
 
   const handleAdd = async () => {
     const err = validateName(name);
     if (err) { toast.error(err); return; }
-    await onAdd({ name: name.trim(), active: true, color: color || undefined });
-    resetForm();
-    setIsAdding(false);
+    setIsSaving(true);
+    try {
+      await onAdd({ name: name.trim(), active: true, color: color || undefined });
+      resetForm();
+      setIsAdding(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleUpdate = (id: string) => {
@@ -103,61 +112,21 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
   );
 
   const renderLine = (line: Line) => {
-    const isEditing = editingId === line.id;
     return (
       <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-        {isEditing ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-2 items-center">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" className="flex-1" maxLength={80} />
-              <Button size="icon" onClick={() => handleUpdate(line.id)} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" onClick={() => { setEditingId(null); resetForm(); }}><X className="h-4 w-4" /></Button>
-            </div>
-            {ColorPicker}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            {line.color && (
-              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: line.color }} />
-            )}
-            <span className="flex-1 font-medium text-foreground">{line.name}</span>
-            <Button size="icon" variant="ghost" onClick={() => startEdit(line)} className="h-8 w-8" title="Editar">
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setToggleConfirm({ line, action: line.active ? 'deactivate' : 'activate' })}
-              className="h-8 w-8"
-              title={line.active ? 'Desactivar' : 'Activar'}
-            >
-              {line.active ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-            </Button>
-            {onDelete && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        disabled={line.active}
-                        onClick={() => !line.active && setDeleteConfirm(line)}
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                        title={line.active ? undefined : 'Eliminar'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {line.active && (
-                    <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {line.color && (
+            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: line.color }} />
+          )}
+          <span className="flex-1 font-medium text-foreground">{line.name}</span>
+          <button
+            onClick={() => startEdit(line)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
+          >
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
       </div>
     );
   };
@@ -176,7 +145,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
                 <CardDescription>Organizan el menú de cobro y facilitan la búsqueda de servicios.</CardDescription>
               </div>
             </div>
-            {!isAdding && activeSubTab === 'active' && (
+            {!isAdding && !editingId && activeSubTab === 'active' && (
               <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Agregar
               </Button>
@@ -186,20 +155,10 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
         <CardContent className="space-y-4">
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activas ({active.length})</TabsTrigger>
-              <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivas ({inactive.length})</TabsTrigger>
+              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">Activas<TabBadge count={active.length} /></TabsTrigger>
+              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">Inactivas<TabBadge count={inactive.length} /></TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="mt-4 space-y-2">
-              {isAdding && (
-                <div className="flex flex-col gap-3 p-3 bg-muted/30 border border-border rounded-lg animate-scale-in">
-                  <div className="flex gap-2 items-center">
-                    <Input placeholder="Nombre (ej: Essencial, Deluxe)" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" maxLength={80} />
-                    <Button size="icon" onClick={handleAdd} className="bg-success hover:bg-success/90"><Save className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}><X className="h-4 w-4" /></Button>
-                  </div>
-                  {ColorPicker}
-                </div>
-              )}
               {active.map(renderLine)}
               {active.length === 0 && !isAdding && (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
@@ -225,6 +184,90 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
           </Tabs>
         </CardContent>
       </Card>
+
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsAdding(false);
+            setEditingId(null);
+            resetForm();
+          }
+        }}
+        title={isAdding ? 'Agregar categoría' : 'Editar categoría'}
+        size="sm"
+        footer={
+          isAdding ? (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
+              <Button disabled={isSaving} onClick={handleAdd}>
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          ) : editingLine ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={() => handleUpdate(editingLine.id)}>
+                Guardar cambios
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setToggleConfirm({ line: editingLine, action: 'deactivate' });
+                    setEditingId(null); resetForm();
+                  }}
+                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                >
+                  Desactivar
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      onUpdate(editingLine.id, { active: true });
+                      toast.success('Línea activada');
+                      setEditingId(null); resetForm();
+                    }}
+                    className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  >
+                    Activar
+                  </Button>
+                  {onDelete && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setDeleteConfirm(editingLine);
+                        setEditingId(null); resetForm();
+                      }}
+                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    >
+                      Eliminar
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ej: Essencial, Deluxe"
+              maxLength={80}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Color (opcional)</label>
+            {ColorPicker}
+          </div>
+        </div>
+      </DrawerForm>
 
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
         <AlertDialogContent>

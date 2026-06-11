@@ -19,6 +19,9 @@ import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMercadoPago } from '@/hooks/useMercadoPago';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { MpTerminalPaymentDialog } from '@/components/MpTerminalPaymentDialog';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +51,8 @@ interface PaymentRegistrationProps {
     subtotal: number;
     total: number;
     productos?: ProductoCartInput[];
+    mpPaymentIntentId?: string | null;
+    mpDeviceId?: string | null;
   }) => Promise<any | null>;
 }
 
@@ -88,6 +93,24 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   // Asignación explícita de la venta de productos: pending | no_barber | barber
   type ProductSaleAssignment = 'pending' | 'no_barber' | 'barber';
   const [productSaleAssignment, setProductSaleAssignment] = useState<ProductSaleAssignment>('pending');
+
+  // MercadoPago terminal flow
+  const { currentSucursal } = useSucursal();
+  const { isConnected: mpConnected, getDevicesForSucursal } = useMercadoPago();
+  const [mpDialogOpen, setMpDialogOpen] = useState(false);
+  const [pendingMpPayload, setPendingMpPayload] = useState<{
+    payments: { method: PaymentMethod; amount: number; basePago: number; recargoPct: number; recargoMonto: number }[];
+    primaryMethod: PaymentMethod;
+    productosPayload: ProductoCartInput[];
+    finalBarberId: string;
+    finalBarberName: string;
+    mpAmountPesos: number;
+    mpDeviceId: string | null;
+  } | null>(null);
+
+  const hasMpDevicesForSucursal = currentSucursal
+    ? getDevicesForSucursal(currentSucursal.id).length > 0
+    : false;
   // Cancelar venta
   const [cancelOpen, setCancelOpen] = useState(false);
 
@@ -543,6 +566,33 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         ? (barber ? `${barber.firstName} ${barber.lastName}` : '')
         : (productSaleAssignment === 'barber' ? (cartBarberName || '') : '');
 
+      // ── MercadoPago terminal intercept ───────────────────────────────────────
+      // When the payment includes MP AND the org has connected terminals for this sucursal,
+      // open the terminal dialog instead of submitting directly.
+      const isMpPayment =
+        primaryMethod === 'mercado_pago' ||
+        (splitMode && selectedDigitalMethod === 'mercado_pago');
+
+      if (isMpPayment && mpConnected && hasMpDevicesForSucursal) {
+        // Amount to charge on terminal = the MP portion (base + recargo)
+        const mpPaymentLine = payments.find((p) => p.method === 'mercado_pago');
+        const mpAmountPesos = mpPaymentLine ? mpPaymentLine.amount : totalACobrar;
+
+        setPendingMpPayload({
+          payments,
+          primaryMethod,
+          productosPayload,
+          finalBarberId,
+          finalBarberName,
+          mpAmountPesos,
+          mpDeviceId: null, // Will be resolved by the dialog
+        });
+        setMpDialogOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       const result = await onSubmit({
         barberId: finalBarberId,
         barberName: finalBarberName,
@@ -638,10 +688,81 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
 
+  // ── MP Terminal confirmed callback ──────────────────────────────────────────
+  const handleMpTerminalConfirmed = useCallback(async (intentId: string) => {
+    if (!pendingMpPayload) return;
+    setMpDialogOpen(false);
+
+    const {
+      payments,
+      primaryMethod,
+      productosPayload,
+      finalBarberId,
+      finalBarberName,
+    } = pendingMpPayload;
+
+    // Determine device_id from the dialog (stored in selectedDevice inside dialog)
+    // We pass the intentId so addTransaction can store it on the venta row.
+    setIsSubmitting(true);
+    try {
+      const result = await onSubmit({
+        barberId: finalBarberId,
+        barberName: finalBarberName,
+        serviceId: service?.id || '',
+        serviceName: service?.name || '',
+        servicePrice: service?.price || 0,
+        extras: selectedExtrasData.map(e => ({ uid: e.id, name: e.name, price: e.price })),
+        discount: selectedDiscountData?.value || 0,
+        discountType: selectedDiscountData?.type || 'percentage',
+        paymentMethod: primaryMethod,
+        payments,
+        subtotal,
+        total,
+        productos: productosPayload,
+        mpPaymentIntentId: intentId,
+      });
+
+      if (result) {
+        const isServiceSale = !!service?.id;
+        const summaryLabel = isServiceSale ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
+        toast({
+          title: '✅ Cobro guardado correctamente',
+          description: recargoTotal > 0
+            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
+            : `$${total.toLocaleString()} - ${summaryLabel}`,
+        });
+        resetForm();
+      } else {
+        toast({
+          title: '❌ No se pudo guardar el cobro',
+          description: 'El pago fue aprobado en la terminal pero falló al registrarse. Anotalo manualmente.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+      setPendingMpPayload(null);
+    }
+  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
+
   const StepIcon = STEP_INFO[currentStep].icon;
 
   return (
     <div className="space-y-6 animate-fade-in sm:space-y-8">
+
+      {/* MP Terminal Payment Dialog */}
+      {pendingMpPayload && (
+        <MpTerminalPaymentDialog
+          open={mpDialogOpen}
+          amountPesos={pendingMpPayload.mpAmountPesos}
+          description={service?.name || `${cart.length} producto(s)`}
+          onSuccess={handleMpTerminalConfirmed}
+          onCancel={() => {
+            setMpDialogOpen(false);
+            setPendingMpPayload(null);
+          }}
+        />
+      )}
 
       {/* Header */}
       <div>

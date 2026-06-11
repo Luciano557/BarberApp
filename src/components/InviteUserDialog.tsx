@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { z } from 'zod';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, UserPlus, Loader2, Check, Copy, Eye, EyeOff } from 'lucide-react';
+import { Mail, Loader2, Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
 import { Sucursal } from '@/contexts/SucursalContext';
+import { DrawerForm } from '@/components/ui/drawer-form';
 
 const inviteSchema = z.object({
   email: z.string().trim().email({ message: "Email inválido" }).max(255),
@@ -34,9 +34,9 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [selectedSucursalId, setSelectedSucursalId] = useState('');
-  
+
   const barberFullName = barber ? `${barber.firstName} ${barber.lastName}`.trim() : '';
-  
+
   const [formData, setFormData] = useState({
     email: '',
     fullName: barberFullName,
@@ -109,7 +109,7 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      
+
       const response = await supabase.functions.invoke('invite-user', {
         body: {
           email: formData.email.trim(),
@@ -190,99 +190,108 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
     }
   };
 
-  // Show success screen with credentials
-  if (createdCredentials) {
-    return (
-      <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-status-success-foreground">
-              <Check className="w-5 h-5" /> ¡Usuario creado!
-            </DialogTitle>
-            <DialogDescription>
-              Compartí estas credenciales con {formData.fullName || 'el usuario'}. Deberá cambiar la contraseña en su primer inicio de sesión.
-            </DialogDescription>
-          </DialogHeader>
+  return (
+    <DrawerForm
+      open={open}
+      onOpenChange={handleClose}
+      title="Invitar usuario"
+      size="md"
+      footer={
+        createdCredentials ? (
+          <div className="flex w-full justify-end">
+            <Button onClick={handleClose}>Cerrar</Button>
+          </div>
+        ) : (
+          <div className="flex w-full justify-between">
+            <Button type="button" variant="ghost" onClick={handleClose} disabled={isLoading}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="invite-form" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Enviar invitación
+                </>
+              )}
+            </Button>
+          </div>
+        )
+      }
+    >
+      {createdCredentials ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-status-success-foreground">
+            <Check className="w-5 h-5" />
+            <span className="text-lg font-semibold">¡Usuario creado!</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Compartí estas credenciales con {formData.fullName || 'el usuario'}. Deberá cambiar la contraseña en su primer inicio de sesión.
+          </p>
 
-          <div className="space-y-4 py-4">
-            <div className="bg-muted rounded-lg p-4 space-y-4">
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase">Email</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm truncate">
-                    {createdCredentials.email}
-                  </code>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={copyEmail}
-                    title="Copiar email"
-                  >
-                    {copiedEmail ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase">Contraseña temporal</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm">
-                    {showPassword ? createdCredentials.password : '••••••••••'}
-                  </code>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowPassword(!showPassword)}
-                    title={showPassword ? "Ocultar" : "Mostrar"}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={copyPassword}
-                    title="Copiar contraseña"
-                  >
-                    {copiedPassword ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
+          <div className="bg-muted rounded-lg p-4 space-y-4">
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase">Email</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm truncate">
+                  {createdCredentials.email}
+                </code>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyEmail}
+                  title="Copiar email"
+                >
+                  {copiedEmail ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
+                </Button>
               </div>
             </div>
-
-            <div className="bg-status-warning-bg border border-status-warning rounded-lg p-3 text-sm text-status-warning-foreground">
-              ⚠️ <strong>Importante:</strong> Esta contraseña solo se muestra una vez. Asegurate de compartirla de forma segura.
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase">Contraseña temporal</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-1 bg-background px-3 py-2 rounded border font-mono text-sm">
+                  {showPassword ? createdCredentials.password : '••••••••••'}
+                </code>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? "Ocultar" : "Mostrar"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyPassword}
+                  title="Copiar contraseña"
+                >
+                  {copiedPassword ? <Check className="w-4 h-4 text-status-success-foreground" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button onClick={handleClose}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5" />
-            Invitar Usuario
-          </DialogTitle>
-          <DialogDescription>
-            {barber 
+          <div className="bg-status-warning-bg border border-status-warning rounded-lg p-3 text-sm text-status-warning-foreground">
+            ⚠️ <strong>Importante:</strong> Esta contraseña solo se muestra una vez. Asegurate de compartirla de forma segura.
+          </div>
+        </div>
+      ) : (
+        <form id="invite-form" onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {barber
               ? `Enviar invitación a ${barber.firstName} ${barber.lastName} para que acceda al sistema`
               : 'Envía una invitación por email con credenciales de acceso'
             }
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="invite-email">Email</Label>
             <div className="relative">
@@ -315,8 +324,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
 
           <div className="space-y-2">
             <Label htmlFor="invite-role">Rol</Label>
-            <Select 
-              value={formData.role} 
+            <Select
+              value={formData.role}
               onValueChange={(value: 'barber' | 'manager' | 'general_manager') => {
                 setFormData(prev => ({ ...prev, role: value }));
                 if (value !== 'manager') setSelectedSucursalId('');
@@ -359,27 +368,8 @@ export function InviteUserDialog({ open, onOpenChange, barber, sucursales = [], 
               <li>Instrucciones para cambiar la contraseña</li>
             </ul>
           </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Enviar invitación
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      )}
+    </DrawerForm>
   );
 }

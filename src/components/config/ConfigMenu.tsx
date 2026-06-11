@@ -1,8 +1,8 @@
-import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles, Bell } from 'lucide-react';
+import { Shield, ChevronRight, ClipboardList, Crown, Wallet, Sparkles, Bell, MonitorSmartphone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 
-type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'notificaciones' | 'mi-cuenta';
+type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'mercadopago' | 'notificaciones' | 'mi-cuenta';
 
 interface ConfigMenuItem {
   id: ConfigSection;
@@ -32,6 +32,12 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
       icon: <Wallet className="h-5 w-5" />,
       title: 'Métodos de pago y recargos',
       description: 'Configuración general del negocio',
+    },
+    {
+      id: 'mercadopago',
+      icon: <MonitorSmartphone className="h-5 w-5" />,
+      title: 'MercadoPago Point',
+      description: 'Conectar cuenta y gestionar terminales Point',
     },
     {
       id: 'pin',

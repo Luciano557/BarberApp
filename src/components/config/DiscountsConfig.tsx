@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Edit2, Save, X, Power, PowerOff, Trash2, BadgePercent } from 'lucide-react';
+import { Plus, MoreVertical, BadgePercent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 function validateDiscountName(name: string): string | null {
   const trimmed = name.trim();
@@ -70,6 +71,7 @@ export function DiscountsConfig({
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Discount | null>(null);
+  const [deactivateConfirm, setDeactivateConfirm] = useState<Discount | null>(null);
 
   // Form state
   const [newLabel, setNewLabel] = useState('');
@@ -138,6 +140,13 @@ export function DiscountsConfig({
     setDeleteConfirm(null);
   };
 
+  const handleConfirmDeactivate = () => {
+    if (!deactivateConfirm || !onToggleActive) return;
+    onToggleActive(deactivateConfirm.id, false);
+    toast.success('Descuento desactivado');
+    setDeactivateConfirm(null);
+  };
+
   const startEdit = (d: Discount) => {
     setIsAdding(false);
     setEditingId(d.id);
@@ -150,23 +159,6 @@ export function DiscountsConfig({
     setNewAppliesTo(d.appliesTo || 'servicios');
   };
 
-  const getPaymentMethodLabel = (method: string) => {
-    switch (method) {
-      case 'efectivo': return 'Solo Efectivo';
-      case 'mercado_pago': return 'Solo QR';
-      default: return 'Todos';
-    }
-  };
-
-  const getRoundingLabel = (rounding: string, unit?: number) => {
-    const unitLabel = unit && unit !== 1 ? ` (×${unit})` : '';
-    switch (rounding) {
-      case 'negocio': return `↑ Negocio${unitLabel}`;
-      case 'matematico': return `≈ Matemático${unitLabel}`;
-      default: return `↓ Cliente${unitLabel}`;
-    }
-  };
-
   const filtered = useMemo(() => {
     if (typeFilter === 'todos') return discounts;
     return discounts.filter(d => (d.appliesTo || 'servicios') === typeFilter);
@@ -175,9 +167,12 @@ export function DiscountsConfig({
   const flagFor = (d: Discount) => isGlobal ? (d.globalActive ?? d.active) : d.active;
   const activos = filtered.filter(d => flagFor(d));
   const inactivos = filtered.filter(d => !flagFor(d));
+  const editingDiscount = editingId ? (discounts.find(d => d.id === editingId) ?? null) : null;
+  const editingIsActive = editingDiscount ? flagFor(editingDiscount) : false;
+  const canToggle = !!onToggleActive && !(!isGlobal && editingDiscount?.globalActive === false);
 
-  const Form = ({ isEdit = false, id = '' }: { isEdit?: boolean; id?: string }) => (
-    <div className="space-y-4 p-4 bg-muted rounded-lg animate-scale-in">
+  const Form = () => (
+    <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Nombre</label>
@@ -260,116 +255,41 @@ export function DiscountsConfig({
           </Select>
         </div>
       </div>
-      <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full sm:w-auto"
-          onClick={() => { if (isEdit) setEditingId(null); else setIsAdding(false); resetForm(); }}
-        >
-          <X className="h-4 w-4 mr-1" /> Cancelar
-        </Button>
-        <Button size="sm" onClick={() => isEdit ? handleUpdate(id) : handleAdd()} className="w-full bg-success hover:bg-success/90 sm:w-auto">
-          <Save className="h-4 w-4 mr-1" /> {isEdit ? 'Guardar' : 'Agregar'}
-        </Button>
-      </div>
     </div>
   );
 
-  const renderRow = (d: Discount) => (
-    <div key={d.id} className="animate-item-in">
-      {editingId === d.id ? (
-        <Form isEdit id={d.id} />
-      ) : (
+  const renderRow = (d: Discount) => {
+    const appliesTo = d.appliesTo || 'servicios';
+    const categoryLabel = appliesTo === 'productos' ? 'Productos' : 'Servicios';
+    const categoryClass = appliesTo === 'productos'
+      ? 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
+      : 'bg-[#EEF2FF] text-[#3730A3] border border-[#C7D2FE]';
+    const valueLabel = d.type === 'fixed'
+      ? `$${d.value.toLocaleString('es-AR')}`
+      : `${d.value}%`;
+    return (
+      <div key={d.id} className="animate-item-in">
         <div className="flex flex-col gap-3 rounded-lg bg-muted/50 p-3 transition-colors hover:bg-muted sm:flex-row sm:items-center">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-foreground">{d.label}</span>
-              <span className="text-sm px-2 py-0.5 rounded bg-primary/10 text-primary">
-                {d.type === 'fixed' ? `$${d.value.toLocaleString('es-AR')}` : `${d.value}%`}
-              </span>
-              <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-                {(d.appliesTo || 'servicios') === 'productos' ? 'Productos' : 'Servicios'}
-              </span>
-              {d.type === 'percentage' && (
-                <span className="text-xs px-2 py-0.5 rounded bg-secondary text-secondary-foreground">
-                  {getRoundingLabel(d.rounding, d.roundingUnit)}
-                </span>
-              )}
-              {d.paymentMethod !== 'todos' && (
-                <span className="text-xs px-2 py-0.5 rounded bg-accent text-accent-foreground">
-                  {getPaymentMethodLabel(d.paymentMethod)}
-                </span>
-              )}
-              {!d.active && (
-                <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                  Inactivo
-                </span>
-              )}
-              {!isGlobal && d.globalActive === false && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  Inactivo globalmente
-                </Badge>
-              )}
-            </div>
+            <span className="font-medium text-foreground">{d.label}</span>
           </div>
-          <div className="flex items-center justify-end gap-1 sm:justify-start">
-            <Button size="icon" variant="ghost" onClick={() => startEdit(d)} className="h-8 w-8" title="Editar">
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            {onToggleActive && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          if (!isGlobal && d.globalActive === false) return;
-                          const nextActive = !flagFor(d);
-                          onToggleActive(d.id, nextActive);
-                          toast.success(nextActive ? 'Descuento activado' : 'Descuento desactivado');
-                        }}
-                        disabled={!isGlobal && d.globalActive === false}
-                        className="h-8 w-8"
-                      >
-                        {flagFor(d) ? <PowerOff className="h-4 w-4 text-destructive" /> : <Power className="h-4 w-4 text-success" />}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!isGlobal && d.globalActive === false && (
-                    <TooltipContent>Este descuento está desactivado globalmente. Activalo desde la vista General para poder usarlo acá.</TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={flagFor(d)}
-                      onClick={() => !flagFor(d) && setDeleteConfirm(d)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive disabled:opacity-40"
-                      title={flagFor(d) ? undefined : 'Eliminar'}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                {flagFor(d) && (
-                  <TooltipContent>Para eliminar este elemento, primero debes desactivarlo.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Badge variant="category" className={categoryClass}>{categoryLabel}</Badge>
+            <Badge variant="category">{valueLabel}</Badge>
+          </div>
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => startEdit(d)}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+              title="Opciones"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
 
   return (
     <Card className="border border-border bg-card">
@@ -400,11 +320,11 @@ export function DiscountsConfig({
       <CardContent className="space-y-4">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}>
           <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-            <TabsTrigger value="activos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Activos ({activos.length})
+            <TabsTrigger value="activos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Activos<TabBadge count={activos.length} />
             </TabsTrigger>
-            <TabsTrigger value="inactivos" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Inactivos ({inactivos.length})
+            <TabsTrigger value="inactivos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+              Inactivos<TabBadge count={inactivos.length} />
             </TabsTrigger>
           </TabsList>
 
@@ -428,8 +348,6 @@ export function DiscountsConfig({
                 </button>
               ))}
             </div>
-
-            {isAdding && <Form />}
 
             {activos.length === 0 && inactivos.length === 0 && !isAdding ? (
               <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center">
@@ -489,6 +407,75 @@ export function DiscountsConfig({
         </Tabs>
       </CardContent>
 
+      <DrawerForm
+        open={isAdding || editingId !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsAdding(false);
+            setEditingId(null);
+            resetForm();
+          }
+        }}
+        title={isAdding ? 'Agregar descuento' : 'Editar descuento'}
+        size="sm"
+        footer={
+          isAdding ? (
+            <div className="flex w-full justify-between">
+              <Button variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
+              <Button onClick={handleAdd}>Guardar</Button>
+            </div>
+          ) : editingDiscount ? (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button onClick={() => handleUpdate(editingDiscount.id)}>
+                Guardar cambios
+              </Button>
+              <div className="w-px h-5 bg-border" />
+              {canToggle && editingIsActive ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setDeactivateConfirm(editingDiscount);
+                    setEditingId(null);
+                    resetForm();
+                  }}
+                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                >
+                  Desactivar
+                </Button>
+              ) : canToggle ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      onToggleActive!(editingDiscount.id, true);
+                      toast.success('Descuento activado');
+                      setEditingId(null);
+                      resetForm();
+                    }}
+                    className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  >
+                    Activar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setDeleteConfirm(editingDiscount);
+                      setEditingId(null);
+                      resetForm();
+                    }}
+                    className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                  >
+                    Eliminar
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          ) : null
+        }
+      >
+        <Form />
+      </DrawerForm>
+
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -501,6 +488,23 @@ export function DiscountsConfig({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deactivateConfirm} onOpenChange={(open) => !open && setDeactivateConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desactivar descuento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este descuento dejará de estar disponible. Podés volver a activarlo cuando quieras.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeactivate} className="bg-amber-500 text-white hover:bg-amber-600">
+              Desactivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

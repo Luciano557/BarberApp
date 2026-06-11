@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Lock, Eye, EyeOff, Loader2, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -15,8 +14,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 
 interface StaffPinDialogProps {
   open: boolean;
@@ -27,13 +26,13 @@ interface StaffPinDialogProps {
   onPinUpdated: () => void;
 }
 
-export function StaffPinDialog({ 
-  open, 
-  onOpenChange, 
-  barberId, 
-  barberName, 
+export function StaffPinDialog({
+  open,
+  onOpenChange,
+  barberId,
+  barberName,
   hasPin,
-  onPinUpdated 
+  onPinUpdated
 }: StaffPinDialogProps) {
   const [currentPin, setCurrentPin] = useState('');
   const [showCurrentPin, setShowCurrentPin] = useState(false);
@@ -43,6 +42,7 @@ export function StaffPinDialog({
   const [showConfirmPin, setShowConfirmPin] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [alertOpen, setAlertOpen] = useState(false);
 
   const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>, setter: (value: string) => void) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -131,19 +131,52 @@ export function StaffPinDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
-            <DialogTitle>PIN de Seguridad</DialogTitle>
+    <>
+      <DrawerForm
+        open={open}
+        onOpenChange={handleClose}
+        title={hasPin ? 'Cambiar PIN' : 'Configurar PIN'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            {hasPin ? (
+              <Button
+                variant="destructive"
+                type="button"
+                disabled={isDeleting || currentPin.length < 4}
+                onClick={() => setAlertOpen(true)}
+              >
+                {isDeleting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Eliminando...</>
+                ) : (
+                  <><Trash2 className="mr-2 h-4 w-4" />Eliminar PIN</>
+                )}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <Button variant="ghost" type="button" onClick={handleClose}>Cancelar</Button>
+              <Button
+                type="submit"
+                form="pin-form"
+                disabled={pin.length < 4 || pin !== confirmPin || isSaving || (hasPin && currentPin.length < 4)}
+              >
+                {isSaving ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
+            </div>
           </div>
-          <DialogDescription>
+        }
+      >
+        <form id="pin-form" onSubmit={handleSubmit} className="space-y-4 mt-2" autoComplete="off">
+          <p className="text-sm text-muted-foreground mb-4">
             Configurar PIN para <strong>{barberName}</strong>. Este PIN permite acceder a las secciones Resumen y Sueldos.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2" autoComplete="off">
           {hasPin && (
             <div className="space-y-2">
               <Label htmlFor="staff-current-pin">PIN actual</Label>
@@ -261,56 +294,23 @@ export function StaffPinDialog({
           {pin && confirmPin && pin !== confirmPin && (
             <p className="text-sm text-destructive">Los PINs no coinciden</p>
           )}
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            {hasPin && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" type="button" disabled={isDeleting || currentPin.length < 4} className="mr-auto">
-                    {isDeleting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Eliminar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Eliminar PIN?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {barberName} ya no podrá acceder a las secciones protegidas.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete}>
-                      Eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            
-            <Button 
-              type="submit" 
-              disabled={pin.length < 4 || pin !== confirmPin || isSaving || (hasPin && currentPin.length < 4)}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Lock className="mr-2 h-4 w-4" />
-                  {hasPin ? 'Cambiar PIN' : 'Configurar PIN'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DrawerForm>
+
+      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar PIN?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {barberName} ya no podrá acceder a las secciones protegidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

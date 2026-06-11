@@ -13,6 +13,7 @@ import { ProductoDialog } from './ProductoDialog';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
 import { StockMovementDialog } from './StockMovementDialog';
 import { StockHistoryDialog } from './StockHistoryDialog';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface ProductosConfigProps {
   sucursalId: string;
@@ -89,6 +90,17 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   const activeCount = items.filter(it => it.sucursal?.activo === true).length;
   const inactiveCount = items.length - activeCount;
 
+  const handleDeleteProductoSucursal = async (item: ProductoConSucursal) => {
+    if (!item.sucursal) return;
+    const { error } = await supabase
+      .from('productos_sucursal')
+      .delete()
+      .eq('id', item.sucursal.id);
+    if (error) { toast.error('No se pudo eliminar la configuración'); return; }
+    toast.success('Configuración de sucursal eliminada');
+    await fetchAll();
+  };
+
   const handleToggleActiveSucursal = async (item: ProductoConSucursal, nextActive: boolean) => {
     if (!orgId) return;
     if (item.sucursal) {
@@ -155,11 +167,11 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
 
           <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos ({activeCount})
+              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Activos<TabBadge count={activeCount} />
               </TabsTrigger>
-              <TabsTrigger value="inactive" className="min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos ({inactiveCount})
+              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
+                Inactivos<TabBadge count={inactiveCount} />
               </TabsTrigger>
             </TabsList>
 
@@ -187,6 +199,7 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
                     onAgregarStock={() => setStockDialog({ open: true, producto: item, tipo: 'reposicion' })}
                     onAjustarStock={() => setStockDialog({ open: true, producto: item, tipo: 'ajuste_manual' })}
                     onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
+                    onDelete={() => handleDeleteProductoSucursal(item)}
                   />
                 ))
               )}

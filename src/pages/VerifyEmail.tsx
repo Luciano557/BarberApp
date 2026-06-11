@@ -131,7 +131,7 @@ export default function VerifyEmail() {
         }
         .primary-btn {
           width: 100%; height: 44px;
-          background: #1e2a4a; color: #fff;
+          background: hsl(var(--primary)); color: #fff;
           border: none; border-radius: 10px;
           font-size: 14px; font-weight: 500; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -141,7 +141,7 @@ export default function VerifyEmail() {
         .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .secondary-btn {
           width: 100%; height: 42px;
-          background: #fff; color: #1e2a4a;
+          background: #fff; color: hsl(var(--primary));
           border: 1px solid #e2e8f0; border-radius: 10px;
           font-size: 13px; font-weight: 500; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -162,7 +162,7 @@ export default function VerifyEmail() {
       {/* Left panel — branding */}
       <div
         className="hidden lg:flex flex-col justify-between w-[480px] flex-shrink-0 p-10"
-        style={{ background: '#1e2a4a' }}
+        style={{ background: 'hsl(var(--primary))' }}
       >
         <Link to="/" className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
@@ -191,7 +191,7 @@ export default function VerifyEmail() {
       <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 lg:p-6">
         <div className="w-full max-w-sm animate-in text-center sm:max-w-md">
           <div className="icon-circle">
-            <MailCheck size={28} style={{ color: '#1e2a4a' }} />
+            <MailCheck size={28} style={{ color: 'hsl(var(--primary))' }} />
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-2">

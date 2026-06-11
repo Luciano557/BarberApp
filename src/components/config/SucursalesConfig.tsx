@@ -12,7 +12,8 @@ import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -419,40 +420,49 @@ export function SucursalesConfig() {
         ))}
       </div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingSucursal ? 'Editar sucursal' : 'Nueva sucursal'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input value={formData.nombre} onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" />
-            </div>
-            <div className="space-y-2">
-              <Label>Dirección</Label>
-              <Input value={formData.direccion} onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" />
-            </div>
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <PhoneInput
-                value={phoneOut?.e164 ?? (formData.telefono || null)}
-                onChange={(o) => { setPhoneOut(o); setFormData(prev => ({ ...prev, telefono: o.e164 ?? '' })); }}
-                defaultCountry="AR"
-                allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-                mode="any"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowDialog(false)}>Cancelar</Button>
+      <DrawerForm
+        open={showDialog}
+        onOpenChange={(o) => {
+          if (!o) {
+            setShowDialog(false);
+            setFormData({ nombre: '', direccion: '', telefono: '' });
+            setPhoneOut(null);
+          }
+        }}
+        title={editingSucursal ? 'Editar sucursal' : 'Nueva sucursal'}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" disabled={isSaving} onClick={() => { setShowDialog(false); setFormData({ nombre: '', direccion: '', telefono: '' }); setPhoneOut(null); }}>
+              Cancelar
+            </Button>
             <Button onClick={handleSave} disabled={isSaving || !formData.nombre.trim()}>
               {isSaving ? 'Guardando...' : 'Guardar'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nombre</Label>
+            <Input value={formData.nombre} onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" />
+          </div>
+          <div className="space-y-2">
+            <Label>Dirección</Label>
+            <Input value={formData.direccion} onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" />
+          </div>
+          <div className="space-y-2">
+            <Label>Teléfono</Label>
+            <PhoneInput
+              value={phoneOut?.e164 ?? (formData.telefono || null)}
+              onChange={(o) => { setPhoneOut(o); setFormData(prev => ({ ...prev, telefono: o.e164 ?? '' })); }}
+              defaultCountry="AR"
+              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+              mode="any"
+            />
+          </div>
+        </div>
+      </DrawerForm>
 
       {/* Users & Roles Dialog */}
       <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>

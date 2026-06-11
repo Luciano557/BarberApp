@@ -148,7 +148,7 @@ export default function AuthCallback() {
         {status === 'loading' && (
           <>
             <div className="flex justify-center mb-5">
-              <Loader2 size={36} className="animate-spin" style={{ color: '#1e2a4a' }} />
+              <Loader2 size={36} className="animate-spin" style={{ color: 'hsl(var(--primary))' }} />
             </div>
             <h1 className="text-lg font-semibold text-slate-900 mb-1">
               Verificando tu cuenta...
@@ -182,7 +182,7 @@ export default function AuthCallback() {
               <button
                 onClick={() => navigate('/verify-email', { replace: true })}
                 className="w-full h-11 rounded-[10px] text-white text-sm font-medium"
-                style={{ background: '#1e2a4a' }}
+                style={{ background: 'hsl(var(--primary))' }}
               >
                 Solicitar nuevo email
               </button>
@@ -215,7 +215,7 @@ export default function AuthCallback() {
             <button
               onClick={() => navigate('/login', { replace: true })}
               className="w-full h-11 rounded-[10px] text-white text-sm font-medium"
-              style={{ background: '#1e2a4a' }}
+              style={{ background: 'hsl(var(--primary))' }}
             >
               Ir al login
             </button>

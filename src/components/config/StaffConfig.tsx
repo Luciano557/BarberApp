@@ -10,6 +10,7 @@ import { Barber } from '@/types/barbershop';
 import { InviteUserDialog } from '@/components/InviteUserDialog';
 import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { TabBadge } from '@/components/ui/TabBadge';
 
 interface StaffConfigProps {
   barbers: Barber[];
@@ -193,8 +194,8 @@ export function StaffConfig({ barbers, onAdd, onUpdate }: StaffConfigProps) {
       <CardContent className="space-y-4">
         <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
           <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-            <TabsTrigger value="active" className="flex-1 text-xs data-[state=active]:bg-card">Activos ({activeBarbers.length})</TabsTrigger>
-            <TabsTrigger value="inactive" className="flex-1 text-xs data-[state=active]:bg-card">Inactivos ({inactiveBarbers.length})</TabsTrigger>
+            <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeBarbers.length} /></TabsTrigger>
+            <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">Inactivos<TabBadge count={inactiveBarbers.length} /></TabsTrigger>
           </TabsList>
           <TabsContent value="active" className="mt-4 space-y-3">
             {isAdding && (

@@ -399,7 +399,7 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
           <Button onClick={handleSave} disabled={!canSave}>
-            {saving ? 'Guardando...' : (isNew ? 'Crear producto' : 'Guardar cambios')}
+            {saving ? 'Guardando...' : 'Guardar'}
           </Button>
         </DialogFooter>
       </DialogContent>

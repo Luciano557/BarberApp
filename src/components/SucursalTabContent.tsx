@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Phone, Edit2, Save, X, Building2, Power, AlertTriangle, KeyRound, Info } from 'lucide-react';
+import { MapPin, Phone, Edit2, Building2, Power, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { CuentaSucursalBlock } from '@/components/config/CuentaSucursalBlock';
 import { useSucursal } from '@/contexts/SucursalContext';
 import {
@@ -208,8 +209,8 @@ export function SucursalTabContent({
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
       {/* Banner contextual de la vista Sucursal */}
-      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 mb-2">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary mb-2">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/70" />
         <p>
           En esta sección configurás todo lo que aplica específicamente a esta sucursal: precios, stock, disponibilidad del equipo y métodos de pago. El catálogo base, los cargos y la compensación se definen desde la vista General.
         </p>
@@ -331,46 +332,21 @@ export function SucursalTabContent({
             </div>
           </CardHeader>
           <CardContent>
-            {isEditingInfo ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre</Label>
-                  <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Dirección</Label>
-                  <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
-                </div>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button variant="ghost" size="sm" className="w-full sm:w-auto" onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }} disabled={isSavingInfo}>
-                    <X className="h-4 w-4 mr-1" /> Cancelar
-                  </Button>
-                  <Button size="sm" className="w-full sm:w-auto" onClick={handleSaveInfo} disabled={isSavingInfo || !infoForm.nombre.trim()}>
-                    <Save className="h-4 w-4 mr-1" /> {isSavingInfo ? 'Guardando...' : 'Guardar'}
-                  </Button>
-                </div>
+            <div className="space-y-2">
+              <div>
+                <Badge key={String(sucursal.activa)} variant={sucursal.activa ? 'default' : 'secondary'} className="animate-pop-in">
+                  {sucursal.activa ? 'Activa' : 'Inactiva'}
+                </Badge>
               </div>
-            ) : (
-              <div className="space-y-2">
-                <div>
-                  <Badge key={String(sucursal.activa)} variant={sucursal.activa ? 'default' : 'secondary'} className="animate-pop-in">
-                    {sucursal.activa ? 'Activa' : 'Inactiva'}
-                  </Badge>
-                </div>
-                <div className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
-                </div>
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
               </div>
-            )}
+              <div className="flex items-start gap-2">
+                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -447,6 +423,50 @@ export function SucursalTabContent({
         </div>
 
       </div>
+
+      <DrawerForm
+        open={isEditingInfo}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsEditingInfo(false);
+            setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' });
+          }
+        }}
+        title="Editar información"
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button
+              variant="ghost"
+              disabled={isSavingInfo}
+              onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={isSavingInfo || !infoForm.nombre.trim()}
+              onClick={handleSaveInfo}
+            >
+              {isSavingInfo ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Nombre</Label>
+            <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
+          </div>
+          <div className="space-y-2">
+            <Label>Dirección</Label>
+            <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
+          </div>
+          <div className="space-y-2">
+            <Label>Teléfono</Label>
+            <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+          </div>
+        </div>
+      </DrawerForm>
 
       <Sheet open={cuentaOpen} onOpenChange={setCuentaOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
