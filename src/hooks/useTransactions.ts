@@ -21,6 +21,9 @@ interface VentaInsert {
   organization_id: string;
   sucursal_id?: string | null;
   tipo_venta: 'servicio' | 'productos' | 'mixta';
+  mp_payment_intent_id?: string | null;
+  mp_device_id?: string | null;
+  mp_status?: string | null;
 }
 
 export interface ProductoCartInput {
@@ -200,7 +203,11 @@ export function useTransactions() {
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
   const addTransaction = useCallback(async (
-    transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & { productos?: ProductoCartInput[] }
+    transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & {
+      productos?: ProductoCartInput[];
+      mpPaymentIntentId?: string | null;
+      mpDeviceId?: string | null;
+    }
   ) => {
     if (!organization) {
       toast.error('No se encontró la organización');
@@ -290,6 +297,9 @@ export function useTransactions() {
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       tipo_venta: tipoVenta,
+      mp_payment_intent_id: transaction.mpPaymentIntentId ?? null,
+      mp_device_id: transaction.mpDeviceId ?? null,
+      mp_status: transaction.mpPaymentIntentId ? 'approved' : null,
     };
 
     const { data: venta, error: ventaError } = await supabase
