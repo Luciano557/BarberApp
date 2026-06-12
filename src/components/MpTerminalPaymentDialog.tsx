@@ -95,15 +95,14 @@ export function MpTerminalPaymentDialog({
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
 
-  const sucursalDevices: MpDevice[] = currentSucursal
-    ? getDevicesForSucursal(currentSucursal.id)
-    : [];
-
   // Only PDV + active terminals can receive payment intents through the API.
   const payableDevices = useMemo(
     () => devices.filter((device) => device.activo && device.operating_mode === 'PDV'),
     [devices],
   );
+  const sucursalDevices: MpDevice[] = currentSucursal
+    ? getDevicesForSucursal(currentSucursal.id).filter((device) => device.operating_mode === 'PDV')
+    : [];
   const displayDevices = sucursalDevices.length > 0 ? sucursalDevices : payableDevices;
   const showsSucursalFallback = sucursalDevices.length === 0 && payableDevices.length > 0;
 
