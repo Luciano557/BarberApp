@@ -9,7 +9,14 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getAccessToken, mpFetch, corsHeaders, jsonResponse } from '../_shared/mp-client.ts';
+import {
+  getAccessToken,
+  mpErrorMessage,
+  mpFetch,
+  readMpError,
+  corsHeaders,
+  jsonResponse,
+} from '../_shared/mp-client.ts';
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -57,28 +64,48 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'MercadoPago no está conectado para esta organización' }, 404);
     }
 
-    // Fetch devices from MP API
-    const mpRes = await mpFetch('/point/integration-api/devices', accessToken);
+    // Orders API terminal listing.
+    const mpRes = await mpFetch('/terminals/v1/list', accessToken);
 
     if (!mpRes.ok) {
-      const body = await mpRes.text();
-      console.error('[mp-list-devices] MP API error:', mpRes.status, body);
-      return jsonResponse({ error: 'Error al obtener terminales de MercadoPago' }, 502);
+      const mpError = await readMpError(mpRes);
+      console.error('[mp-list-devices] MP API error:', mpRes.status, mpError.payload);
+      return jsonResponse({
+        error: mpErrorMessage(mpError, mpRes.status, 'Error al obtener terminales de Mercado Pago'),
+        code: mpError.code,
+      }, mpRes.status >= 500 ? 502 : 422);
     }
 
     const mpData = await mpRes.json();
-    // MP response shape: { devices: [{ id, operating_mode, ... }] }
+    // Response shape: { data: { terminals: [{ id, operating_mode, ... }] } }
     const devices: Array<{ id: string; operating_mode: string; [k: string]: unknown }> =
-      mpData.devices ?? [];
+      mpData?.data?.terminals ?? [];
+
+    await supabaseAdmin
+      .from('mp_devices')
+      .update({ activo: false, updated_at: new Date().toISOString() })
+      .eq('organization_id', orgId);
 
     if (devices.length > 0) {
+      const { data: existingDevices } = await supabaseAdmin
+        .from('mp_devices')
+        .select('mp_device_id, name')
+        .eq('organization_id', orgId);
+
+      const existingNames = new Map<string, string | null>(
+        (existingDevices ?? []).map((device: { mp_device_id: string; name: string | null }) => [
+          device.mp_device_id,
+          device.name,
+        ]),
+      );
+
       // Sync devices into our table (upsert, preserve sucursal_id assignment)
       const upsertRows = devices.map((d) => ({
         organization_id: orgId,
         mp_device_id: d.id,
-        name: (d.id as string), // MP doesn't return a friendly name — use ID as default
-        operating_mode: d.operating_mode ?? 'PDV',
-        activo: true,
+        name: existingNames.get(d.id) ?? d.id,
+        operating_mode: d.operating_mode ?? 'UNDEFINED',
+        activo: d.operating_mode === 'PDV',
         updated_at: new Date().toISOString(),
       }));
 

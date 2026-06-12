@@ -663,7 +663,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
 
   // ── MP Terminal confirmed callback ──────────────────────────────────────────
-  const handleMpTerminalConfirmed = useCallback(async (intentId: string) => {
+  const handleMpTerminalConfirmed = useCallback(async (intentId: string, deviceId: string) => {
     if (!pendingMpPayload) return;
     setMpDialogOpen(false);
 
@@ -694,6 +694,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         total,
         productos: productosPayload,
         mpPaymentIntentId: intentId,
+        mpDeviceId: deviceId,
       });
 
       if (result) {

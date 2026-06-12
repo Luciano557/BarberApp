@@ -78,15 +78,108 @@ export async function mpFetch(
   accessToken: string,
   options: RequestInit = {},
 ): Promise<Response> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const headers = new Headers(options.headers);
+
+  headers.set('Authorization', `Bearer ${accessToken}`);
+  headers.set('Content-Type', 'application/json');
+
+  if (method !== 'GET' && method !== 'HEAD' && !headers.has('X-Idempotency-Key')) {
+    headers.set('X-Idempotency-Key', crypto.randomUUID());
+  }
+
   return fetch(`${MP_BASE}${path}`, {
     ...options,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'X-Idempotency-Key': crypto.randomUUID(),
-      ...(options.headers ?? {}),
-    },
+    headers,
   });
+}
+
+export interface MpApiError {
+  code: string | null;
+  message: string | null;
+  payload: unknown;
+}
+
+/** Safely reads Mercado Pago error responses without leaking credentials. */
+export async function readMpError(response: Response): Promise<MpApiError> {
+  const text = await response.text();
+  let payload: unknown = text;
+
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    // Keep non-JSON responses as plain text.
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return {
+      code: null,
+      message: typeof payload === 'string' && payload.trim() ? payload : null,
+      payload,
+    };
+  }
+
+  const record = payload as Record<string, unknown>;
+  const cause = Array.isArray(record.cause) ? record.cause[0] : null;
+  const causeRecord = cause && typeof cause === 'object'
+    ? cause as Record<string, unknown>
+    : null;
+  const firstError = Array.isArray(record.errors) ? record.errors[0] : null;
+  const errorRecord = firstError && typeof firstError === 'object'
+    ? firstError as Record<string, unknown>
+    : null;
+
+  const codeCandidate = record.code ?? record.error ?? errorRecord?.code ?? causeRecord?.code;
+  const messageCandidate =
+    record.message ??
+    record.error_description ??
+    errorRecord?.message ??
+    errorRecord?.details ??
+    causeRecord?.description ??
+    causeRecord?.message;
+
+  return {
+    code: typeof codeCandidate === 'string' ? codeCandidate : null,
+    message: typeof messageCandidate === 'string' ? messageCandidate : null,
+    payload,
+  };
+}
+
+/** Converts common Point/Orders API failures into actionable Spanish messages. */
+export function mpErrorMessage(
+  error: MpApiError,
+  status: number,
+  fallback: string,
+): string {
+  switch (error.code) {
+    case 'already_queued_order_for_terminal':
+      return 'La terminal ya tiene un cobro pendiente. Finalizalo o cancelalo antes de enviar otro.';
+    case 'forbidden_checking_terminal_owner':
+      return 'La terminal no pertenece a la cuenta de Mercado Pago conectada.';
+    case 'terminal_not_allowed_action':
+      return 'La terminal no admite cobros integrados. Configurala en modo PDV.';
+    case 'store_pos_not_found':
+      return 'La terminal no tiene una sucursal o caja configurada en Mercado Pago.';
+    case 'required_properties':
+    case 'minimum_properties':
+    case 'minimum_items':
+    case 'maximum_items':
+    case 'property_value':
+    case 'property_type':
+    case 'json_syntax_error':
+    case 'invalid_payload':
+    case 'unsupported_properties':
+      return error.message
+        ? `Mercado Pago rechazó los datos del cobro: ${error.message}`
+        : 'Mercado Pago rechazó los datos del cobro.';
+    case 'unauthorized':
+      return 'La conexión con Mercado Pago venció. Volvé a conectar la cuenta.';
+    default:
+      if (status === 401) {
+        return 'La conexión con Mercado Pago venció. Volvé a conectar la cuenta.';
+      }
+      return error.message ? `${fallback}: ${error.message}` : fallback;
+  }
 }
 
 /** Standard CORS headers for all MP edge functions. */

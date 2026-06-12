@@ -9,7 +9,13 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getAccessToken, mpFetch, corsHeaders, jsonResponse } from '../_shared/mp-client.ts';
+import {
+  getAccessToken,
+  mpFetch,
+  readMpError,
+  corsHeaders,
+  jsonResponse,
+} from '../_shared/mp-client.ts';
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -51,13 +57,12 @@ serve(async (req: Request): Promise<Response> => {
   const orgId = profile.organization_id as string;
 
   try {
-    const { device_id, payment_intent_id } = await req.json() as {
-      device_id: string;
+    const { payment_intent_id } = await req.json() as {
       payment_intent_id: string;
     };
 
-    if (!device_id || !payment_intent_id) {
-      return jsonResponse({ error: 'device_id y payment_intent_id son requeridos' }, 400);
+    if (!payment_intent_id) {
+      return jsonResponse({ error: 'payment_intent_id es requerido' }, 400);
     }
 
     const accessToken = await getAccessToken(supabaseAdmin, orgId);
@@ -66,16 +71,20 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const mpRes = await mpFetch(
-      `/point/integration-api/devices/${device_id}/payment-intents/${payment_intent_id}`,
+      `/v1/orders/${encodeURIComponent(payment_intent_id)}/cancel`,
       accessToken,
-      { method: 'DELETE' },
+      {
+        method: 'POST',
+        headers: { 'x-allow-cancelable-status': 'at_terminal' },
+      },
     );
 
-    // 200 or 404 (already gone) are both acceptable outcomes
+    // Missing/already-cancelled orders are acceptable for this best-effort cleanup.
     if (!mpRes.ok && mpRes.status !== 404) {
-      const errBody = await mpRes.text();
-      console.warn('[mp-cancel-payment-intent] MP error:', mpRes.status, errBody);
-      // Don't propagate — cancellation failure is non-critical for the UX
+      const mpError = await readMpError(mpRes);
+      if (mpError.code !== 'order_already_canceled') {
+        console.warn('[mp-cancel-payment-intent] MP error:', mpRes.status, mpError.payload);
+      }
     }
 
     return jsonResponse({ ok: true });
