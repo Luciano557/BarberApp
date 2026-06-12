@@ -79,6 +79,8 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const mpData = await mpRes.json();
+    console.log('[mp-list-devices] MP response status:', mpRes.status);
+console.log('[mp-list-devices] MP raw payload:', JSON.stringify(mpData));
     // Response shape: { devices: [{ id, operating_mode, pos_id, store_id, ... }], paging: {...} }
     const devices: Array<{ id: string; operating_mode: string; [k: string]: unknown }> =
       mpData?.devices ?? [];
