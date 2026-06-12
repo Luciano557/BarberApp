@@ -141,11 +141,13 @@ export function useMercadoPago() {
     try {
       const { data, error } = await supabase.functions.invoke('mp-list-devices');
       if (error) throw error;
-      // Edge function returns full DB rows including custom names saved by the user
-      setDevices((data?.devices as MpDevice[]) ?? []);
+      const synced = (data?.devices as MpDevice[]) ?? [];
+      setDevices(synced);
+      return synced;
     } catch (err) {
       console.error('[useMercadoPago] syncDevices error:', err);
-      // Silently fail on background auto-sync
+      toast.error('No se pudieron sincronizar las terminales de MercadoPago. Verificá tu conexión.');
+      return [];
     } finally {
       setDevicesLoading(false);
     }
