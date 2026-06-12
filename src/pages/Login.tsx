@@ -241,10 +241,11 @@ export default function Login() {
       >
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-            <Scissors size={15} className="text-white" />
-          </div>
-          <span className="text-white font-semibold text-base">Vittro</span>
+           <img 
+              src="/MagotipoBlanco.png" 
+              alt="Logo Vittro" 
+              className="h-8 w-auto object-contain"
+              />
         </Link>
 
         {/* Center content */}
@@ -288,10 +289,11 @@ export default function Login() {
 
           {/* Mobile logo */}
           <div className="mb-8 flex items-center justify-center gap-2 lg:hidden">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Scissors size={14} className="text-white" />
-            </div>
-            <span className="font-semibold text-base">Vittro</span>
+           <img 
+              src="/MagotipoAzul.png" 
+              alt="Logo Vittro" 
+              className="h-8 w-auto object-contain"
+              />
           </div>
 
           <div className="mb-8 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 lg:hidden">
