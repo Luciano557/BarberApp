@@ -64,8 +64,10 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'MercadoPago no está conectado para esta organización' }, 404);
     }
 
-    // Orders API terminal listing.
-    const mpRes = await mpFetch('/terminals/v1/list', accessToken);
+    // Mercado Pago Point integration API — device listing.
+    // Docs: GET /point/integration-api/devices
+    // Response: { devices: [{ id, operating_mode, pos_id, store_id, ... }], paging: { ... } }
+    const mpRes = await mpFetch('/point/integration-api/devices', accessToken);
 
     if (!mpRes.ok) {
       const mpError = await readMpError(mpRes);
@@ -77,9 +79,11 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const mpData = await mpRes.json();
-    // Response shape: { data: { terminals: [{ id, operating_mode, ... }] } }
+    console.log('[mp-list-devices] MP response status:', mpRes.status);
+console.log('[mp-list-devices] MP raw payload:', JSON.stringify(mpData));
+    // Response shape: { devices: [{ id, operating_mode, pos_id, store_id, ... }], paging: {...} }
     const devices: Array<{ id: string; operating_mode: string; [k: string]: unknown }> =
-      mpData?.data?.terminals ?? [];
+      mpData?.devices ?? [];
 
     await supabaseAdmin
       .from('mp_devices')
@@ -89,7 +93,7 @@ serve(async (req: Request): Promise<Response> => {
     if (devices.length > 0) {
       const { data: existingDevices } = await supabaseAdmin
         .from('mp_devices')
-        .select('mp_device_id, name')
+        .select('mp_device_id, name, sucursal_id')
         .eq('organization_id', orgId);
 
       const existingNames = new Map<string, string | null>(
@@ -99,13 +103,26 @@ serve(async (req: Request): Promise<Response> => {
         ]),
       );
 
+      // Preserve sucursal_id already assigned by the user — only update fields we own.
+      const existingSucursales = new Map<string, string | null>(
+        (existingDevices ?? []).map(
+          (device: { mp_device_id: string; sucursal_id: string | null }) => [
+            device.mp_device_id,
+            device.sucursal_id,
+          ],
+        ),
+      );
+
       // Sync devices into our table (upsert, preserve sucursal_id assignment)
       const upsertRows = devices.map((d) => ({
         organization_id: orgId,
         mp_device_id: d.id,
         name: existingNames.get(d.id) ?? d.id,
         operating_mode: d.operating_mode ?? 'UNDEFINED',
+        // Only PDV-mode terminals can receive programmatic payment intents via API.
         activo: d.operating_mode === 'PDV',
+        // Preserve any sucursal assignment the admin has already made.
+        sucursal_id: existingSucursales.get(d.id) ?? null,
         updated_at: new Date().toISOString(),
       }));
 

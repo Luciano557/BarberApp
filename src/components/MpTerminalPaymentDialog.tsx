@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Loader2, MonitorSmartphone, CheckCircle2, XCircle, Clock, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -89,7 +89,7 @@ export function MpTerminalPaymentDialog({
   onCancel,
 }: MpTerminalPaymentDialogProps) {
   const { currentSucursal } = useSucursal();
-  const { devices, syncDevices, getDevicesForSucursal } = useMercadoPago();
+  const { devices, devicesLoading, syncDevices, getDevicesForSucursal } = useMercadoPago();
   const { status, intentId, errorMessage, createIntent, cancelIntent, reset } =
     useMpPaymentIntent();
 
@@ -99,12 +99,19 @@ export function MpTerminalPaymentDialog({
     ? getDevicesForSucursal(currentSucursal.id)
     : [];
 
-  // Auto-select if only one device
+  // Fallback: if no devices are assigned to this sucursal yet, show all active ones
+  // so the user can still operate while setting up assignments in Settings.
+  // Ahora tomamos todas las terminales sin importar si el campo activo es true o false
+  const allActiveDevices = useMemo(() => devices, [devices]);
+  const displayDevices = sucursalDevices.length > 0 ? sucursalDevices : allActiveDevices;
+  const showsSucursalFallback = sucursalDevices.length === 0 && allActiveDevices.length > 0;
+
+  // Auto-select if only one device available
   useEffect(() => {
-    if (open && sucursalDevices.length === 1 && !selectedDeviceId) {
-      setSelectedDeviceId(sucursalDevices[0].mp_device_id);
+    if (open && displayDevices.length === 1 && !selectedDeviceId) {
+      setSelectedDeviceId(displayDevices[0].mp_device_id);
     }
-  }, [open, sucursalDevices, selectedDeviceId]);
+  }, [open, displayDevices, selectedDeviceId]);
 
   // Trigger success callback once approved
   useEffect(() => {
@@ -174,15 +181,30 @@ export function MpTerminalPaymentDialog({
           {/* Device selector — only shown when idle */}
           {status === 'idle' && (
             <div className="space-y-2">
-              {sucursalDevices.length === 0 ? (
+              {devicesLoading ? (
+                <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Sincronizando terminales...</span>
+                </div>
+              ) : displayDevices.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center">
-                  No hay terminales asignadas a esta sucursal.{' '}
-                  <span className="underline cursor-pointer" onClick={syncDevices}>
+                  No hay terminales disponibles.{' '}
+                  <button
+                    type="button"
+                    className="underline cursor-pointer"
+                    onClick={() => syncDevices()}
+                  >
                     Sincronizar terminales
-                  </span>
+                  </button>
                 </p>
               ) : (
                 <>
+                  {showsSucursalFallback && (
+                    <p className="text-xs text-amber-600 rounded-md bg-amber-50 px-3 py-2 border border-amber-200">
+                      Ninguna terminal está asignada a esta sucursal. Mostrando todas las disponibles.
+                      Podés asignarlas en <strong>Configuración → Terminales</strong>.
+                    </p>
+                  )}
                   <label className="text-sm font-medium">Terminal</label>
                   <Select
                     value={selectedDeviceId}
@@ -192,7 +214,7 @@ export function MpTerminalPaymentDialog({
                       <SelectValue placeholder="Seleccioná una terminal" />
                     </SelectTrigger>
                     <SelectContent>
-                      {sucursalDevices.map((d) => (
+                      {displayDevices.map((d) => (
                         <SelectItem key={d.mp_device_id} value={d.mp_device_id}>
                           <span className="flex items-center gap-2">
                             <MonitorSmartphone className="h-4 w-4" />
@@ -217,7 +239,7 @@ export function MpTerminalPaymentDialog({
               </Button>
               <Button
                 onClick={handleSend}
-                disabled={!selectedDeviceId || sucursalDevices.length === 0}
+                disabled={!selectedDeviceId || displayDevices.length === 0}
               >
                 Enviar a terminal
               </Button>
