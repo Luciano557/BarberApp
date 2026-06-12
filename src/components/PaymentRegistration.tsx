@@ -1512,9 +1512,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               {/* Cobrar con Terminal — visible cuando el método incluye MP */}
               {(paymentMethod === 'mercado_pago' || (splitMode && selectedDigitalMethod === 'mercado_pago')) && (
                 <Button
-                  variant="outline"
                   onClick={handleCobrarConTerminal}
-                  className="w-full h-12 text-base gap-2"
+                  className="w-full mt-2 h-14 text-base font-medium gap-2 bg-secondary text-secondary-foreground hover:bg-secondary/90"
                   disabled={isSubmitting || (splitMode && !splitValid)}
                 >
                   <MonitorSmartphone className="h-5 w-5" />
