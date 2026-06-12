@@ -50,8 +50,7 @@ serve(async (req: Request): Promise<Response> => {
   const { data: roles } = await supabaseAdmin
     .from('user_roles')
     .select('role')
-    .eq('user_id', user.id)
-    .eq('organization_id', profile.organization_id);
+    .eq('user_id', user.id);
 
   const allowedRoles = ['owner', 'general_manager'];
   const hasPermission = roles?.some((r: { role: string }) => allowedRoles.includes(r.role));
