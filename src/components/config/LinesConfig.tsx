@@ -9,6 +9,7 @@ import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { TabBadge } from '@/components/ui/TabBadge';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 const LINE_COLORS = [
   { label: 'Azul', value: '#3B82F6' },
@@ -114,18 +115,18 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
   const renderLine = (line: Line) => {
     return (
       <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-        <div className="flex items-center gap-3">
-          {line.color && (
-            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: line.color }} />
-          )}
-          <span className="flex-1 font-medium text-foreground">{line.name}</span>
-          <button
-            onClick={() => startEdit(line)}
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
-            title="Opciones"
-          >
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <EntityColorBar color={line.color} />
+          <div className="flex flex-1 items-center gap-3">
+            <span className="flex-1 font-medium text-foreground">{line.name}</span>
+            <button
+              onClick={() => startEdit(line)}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+              title="Opciones"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto, ProductoSucursal } from './types';
 import { Badge } from '@/components/ui/badge';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 export interface CartItem {
@@ -212,16 +213,11 @@ export function ProductoPickerDialog({
                 return (
                   <div
                     key={row.sucursal.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border bg-card transition-colors ${
+                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border bg-card transition-colors ${
                       qty > 0 ? 'border-secondary/50 bg-secondary/5' : 'border-border'
                     } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    {row.marca && (
-                      <div
-                        className="w-1.5 h-10 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: row.marca.color }}
-                      />
-                    )}
+                    <EntityColorBar color={row.marca?.color} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm text-foreground truncate">{row.producto.nombre}</p>

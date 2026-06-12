@@ -14,6 +14,7 @@ import { LineQuickEditPopover } from './LineQuickEditPopover';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { TabBadge } from '@/components/ui/TabBadge';
 import { Badge } from '@/components/ui/badge';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -204,10 +205,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
     return (
     <div key={service.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
       <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+        <EntityColorBar color={linkedLine?.color} />
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {linkedLine?.color && (
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: linkedLine.color }} />
-          )}
           <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">

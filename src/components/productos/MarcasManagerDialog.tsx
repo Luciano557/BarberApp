@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, MARCA_COLORS } from './types';
 import { cn } from '@/lib/utils';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
@@ -147,26 +148,25 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
       {editingId === m.id ? (
         renderEditor()
       ) : (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-          <span
-            className="w-5 h-5 rounded-full border border-border shrink-0"
-            style={{ backgroundColor: m.color }}
-          />
-          <span className="flex-1 font-medium text-foreground truncate">{m.nombre}</span>
-          <Button size="icon" variant="ghost" onClick={() => handleStartEdit(m)} className="h-8 w-8">
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setToggleConfirm({ marca: m, next: !m.activo })}
-            className="h-8 w-8"
-            title={m.activo ? 'Desactivar' : 'Activar'}
-          >
-            {m.activo
-              ? <PowerOff className="h-4 w-4 text-destructive" />
-              : <Power className="h-4 w-4 text-success" />}
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+          <EntityColorBar color={m.color} />
+          <div className="flex flex-1 items-center gap-3">
+            <span className="flex-1 font-medium text-foreground truncate">{m.nombre}</span>
+            <Button size="icon" variant="ghost" onClick={() => handleStartEdit(m)} className="h-8 w-8">
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setToggleConfirm({ marca: m, next: !m.activo })}
+              className="h-8 w-8"
+              title={m.activo ? 'Desactivar' : 'Activar'}
+            >
+              {m.activo
+                ? <PowerOff className="h-4 w-4 text-destructive" />
+                : <Power className="h-4 w-4 text-success" />}
+            </Button>
+          </div>
         </div>
       )}
     </div>
