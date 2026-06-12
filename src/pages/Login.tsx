@@ -292,7 +292,7 @@ export default function Login() {
            <img 
               src="/MagotipoAzul.png" 
               alt="Logo Vittro" 
-              className="h-8 w-auto object-contain"
+              className="h-12 w-auto object-contain"
               />
           </div>
 
