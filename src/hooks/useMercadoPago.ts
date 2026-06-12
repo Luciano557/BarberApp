@@ -137,19 +137,19 @@ export function useMercadoPago() {
   // ── Devices ───────────────────────────────────────────────────────────────────
 
   const syncDevices = useCallback(async () => {
-    if (!connectionStatus.isConnected) return;
     setDevicesLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('mp-list-devices');
       if (error) throw error;
+      // Edge function returns full DB rows including custom names saved by the user
       setDevices((data?.devices as MpDevice[]) ?? []);
     } catch (err) {
       console.error('[useMercadoPago] syncDevices error:', err);
-      toast.error('No se pudieron cargar las terminales de MercadoPago');
+      // Silently fail on background auto-sync
     } finally {
       setDevicesLoading(false);
     }
-  }, [connectionStatus.isConnected]);
+  }, []);
 
   const assignDevice = useCallback(async (mpDeviceId: string, sucursalId: string | null) => {
     try {
