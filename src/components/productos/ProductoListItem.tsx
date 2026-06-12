@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { MoreVertical, PackagePlus, Settings2, History, AlertTriangle } from 'lucide-react';
+import { MoreVertical, PackagePlus, Settings2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ProductoConSucursal } from './types';
@@ -57,14 +58,13 @@ export function ProductoListItem({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-foreground truncate">{item.producto.nombre}</span>
             {!activeInSucursal && (
-              <Badge variant="secondary" className="text-xs">
-                {sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
-              </Badge>
+              <StatusPill
+                status="neutral"
+                label={sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
+              />
             )}
             {stockNegativo && (
-              <Badge variant="destructive" className="text-xs gap-1">
-                <AlertTriangle className="h-3 w-3" /> Stock negativo
-              </Badge>
+              <StatusPill status="error" label="Stock negativo" />
             )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
@@ -86,9 +86,7 @@ export function ProductoListItem({
             <Badge variant="category">{item.marca.nombre}</Badge>
           )}
           {stockBajo && !stockNegativo && (
-            <Badge variant="category" className="bg-amber-50 text-amber-800 border border-amber-200">
-              Stock bajo
-            </Badge>
+            <StatusPill status="warning" label="Stock bajo" />
           )}
           <button
             onClick={() => setDrawerOpen(true)}

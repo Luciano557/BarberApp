@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { History, Calendar as CalendarIcon, User, Clock, FileX, MessageSquare } from 'lucide-react';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
@@ -193,9 +194,7 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
                         </div>
                         <span className="font-semibold text-foreground">{record.barbero_nombre}</span>
                         {record.motivo?.startsWith('Se registraron ventas después del cierre') && (
-                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border border-destructive/30 text-destructive">
-                            Regularización
-                          </span>
+                          <StatusPill status="error" label="Regularización" />
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">

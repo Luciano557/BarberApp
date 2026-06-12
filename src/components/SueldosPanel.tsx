@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Wallet, Plus, TrendingUp, TrendingDown, Minus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Wallet, Plus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -871,26 +872,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
   const getSaldoBadge = (saldo: number) => {
     if (saldo > 0) {
-      return (
-        <Badge variant="destructive" className="flex items-center gap-1">
-          <TrendingUp className="h-3 w-3" />
-          Debe: {formatCurrency(saldo)}
-        </Badge>
-      );
+      return <StatusPill status="error" label={`Debe: ${formatCurrency(saldo)}`} />;
     } else if (saldo < 0) {
-      return (
-        <Badge variant="secondary" className="flex items-center gap-1 bg-status-warning-bg text-status-warning-foreground border-status-warning">
-          <TrendingDown className="h-3 w-3" />
-          A favor: {formatCurrency(Math.abs(saldo))}
-        </Badge>
-      );
+      return <StatusPill status="warning" label={`A favor: ${formatCurrency(Math.abs(saldo))}`} icon={false} />;
     } else {
-      return (
-        <Badge variant="outline" className="flex items-center gap-1">
-          <Minus className="h-3 w-3" />
-          Al día
-        </Badge>
-      );
+      return <StatusPill status="neutral" label="Al día" />;
     }
   };
 

@@ -21,6 +21,7 @@ import { MultiDayClosingSummary } from './MultiDayClosingSummary';
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -873,9 +874,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             </Badge>
                           )}
                           {isVoided && (
-                            <Badge variant="destructive" className="text-xs">
-                              Anulado
-                            </Badge>
+                            <StatusPill status="error" label="Anulado" />
                           )}
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
