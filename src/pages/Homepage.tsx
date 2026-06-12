@@ -5,7 +5,7 @@ import {
   BarChart3, Calendar, Users, TrendingUp,
   CreditCard, Banknote, Star, Zap
 } from 'lucide-react';
-
+import logoVittro from '../assets/MagotipoBlanco.png';
 // ─── Scroll reveal hook ───────────────────────────────────────────────────────
 function useReveal() {
   const ref = useRef<HTMLDivElement>(null);
@@ -341,33 +341,36 @@ export default function Homepage() {
 
       {/* ── NAV ─────────────────────────────────────────────────────────────── */}
 <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          
-          {/* Acá reemplazamos el divs del ícono y el span de texto por tu imagen */}
-          <Link to="/" className="flex items-center">
-            <img 
-              src="/MagotipoBlanco1.png" />
-          </Link>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        
+        <Link to="/" className="flex items-center">
+          {/* 2. Usamos la variable en el src en lugar de una ruta de texto */}
+          <img 
+            src={logoVittro} 
+            alt="Logo Vittro" 
+            className="h-8 w-auto object-contain" 
+          />
+        </Link>
 
-          <nav className="hidden md:flex items-center gap-6">
-            {[['Funcionalidades', '#funcionalidades'], ['Planes', '#planes']].map(([l, h]) => (
-              <a key={l} href={h} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">{l}</a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <Link to="/login">
-              <button className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-all hidden sm:block">
-                Iniciar sesión
-              </button>
-            </Link>
-            <Link to="/login?mode=signup">
-              <button className="text-sm bg-primary text-white px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1.5">
-                Empezar gratis <ArrowRight size={13} />
-              </button>
-            </Link>
-          </div>
+        <nav className="hidden md:flex items-center gap-6">
+          {[['Funcionalidades', '#funcionalidades'], ['Planes', '#planes']].map(([l, h]) => (
+            <a key={l} href={h} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">{l}</a>
+          ))}
+        </nav>
+        <div className="flex items-center gap-2">
+          <Link to="/login">
+            <button className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-all hidden sm:block">
+              Iniciar sesión
+            </button>
+          </Link>
+          <Link to="/login?mode=signup">
+            <button className="text-sm bg-primary text-white px-4 py-1.5 rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-1.5">
+              Empezar gratis <ArrowRight size={13} />
+            </button>
+          </Link>
         </div>
-      </header>
+      </div>
+    </header>
 
       {/* ── HERO ────────────────────────────────────────────────────────────── */}
       <section className="hero-glow pt-16 sm:pt-20 pb-0 px-4 sm:px-6 text-center overflow-hidden">
