@@ -45,6 +45,8 @@ function DeviceNameEditor({
         .update({ name: trimmed })
         .eq('id', device.id);
       if (error) throw error;
+      // Update local display value immediately without waiting for re-sync
+      setValue(trimmed);
       toast.success('Nombre actualizado');
       setEditing(false);
     } catch {
@@ -83,14 +85,16 @@ function DeviceNameEditor({
   return (
     <div className="flex items-center gap-1 flex-1 min-w-0 group">
       <div className="min-w-0">
-        <p className="text-sm font-medium truncate">{device.name || device.mp_device_id}</p>
+        {/* Use local `value` so the name updates immediately after saving */}
+        <p className="text-sm font-medium truncate">{value || device.mp_device_id}</p>
         <p className="text-xs text-muted-foreground truncate">{device.mp_device_id}</p>
       </div>
       {canManage && (
         <Button
           size="icon"
           variant="ghost"
-          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          // Always visible on touch devices; hover-only on pointer devices
+          className="h-7 w-7 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
           onClick={() => setEditing(true)}
         >
           <Pencil className="h-3 w-3" />
@@ -159,14 +163,17 @@ export function MpDevicesConfig({
             {devices.map((device) => (
               <div
                 key={device.mp_device_id}
-                className="flex items-center gap-3 rounded-lg border p-3"
+                className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center"
               >
-                <MonitorSmartphone className="h-5 w-5 shrink-0 text-muted-foreground" />
+                {/* Row 1 on mobile: icon + name */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <MonitorSmartphone className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <DeviceNameEditor device={device} canManage={canManage} />
+                </div>
 
-                <DeviceNameEditor device={device} canManage={canManage} />
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="outline" className="text-xs hidden sm:flex">
+                {/* Row 2 on mobile: badge + sucursal selector */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">
                     {device.operating_mode ?? 'PDV'}
                   </Badge>
 
@@ -177,7 +184,7 @@ export function MpDevicesConfig({
                         onAssign(device.mp_device_id, val === 'none' ? null : val)
                       }
                     >
-                      <SelectTrigger className="w-[160px] h-8 text-xs">
+                      <SelectTrigger className="w-full sm:w-[160px] h-9 text-xs">
                         <SelectValue placeholder="Sin asignar" />
                       </SelectTrigger>
                       <SelectContent>
