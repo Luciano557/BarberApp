@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { TagPill } from '@/components/ui/TagPill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -228,7 +228,7 @@ export function ProductosGlobalConfig() {
                     </div>
                     <div className="flex items-center gap-2">
                       {marca && (
-                        <Badge variant="category">{marca.nombre}</Badge>
+                        <TagPill label={marca.nombre} />
                       )}
                       <button
                         onClick={() => openEdit(p)}

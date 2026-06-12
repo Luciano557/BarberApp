@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { MoreVertical, PackagePlus, Settings2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { TagPill } from '@/components/ui/TagPill';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ProductoConSucursal } from './types';
@@ -83,7 +83,7 @@ export function ProductoListItem({
 
         <div className="flex items-center gap-2 justify-end">
           {item.marca && (
-            <Badge variant="category">{item.marca.nombre}</Badge>
+            <TagPill label={item.marca.nombre} />
           )}
           {stockBajo && !stockNegativo && (
             <StatusPill status="warning" label="Stock bajo" />

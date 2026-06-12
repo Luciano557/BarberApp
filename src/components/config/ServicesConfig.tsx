@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { LineQuickEditPopover } from './LineQuickEditPopover';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { TabBadge } from '@/components/ui/TabBadge';
-import { Badge } from '@/components/ui/badge';
+import { TagPill } from '@/components/ui/TagPill';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 interface ServicesConfigProps {
@@ -210,18 +210,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
-          {linkedLine?.color && (
-            <Badge
-              variant="category"
-              className="border"
-              style={{
-                backgroundColor: `${linkedLine.color}1A`,
-                borderColor: `${linkedLine.color}40`,
-                color: linkedLine.color,
-              }}
-            >
-              {linkedLine.name}
-            </Badge>
+          {linkedLine && (
+            <TagPill label={linkedLine.name} />
           )}
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />{service.durationMin || 30} min

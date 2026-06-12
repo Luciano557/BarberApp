@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Plus, MoreVertical, BadgePercent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TagPill } from '@/components/ui/TagPill';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -261,9 +262,6 @@ export function DiscountsConfig({
   const renderRow = (d: Discount) => {
     const appliesTo = d.appliesTo || 'servicios';
     const categoryLabel = appliesTo === 'productos' ? 'Productos' : 'Servicios';
-    const categoryClass = appliesTo === 'productos'
-      ? 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
-      : 'bg-[#EEF2FF] text-[#3730A3] border border-[#C7D2FE]';
     const valueLabel = d.type === 'fixed'
       ? `$${d.value.toLocaleString('es-AR')}`
       : `${d.value}%`;
@@ -274,7 +272,7 @@ export function DiscountsConfig({
             <span className="font-medium text-foreground">{d.label}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <Badge variant="category" className={categoryClass}>{categoryLabel}</Badge>
+            <TagPill label={categoryLabel} />
             <Badge variant="category">{valueLabel}</Badge>
           </div>
           <div className="flex items-center justify-end">
