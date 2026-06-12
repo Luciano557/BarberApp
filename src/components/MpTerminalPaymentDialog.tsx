@@ -101,7 +101,8 @@ export function MpTerminalPaymentDialog({
 
   // Fallback: if no devices are assigned to this sucursal yet, show all active ones
   // so the user can still operate while setting up assignments in Settings.
-  const allActiveDevices = useMemo(() => devices.filter((d) => d.activo), [devices]);
+  // Ahora tomamos todas las terminales sin importar si el campo activo es true o false
+const allActiveDevices = useMemo(() => devices, [devices]);
   const displayDevices = sucursalDevices.length > 0 ? sucursalDevices : allActiveDevices;
   const showsSucursalFallback = sucursalDevices.length === 0 && allActiveDevices.length > 0;
 
