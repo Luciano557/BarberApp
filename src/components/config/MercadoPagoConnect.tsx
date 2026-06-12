@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Wifi, WifiOff, RefreshCw, LogOut, Loader2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useMercadoPago } from '@/hooks/useMercadoPago';
@@ -79,9 +79,11 @@ export function MercadoPagoConnect() {
                   : 'Conectá tu cuenta para cobrar con terminales Point directamente desde la app.'}
               </CardDescription>
             </div>
-            <Badge variant={isConnected ? 'default' : 'secondary'} className="shrink-0">
-              {isConnected ? 'Conectado' : 'Desconectado'}
-            </Badge>
+            <StatusPill
+              status={isConnected ? 'success' : 'neutral'}
+              label={isConnected ? 'Conectado' : 'Desconectado'}
+              className="shrink-0"
+            />
           </div>
         </CardHeader>
 

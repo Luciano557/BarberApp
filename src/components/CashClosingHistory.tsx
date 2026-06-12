@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -265,9 +266,10 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
                           Diferido
                         </Badge>
                       )}
-                      <Badge variant={record.estado === 'activo' ? 'default' : 'secondary'}>
-                        {record.estado || 'activo'}
-                      </Badge>
+                      <StatusPill
+                        status={record.estado === 'activo' ? 'success' : 'neutral'}
+                        label={record.estado || 'activo'}
+                      />
                       {record.estado === 'eliminado' ? (
                         <AlertDialog>
                           <AlertDialogTrigger asChild>

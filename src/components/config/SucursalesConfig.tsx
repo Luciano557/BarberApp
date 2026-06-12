@@ -12,6 +12,7 @@ import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
@@ -390,7 +391,7 @@ export function SucursalesConfig() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
+                  <StatusPill status={suc.activa ? 'success' : 'neutral'} label={suc.activa ? 'Activa' : 'Inactiva'} />
                   {(isOwner || isGeneralManager || (isManager && sucursales.some(s => s.id === suc.id))) && (
                     <Button variant="outline" size="sm" onClick={() => setCuentaSucursal(suc)} className="px-3 py-1.5 text-xs font-medium">
                       <KeyRound className="h-3.5 w-3.5 mr-1.5" />

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { MapPin, Phone, Edit2, Building2, Power, AlertTriangle, KeyRound, Info } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { DrawerForm } from '@/components/ui/drawer-form';
@@ -334,9 +334,12 @@ export function SucursalTabContent({
           <CardContent>
             <div className="space-y-2">
               <div>
-                <Badge key={String(sucursal.activa)} variant={sucursal.activa ? 'default' : 'secondary'} className="animate-pop-in">
-                  {sucursal.activa ? 'Activa' : 'Inactiva'}
-                </Badge>
+                <StatusPill
+                  key={String(sucursal.activa)}
+                  status={sucursal.activa ? 'success' : 'neutral'}
+                  label={sucursal.activa ? 'Activa' : 'Inactiva'}
+                  className="animate-pop-in"
+                />
               </div>
               <div className="flex items-start gap-2">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
