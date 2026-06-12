@@ -343,7 +343,7 @@ export default function Homepage() {
 <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           
-          {/* Acá reemplazamos el div del ícono y el span de texto por tu imagen */}
+          {/* Acá reemplazamos el divs del ícono y el span de texto por tu imagen */}
           <Link to="/" className="flex items-center">
             <img 
               src="/MagotipoBlanco.png" 
