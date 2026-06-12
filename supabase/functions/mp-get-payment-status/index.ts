@@ -13,7 +13,14 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getAccessToken, mpFetch, corsHeaders, jsonResponse } from '../_shared/mp-client.ts';
+import {
+  getAccessToken,
+  mpErrorMessage,
+  mpFetch,
+  readMpError,
+  corsHeaders,
+  jsonResponse,
+} from '../_shared/mp-client.ts';
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -67,7 +74,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const mpRes = await mpFetch(
-      `/point/integration-api/payment-intents/${payment_intent_id}`,
+      `/v1/orders/${encodeURIComponent(payment_intent_id)}`,
       accessToken,
     );
 
@@ -75,25 +82,29 @@ serve(async (req: Request): Promise<Response> => {
       if (mpRes.status === 404) {
         return jsonResponse({ status: 'NOT_FOUND' });
       }
-      const errBody = await mpRes.text();
-      console.warn('[mp-get-payment-status] MP error:', mpRes.status, errBody);
-      return jsonResponse({ error: 'Error al consultar estado' }, 502);
+      const mpError = await readMpError(mpRes);
+      console.warn('[mp-get-payment-status] MP error:', mpRes.status, mpError.payload);
+      return jsonResponse({
+        error: mpErrorMessage(mpError, mpRes.status, 'Error al consultar el estado del cobro'),
+        code: mpError.code,
+      }, mpRes.status >= 500 ? 502 : 422);
     }
 
-    const intent = await mpRes.json();
-    // intent shape: {
-    //   id, amount,
-    //   state: { terminal_state: "OPEN" | "ON_TERMINAL" | "PROCESSING" | "FINISHED" },
-    //   payment?: { id, status: "approved" | "rejected" | "cancelled" }
-    // }
-    const terminalState: string = intent?.state?.terminal_state ?? 'OPEN';
-    const paymentStatus: string | undefined = intent?.payment?.status;
-    const mpPaymentId: string | undefined = intent?.payment?.id
-      ? String(intent.payment.id)
+    const order = await mpRes.json();
+    const orderStatus: string = order?.status ?? 'created';
+    const payment = order?.transactions?.payments?.[0];
+    const paymentStatus: string | undefined =
+      orderStatus === 'processed' ? 'approved'
+        : orderStatus === 'failed' ? 'rejected'
+        : orderStatus === 'canceled' || orderStatus === 'expired' ? 'cancelled'
+        : payment?.status;
+    const mpPaymentId: string | undefined = payment?.id
+      ? String(payment.id)
       : undefined;
 
     return jsonResponse({
-      status: terminalState,
+      status: orderStatus,
+      status_detail: order?.status_detail ?? payment?.status_detail,
       payment_status: paymentStatus,
       mp_payment_id: mpPaymentId,
     });

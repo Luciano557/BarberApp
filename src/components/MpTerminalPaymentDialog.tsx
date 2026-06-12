@@ -26,7 +26,7 @@ interface MpTerminalPaymentDialogProps {
   /** Amount in ARS pesos (e.g. 1500 = $1500) */
   amountPesos: number;
   description?: string;
-  onSuccess: (intentId: string) => void;
+  onSuccess: (intentId: string, deviceId: string) => void;
   onCancel: () => void;
 }
 
@@ -110,10 +110,10 @@ export function MpTerminalPaymentDialog({
   useEffect(() => {
     if (status === 'approved' && intentId) {
       // Brief delay so the user sees the success state before the dialog closes
-      const t = setTimeout(() => onSuccess(intentId), 1200);
+      const t = setTimeout(() => onSuccess(intentId, selectedDeviceId), 1200);
       return () => clearTimeout(t);
     }
-  }, [status, intentId, onSuccess]);
+  }, [status, intentId, onSuccess, selectedDeviceId]);
 
   // Always sync when dialog opens so the list is fresh
   useEffect(() => {

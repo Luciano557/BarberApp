@@ -3,7 +3,7 @@
  *
  * Receives asynchronous payment notifications from MercadoPago.
  * Validates the x-signature header, logs the event, and updates venta.mp_status
- * for any venta that has a matching mp_payment_intent_id.
+ * for any venta that has a matching order ID in mp_payment_intent_id.
  *
  * Must be registered as the webhook URL in the MP developer portal.
  * This endpoint is PUBLIC (no Authorization header from MP).
@@ -96,10 +96,14 @@ serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Invalid JSON' }, 400);
   }
 
-  // MP sends: { action: "payment.updated", data: { id: "12345" }, type: "payment", ... }
+  // Orders notifications include the order ID in data.id.
   const action = payload.action as string | undefined;
   const type = payload.type as string | undefined;
   const dataId = (payload.data as Record<string, unknown>)?.id as string | undefined;
+  const isOrderEvent =
+    type === 'orders' ||
+    type === 'order' ||
+    action?.startsWith('order.') === true;
 
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -109,17 +113,20 @@ serve(async (req: Request): Promise<Response> => {
 
   // Log the event regardless of type (for audit/debugging)
   await supabaseAdmin.from('mp_webhook_log').insert({
-    payment_intent_id: null, // Will be correlated below if found
-    mp_payment_id: dataId ?? null,
+    payment_intent_id: isOrderEvent ? dataId ?? null : null,
+    mp_payment_id: isOrderEvent ? null : dataId ?? null,
     event_type: action ?? type ?? 'unknown',
     payload,
   });
 
-  // We only process point.integration_api events (PDV payment intents)
-  // These arrive with type = "point_integration_ipn" or action = "payment.updated"
-  if (dataId && (type === 'point_integration_ipn' || action?.startsWith('payment'))) {
-    // Look for a venta with this mp_payment_intent or mp_payment_id
-    // MP sends the payment_intent_id as data.id for point integration events
+  if (
+    dataId &&
+    (
+      isOrderEvent ||
+      type === 'point_integration_ipn' ||
+      action?.startsWith('payment') === true
+    )
+  ) {
     const { data: ventaRows } = await supabaseAdmin
       .from('venta')
       .select('id, mp_payment_intent_id, mp_status')
@@ -128,11 +135,14 @@ serve(async (req: Request): Promise<Response> => {
 
     const venta = ventaRows?.[0];
     if (venta && venta.mp_status !== 'approved') {
-      // Map MP payment status to our status
-      const newStatus = payload.status as string | undefined;
-      const mappedStatus = newStatus === 'approved' ? 'approved'
-        : newStatus === 'rejected' ? 'rejected'
-        : newStatus === 'cancelled' ? 'cancelled'
+      const eventStatus =
+        (payload.status as string | undefined) ??
+        action?.split('.').at(-1);
+      const mappedStatus =
+        eventStatus === 'approved' || eventStatus === 'processed' ? 'approved'
+        : eventStatus === 'rejected' || eventStatus === 'failed' ? 'rejected'
+        : eventStatus === 'cancelled' || eventStatus === 'canceled' || eventStatus === 'expired'
+          ? 'cancelled'
         : undefined;
 
       if (mappedStatus) {

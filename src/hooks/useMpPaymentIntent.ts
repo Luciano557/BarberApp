@@ -25,11 +25,25 @@ const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 function mapTerminalState(terminalState: string, paymentStatus?: string): MpIntentStatus | null {
   switch (terminalState.toUpperCase()) {
     case 'OPEN':
+    case 'CREATED':
       return 'pending';
     case 'ON_TERMINAL':
+    case 'AT_TERMINAL':
+    case 'ACTION_REQUIRED':
       return 'on_terminal';
     case 'PROCESSING':
       return 'on_terminal';
+    case 'PROCESSED':
+      return 'approved';
+    case 'FAILED':
+      return 'rejected';
+    case 'CANCELED':
+    case 'CANCELLED':
+      return 'cancelled';
+    case 'EXPIRED':
+      return 'timeout';
+    case 'REFUNDED':
+      return 'cancelled';
     case 'FINISHED':
       if (!paymentStatus) return null; // Wait for next poll
       if (paymentStatus === 'approved') return 'approved';
@@ -39,6 +53,30 @@ function mapTerminalState(terminalState: string, paymentStatus?: string): MpInte
     default:
       return null; // Unknown state — keep polling
   }
+}
+
+async function getFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const functionError = error as {
+    message?: string;
+    context?: Response | { response?: Response };
+  } | null;
+  const context = functionError?.context;
+  const response = context instanceof Response
+    ? context
+    : context?.response instanceof Response
+      ? context.response
+      : null;
+
+  if (response) {
+    try {
+      const payload = await response.clone().json() as { error?: string };
+      if (payload?.error) return payload.error;
+    } catch {
+      // Fall through to the SDK message.
+    }
+  }
+
+  return functionError?.message || fallback;
 }
 
 export function useMpPaymentIntent() {
@@ -147,7 +185,10 @@ export function useMpPaymentIntent() {
         });
 
         if (error || !data?.payment_intent_id) {
-          const msg = error?.message ?? 'No se pudo crear el intento de pago';
+          const msg = await getFunctionErrorMessage(
+            error,
+            'No se pudo crear el intento de pago',
+          );
           setState({ status: 'error', intentId: null, errorMessage: msg });
           return null;
         }
