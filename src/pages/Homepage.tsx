@@ -340,14 +340,18 @@ export default function Homepage() {
       `}</style>
 
       {/* ── NAV ─────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
+<header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
-              <Scissors size={13} className="text-white" />
-            </div>
-            <span className="font-semibold text-base tracking-tight">Vittro</span>
+          
+          {/* Acá reemplazamos el div del ícono y el span de texto por tu imagen */}
+          <Link to="/" className="flex items-center">
+            <img 
+              src="/MagotipoBlanco.png" 
+              alt="Logo Vittro" 
+              className="h-8 w-auto object-contain" 
+            />
           </Link>
+
           <nav className="hidden md:flex items-center gap-6">
             {[['Funcionalidades', '#funcionalidades'], ['Planes', '#planes']].map(([l, h]) => (
               <a key={l} href={h} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">{l}</a>
