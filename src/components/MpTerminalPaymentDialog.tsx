@@ -115,9 +115,9 @@ export function MpTerminalPaymentDialog({
     }
   }, [status, intentId, onSuccess]);
 
-  // Load devices when dialog opens if list is empty
+  // Always sync when dialog opens so the list is fresh
   useEffect(() => {
-    if (open && devices.length === 0) {
+    if (open) {
       syncDevices();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
