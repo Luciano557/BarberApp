@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ProductoConSucursal } from './types';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 interface Props {
   item: ProductoConSucursal;
@@ -50,12 +51,7 @@ export function ProductoListItem({
   return (
     <>
       <div className="flex flex-col gap-3 rounded-lg border border-transparent bg-muted/30 p-3 transition-colors hover:border-border hover:bg-muted/50 sm:flex-row sm:items-center">
-        {/* Color de marca */}
-        <div
-          className="h-1 w-full shrink-0 rounded-full sm:h-10 sm:w-1"
-          style={{ backgroundColor: item.marca?.color || 'hsl(var(--muted-foreground))' }}
-          aria-hidden
-        />
+        <EntityColorBar color={item.marca?.color} />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">

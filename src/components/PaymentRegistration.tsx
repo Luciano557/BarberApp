@@ -25,6 +25,7 @@ import { MpTerminalPaymentDialog } from '@/components/MpTerminalPaymentDialog';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 
@@ -1060,12 +1061,12 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               {grouped.map((group) => (
                 <div key={group.lineId || 'no-line'}>
                   {group.lineName && (
-                    <div className="flex items-center gap-2 mb-3">
-                      {group.lineColor && (
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: group.lineColor }} />
-                      )}
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{group.lineName}</h3>
-                      <div className="flex-1 h-px bg-border" />
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                      <EntityColorBar color={group.lineColor} size="sm" />
+                      <div className="flex flex-1 items-center gap-2">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{group.lineName}</h3>
+                        <div className="flex-1 h-px bg-border" />
+                      </div>
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
