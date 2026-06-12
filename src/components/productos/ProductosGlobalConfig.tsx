@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { Marca, Producto } from './types';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
 import { TabBadge } from '@/components/ui/TabBadge';
+import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 /**
  * Configuración global del catálogo de productos.
@@ -217,7 +218,8 @@ export function ProductosGlobalConfig() {
               {filtered.map(p => {
                 const marca = p.marca_id ? marcasMap.get(p.marca_id) : null;
                 return (
-                  <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+                  <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+                    <EntityColorBar color={marca?.color} />
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-foreground truncate">{p.nombre}</span>
                       {p.descripcion && (

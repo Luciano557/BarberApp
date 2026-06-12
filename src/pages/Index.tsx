@@ -40,7 +40,7 @@ const Index = () => {
   };
   
   const [activeTab, setActiveTab] = useState(getDefaultTab);
-  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
+  const [configInitialSection, setConfigInitialSection] = useState<'menu' | 'payments' | 'mercadopago' | 'plan' | 'pin' | 'tareas' | 'notificaciones' | 'mi-cuenta'>('menu');
   const prevActiveTabRef = useRef(activeTab);
   const miNegocioPanelRef = useRef<MiNegocioPanelHandle>(null);
 

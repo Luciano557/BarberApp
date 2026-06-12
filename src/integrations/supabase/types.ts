@@ -1827,6 +1827,136 @@ export type Database = {
           },
         ]
       }
+      mp_connections: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          mp_user_id: string
+          organization_id: string
+          refresh_token: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          mp_user_id: string
+          organization_id: string
+          refresh_token: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          mp_user_id?: string
+          organization_id?: string
+          refresh_token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_connections_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_devices: {
+        Row: {
+          activo: boolean | null
+          created_at: string | null
+          id: string
+          mp_device_id: string
+          name: string | null
+          operating_mode: string | null
+          organization_id: string
+          sucursal_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          mp_device_id: string
+          name?: string | null
+          operating_mode?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string | null
+          id?: string
+          mp_device_id?: string
+          name?: string | null
+          operating_mode?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_devices_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mp_devices_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mp_webhook_log: {
+        Row: {
+          event_type: string | null
+          id: string
+          mp_payment_id: string | null
+          organization_id: string | null
+          payload: Json | null
+          payment_intent_id: string | null
+          received_at: string | null
+        }
+        Insert: {
+          event_type?: string | null
+          id?: string
+          mp_payment_id?: string | null
+          organization_id?: string | null
+          payload?: Json | null
+          payment_intent_id?: string | null
+          received_at?: string | null
+        }
+        Update: {
+          event_type?: string | null
+          id?: string
+          mp_payment_id?: string | null
+          organization_id?: string | null
+          payload?: Json | null
+          payment_intent_id?: string | null
+          received_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mp_webhook_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_deliveries: {
         Row: {
           created_at: string
@@ -3352,6 +3482,9 @@ export type Database = {
           fecha_hora: string
           id: string
           metodo_pago: string
+          mp_device_id: string | null
+          mp_payment_intent_id: string | null
+          mp_status: string | null
           organization_id: string | null
           precio_servicio: number | null
           recargo_total: number
@@ -3374,6 +3507,9 @@ export type Database = {
           fecha_hora?: string
           id?: string
           metodo_pago: string
+          mp_device_id?: string | null
+          mp_payment_intent_id?: string | null
+          mp_status?: string | null
           organization_id?: string | null
           precio_servicio?: number | null
           recargo_total?: number
@@ -3396,6 +3532,9 @@ export type Database = {
           fecha_hora?: string
           id?: string
           metodo_pago?: string
+          mp_device_id?: string | null
+          mp_payment_intent_id?: string | null
+          mp_status?: string | null
           organization_id?: string | null
           precio_servicio?: number | null
           recargo_total?: number
@@ -3861,6 +4000,15 @@ export type Database = {
         Returns: string
       }
       current_user_has_pin: { Args: never; Returns: boolean }
+      delete_mp_connection: { Args: { _org_id: string }; Returns: undefined }
+      get_mp_connection_status: {
+        Args: { _org_id: string }
+        Returns: {
+          expires_at: string
+          is_connected: boolean
+          mp_user_id: string
+        }[]
+      }
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
       get_user_organization_id: { Args: { _user_id: string }; Returns: string }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, MonitorSmartphone, CheckCircle2, XCircle, Clock, ChevronDown } from 'lucide-react';
+import { Loader2, MonitorSmartphone, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -95,16 +95,16 @@ export function MpTerminalPaymentDialog({
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
 
+  // Only PDV + active terminals can receive payment intents through the API.
+  const payableDevices = useMemo(
+    () => devices.filter((device) => device.activo && device.operating_mode === 'PDV'),
+    [devices],
+  );
   const sucursalDevices: MpDevice[] = currentSucursal
-    ? getDevicesForSucursal(currentSucursal.id)
+    ? getDevicesForSucursal(currentSucursal.id).filter((device) => device.operating_mode === 'PDV')
     : [];
-
-  // Fallback: if no devices are assigned to this sucursal yet, show all active ones
-  // so the user can still operate while setting up assignments in Settings.
-  // Ahora tomamos todas las terminales sin importar si el campo activo es true o false
-  const allActiveDevices = useMemo(() => devices, [devices]);
-  const displayDevices = sucursalDevices.length > 0 ? sucursalDevices : allActiveDevices;
-  const showsSucursalFallback = sucursalDevices.length === 0 && allActiveDevices.length > 0;
+  const displayDevices = sucursalDevices.length > 0 ? sucursalDevices : payableDevices;
+  const showsSucursalFallback = sucursalDevices.length === 0 && payableDevices.length > 0;
 
   // Auto-select if only one device available
   useEffect(() => {
@@ -188,7 +188,7 @@ export function MpTerminalPaymentDialog({
                 </div>
               ) : displayDevices.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center">
-                  No hay terminales disponibles.{' '}
+                  No hay terminales activas en modo PDV.{' '}
                   <button
                     type="button"
                     className="underline cursor-pointer"
@@ -200,7 +200,7 @@ export function MpTerminalPaymentDialog({
               ) : (
                 <>
                   {showsSucursalFallback && (
-                    <p className="text-xs text-amber-600 rounded-md bg-amber-50 px-3 py-2 border border-amber-200">
+                    <p className="text-xs text-status-warning-foreground rounded-md bg-status-warning-bg px-3 py-2 border border-status-warning">
                       Ninguna terminal está asignada a esta sucursal. Mostrando todas las disponibles.
                       Podés asignarlas en <strong>Configuración → Terminales</strong>.
                     </p>
