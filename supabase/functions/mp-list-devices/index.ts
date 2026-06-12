@@ -65,7 +65,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Orders API terminal listing.
-    const mpRes = await mpFetch('/terminals/v1/list', accessToken);
+    const mpRes = await mpFetch('/point/integration-api/devices', accessToken);
 
     if (!mpRes.ok) {
       const mpError = await readMpError(mpRes);
@@ -79,7 +79,7 @@ serve(async (req: Request): Promise<Response> => {
     const mpData = await mpRes.json();
     // Response shape: { data: { terminals: [{ id, operating_mode, ... }] } }
     const devices: Array<{ id: string; operating_mode: string; [k: string]: unknown }> =
-      mpData?.data?.terminals ?? [];
+      mpData?.devices ?? [];
 
     await supabaseAdmin
       .from('mp_devices')
