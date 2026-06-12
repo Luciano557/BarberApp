@@ -346,7 +346,10 @@ export default function Homepage() {
           {/* Acá reemplazamos el divs del ícono y el span de texto por tu imagen */}
           <Link to="/" className="flex items-center">
             <img 
-              src="/MagotipoBlanco.png" />
+              src="/MagotipoAzul.png" 
+              alt="Logo Vittro" 
+              className="h-8 w-auto object-contain"
+              />
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
