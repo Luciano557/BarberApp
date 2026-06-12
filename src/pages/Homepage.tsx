@@ -346,7 +346,7 @@ export default function Homepage() {
           {/* Acá reemplazamos el divs del ícono y el span de texto por tu imagen */}
           <Link to="/" className="flex items-center">
             <img 
-              src="/MagotipoBlanco.jpg" />
+              src="/MagotipoBlanco.png" />
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
