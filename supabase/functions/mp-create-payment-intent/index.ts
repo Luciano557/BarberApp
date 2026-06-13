@@ -76,7 +76,7 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'device_id y amount_cents son requeridos' }, 400);
     }
 
-    // Verify the device belongs to this organization
+    // Verify the device belongs to this organization and can receive API charges.
     const { data: device } = await supabaseAdmin
       .from('mp_devices')
       .select('mp_device_id, activo, operating_mode')
@@ -84,13 +84,19 @@ serve(async (req: Request): Promise<Response> => {
       .eq('organization_id', orgId)
       .maybeSingle();
 
-    if (!device || !device.activo) {
-      return jsonResponse({ error: 'Terminal no encontrada o inactiva' }, 404);
+    if (!device) {
+      return jsonResponse({ error: 'Terminal no encontrada' }, 404);
     }
 
     if (device.operating_mode !== 'PDV') {
       return jsonResponse({
-        error: 'La terminal debe estar configurada en modo PDV para recibir cobros.',
+        error: 'La terminal está en modo Standalone. Cambiala a modo PDV/Integrado desde Mercado Pago Point y sincronizá las terminales.',
+      }, 409);
+    }
+
+    if (!device.activo) {
+      return jsonResponse({
+        error: 'La terminal está inactiva. Verificá que esté encendida y sincronizá las terminales.',
       }, 409);
     }
 

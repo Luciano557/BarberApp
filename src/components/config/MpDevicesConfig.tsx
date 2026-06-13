@@ -113,6 +113,13 @@ export function MpDevicesConfig({
 }: MpDevicesConfigProps) {
   const { sucursales } = useSucursal();
 
+  const getDeviceModeLabel = (device: MpDevice) => {
+    if (device.operating_mode === 'PDV' && device.activo) return 'PDV activo';
+    if (device.operating_mode === 'STANDALONE') return 'Standalone';
+    if (!device.activo) return 'Inactiva';
+    return device.operating_mode ?? 'Sin modo';
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -173,8 +180,13 @@ export function MpDevicesConfig({
 
                 {/* Row 2 on mobile: badge + sucursal selector */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className="text-xs">
-                    {device.operating_mode ?? 'PDV'}
+                  <Badge
+                    variant="outline"
+                    className={device.activo && device.operating_mode === 'PDV'
+                      ? 'text-xs'
+                      : 'text-xs border-status-warning bg-status-warning-bg text-status-warning-foreground'}
+                  >
+                    {getDeviceModeLabel(device)}
                   </Badge>
 
                   {canManage ? (
