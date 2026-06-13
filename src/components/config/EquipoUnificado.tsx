@@ -1330,7 +1330,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-status-warning" />}
               {confirmRegen?.isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1383,8 +1383,8 @@ export function EquipoUnificado({
                 {finalizarTarget?.loading ? (
                   <p className="text-xs">Verificando turnos futuros…</p>
                 ) : finalizarTarget && finalizarTarget.futureTurnos !== null && finalizarTarget.futureTurnos > 0 ? (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
                     <span>
                       Tiene <strong>{finalizarTarget.futureTurnos}</strong> turno{finalizarTarget.futureTurnos === 1 ? '' : 's'} futuro{finalizarTarget.futureTurnos === 1 ? '' : 's'} agendado{finalizarTarget.futureTurnos === 1 ? '' : 's'}. Al finalizar la actividad esos turnos quedarán asignados a este barbero. Reasignalos o cancelalos antes si corresponde.
                     </span>
@@ -1432,7 +1432,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-status-warning" />
               Reemplazar Encargado de Sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1486,7 +1486,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-status-warning" />
               Corregir encargado de sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>

@@ -611,7 +611,7 @@ export function SucursalesConfig() {
               </AlertDialogHeader>
 
               {toggleTarget.isDeactivating && toggleTarget.futureTurnos !== null && toggleTarget.futureTurnos > 0 && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning-foreground">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
                     Esta sucursal tiene {toggleTarget.futureTurnos} turno{toggleTarget.futureTurnos === 1 ? '' : 's'} futuro{toggleTarget.futureTurnos === 1 ? '' : 's'} que quedará{toggleTarget.futureTurnos === 1 ? '' : 'n'} sin atender.

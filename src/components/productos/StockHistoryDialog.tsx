@@ -15,7 +15,7 @@ interface Props {
 const TIPO_LABEL: Record<MovimientoStock['tipo'], { label: string; className: string }> = {
   stock_inicial: { label: 'Stock inicial', className: 'bg-muted text-foreground' },
   reposicion: { label: 'Reposición', className: 'bg-success/15 text-success border border-success/30' },
-  ajuste_manual: { label: 'Ajuste manual', className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30' },
+  ajuste_manual: { label: 'Ajuste manual', className: 'bg-status-warning/15 text-status-warning-foreground border border-status-warning/30' },
   venta: { label: 'Venta', className: 'bg-primary/15 text-primary border border-primary/30' },
 };
 

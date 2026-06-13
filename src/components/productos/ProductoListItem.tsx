@@ -181,7 +181,7 @@ export function ProductoListItem({
             </div>
             <div className="text-xs text-muted-foreground mt-1.5 uppercase tracking-wide">Stock actual</div>
             {stockBajo && !stockNegativo && (
-              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">Bajo el mínimo</div>
+              <div className="mt-2 text-xs text-status-warning-foreground font-medium">Bajo el mínimo</div>
             )}
             {stockNegativo && (
               <div className="mt-2 text-xs text-destructive font-medium">Stock negativo</div>

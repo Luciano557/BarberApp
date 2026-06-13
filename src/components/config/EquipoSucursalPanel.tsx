@@ -487,7 +487,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               {deleteFutureCount != null && deleteFutureCount > 0 && (
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertTriangle className="h-4 w-4 text-status-warning" />
               )}
               Eliminar asignación
             </AlertDialogTitle>
@@ -532,8 +532,8 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                 {deactivateFutureCount == null ? (
                   <p className="text-xs">Verificando turnos futuros…</p>
                 ) : deactivateFutureCount > 0 ? (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
                     <span>
                       Tiene <strong>{deactivateFutureCount}</strong> turno{deactivateFutureCount === 1 ? '' : 's'} futuro{deactivateFutureCount === 1 ? '' : 's'} en esta sucursal. Esos turnos pueden quedar sin barbero disponible.
                     </span>
