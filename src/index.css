@@ -47,6 +47,10 @@
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
 
+    --status-warning: 38 92% 50%;
+    --status-warning-foreground: 38 92% 40%;
+    --status-warning-bg: 38 92% 95%;
+
     --border: 232 30% 90%;
     --input: 232 30% 88%;
     --ring: 224 43% 30%;
@@ -107,6 +111,10 @@
 
     --success: 142 76% 42%;
     --success-foreground: 0 0% 100%;
+
+    --status-warning: 38 92% 55%;
+    --status-warning-foreground: 38 92% 70%;
+    --status-warning-bg: 38 30% 15%;
 
     --border: 234 25% 22%;
     --input: 234 25% 22%;

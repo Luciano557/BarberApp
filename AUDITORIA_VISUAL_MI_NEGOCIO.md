@@ -226,3 +226,162 @@
 **Tag:** ⚠️ PARCIAL — 🆕 dos paletas de entidad distintas (LINE_COLORS 8 colores vs MARCA_COLORS 12 colores) sin regla que las unifique.
 
 ---
+
+## 5. Mi Negocio — Tab por sucursal / Métodos de pago / Horarios / Ausencias / Agenda
+
+#### SucursalTabContent — `src/components/SucursalTabContent.tsx`
+**Estructura:** Card de info con StatusPill Activa/Inactiva (migrado ✅, conserva `animate-pop-in`). Botonera header: outline "Cuenta de sucursal" / "Editar" / "Desactivar" (este último outline con `text-destructive border-destructive/30` — patrón "outline destructivo" distinto a variant=destructive). DrawerForm "Editar información" sm: ghost "Cancelar" + "Guardar"/"Guardando..." ✅ regla 1. Sheet lateral para Cuenta de sucursal. AlertDialog toggle con Action `bg-destructive` cuando desactiva ✅.
+**Estética:** ❌ advertencia turnos futuros con `border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300` hardcodeado (4ª aparición del patrón amber).
+**Microcopy:** "Editar información", "Cuenta de sucursal", "Reactivar"/"Desactivar"/"Procesando...", "Sucursal actualizada/desactivada/reactivada". Placeholder de teléfono "+54 11 1234-5678" (Input común — el alta en MiNegocioPanel usa PhoneInput con validación: **mismo campo, dos widgets distintos según pantalla**).
+**Tag:** ⚠️ PARCIAL — DrawerForm ✅; amber hardcodeado; 🆕 botón "outline destructivo" no contemplado por las reglas; inconsistencia PhoneInput vs Input plano.
+
+#### EquipoSucursalPanel — `src/components/config/EquipoSucursalPanel.tsx`
+**Estructura:** Card + Tabs Activos/Inactivos + TabBadge ✅. Filas con Badges outline/secondary para roles y asignaciones. Eliminar por fila = botón ghost icon (sin kebab — acciones directas). 2 DrawerForms ("Asignación temporal" / "Asignación recurrente"): ghost "Cancelar" + Guardar ✅ regla 1. AlertDialogs con advertencia amber hardcodeada (`border-amber-500/40 bg-amber-500/10`, 5ª aparición).
+**Microcopy:** "Asignación temporal/recurrente creada", "Asignación eliminada", "Barbero activado/desactivado en esta sucursal", "Sin asignación vigente hoy", placeholder "Elegí un barbero".
+**Tag:** ⚠️ PARCIAL — TabBadge ✅, DrawerForms ✅; sin kebab (acciones inline); amber hardcodeado.
+
+#### CobrarConfig — `src/components/config/CobrarConfig.tsx`
+**Estructura:** wrapper Tabs Servicios/Extras que delega a ServicesConfig/ExtrasConfig modo sucursal. Nota informativa "Para crear o eliminar extras, usá la vista general del negocio."
+**Tag:** ✅ — sin criterios visuales propios relevantes.
+
+#### PaymentMethodsConfig — `src/components/config/PaymentMethodsConfig.tsx`
+**Estructura:** Card única (no CRUD de lista — sin tabs/kebab, no le aplica regla 2). Filas método: Switch + label + Input % + **botón "Guardar" por fila como `<button>` HTML crudo** (`rounded border px-2 py-1 text-xs` — no usa el componente Button). Empty state "usa configuración general" con CTA primario "Editar configuración general" + outline "Personalizar esta sucursal". AlertDialog revert: Cancelar + "Confirmar" ✅.
+**Estética:** tokens OK. Ícono de empty en caja `bg-primary/10 text-primary` (patrón B de header-ícono).
+**Microcopy:** "Métodos de pago y recargos", "Guardar" (por fila), "{Método} actualizado", "Personalizar esta sucursal", "Volver a configuración general".
+**Tag:** ⚠️ PARCIAL — ❌ botón "Guardar" como elemento HTML crudo en vez de `<Button>`; 🆕 patrón "guardado por fila on-blur + botón" no documentado.
+
+#### HorariosTrabajoSection — `src/components/config/HorariosTrabajoSection.tsx`
+**Estructura:** Card con Tabs "Horario sucursal" / "Por barbero" (sin TabBadge — son vistas, no listas). StatusPills migradas ✅ (Sin horario/Abierto/Pausado; Horario propio/Usa sucursal). Edición por día via **Sheet lateral crudo** (`SheetContent sm:max-w-md`) — NO DrawerForm: sin footer fijo, acciones inline (botón outline "Agregar rango" al final, eliminar por rango ghost icon). AlertDialog para limpiar día. Select "Seleccionar barbero" + outline "Crear horario propio"-style buttons; "removeOverride" ghost `text-destructive`.
+**Estética:** tokens OK (amber no detectado).
+**Microcopy:** "Editar {día}", "Aplicado a N día(s)", "Horario propio creado", "Barbero volvió al horario de sucursal", "{Día} sin horario", validaciones "La hora fin debe ser mayor que la de inicio", "Ese rango ya está agregado", "El rango se superpone con otro".
+**Tag:** ⚠️ PARCIAL — pills ✅; ❌ usa Sheet crudo sin footer estándar donde el resto usa DrawerForm — DUDA: ¿se considera "formulario" sujeto a regla 1 o herramienta de edición libre?
+
+#### BloqueosSection — `src/components/config/BloqueosSection.tsx`
+**Estructura:** Card con **formulario inline colapsable** (`border rounded-lg bg-muted/30`) — no Drawer/Dialog. Botonera del form: `justify-end` ghost "Cancelar" + primario "Crear ausencia" (ambos a la derecha, ≠ `justify-between` del patrón drawer). Eliminar por fila ghost icon directo **sin confirmación** (único caso de delete sin AlertDialog en todo lo auditado — DUDA: ¿intencional por ser registros menores?). Badges con tamaños custom `text-[10px] h-5` / `h-4`.
+**Microcopy:** "Nueva ausencia", "Crear ausencia", "Ausencia registrada" pero "**Bloqueo** eliminado" — mezcla ausencia/bloqueo para el mismo concepto (el archivo se llama Bloqueos, la UI dice ausencias).
+**Tag:** ⚠️ PARCIAL — 🆕 formulario inline no contemplado; delete sin confirmación; terminología ausencia/bloqueo inconsistente.
+
+#### AgendaManagement + AgendaConfigSection — `src/components/config/`
+**Estructura:** AgendaManagement = Tabs anidadas 2 niveles (Agenda/Configuración → Portal público/Configuración de reservas). AgendaConfigSection = 2 Cards de settings con Selects + opción "Personalizado" con Input; **botón primario único "Guardar" al final de la sección** (patrón "settings page con save global", distinto de todo lo demás).
+**Microcopy:** ❌ toasts **sin tilde**: "Error al guardar configuracion", "Configuracion guardada" (3 ocurrencias — el resto del sistema escribe "configuración" correctamente).
+**Tag:** ⚠️ PARCIAL — 🆕 patrón "settings con save global" no documentado; typos de acentuación en toasts.
+
+---
+
+## 6. Configuración — Portal público / PIN / Notificaciones / Mi cuenta / Tareas / Plan / MercadoPago
+
+#### PortalPublicoSection — `src/components/config/PortalPublicoSection.tsx`
+**Estructura:** Card con link + QR + Accordion "avanzado" conteniendo todo el formulario (logo, portada, color, descripción, links). **Botón primario único "Guardar" `size="lg"` al final del Accordion** (save global — tercer patrón de guardado del sistema). Botones outline para copiar/descargar QR/subir/quitar.
+**Estética:** `#000000` como fallback del color input (funcional, es valor de dato no de UI). Validación "El color debe tener formato #RRGGBB".
+**Microcopy:** "Cambios guardados", "Logo actualizado/quitado", "Portada actualizada/quitada", "Encuadre guardado", "Link copiado", "Máximo 4 links".
+**Tag:** ⚠️ PARCIAL — formulario complejo de 8+ campos que NO es Dialog centrado ni Drawer: es Accordion inline con save global. Las reglas no contemplan este caso (DUDA: ¿la regla 1 aplica a settings-pages o solo a alta/edición de entidades?).
+
+#### PortalLinksEditor — `src/components/config/PortalLinksEditor.tsx`
+**Estructura:** editor de lista inline con Popover para elegir ícono, botones ghost icon para mover/eliminar, outline "Agregar link".
+**Estética:** tokens OK. Placeholders "Instagram", "https://...".
+**Tag:** ✅ — 🆕 patrón "lista reordenable inline" no documentado pero consistente.
+
+#### PortalColorPalette — `src/components/config/PortalColorPalette.tsx`
+**Estructura:** picker de 10 presets circulares + Check con `mixBlendMode: 'difference'` y `color: '#fff'`.
+**Estética:** `PORTAL_COLOR_PRESETS` con **10 hex hardcodeados** (`#0A0A0A`…`#78350F`) — TERCERA paleta de picker del sistema (junto a LINE_COLORS y MARCA_COLORS). Uso legítimo (el valor elegido es dato del portal del cliente, no UI del sistema).
+**Tag:** 🆕 NO_CUBIERTO — pickers de color de entidad/portal: 3 paletas distintas sin regla unificadora.
+
+#### PortalCoverUploader — `src/components/config/PortalCoverUploader.tsx`
+**Estructura:** uploader con botones outline (subir/ajustar/quitar). Tokens OK.
+**Tag:** ✅.
+
+#### PortalCoverPositionDialog — `src/components/config/PortalCoverPositionDialog.tsx`
+**Estructura:** Dialog centrado para encuadre. DialogFooter `sm:justify-between`: ghost "Restablecer" izquierda + grupo derecha (outline "Cancelar" + primario Guardar) — **"Cancelar" es outline, no ghost** (≠ regla 1).
+**Tag:** ⚠️ PARCIAL — orden correcto pero variante de Cancelar desviada; 🆕 tercer botón "Restablecer" en footer no contemplado.
+
+#### PortalPreview — `src/components/config/PortalPreview.tsx`
+**Estructura:** preview sin estilos propios relevantes (sin hex, sin botones).
+**Tag:** ✅.
+
+#### PinConfigSection — `src/components/PinConfigSection.tsx`
+**Estructura:** Card con formulario inline (no Drawer/Dialog). Inputs con toggle Eye/EyeOff (botones ghost embebidos). Botonera: **primario "Configurar PIN"/"Cambiar PIN" a la IZQUIERDA + `variant="destructive"` relleno "Eliminar PIN" a la derecha** — orden inverso al patrón y destructivo relleno. AlertDialog "¿Eliminar PIN?" con Action default (sin bg-destructive — inconsistente con otros deletes).
+**Microcopy:** "PIN configurado/actualizado/eliminado correctamente". ❌ tuteo: "Si **eliminas** tu PIN, perderás acceso… hasta que **configures** uno nuevo", placeholder "Repite el PIN" (mismo string tuteado que StaffPinDialog).
+**Tag:** ⚠️ PARCIAL — 🆕 formulario inline de settings; orden de botones propio; tuteo; AlertDialogAction de delete sin estilo destructivo.
+
+#### NotificationsConfig — `src/components/config/NotificationsConfig.tsx`
+**Estructura:** lista de toggles agrupados (Switch por evento + Select de modo + Badge secondary `text-[10px]`). Análogo a PinActionsToggleList.
+**Tag:** ✅ — patrón fila-con-switch consistente.
+
+#### MiCuentaConfig — `src/components/config/MiCuentaConfig.tsx`
+**Estructura:** 2 Cards de solo lectura + NotificationsConfig embebido. Tokens OK.
+**Tag:** ✅.
+
+#### TareasConfig — `src/components/config/TareasConfig.tsx`
+**Estructura:** VencimientoCards con **presets como botones toggle default/outline** + Input custom + **botón "Guardar" por card** (cuarto patrón de guardado: per-card). CardTitle `text-lg` (los demás Config usan `text-base` — inconsistencia tipográfica).
+**Microcopy:** "Configuración guardada" (con tilde, a diferencia de AgendaConfigSection).
+**Tag:** 🆕 NO_CUBIERTO — patrón "preset buttons + save por card" no documentado; título text-lg desviado.
+
+#### OrganizationSettings — `src/components/OrganizationSettings.tsx`
+**Estructura:** Cards de info con edición inline (ghost "Cancelar" + primario "Guardar" — orden ✅). **Badge de plan usa tokens de estado** (`bg-status-warning-bg…` premium / `bg-status-info-bg…` profesional) — correctamente tokenizado, mantiene color propio como indica el candado del proyecto.
+**Tag:** ✅ CUMPLE.
+
+#### MercadoPagoConnect — `src/components/config/MercadoPagoConnect.tsx`
+**Estructura:** StatusPill Conectado/Desconectado (migrado ✅). Botón primario "Conectar", outline para gestión, **outline destructivo** (`text-destructive hover:text-destructive`) para desconectar + AlertDialog.
+**Tag:** ✅ — mismo patrón "outline destructivo" que SucursalTabContent (🆕 variante no documentada pero consistente entre ambos).
+
+#### MpDevicesConfig — `src/components/config/MpDevicesConfig.tsx`
+**Estructura:** lista de terminales con edición inline de nombre (botones ghost icon check/x), Badge outline + Select de sucursal por fila.
+**Microcopy:** "Nombre actualizado", placeholder "Sin asignar".
+**Tag:** ⚠️ PARCIAL — 🆕 edición inline de campo único (patrón no documentado); sin desviaciones de color.
+
+---
+
+## Resumen ejecutivo
+
+### Cobertura
+**57 componentes relevados** en ~50 archivos (los 3 Comision*Config se contaron individualmente; AgendaManagement+AgendaConfigSection como una entrada; 8 entradas de baseline compartido).
+
+### Conteo por tag (tag principal asignado; muchos ⚠️ incluyen además hallazgos 🆕 secundarios)
+
+| Tag | Cantidad |
+|-----|----------|
+| ✅ CUMPLE | 20 |
+| ⚠️ PARCIAL | 27 |
+| ❌ NO_APLICA | 3 (ComisionEquipoConfig, BonoFijoConfig, ComisionProductosConfig) |
+| 🆕 NO_CUBIERTO | 7 (StatusPill, TagPill, EntityColorBar, ShowMoreDivider, LineQuickEditPopover, PortalColorPalette, TareasConfig) |
+| **Total** | **57** |
+
+### Conflicto detectado ENTRE las propias reglas documentadas
+La regla 1 dice "destructivos mantienen `variant='destructive'`" y la regla 2 dice "footer con botones grises neutros, solo el texto cambia color para destructivos". **Ambas conviven sin jerarquía clara** y el código refleja la ambigüedad: StaffPinDialog/PinConfigSection usan destructive relleno; ProductosGlobalConfig/ProductoListItem usan gris+texto coloreado; ServicesConfig/LinesConfig/ExtrasConfig/DiscountsConfig usan una TERCERA variante (fondos tintados amber-50/green-50/red-50) que no coincide con ninguna de las dos lecturas.
+
+### Hallazgos 🆕 más relevantes (patrones recurrentes sin regla)
+
+1. **Footer de edición de drawer con acciones de estado** — el patrón real más extendido (7+ componentes): "Guardar cambios" izquierda + divider + Desactivar/Activar/Eliminar. Existe en DOS implementaciones de color distintas (tintes Tailwind vs gris hex `#f9fafb`); ProductoListItem mezcla ambas en el mismo archivo. Sin "Cancelar" en modo edición.
+2. **Advertencia inline amber hardcodeada** — `border-amber-500/30-40 bg-amber-500/5-10` + AlertTriangle aparece en ≥7 archivos (RegenerarPasswordDialog, EquipoUnificado ×3, SucursalTabContent, EquipoSucursalPanel, StockMovementDialog, StockHistoryDialog) cuando existe el token `--status-warning-*`. Es la deuda de tokens más sistemática.
+3. **Formularios inline embebidos** (sin Drawer/Dialog): Comision×3, BloqueosSection, MarcasManagerDialog, PinConfigSection, MpDevicesConfig, OrganizationSettings — cada uno con su propio orden/variante de botones. Las reglas solo cubren Drawer/Dialog.
+4. **Cuatro patrones de guardado conviviendo**: por fila on-blur (PaymentMethods), save global de sección (AgendaConfig, PortalPublico), save por card (TareasConfig), save por formulario (resto).
+5. **Tres paletas de picker de color hex** sin unificar: LINE_COLORS (8, duplicada en 3 archivos), MARCA_COLORS (12), PORTAL_COLOR_PRESETS (10).
+6. **"Outline destructivo"** (`variant="outline"` + `text-destructive`) en SucursalTabContent y MercadoPagoConnect — consistente entre sí pero no documentado.
+7. **Drawer como menú de acciones del kebab** (ProductoListItem) y **Sheet crudo sin footer** (HorariosTrabajoSection, CuentaSucursal) — contenedores fuera del catálogo de las reglas.
+8. **AlertDialogAction sin estilo en deletes**: BarberSucursalesGeneralSection y PinConfigSection confirman "Eliminar" con botón navy default, mientras el resto usa `bg-destructive` — inconsistencia en la acción más sensible.
+
+### Inconsistencias de microcopy más frecuentes
+
+| Concepto | Variantes encontradas |
+|----------|----------------------|
+| Guardar | "Guardar" · "Guardar cambios" · "Crear" · "Crear ausencia" · "Actualizar" · "Confirmar" · "Confirmar cambio" · "Listo" · "Corregir y continuar" |
+| Estado guardando | "Guardando..." (ASCII) · "Guardando…" (Unicode …) · "Enviando..." · "Regenerando…" · "Aplicando…" · "Procesando..." · "Finalizando…" · "Eliminando..." |
+| Agregar | "Agregar" · "Agregar servicio/categoría/extra/descuento/miembro/integrante" · "Nueva sucursal/línea/ausencia" · "Nuevo producto" |
+| Tabs de listas | "Activos/Inactivos" · "Activas/Inactivas" · "Activos/**Historial**" (EquipoUnificado) |
+| Voseo vs tuteo | Voseo dominante ("Elegí", "Agregá", "Ingresá") con fugas de tuteo: "Repite el PIN" (×2), "debes desactivarla", "Selecciona una línea", "Si eliminas tu PIN… configures" · además "Seleccionar rol/sucursal/barbero" (infinitivo neutro) |
+| Terminología de dominio | "línea" vs "categoría" (mismo concepto, mezclado dentro de LinesConfig) · "ausencia" vs "bloqueo" (BloqueosSection) |
+| Ortografía | "configuracion" sin tilde (AgendaConfigSection ×3) · "Essencial" (placeholder) vs "Esencial" · "Cera mate" vs "Cera matte" |
+
+### Otros usos de `variant="category"` + color dinámico encontrados fuera de la lista original
+Ninguno — tras la migración a TagPill, el único `variant="category"` restante es `DiscountsConfig.tsx:278` (badge de valor $/%, sin color, usa el default del sistema). No quedan usos con color dinámico.
+
+### Dudas explícitas acumuladas (requieren decisión, no asumí)
+1. ¿Cuál de las DOS/TRES implementaciones de footer de edición es la canónica? (tintes vs gris hex vs destructive relleno)
+2. ¿La regla 3 (`--primary`) aplica también al valor dark `234 50% 65%`?
+3. ¿`getEstadoBadge` en CuentaSucursalBlock es dead code? (se calcula `estado` pero no se renderiza)
+4. ¿El botón "Agregar" primario de ProductosConfig (vs outline en el resto) es intencional?
+5. ¿"Essencial" con doble s es branding o typo?
+6. ¿Los formularios de settings (Portal, Agenda, Tareas) están sujetos a la regla 1 o son una categoría aparte?
+7. ¿El delete sin confirmación de BloqueosSection es intencional?
+8. ¿Los Sheet crudos (DayEditSheet, Cuenta de sucursal) deberían migrar a DrawerForm?
+
