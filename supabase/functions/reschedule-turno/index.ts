@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { formatMinutesToText } from "../_shared/formatMinutes.ts";
 import { canonicalPhoneOrNull } from "../_shared/phone.ts";
 
 const corsHeaders = {
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const [configRes, servicioRes, orgRes, sucRes] = await Promise.all([
-      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
+      supabase.from("agenda_config").select("modificacion_limite_min, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
       supabase.from("servicios").select("duracion_min").eq("id", turno.servicio_id).single(),
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
@@ -106,25 +107,25 @@ Deno.serve(async (req) => {
     }
 
     const timezone = sucRes.data?.timezone || orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
-    const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
+    const limiteMin = (configRes.data as any)?.modificacion_limite_min ?? 120;
     const duracion = servicioRes.data?.duracion_min || configRes.data?.duracion_base_min || 30;
 
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const originalDateTime = new Date(`${turno.fecha}T${turno.hora_inicio}`);
-    const hoursUntilOriginal = (originalDateTime.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
+    const minutesUntilOriginal = (originalDateTime.getTime() - nowDate.getTime()) / 60000;
 
-    if (hoursUntilOriginal <= 0) {
+    if (minutesUntilOriginal <= 0) {
       return new Response(JSON.stringify({ error: "Cannot reschedule a past turno" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (hoursUntilOriginal < limiteHs) {
+    if (minutesUntilOriginal < limiteMin) {
       return new Response(JSON.stringify({
         error: "modify_limit",
-        message: `Solo podés reprogramar con al menos ${limiteHs} horas de anticipación.`,
+        message: `Solo podés reprogramar con al menos ${formatMinutesToText(limiteMin)} de anticipación.`,
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     if (sucursalIds.length > 0) {
       const { data: cfgData } = await supabase
         .from("agenda_config")
-        .select("sucursal_id, cancelacion_limite_hs, modificacion_limite_hs")
+        .select("sucursal_id, cancelacion_limite_min, modificacion_limite_min")
         .eq("organization_id", organization_id)
         .in("sucursal_id", sucursalIds);
       configs = cfgData || [];
@@ -91,10 +91,12 @@ Deno.serve(async (req) => {
         return h * 60 + m > nowMinutes;
       })
       .map((t: any) => {
-        const cfg = configMap.get(t.sucursal_id) || { cancelacion_limite_hs: 2, modificacion_limite_hs: 2 };
+        const cfg = configMap.get(t.sucursal_id) || { cancelacion_limite_min: 120, modificacion_limite_min: 120 };
+        const cancelMin = cfg.cancelacion_limite_min ?? 120;
+        const modMin = cfg.modificacion_limite_min ?? 120;
         const turnoDateTime = new Date(`${t.fecha}T${t.hora_inicio}`);
         const turnoInTz = new Date(turnoDateTime.toLocaleString("en-US", { timeZone: timezone }));
-        const hoursUntil = (turnoInTz.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
+        const minutesUntil = (turnoInTz.getTime() - nowDate.getTime()) / 60000;
 
         return {
           id: t.id,
@@ -112,10 +114,10 @@ Deno.serve(async (req) => {
           servicio_precio: t.servicios?.precio,
           servicio_duracion: t.servicios?.duracion_min,
           organization_id: t.organization_id,
-          puede_cancelar: hoursUntil >= (cfg.cancelacion_limite_hs || 2),
-          puede_reprogramar: hoursUntil >= (cfg.modificacion_limite_hs || 2),
-          cancelacion_limite_hs: cfg.cancelacion_limite_hs || 2,
-          modificacion_limite_hs: cfg.modificacion_limite_hs || 2,
+          puede_cancelar: minutesUntil >= cancelMin,
+          puede_reprogramar: minutesUntil >= modMin,
+          cancelacion_limite_min: cancelMin,
+          modificacion_limite_min: modMin,
         };
       });
 

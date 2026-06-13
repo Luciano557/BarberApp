@@ -8,6 +8,8 @@ import { CalendarDays, Clock, MapPin, Scissors, User, RefreshCw, X, CalendarPlus
 import { CancelTurnoDialog } from "./CancelTurnoDialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatFechaLegible } from "@/lib/dateUtils";
+import { formatMinutesToText } from "@/lib/formatMinutes";
+
 
 interface Turno {
   id: string;
@@ -27,8 +29,8 @@ interface Turno {
   organization_id: string;
   puede_cancelar: boolean;
   puede_reprogramar: boolean;
-  cancelacion_limite_hs: number;
-  modificacion_limite_hs: number;
+  cancelacion_limite_min: number;
+  modificacion_limite_min: number;
 }
 
 interface Props {
@@ -140,7 +142,7 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
                   </TooltipTrigger>
                   {!turno.puede_reprogramar && (
                     <TooltipContent>
-                      <p>Solo podés reprogramar con al menos {turno.modificacion_limite_hs}h de anticipación</p>
+                      <p>Solo podés reprogramar con al menos {formatMinutesToText(turno.modificacion_limite_min)} de anticipación</p>
                     </TooltipContent>
                   )}
                 </Tooltip>
@@ -162,7 +164,7 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
                   </TooltipTrigger>
                   {!turno.puede_cancelar && (
                     <TooltipContent>
-                      <p>Solo podés cancelar con al menos {turno.cancelacion_limite_hs}h de anticipación</p>
+                      <p>Solo podés cancelar con al menos {formatMinutesToText(turno.cancelacion_limite_min)} de anticipación</p>
                     </TooltipContent>
                   )}
                 </Tooltip>

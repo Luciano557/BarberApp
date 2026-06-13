@@ -16,8 +16,8 @@ interface AgendaConfigSectionProps {
 interface ConfigData {
   duracion_base_min: number;
   buffer_despues_min: number;
-  cancelacion_limite_hs: number;
-  modificacion_limite_hs: number;
+  cancelacion_limite_min: number;
+  modificacion_limite_min: number;
   dias_anticipacion: number;
   anticipacion_minima_reserva_min: number;
 }
@@ -30,13 +30,14 @@ type FieldDef = {
   description: string;
   options: Array<{ label: string; value: number }>;
   customSuffix: string;
+  customMax?: number;
 };
 
 const DEFAULTS: ConfigData = {
   duracion_base_min: 15,
   buffer_despues_min: 5,
-  cancelacion_limite_hs: 2,
-  modificacion_limite_hs: 2,
+  cancelacion_limite_min: 120,
+  modificacion_limite_min: 120,
   dias_anticipacion: 30,
   anticipacion_minima_reserva_min: 30,
 };
@@ -103,32 +104,34 @@ const REGLAS_FIELDS: FieldDef[] = [
 
 const LIMITES_FIELDS: FieldDef[] = [
   {
-    key: 'cancelacion_limite_hs',
+    key: 'cancelacion_limite_min',
     label: 'Límite cancelación',
-    description: 'Horas mínimas de anticipación para cancelar.',
+    description: 'Anticipación mínima para cancelar.',
     options: [
-      { label: '15 min', value: 0.25 },
-      { label: '30 min', value: 0.5 },
-      { label: '1 h', value: 1 },
-      { label: '2 h', value: 2 },
-      { label: '4 h', value: 4 },
-      { label: '24 h', value: 24 },
+      { label: '15 min', value: 15 },
+      { label: '30 min', value: 30 },
+      { label: '1 h', value: 60 },
+      { label: '2 h', value: 120 },
+      { label: '4 h', value: 240 },
+      { label: '24 h', value: 1440 },
     ],
-    customSuffix: 'h',
+    customSuffix: 'min',
+    customMax: 10080,
   },
   {
-    key: 'modificacion_limite_hs',
+    key: 'modificacion_limite_min',
     label: 'Límite reprogramación',
-    description: 'Horas mínimas de anticipación para reprogramar.',
+    description: 'Anticipación mínima para reprogramar.',
     options: [
-      { label: '15 min', value: 0.25 },
-      { label: '30 min', value: 0.5 },
-      { label: '1 h', value: 1 },
-      { label: '2 h', value: 2 },
-      { label: '4 h', value: 4 },
-      { label: '24 h', value: 24 },
+      { label: '15 min', value: 15 },
+      { label: '30 min', value: 30 },
+      { label: '1 h', value: 60 },
+      { label: '2 h', value: 120 },
+      { label: '4 h', value: 240 },
+      { label: '24 h', value: 1440 },
     ],
-    customSuffix: 'h',
+    customSuffix: 'min',
+    customMax: 10080,
   },
 ];
 
@@ -151,8 +154,8 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
       setConfig({
         duracion_base_min: data.duracion_base_min,
         buffer_despues_min: data.buffer_despues_min,
-        cancelacion_limite_hs: data.cancelacion_limite_hs,
-        modificacion_limite_hs: data.modificacion_limite_hs,
+        cancelacion_limite_min: (data as any).cancelacion_limite_min ?? 120,
+        modificacion_limite_min: (data as any).modificacion_limite_min ?? 120,
         dias_anticipacion: data.dias_anticipacion,
         anticipacion_minima_reserva_min: (data as any).anticipacion_minima_reserva_min ?? 30,
       });
@@ -257,7 +260,9 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
           </SelectContent>
         </Select>
 
-        {isCustom && (
+        {isCustom && (() => {
+          const maxValue = field.customMax ?? 120;
+          return (
           <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 p-2">
             <div className="flex items-center gap-2">
               <Input
@@ -278,9 +283,9 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
                   }
 
                   const parsed = Number(raw);
-                  if (parsed > 120) {
-                    setCustomError((prev) => ({ ...prev, [field.key]: 'El valor máximo permitido es 120.' }));
-                    updateField(field.key, 120);
+                  if (parsed > maxValue) {
+                    setCustomError((prev) => ({ ...prev, [field.key]: `El valor máximo permitido es ${maxValue}.` }));
+                    updateField(field.key, maxValue);
                     return;
                   }
 
@@ -290,21 +295,22 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
                 onBlur={() => {
                   const raw = customDraft[field.key] ?? '';
                   const parsed = raw === '' ? 0 : Number(raw);
-                  const normalized = Math.min(120, Math.max(0, Math.trunc(Number.isNaN(parsed) ? 0 : parsed)));
+                  const normalized = Math.min(maxValue, Math.max(0, Math.trunc(Number.isNaN(parsed) ? 0 : parsed)));
                   setCustomDraft((prev) => ({ ...prev, [field.key]: String(normalized) }));
                   setCustomError((prev) => ({
                     ...prev,
-                    [field.key]: parsed > 120 ? 'El valor máximo permitido es 120.' : '',
+                    [field.key]: parsed > maxValue ? `El valor máximo permitido es ${maxValue}.` : '',
                   }));
                   updateField(field.key, normalized);
                 }}
               />
               <span className="text-xs text-muted-foreground">{field.customSuffix}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">Ingresá un valor entre 0 y 120.</p>
+            <p className="text-[11px] text-muted-foreground">Ingresá un valor entre 0 y {maxValue}.</p>
             {errorText && <p className="text-[11px] text-destructive">{errorText}</p>}
           </div>
-        )}
+          );
+        })()}
 
         <p className="text-[11px] text-muted-foreground">{field.description}</p>
         {!selectedOption && (

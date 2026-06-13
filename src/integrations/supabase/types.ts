@@ -58,11 +58,13 @@ export type Database = {
           buffer_antes_min: number
           buffer_despues_min: number
           cancelacion_limite_hs: number
+          cancelacion_limite_min: number
           created_at: string
           dias_anticipacion: number
           duracion_base_min: number
           id: string
           modificacion_limite_hs: number
+          modificacion_limite_min: number
           organization_id: string
           sucursal_id: string
           updated_at: string
@@ -72,11 +74,13 @@ export type Database = {
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number
+          cancelacion_limite_min?: number
           created_at?: string
           dias_anticipacion?: number
           duracion_base_min?: number
           id?: string
           modificacion_limite_hs?: number
+          modificacion_limite_min?: number
           organization_id: string
           sucursal_id: string
           updated_at?: string
@@ -86,11 +90,13 @@ export type Database = {
           buffer_antes_min?: number
           buffer_despues_min?: number
           cancelacion_limite_hs?: number
+          cancelacion_limite_min?: number
           created_at?: string
           dias_anticipacion?: number
           duracion_base_min?: number
           id?: string
           modificacion_limite_hs?: number
+          modificacion_limite_min?: number
           organization_id?: string
           sucursal_id?: string
           updated_at?: string
