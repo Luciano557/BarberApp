@@ -283,7 +283,10 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
+            <AlertDialogAction
+              onClick={handleConfirmToggle}
+              className={toggleConfirm?.action === 'deactivate' ? 'bg-status-warning text-white hover:bg-status-warning/90' : undefined}
+            >
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
             </AlertDialogAction>
           </AlertDialogFooter>

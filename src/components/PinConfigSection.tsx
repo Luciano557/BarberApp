@@ -309,7 +309,7 @@ export function PinConfigSection() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDelete}>
+                      <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                         Eliminar
                       </AlertDialogAction>
                     </AlertDialogFooter>

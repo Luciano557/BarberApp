@@ -500,7 +500,7 @@ export function DiscountsConfig({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeactivate} className="bg-amber-500 text-white hover:bg-amber-600">
+            <AlertDialogAction onClick={handleConfirmDeactivate} className="bg-status-warning text-white hover:bg-status-warning/90">
               Desactivar
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -467,7 +467,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
+            <AlertDialogAction
+              onClick={handleConfirmToggle}
+              className={toggleConfirm?.action === 'deactivate' ? 'bg-status-warning text-white hover:bg-status-warning/90' : undefined}
+            >
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
             </AlertDialogAction>
           </AlertDialogFooter>

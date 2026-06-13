@@ -501,7 +501,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={deleting || deleteFutureCount == null}>
+            <AlertDialogAction onClick={confirmDelete} disabled={deleting || deleteFutureCount == null} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? 'Eliminando…' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -544,7 +544,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deactivating}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeactivate} disabled={deactivating || deactivateFutureCount == null}>
+            <AlertDialogAction onClick={confirmDeactivate} disabled={deactivating || deactivateFutureCount == null} className="bg-status-warning text-white hover:bg-status-warning/90">
               {deactivating ? 'Desactivando…' : 'Desactivar'}
             </AlertDialogAction>
           </AlertDialogFooter>

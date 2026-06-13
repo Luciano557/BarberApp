@@ -358,7 +358,10 @@ export function ProductosGlobalConfig() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
+            <AlertDialogAction
+              onClick={handleConfirmToggle}
+              className={toggleConfirm?.next ? undefined : 'bg-status-warning text-white hover:bg-status-warning/90'}
+            >
               {toggleConfirm?.next ? 'Activar' : 'Desactivar'}
             </AlertDialogAction>
           </AlertDialogFooter>

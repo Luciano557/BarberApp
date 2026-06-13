@@ -223,7 +223,7 @@ export function ProductoListItem({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { onToggleActive(false); setDeactivateConfirm(false); }}
-              className="bg-amber-500 text-white hover:bg-amber-600"
+              className="bg-status-warning text-white hover:bg-status-warning/90"
             >
               Desactivar
             </AlertDialogAction>
