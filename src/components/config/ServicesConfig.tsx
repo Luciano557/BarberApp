@@ -331,7 +331,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     setToggleConfirm({ service: editingService, action: 'deactivate' });
                     setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -350,12 +350,11 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                   </Button>
                   {onDelete && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingService);
                         setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
                       }}
-                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                     >
                       Eliminar
                     </Button>

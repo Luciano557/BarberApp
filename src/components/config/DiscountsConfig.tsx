@@ -436,7 +436,7 @@ export function DiscountsConfig({
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -455,13 +455,12 @@ export function DiscountsConfig({
                     Activar
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     onClick={() => {
                       setDeleteConfirm(editingDiscount);
                       setEditingId(null);
                       resetForm();
                     }}
-                    className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                   >
                     Eliminar
                   </Button>

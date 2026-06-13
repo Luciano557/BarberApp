@@ -261,7 +261,7 @@ export function ProductosGlobalConfig() {
               {editingIsActive ? (
                 <Button
                   variant="ghost"
-                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                   onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: false }); }}
                 >
                   Desactivar

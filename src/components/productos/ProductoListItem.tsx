@@ -107,14 +107,14 @@ export function ProductoListItem({
           <div className="flex w-full flex-col gap-1.5">
             <Button
               variant="ghost"
-              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              className="w-full justify-start bg-muted/50 border-border text-foreground hover:bg-muted"
               onClick={() => { setDrawerOpen(false); onAgregarStock(); }}
             >
               <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              className="w-full justify-start bg-muted/50 border-border text-foreground hover:bg-muted"
               onClick={() => { setDrawerOpen(false); onAjustarStock(); }}
             >
               <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
@@ -142,7 +142,7 @@ export function ProductoListItem({
             {activeInSucursal ? (
               <Button
                 variant="ghost"
-                className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                className="w-full justify-start bg-status-warning text-white hover:bg-status-warning/90"
                 onClick={() => { setDrawerOpen(false); setDeactivateConfirm(true); }}
               >
                 Desactivar en sucursal
@@ -158,8 +158,8 @@ export function ProductoListItem({
                 </Button>
                 {onDelete && ps && (
                   <Button
-                    variant="ghost"
-                    className="w-full justify-start bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    variant="destructive"
+                    className="w-full justify-start"
                     onClick={() => { setDrawerOpen(false); setDeleteConfirm(true); }}
                   >
                     Eliminar

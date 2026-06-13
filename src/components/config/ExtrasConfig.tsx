@@ -229,7 +229,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                     setToggleConfirm({ extra: editingExtra, action: 'deactivate' });
                     setEditingId(null); setNewName(''); setNewPrice('');
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -248,12 +248,11 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                   </Button>
                   {onDelete && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingExtra);
                         setEditingId(null); setNewName(''); setNewPrice('');
                       }}
-                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                     >
                       Eliminar
                     </Button>
