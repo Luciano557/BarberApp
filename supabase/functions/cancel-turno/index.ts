@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { canonicalPhoneOrNull } from "../_shared/phone.ts";
+import { formatMinutesToText } from "../_shared/formatMinutes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,28 +65,28 @@ Deno.serve(async (req) => {
 
     const [orgRes, configRes] = await Promise.all([
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
-      supabase.from("agenda_config").select("cancelacion_limite_hs").eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
+      supabase.from("agenda_config").select("cancelacion_limite_min").eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
     ]);
 
     const timezone = orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
-    const limiteHs = configRes.data?.cancelacion_limite_hs ?? 2;
+    const limiteMin = (configRes.data as any)?.cancelacion_limite_min ?? 120;
 
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const turnoDateTime = new Date(`${turno.fecha}T${turno.hora_inicio}`);
-    const hoursUntil = (turnoDateTime.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
+    const minutesUntil = (turnoDateTime.getTime() - nowDate.getTime()) / 60000;
 
-    if (hoursUntil <= 0) {
+    if (minutesUntil <= 0) {
       return new Response(JSON.stringify({ error: "Cannot cancel a past turno" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (hoursUntil < limiteHs) {
+    if (minutesUntil < limiteMin) {
       return new Response(JSON.stringify({
         error: "cancel_limit",
-        message: `Solo podés cancelar con al menos ${limiteHs} horas de anticipación.`,
+        message: `Solo podés cancelar con al menos ${formatMinutesToText(limiteMin)} de anticipación.`,
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
