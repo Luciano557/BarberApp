@@ -260,7 +260,9 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
           </SelectContent>
         </Select>
 
-        {isCustom && (
+        {isCustom && (() => {
+          const maxValue = field.customMax ?? 120;
+          return (
           <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 p-2">
             <div className="flex items-center gap-2">
               <Input
@@ -281,9 +283,9 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
                   }
 
                   const parsed = Number(raw);
-                  if (parsed > 120) {
-                    setCustomError((prev) => ({ ...prev, [field.key]: 'El valor máximo permitido es 120.' }));
-                    updateField(field.key, 120);
+                  if (parsed > maxValue) {
+                    setCustomError((prev) => ({ ...prev, [field.key]: `El valor máximo permitido es ${maxValue}.` }));
+                    updateField(field.key, maxValue);
                     return;
                   }
 
@@ -293,21 +295,22 @@ export function AgendaConfigSection({ sucursalId, organizationId }: AgendaConfig
                 onBlur={() => {
                   const raw = customDraft[field.key] ?? '';
                   const parsed = raw === '' ? 0 : Number(raw);
-                  const normalized = Math.min(120, Math.max(0, Math.trunc(Number.isNaN(parsed) ? 0 : parsed)));
+                  const normalized = Math.min(maxValue, Math.max(0, Math.trunc(Number.isNaN(parsed) ? 0 : parsed)));
                   setCustomDraft((prev) => ({ ...prev, [field.key]: String(normalized) }));
                   setCustomError((prev) => ({
                     ...prev,
-                    [field.key]: parsed > 120 ? 'El valor máximo permitido es 120.' : '',
+                    [field.key]: parsed > maxValue ? `El valor máximo permitido es ${maxValue}.` : '',
                   }));
                   updateField(field.key, normalized);
                 }}
               />
               <span className="text-xs text-muted-foreground">{field.customSuffix}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">Ingresá un valor entre 0 y 120.</p>
+            <p className="text-[11px] text-muted-foreground">Ingresá un valor entre 0 y {maxValue}.</p>
             {errorText && <p className="text-[11px] text-destructive">{errorText}</p>}
           </div>
-        )}
+          );
+        })()}
 
         <p className="text-[11px] text-muted-foreground">{field.description}</p>
         {!selectedOption && (
