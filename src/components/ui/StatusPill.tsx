@@ -1,70 +1,68 @@
-import { AlertTriangle, Clock } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export type StatusPillStatus = 'success' | 'neutral' | 'info' | 'warning' | 'error';
+
 interface StatusPillProps {
-  status: 'success' | 'neutral' | 'info' | 'warning' | 'error';
+  status: StatusPillStatus;
   label: string;
-  icon?: boolean;
+  /** Ícono que reemplaza el dot (ej: Lock, AlertTriangle). false = ni dot ni ícono (solo texto). Omitido = dot por defecto. */
+  icon?: LucideIcon | false;
+  size?: 'sm' | 'md'; // sm: text-[10px] px-2 py-0.5 · md (default): text-xs px-2.5 py-0.5
   className?: string;
 }
 
-type DotConfig = {
-  kind: 'dot';
+type StatusConfig = {
+  containerClass: string;
   dotClass: string;
-  containerClass: string;
 };
 
-type IconConfig = {
-  kind: 'icon';
-  Icon: React.ComponentType<{ className?: string }>;
-  containerClass: string;
-};
-
-const statusConfig: Record<StatusPillProps['status'], DotConfig | IconConfig> = {
+const statusConfig: Record<StatusPillStatus, StatusConfig> = {
   success: {
-    kind: 'dot',
-    dotClass: 'bg-status-success',
     containerClass: 'bg-status-success-bg text-status-success-foreground border-status-success',
+    dotClass: 'bg-status-success',
   },
   neutral: {
-    kind: 'dot',
-    dotClass: 'bg-muted-foreground',
     containerClass: 'bg-secondary text-secondary-foreground border-border',
+    dotClass: 'bg-muted-foreground',
   },
   info: {
-    kind: 'dot',
-    dotClass: 'bg-status-info',
     containerClass: 'bg-status-info-bg text-status-info-foreground border-status-info',
+    dotClass: 'bg-status-info',
   },
   warning: {
-    kind: 'icon',
-    Icon: Clock,
     containerClass: 'bg-status-warning-bg text-status-warning-foreground border-status-warning',
+    dotClass: 'bg-status-warning',
   },
   error: {
-    kind: 'icon',
-    Icon: AlertTriangle,
     containerClass: 'bg-status-error-bg text-status-error-foreground border-status-error',
+    dotClass: 'bg-status-error',
   },
 };
 
-export function StatusPill({ status, label, icon = true, className }: StatusPillProps) {
+const sizeClasses = {
+  sm: 'text-[10px] px-2 py-0.5',
+  md: 'text-xs px-2.5 py-0.5',
+} as const;
+
+export function StatusPill({ status, label, icon, size = 'md', className }: StatusPillProps) {
   const config = statusConfig[status];
+  const Icon = icon;
 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+        'inline-flex items-center gap-1.5 rounded-full border font-semibold',
+        sizeClasses[size],
         config.containerClass,
         className,
       )}
     >
-      {config.kind === 'dot' && (
+      {Icon ? (
+        <Icon className="h-3 w-3 shrink-0" />
+      ) : Icon === undefined ? (
         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', config.dotClass)} />
-      )}
-      {config.kind === 'icon' && icon && (
-        <config.Icon className="h-3 w-3 shrink-0" />
-      )}
+      ) : null}
       {label}
     </span>
   );
