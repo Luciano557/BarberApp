@@ -51,6 +51,26 @@
     --status-warning-foreground: 38 92% 40%;
     --status-warning-bg: 38 92% 95%;
 
+    --status-success: 142 76% 36%;
+    --status-success-foreground: 142 72% 26%;
+    --status-success-bg: 142 70% 95%;
+
+    --status-info: 217 91% 60%;
+    --status-info-foreground: 221 70% 40%;
+    --status-info-bg: 214 95% 95%;
+
+    --status-error: 0 72% 50%;
+    --status-error-foreground: 0 70% 40%;
+    --status-error-bg: 0 86% 96%;
+
+    --status-purple: 270 70% 55%;
+    --status-purple-foreground: 270 60% 42%;
+    --status-purple-bg: 270 70% 96%;
+
+    --status-indigo: 243 75% 59%;
+    --status-indigo-foreground: 243 60% 45%;
+    --status-indigo-bg: 243 75% 96%;
+
     --border: 232 30% 90%;
     --input: 232 30% 88%;
     --ring: 224 43% 30%;
@@ -115,6 +135,26 @@
     --status-warning: 38 92% 55%;
     --status-warning-foreground: 38 92% 70%;
     --status-warning-bg: 38 30% 15%;
+
+    --status-success: 142 76% 42%;
+    --status-success-foreground: 142 60% 65%;
+    --status-success-bg: 142 30% 14%;
+
+    --status-info: 217 91% 65%;
+    --status-info-foreground: 217 80% 72%;
+    --status-info-bg: 217 30% 16%;
+
+    --status-error: 0 84% 60%;
+    --status-error-foreground: 0 80% 72%;
+    --status-error-bg: 0 30% 15%;
+
+    --status-purple: 270 70% 62%;
+    --status-purple-foreground: 270 70% 75%;
+    --status-purple-bg: 270 25% 16%;
+
+    --status-indigo: 243 75% 65%;
+    --status-indigo-foreground: 243 75% 76%;
+    --status-indigo-bg: 243 25% 16%;
 
     --border: 234 25% 22%;
     --input: 234 25% 22%;
