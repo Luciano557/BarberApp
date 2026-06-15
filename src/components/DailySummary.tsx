@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, MoreVertical, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -18,8 +18,8 @@ import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
 import { BackfillWizard } from './BackfillWizard';
 import { MultiDayClosingSummary } from './MultiDayClosingSummary';
+import { TransactionDetailDrawer } from './TransactionDetailDrawer';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { supabase } from '@/integrations/supabase/client';
@@ -67,6 +67,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const { saveCashClosing } = useCashClosing();
   const requirePinForAction = useRequirePinForAction();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
+  const [detailTransaction, setDetailTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
   const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
@@ -816,7 +817,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               <p className="text-sm mt-1">Los cobros aparecerán aquí</p>
             </div>
           ) : (
-            <TooltipProvider>
               <div className="space-y-2">
                 {summary.transactions.map((tx) => {
                   const isVoided = tx.estado === 'anulado';
@@ -831,11 +831,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   return (
                     <div
                       key={tx.id}
-                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center ${
-                        isVoided 
-                          ? 'bg-destructive/10 border border-destructive/20' 
+                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center cursor-pointer ${
+                        isVoided
+                          ? 'bg-destructive/10 border border-destructive/20 hover:bg-destructive/15'
                           : 'bg-muted/50 hover:bg-muted'
                       }`}
+                      onClick={() => setDetailTransaction(tx)}
                     >
                       <div className="flex-shrink-0">
                         {isVoided ? (
@@ -863,14 +864,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             {tx.serviceName || (tx.productos && tx.productos.length > 0 ? 'Venta de productos' : '—')}
                           </span>
                           {tx.extras.length > 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
-                              +{tx.extras.length}
-                            </span>
+                            <Badge variant="secondary">+{tx.extras.length}</Badge>
                           )}
                           {isMixed && !isVoided && (
-                            <Badge variant="outline" className="text-[10px] py-0 h-4">
-                              Mixto
-                            </Badge>
+                            <Badge variant="category" color="default" size="sm">Mixto</Badge>
                           )}
                           {isVoided && (
                             <StatusPill status="error" label="Anulado" />
@@ -899,32 +896,22 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             </p>
                           )}
                         </div>
-                        {!isVoided && onVoidTransaction && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className={`h-8 w-8 border-destructive/30 ${canVoid ? 'text-destructive hover:text-destructive hover:bg-destructive/10' : 'text-muted-foreground/50 cursor-not-allowed opacity-50'}`}
-                                onClick={() => canVoid && setVoidingTransaction(tx)}
-                                disabled={!canVoid}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {canVoid 
-                                ? 'Anular transacción' 
-                                : 'No se puede anular: caja cerrada'}
-                            </TooltipContent>
-                          </Tooltip>
+                        {!isVoided && onVoidTransaction ? (
+                          <button
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted border-[0.5px] border-border"
+                            onClick={(e) => { e.stopPropagation(); setDetailTransaction(tx); }}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Ver detalle</span>
+                          </button>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
                         )}
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </TooltipProvider>
           )}
         </CardContent>
       </Card>
@@ -943,8 +930,17 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           await onVoidTransaction(voidingTransaction.id, voidedBy, voidedById);
           toast.success(`Transacción anulada por ${voidedBy}`);
           setVoidingTransaction(null);
+          setDetailTransaction(null);
           checkClosedBarbers();
         }}
+      />
+
+      <TransactionDetailDrawer
+        transaction={detailTransaction}
+        open={!!detailTransaction}
+        onOpenChange={(open) => { if (!open) setDetailTransaction(null); }}
+        canVoid={detailTransaction ? canVoidTransaction(detailTransaction) : false}
+        onVoidRequest={() => { if (detailTransaction) setVoidingTransaction(detailTransaction); }}
       />
 
       {/* Cash Closing Dialog */}
