@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { Plus, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Extra } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { DrawerForm } from '@/components/ui/drawer-form';
-import { TabBadge } from '@/components/ui/TabBadge';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 interface ExtrasConfigProps {
   extras: Extra[];
@@ -135,68 +134,65 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Plus className="h-5 w-5 text-muted-foreground" />
+      <CatalogSectionCard
+        icon={Plus}
+        title={isGlobal ? 'Complementos de cobro' : 'Extras de esta sucursal'}
+        description={
+          isGlobal
+            ? 'Ítems opcionales que se suman al cobro. Los precios se configuran en cada sucursal.'
+            : 'Activá los extras disponibles y configurá el precio.'
+        }
+        actions={
+          !isAdding && !editingId && activeSubTab === 'active' ? (
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          ) : undefined
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activos', count: activeExtras.length },
+              { value: 'inactive', label: 'Inactivos', count: inactiveExtras.length },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        {isGlobal && (
+          <p className="text-xs text-muted-foreground">
+            Los precios de los extras se configuran por sucursal.
+          </p>
+        )}
+        {activeSubTab === 'active' && (
+          <div className="space-y-2" role="tabpanel">
+            {activeExtras.map(renderExtraItem)}
+            {activeExtras.length === 0 && !isAdding && (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                <Plus className="h-8 w-8 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium">No hay extras activos</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Agregá extras para cobrarlos junto a un servicio.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                  Agregar extra
+                </Button>
               </div>
-              <div>
-                <CardTitle className="text-base">
-                  {isGlobal ? 'Complementos de cobro' : 'Extras de esta sucursal'}
-                </CardTitle>
-                <CardDescription>
-                  {isGlobal
-                    ? 'Ítems opcionales que se suman al cobro. Los precios se configuran en cada sucursal.'
-                    : 'Activá los extras disponibles y configurá el precio.'}
-                </CardDescription>
-              </div>
-            </div>
-            {!isAdding && !editingId && activeSubTab === 'active' && (
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
-                <Plus className="h-4 w-4 mr-1" /> Agregar
-              </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isGlobal && (
-            <p className="text-xs text-muted-foreground">
-              Los precios de los extras se configuran por sucursal.
-            </p>
-          )}
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeExtras.length} /></TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos<TabBadge count={inactiveExtras.length} /></TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-2">
-              {activeExtras.map(renderExtraItem)}
-              {activeExtras.length === 0 && !isAdding && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-                  <Plus className="h-8 w-8 text-muted-foreground/50" />
-                  <div>
-                    <p className="text-sm font-medium">No hay extras activos</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Agregá extras para cobrarlos junto a un servicio.
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
-                    Agregar extra
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-2">
-              {inactiveExtras.map(renderExtraItem)}
-              {inactiveExtras.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay extras inactivos</p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        )}
+        {activeSubTab === 'inactive' && (
+          <div className="space-y-2" role="tabpanel">
+            {inactiveExtras.map(renderExtraItem)}
+            {inactiveExtras.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay extras inactivos</p>
+            )}
+          </div>
+        )}
+      </CatalogSectionCard>
 
       <DrawerForm
         open={isAdding || editingId !== null}
@@ -264,13 +260,13 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
         }
       >
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre</label>
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Barba" />
           </div>
           {!isGlobal && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Precio</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Precio</label>
               <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
             </div>
           )}

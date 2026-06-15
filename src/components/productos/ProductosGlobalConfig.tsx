@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
 import { TagPill } from '@/components/ui/TagPill';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
@@ -17,7 +17,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto } from './types';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
-import { TabBadge } from '@/components/ui/TabBadge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
 /**
@@ -162,29 +161,21 @@ export function ProductosGlobalConfig() {
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Package className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Catálogo de productos</CardTitle>
-                <CardDescription>Productos para reventa. Los precios y stock se configuran en cada sucursal.</CardDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setMarcasDialogOpen(true)}>
-                <Tag className="h-4 w-4 mr-1" /> Marcas
-              </Button>
-              <Button variant="outline" size="sm" onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-1" /> Agregar
-              </Button>
-            </div>
+      <CatalogSectionCard
+        icon={Package}
+        title="Catálogo de productos"
+        description="Productos para reventa. Los precios y stock se configuran en cada sucursal."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setMarcasDialogOpen(true)}>
+              <Tag className="h-4 w-4 mr-1" /> Marcas
+            </Button>
+            <Button variant="outline" size="sm" onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        }
+        search={
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -195,56 +186,55 @@ export function ProductosGlobalConfig() {
               maxLength={80}
             />
           </div>
-
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
-                Activos<TabBadge count={activeCount} />
-              </TabsTrigger>
-              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
-                Inactivos<TabBadge count={inactiveCount} />
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value={activeSubTab} className="mt-4 space-y-2">
-              {loading && (
-                <p className="text-sm text-muted-foreground text-center py-4">Cargando…</p>
-              )}
-              {!loading && filtered.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {activeSubTab === 'active' ? 'No hay productos activos' : 'No hay productos inactivos'}
-                </p>
-              )}
-              {filtered.map(p => {
-                const marca = p.marca_id ? marcasMap.get(p.marca_id) : null;
-                return (
-                  <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                    <EntityColorBar color={marca?.color} />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-foreground truncate">{p.nombre}</span>
-                      {p.descripcion && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.descripcion}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {marca && (
-                        <TagPill label={marca.nombre} />
-                      )}
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
-                        title="Opciones"
-                      >
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activos', count: activeCount },
+              { value: 'inactive', label: 'Inactivos', count: inactiveCount },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        <div className="space-y-2" role="tabpanel">
+          {loading && (
+            <p className="text-sm text-muted-foreground text-center py-4">Cargando…</p>
+          )}
+          {!loading && filtered.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              {activeSubTab === 'active' ? 'No hay productos activos' : 'No hay productos inactivos'}
+            </p>
+          )}
+          {filtered.map(p => {
+            const marca = p.marca_id ? marcasMap.get(p.marca_id) : null;
+            return (
+              <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+                <EntityColorBar color={marca?.color} />
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-foreground truncate">{p.nombre}</span>
+                  {p.descripcion && (
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{p.descripcion}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {marca && (
+                    <TagPill label={marca.nombre} />
+                  )}
+                  <button
+                    onClick={() => openEdit(p)}
+                    className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+                    title="Opciones"
+                  >
+                    <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CatalogSectionCard>
 
       <DrawerForm
         open={showDialog}
@@ -269,7 +259,7 @@ export function ProductosGlobalConfig() {
               ) : (
                 <Button
                   variant="ghost"
-                  className="bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#166534] hover:bg-muted"
+                  className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: true }); }}
                 >
                   Activar
@@ -289,11 +279,11 @@ export function ProductosGlobalConfig() {
         }
       >
         <div className="space-y-4">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Datos generales del producto. El stock y los precios se configuran por sucursal.
           </p>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre</label>
             <Input
               value={form.nombre}
               onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
@@ -301,8 +291,8 @@ export function ProductosGlobalConfig() {
               maxLength={80}
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Marca</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Marca</label>
             <div className="flex gap-2">
               <Select
                 value={form.marca_id || 'none'}
@@ -321,8 +311,8 @@ export function ProductosGlobalConfig() {
               </Button>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Descripción</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Descripción</label>
             <Textarea
               value={form.descripcion}
               onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}

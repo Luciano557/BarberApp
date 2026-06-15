@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck, UserX, ChevronDown, MoreVertical, User, Phone, Mail, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -29,7 +29,6 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
-import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
   sucursalId: string;
@@ -372,20 +371,12 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   };
 
   return (
-    <Card className="border border-border bg-card">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="rounded-md bg-muted p-2">
-            <CalendarCheck className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <div>
-            <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
-            <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+    <>
+      <CatalogSectionCard
+        icon={CalendarCheck}
+        title="Disponibilidad del equipo"
+        description="Quién está disponible hoy y asignaciones temporales o automáticas."
+      >
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
             <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipo…
@@ -401,36 +392,38 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
             </p>
           </div>
         ) : (
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos<TabBadge count={activeIds.length} />
-              </TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos<TabBadge count={inactiveIds.length} />
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-3">
-              {activeIds.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">No hay miembros activos en esta sucursal hoy.</p>
-                </div>
-              ) : (
-                activeIds.map(id => renderBarberoCard(id, true))
+          <>
+            <SegmentedControl
+              options={[
+                { value: 'active', label: 'Activos', count: activeIds.length },
+                { value: 'inactive', label: 'Inactivos', count: inactiveIds.length },
+              ]}
+              value={activeSubTab}
+              onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+            />
+            <div className="space-y-3" role="tabpanel">
+              {activeSubTab === 'active' && (
+                activeIds.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No hay miembros activos en esta sucursal hoy.</p>
+                  </div>
+                ) : (
+                  activeIds.map(id => renderBarberoCard(id, true))
+                )
               )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-3">
-              {inactiveIds.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">No hay miembros inactivos en esta sucursal.</p>
-                </div>
-              ) : (
-                inactiveIds.map(id => renderBarberoCard(id, false))
+              {activeSubTab === 'inactive' && (
+                inactiveIds.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No hay miembros inactivos en esta sucursal.</p>
+                  </div>
+                ) : (
+                  inactiveIds.map(id => renderBarberoCard(id, false))
+                )
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          </>
         )}
-      </CardContent>
+      </CatalogSectionCard>
 
 
       {/* Sheets */}
@@ -648,7 +641,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </div>
         </div>
       </DrawerForm>
-    </Card>
+    </>
 
   );
 }

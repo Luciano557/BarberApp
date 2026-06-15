@@ -23,10 +23,10 @@ export function DrawerForm({ open, onOpenChange, title, size, children, footer }
           className={cn(
             "fixed inset-y-0 right-0 z-50 flex flex-col",
             "bg-card border-l shadow-lg",
-            "transition-opacity ease-in-out",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-            "data-[state=closed]:duration-300 data-[state=open]:duration-500",
+            "data-[state=closed]:duration-200 data-[state=open]:duration-300",
+            "[animation-timing-function:cubic-bezier(0.23,1,0.32,1)]",
             "w-[calc(100%-48px)]",
             size === "sm" ? "sm:w-[380px]" : "sm:w-[520px]",
           )}
@@ -56,20 +56,3 @@ export function DrawerForm({ open, onOpenChange, title, size, children, footer }
     </Sheet>
   );
 }
-
-// EJEMPLO DE USO (borrar después de validar):
-//
-// <DrawerForm
-//   open={open}
-//   onOpenChange={setOpen}
-//   title="Agregar servicio"
-//   size="md"
-//   footer={
-//     <div className="flex justify-between w-full">
-//       <Button variant="ghost">Cancelar</Button>
-//       <Button>Guardar</Button>
-//     </div>
-//   }
-// >
-//   <p>Contenido del formulario aquí</p>
-// </DrawerForm>

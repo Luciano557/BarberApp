@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { toast } from 'sonner';
 import { Loader2, Clock, ListChecks } from 'lucide-react';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 
 type FieldKey = 'peticiones_vencimiento_dias' | 'tareas_vencimiento_dias_default';
 type FieldUpdate = Partial<Record<FieldKey, number>>;
 
 interface VencimientoCardProps {
-  icon: React.ReactNode;
+  icon: LucideIcon;
   title: string;
   description: string;
   field: FieldKey;
@@ -44,52 +45,39 @@ function VencimientoCard({ icon, title, description, field, presets, initialValu
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            {icon}
-          </div>
-          <div>
-            <CardTitle className="text-lg">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {presets.map(p => (
-            <Button
-              key={p.value}
-              variant={parseInt(dias) === p.value ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setDias(String(p.value))}
-            >
-              {p.label}
-            </Button>
-          ))}
-        </div>
+    <CatalogSectionCard icon={icon} title={title} description={description}>
+      <div className="flex flex-wrap gap-2">
+        {presets.map(p => (
+          <Button
+            key={p.value}
+            variant={parseInt(dias) === p.value ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setDias(String(p.value))}
+          >
+            {p.label}
+          </Button>
+        ))}
+      </div>
 
-        <div className="flex items-center gap-3">
-          <Label className="text-sm shrink-0">Personalizado:</Label>
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={365}
-            value={dias}
-            onChange={e => setDias(e.target.value)}
-            className="w-24"
-          />
-          <span className="text-sm text-muted-foreground">días</span>
-        </div>
+      <div className="flex items-center gap-3">
+        <Label className="text-sm shrink-0">Personalizado:</Label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={365}
+          value={dias}
+          onChange={e => setDias(e.target.value)}
+          className="w-24"
+        />
+        <span className="text-sm text-muted-foreground">días</span>
+      </div>
 
-        <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
-          {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Guardar
-        </Button>
-      </CardContent>
-    </Card>
+      <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+        {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+        Guardar
+      </Button>
+    </CatalogSectionCard>
   );
 }
 
@@ -99,7 +87,7 @@ export function TareasConfig() {
   return (
     <div className="space-y-4">
       <VencimientoCard
-        icon={<Clock className="h-5 w-5 text-primary" />}
+        icon={Clock}
         title="Vencimiento de peticiones"
         description="Las peticiones pendientes se marcarán como vencidas después de este plazo."
         field="peticiones_vencimiento_dias"
@@ -113,7 +101,7 @@ export function TareasConfig() {
       />
 
       <VencimientoCard
-        icon={<ListChecks className="h-5 w-5 text-primary" />}
+        icon={ListChecks}
         title="Vencimiento de tareas"
         description="Las tareas pendientes se marcarán como vencidas después de este plazo."
         field="tareas_vencimiento_dias_default"
