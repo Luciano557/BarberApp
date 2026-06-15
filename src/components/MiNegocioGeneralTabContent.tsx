@@ -93,8 +93,8 @@ export function MiNegocioGeneralTabContent({
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
-      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary mb-2">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/70" />
+      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary shadow-sm">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
         <p>
           Acá definís la base de tu negocio: el catálogo de servicios, el equipo, los descuentos y los métodos de pago que aplican a todas las sucursales. Cada sucursal puede después activar y ajustar lo que necesite por su cuenta.
         </p>
@@ -105,10 +105,8 @@ export function MiNegocioGeneralTabContent({
         <span>Cargando configuración…</span>
       </div>
 
-      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">Configuración general</h2>
-
       {/* Anchor nav — solo desktop */}
-      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+      <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
         <div className="flex items-center gap-1 overflow-x-auto">
           <button onClick={() => { setCuentasOpen(true); scrollTo('seccion-cuentas'); }} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Cuentas de sucursal
@@ -223,17 +221,13 @@ export function MiNegocioGeneralTabContent({
 
         {/* Productos */}
         <section id="seccion-productos" className="border-t pt-6 mt-8">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Productos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Productos</h3>
           <ProductosGlobalConfig />
         </section>
 
         {/* Descuentos */}
         <section id="seccion-descuentos" className="border-t pt-6 mt-8">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Descuentos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Descuentos</h3>
           <DiscountsConfig
             mode="global"
             discounts={discounts}

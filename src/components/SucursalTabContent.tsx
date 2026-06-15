@@ -214,13 +214,13 @@ export function SucursalTabContent({
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
       {/* Banner contextual de la vista Sucursal */}
-      <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary shadow-sm">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
         <p>Configurá lo específico de esta sucursal: precios, stock, equipo y métodos de pago. El catálogo base y la compensación se definen desde la vista General.</p>
       </div>
 
       {/* Anchor nav — solo desktop */}
-      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+      <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
         <div className="flex items-center gap-1 overflow-x-auto">
           <button onClick={() => scrollTo('seccion-informacion')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Información
@@ -333,9 +333,7 @@ export function SucursalTabContent({
 
         {/* Servicios */}
         <section id="seccion-servicios" className="border-t pt-6 mt-6" data-onboarding-id="catalogo-section">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Servicios</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Servicios</h3>
           <CobrarConfig
             services={services} extras={extras} lines={lines}
             onAddService={onAddService} onUpdateService={onUpdateService}
@@ -348,17 +346,13 @@ export function SucursalTabContent({
 
         {/* Productos */}
         <section id="seccion-productos" className="border-t pt-6 mt-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Productos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Productos</h3>
           <ProductosConfig sucursalId={sucursal.id} />
         </section>
 
         {/* Descuentos */}
         <section id="seccion-descuentos" className="border-t pt-6 mt-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Descuentos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Descuentos</h3>
           <DiscountsConfig
             discounts={discounts}
             onAdd={onAddDiscount}

@@ -1,4 +1,5 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from 'react';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ServicesConfig } from './ServicesConfig';
 import { ExtrasConfig } from './ExtrasConfig';
 import { Service, Extra, Line } from '@/types/barbershop';
@@ -25,39 +26,45 @@ export function CobrarConfig({
   canCreateServices = true,
   canEditServiceStructure = true,
 }: CobrarConfigProps) {
+  const [activeTab, setActiveTab] = useState<'services' | 'extras'>('services');
+
   return (
-    <Tabs defaultValue="services" className="w-full">
-      <TabsList className="flex h-auto w-full gap-1 rounded-lg bg-muted p-1">
-        <TabsTrigger value="services" className="min-h-9 flex-1 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
-          Servicios
-        </TabsTrigger>
-        <TabsTrigger value="extras" className="min-h-9 flex-1 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
-          Extras
-        </TabsTrigger>
-      </TabsList>
+    <div className="space-y-4">
+      <SegmentedControl
+        options={[
+          { value: 'services', label: 'Servicios' },
+          { value: 'extras', label: 'Extras' },
+        ]}
+        value={activeTab}
+        onChange={(v) => setActiveTab(v as 'services' | 'extras')}
+      />
 
-      <TabsContent value="services" className="mt-4 sm:mt-6 animate-fade-in">
-        <ServicesConfig
-          services={services}
-          lines={lines}
-          onAdd={onAddService}
-          onUpdate={onUpdateService}
-          onAddLine={onAddLine}
-          canCreate={canCreateServices}
-          canEditStructure={canEditServiceStructure}
-        />
-      </TabsContent>
+      {activeTab === 'services' && (
+        <div className="animate-fade-in">
+          <ServicesConfig
+            services={services}
+            lines={lines}
+            onAdd={onAddService}
+            onUpdate={onUpdateService}
+            onAddLine={onAddLine}
+            canCreate={canCreateServices}
+            canEditStructure={canEditServiceStructure}
+          />
+        </div>
+      )}
 
-      <TabsContent value="extras" className="mt-4 sm:mt-6 animate-fade-in">
-        <p className="text-xs text-muted-foreground mb-4">
-          Para crear o eliminar extras, usá la vista general del negocio.
-        </p>
-        <ExtrasConfig
-          extras={extras}
-          onAdd={onAddExtra}
-          onUpdate={onUpdateExtra}
-        />
-      </TabsContent>
-    </Tabs>
+      {activeTab === 'extras' && (
+        <div className="animate-fade-in">
+          <p className="text-xs text-muted-foreground mb-4">
+            Para crear o eliminar extras, usá la vista general del negocio.
+          </p>
+          <ExtrasConfig
+            extras={extras}
+            onAdd={onAddExtra}
+            onUpdate={onUpdateExtra}
+          />
+        </div>
+      )}
+    </div>
   );
 }
