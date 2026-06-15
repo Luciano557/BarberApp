@@ -85,7 +85,7 @@ export function SucursalesInactivasCollapsible({ sucursalesInactivas, onVerSucur
         />
         <CollapsibleContent className="pt-3 space-y-2">
           {sucursalesInactivas.map((suc) => (
-            <Card key={suc.id} className="opacity-80">
+            <Card key={suc.id} className="bg-muted/40 border-dashed">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">

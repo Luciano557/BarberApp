@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { TagPill } from '@/components/ui/TagPill';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
@@ -88,6 +90,10 @@ export function ProductosGlobalConfig() {
 
   const activeCount = productos.filter(p => p.activo).length;
   const inactiveCount = productos.length - activeCount;
+
+  const isDefaultView = activeSubTab === 'active' && search.trim() === '';
+  const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
+    useShowMore(filtered, { isDefaultView });
 
   const openCreate = () => {
     setEditingId(null);
@@ -207,9 +213,9 @@ export function ProductosGlobalConfig() {
               {activeSubTab === 'active' ? 'No hay productos activos' : 'No hay productos inactivos'}
             </p>
           )}
-          {filtered.map(p => {
+          {visible.map((p, idx) => {
             const marca = p.marca_id ? marcasMap.get(p.marca_id) : null;
-            return (
+            const item = (
               <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                 <EntityColorBar color={marca?.color} />
                 <div className="flex-1 min-w-0">
@@ -232,7 +238,14 @@ export function ProductosGlobalConfig() {
                 </div>
               </div>
             );
+            if (expanded && idx >= threshold) {
+              return <div key={`sm-${p.id}`} className="animate-item-in">{item}</div>;
+            }
+            return item;
           })}
+          {showDivider && (
+            <ShowMoreDivider count={hiddenCount} onClick={toggle} expanded={expanded} label="productos más" />
+          )}
         </div>
       </CatalogSectionCard>
 

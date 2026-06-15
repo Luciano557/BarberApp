@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Plus, MoreVertical, Clock, Scissors } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -115,6 +117,9 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   const inactiveServices = services.filter(s => !flagFor(s));
   const editingService = editingId ? (services.find(s => s.id === editingId) ?? null) : null;
   const editingIsActive = editingService ? flagFor(editingService) : false;
+
+  const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
+    useShowMore(activeServices, { isDefaultView: activeSubTab === 'active' });
 
   const handleAdd = () => {
     const nameErr = validateName(newName);
@@ -261,7 +266,21 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
       >
         {activeSubTab === 'active' && (
           <div className="space-y-2" role="tabpanel">
-            {activeServices.map(renderServiceItem)}
+            {visible.map((s, idx) => {
+              const item = renderServiceItem(s);
+              if (expanded && idx >= threshold) {
+                return <div key={`sm-${s.id}`} className="animate-item-in">{item}</div>;
+              }
+              return item;
+            })}
+            {showDivider && (
+              <ShowMoreDivider
+                count={hiddenCount}
+                onClick={toggle}
+                expanded={expanded}
+                label="servicios más"
+              />
+            )}
             {activeServices.length === 0 && !isAdding && (
               <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
                 <Scissors className="h-8 w-8 text-muted-foreground/50" />

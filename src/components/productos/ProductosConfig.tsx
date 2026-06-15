@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Tag, Search, Package } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Input } from '@/components/ui/input';
@@ -88,6 +90,10 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
 
   const activeCount = items.filter(it => it.sucursal?.activo === true).length;
   const inactiveCount = items.length - activeCount;
+
+  const isDefaultView = activeSubTab === 'active' && search.trim() === '';
+  const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
+    useShowMore(filteredItems, { isDefaultView });
 
   const handleDeleteProductoSucursal = async (item: ProductoConSucursal) => {
     if (!item.sucursal) return;
@@ -181,19 +187,30 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
               </p>
             </div>
           ) : (
-            filteredItems.map(item => (
-              <ProductoListItem
-                key={item.producto.id}
-                item={item}
-                onEdit={() => setProductoDialog({ open: true, producto: item })}
-                onToggleActive={(next) => handleToggleActiveSucursal(item, next)}
-                onStockInicial={() => setStockDialog({ open: true, producto: item, tipo: 'stock_inicial' })}
-                onAgregarStock={() => setStockDialog({ open: true, producto: item, tipo: 'reposicion' })}
-                onAjustarStock={() => setStockDialog({ open: true, producto: item, tipo: 'ajuste_manual' })}
-                onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
-                onDelete={() => handleDeleteProductoSucursal(item)}
-              />
-            ))
+            <>
+              {visible.map((item, idx) => {
+                const row = (
+                  <ProductoListItem
+                    key={item.producto.id}
+                    item={item}
+                    onEdit={() => setProductoDialog({ open: true, producto: item })}
+                    onToggleActive={(next) => handleToggleActiveSucursal(item, next)}
+                    onStockInicial={() => setStockDialog({ open: true, producto: item, tipo: 'stock_inicial' })}
+                    onAgregarStock={() => setStockDialog({ open: true, producto: item, tipo: 'reposicion' })}
+                    onAjustarStock={() => setStockDialog({ open: true, producto: item, tipo: 'ajuste_manual' })}
+                    onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
+                    onDelete={() => handleDeleteProductoSucursal(item)}
+                  />
+                );
+                if (expanded && idx >= threshold) {
+                  return <div key={`sm-${item.producto.id}`} className="animate-item-in">{row}</div>;
+                }
+                return row;
+              })}
+              {showDivider && (
+                <ShowMoreDivider count={hiddenCount} onClick={toggle} expanded={expanded} label="productos más" />
+              )}
+            </>
           )}
         </div>
       </CatalogSectionCard>

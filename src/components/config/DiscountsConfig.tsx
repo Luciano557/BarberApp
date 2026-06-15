@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, MoreVertical, BadgePercent } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TagPill } from '@/components/ui/TagPill';
@@ -168,6 +170,10 @@ export function DiscountsConfig({
   const activos = filtered.filter(d => flagFor(d));
   const inactivos = filtered.filter(d => !flagFor(d));
   const editingDiscount = editingId ? (discounts.find(d => d.id === editingId) ?? null) : null;
+
+  const isDefaultView = activeTab === 'activos' && typeFilter === 'todos';
+  const { visible, expanded, toggle, showDivider, hiddenCount } =
+    useShowMore(activos, { isDefaultView });
   const editingIsActive = editingDiscount ? flagFor(editingDiscount) : false;
   const canToggle = !!onToggleActive && !(!isGlobal && editingDiscount?.globalActive === false);
 
@@ -353,7 +359,10 @@ export function DiscountsConfig({
               </div>
             ) : (
               <div className="space-y-2">
-                {activos.map(renderRow)}
+                {visible.map(renderRow)}
+                {showDivider && (
+                  <ShowMoreDivider count={hiddenCount} onClick={toggle} expanded={expanded} label="descuentos más" />
+                )}
               </div>
             )}
           </div>
