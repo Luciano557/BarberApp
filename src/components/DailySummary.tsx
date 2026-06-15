@@ -577,10 +577,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Digital</p>
-                <p className="text-2xl font-bold text-secondary">${summary.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-status-info-foreground">${summary.totalMercadoPago.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-secondary" />
+              <div className="w-10 h-10 rounded-lg bg-status-info-bg flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-status-info" />
               </div>
             </div>
           </CardContent>
@@ -605,15 +605,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       <div className="space-y-4">
         <h2 className="text-lg font-medium text-foreground flex items-center gap-2">
           <User className="h-5 w-5 text-muted-foreground" />
-          Cierre por Barbero
+          Cierre por barbero
         </h2>
 
         {barberSummaries.length === 0 ? (
           <Card className="border border-border bg-card">
             <CardContent className="py-12">
               <div className="text-center text-muted-foreground">
-                <User className="h-10 w-10 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Sin actividad</p>
+                <User className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">Todavía no hay actividad.</p>
                 <p className="text-sm mt-1">Los cierres por barbero aparecerán aquí</p>
               </div>
             </CardContent>
@@ -697,10 +697,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm text-muted-foreground flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-secondary" />
+                      <CreditCard className="h-4 w-4 text-status-info" />
                       Digital
                     </span>
-                    <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
+                    <span className="font-semibold text-status-info-foreground">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
                   {hayProductosConBarbero && (
                     <div className="flex items-center justify-between py-2 border-b border-border">
@@ -745,13 +745,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           }}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
-                          Anular Cierre
+                          Anular cierre
                         </Button>
                       ) : (
-                        <Badge variant="secondary" className="w-full justify-center py-2">
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Caja Cerrada
-                        </Badge>
+                        <div className="flex w-full justify-center py-1">
+                          <StatusPill status="success" label="Caja cerrada" icon={CheckCircle} />
+                        </div>
                       )
                     ) : isPastDate ? (
                       <Badge variant="outline" className="w-full justify-center py-2 text-muted-foreground">
@@ -764,7 +763,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         onClick={() => handleClosingClick(barber)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Cerrar Caja
+                        Cerrar caja
                       </Button>
                     )}
                   </div>
@@ -806,14 +805,14 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         <CardHeader>
           <CardTitle className="text-base font-medium flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            Transacciones del Día
+            Transacciones del día
           </CardTitle>
         </CardHeader>
         <CardContent>
           {summary.transactions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Receipt className="h-10 w-10 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Sin transacciones</p>
+              <Receipt className="h-8 w-8 mx-auto mb-3 opacity-50" />
+              <p className="font-medium">Todavía no hay transacciones.</p>
               <p className="text-sm mt-1">Los cobros aparecerán aquí</p>
             </div>
           ) : (
@@ -846,15 +845,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         ) : isMixed ? (
                           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center gap-0.5">
                             <Banknote className="h-3 w-3 text-success" />
-                            <CreditCard className="h-3 w-3 text-secondary" />
+                            <CreditCard className="h-3 w-3 text-status-info" />
                           </div>
                         ) : tx.paymentMethod === 'efectivo' ? (
                           <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                             <Banknote className="h-4 w-4 text-success" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
-                            <CreditCard className="h-4 w-4 text-secondary" />
+                          <div className="w-8 h-8 rounded-lg bg-status-info-bg flex items-center justify-center">
+                            <CreditCard className="h-4 w-4 text-status-info" />
                           </div>
                         )}
                       </div>
@@ -881,7 +880,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           {(tx.barberName || '—')} • {format(new Date(tx.createdAt), 'HH:mm')}
                           {isMixed && !isVoided && (
                             <span className="ml-2">
-                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">Dig. ${mpAmt.toLocaleString()}</span>
+                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-status-info-foreground">Dig. ${mpAmt.toLocaleString()}</span>
                             </span>
                           )}
                           {isVoided && tx.anuladoPor && (
@@ -954,7 +953,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-primary" />
-              Cierre de Caja - {closingBarber?.barberName}
+              Cierre de caja: {closingBarber?.barberName}
             </DialogTitle>
             <p className="text-sm text-muted-foreground capitalize">
               {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
@@ -969,9 +968,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                 <p className="text-xl font-bold text-success">${closingBarber?.totalEfectivo.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">{barberTransactions.efectivo.length} servicios</p>
               </div>
-              <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+              <div className="p-4 rounded-lg bg-status-info-bg border border-status-info/20">
                 <p className="text-sm text-muted-foreground">Digital</p>
-                <p className="text-xl font-bold text-secondary">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-xl font-bold text-status-info-foreground">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">{barberTransactions.digital.length} servicios</p>
               </div>
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
@@ -1020,7 +1019,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             {barberTransactions.digital.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-secondary" />
+                  <CreditCard className="h-4 w-4 text-status-info" />
                   Digital ({barberTransactions.digital.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
@@ -1044,7 +1043,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           )}
                           <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
                         </div>
-                        <span className="font-semibold text-secondary">${amt.toLocaleString()}</span>
+                        <span className="font-semibold text-status-info-foreground">${amt.toLocaleString()}</span>
                       </div>
                     );
                   })}
@@ -1088,7 +1087,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               ) : (
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
-              {isSaving ? 'Guardando...' : 'Confirmar Cierre'}
+              {isSaving ? 'Guardando...' : 'Confirmar cierre'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1105,7 +1104,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <XCircle className="h-5 w-5" />
-              Anular Cierre de Caja
+              Anular cierre de caja
             </DialogTitle>
             <DialogDescription>
               Esta acción anulará el cierre de caja de <span className="font-semibold">{voidingClosure?.barberName}</span> para el día{' '}
@@ -1158,7 +1157,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               ) : (
                 <XCircle className="h-4 w-4 mr-2" />
               )}
-              {isVoidingClosure ? 'Anulando...' : 'Confirmar Anulación'}
+              {isVoidingClosure ? 'Anulando...' : 'Confirmar anulación'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1193,6 +1192,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             <AlertDialogAction
               disabled={isRegularizing}
               onClick={(e) => { e.preventDefault(); handleRegularize(); }}
+              className="bg-status-warning text-white hover:bg-status-warning/90"
             >
               {isRegularizing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
