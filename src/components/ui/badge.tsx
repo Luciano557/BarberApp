@@ -22,8 +22,6 @@ const badgeVariants = cva(
 );
 
 const categoryColors = {
-  deluxe: "bg-amber-50 text-amber-800 border-amber-200",
-  esencial: "bg-blue-50 text-blue-800 border-blue-200",
   default: "bg-secondary text-secondary-foreground border-border",
 } as const;
 

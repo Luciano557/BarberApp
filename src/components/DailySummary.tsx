@@ -1,12 +1,11 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, Trash2, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, MoreVertical, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Transaction, Barber, Service, Line, isDigitalMethod } from '@/types/barbershop';
 import { format, addDays, subDays, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,11 +15,14 @@ import { calcComisionProductos, ProductoCfg } from '@/lib/comisionProductos';
 import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { VoidClosureDialog } from './VoidClosureDialog';
+import { useVoidClosure } from '@/hooks/useVoidClosure';
 import { BackfillWizard } from './BackfillWizard';
 import { MultiDayClosingSummary } from './MultiDayClosingSummary';
+import { TransactionDetailDrawer } from './TransactionDetailDrawer';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -66,11 +68,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const { saveCashClosing } = useCashClosing();
   const requirePinForAction = useRequirePinForAction();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
+  const [detailTransaction, setDetailTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
-  const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
-  const [isVoidingClosure, setIsVoidingClosure] = useState(false);
-  const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
   const [isRegularizing, setIsRegularizing] = useState(false);
@@ -149,6 +149,23 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   useEffect(() => {
     checkClosedBarbers();
   }, [checkClosedBarbers]);
+
+  const {
+    voidingClosure,
+    setVoidingClosure,
+    voidReason,
+    setVoidReason,
+    handleVoidClosure,
+    handleVoidClosureWithReason,
+    isVoiding: isVoidingClosure,
+  } = useVoidClosure({
+    currentSucursalId: currentSucursal?.id ?? null,
+    organizationId: organization?.id ?? '',
+    userId: user?.id ?? '',
+    userFullName: profile?.full_name || user?.email || 'Usuario',
+    userEmail: user?.email || '',
+    onSuccess: () => checkClosedBarbers(),
+  });
 
   // Check if a transaction can be voided (barber's cash not closed)
   const canVoidTransaction = useCallback((tx: Transaction): boolean => {
@@ -358,12 +375,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     setClosingBarber(barber);
   }, []);
 
-  // Anular cierre: dialog de motivo abre directamente; al confirmar, la lógica
-  // de anulación valida lo que corresponda. Cuentas personales no ven PIN.
-  const handleVoidClosureClick = useCallback((closureData: { id: number; barberName: string }) => {
-    setVoidingClosure(closureData);
-  }, []);
-
   // Regularizar cierre: abre el AlertDialog directamente.
   const handleRegularizeClick = useCallback((barber: BarberSummary) => {
     setRegularizingBarber(barber);
@@ -377,58 +388,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     setHistoryOpen(true);
   }, [requirePinForAction, currentSucursal?.id]);
 
-  const VOID_REASONS = [
-    'Servicios duplicados o faltantes',
-    'Se registraron ventas después del cierre',
-    'Diferencia entre caja física y sistema detectada post-cierre',
-    'Falla del sistema durante el cierre',
-  ];
-
-  // Handle voiding a cash closing
-  const handleVoidClosure = async () => {
-    if (!voidingClosure || !user || !organization || !voidReason) return;
-
-    const gate = await requirePinForAction('anular_cierre_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-
-    setIsVoidingClosure(true);
-    try {
-      // Update ingreso status to 'eliminado'
-      const { error: updateError } = await supabase
-        .from('ingresos')
-        .update({ estado: 'eliminado' })
-        .eq('id', voidingClosure.id);
-
-      if (updateError) throw updateError;
-
-      // Create anulacion record with reason
-      const { error: insertError } = await supabase
-        .from('anulaciones_cierre')
-        .insert({
-          ingreso_id: voidingClosure.id,
-          barbero_nombre: voidingClosure.barberName,
-          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
-          anulado_por_id: user.id,
-          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
-          anulado_por_email: user.email || '',
-          organization_id: organization.id,
-          motivo: voidReason,
-        });
-
-      if (insertError) throw insertError;
-
-      toast.success('Cierre de caja anulado correctamente');
-      setVoidingClosure(null);
-      setVoidReason('');
-      checkClosedBarbers(); // Refresh the closed barbers state
-    } catch (error) {
-      console.error('Error voiding closure:', error);
-      toast.error('Error al anular el cierre de caja');
-    } finally {
-      setIsVoidingClosure(false);
-    }
-  };
-
   const REGULARIZE_REASON = 'Se registraron ventas después del cierre. El cierre fue regularizado automáticamente para incluir las ventas posteriores.';
 
   // Regularizar cierre: anular el cierre actual con auditoría y crear uno nuevo actualizado
@@ -440,34 +399,20 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       return;
     }
 
-    const gate = await requirePinForAction('regularizar_cierre_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-
     setIsRegularizing(true);
     try {
-      // 1) Anular cierre actual (mismo patrón que handleVoidClosure)
-      const { error: updateError } = await supabase
-        .from('ingresos')
-        .update({ estado: 'eliminado' })
-        .eq('id', closure.id);
-      if (updateError) throw updateError;
+      // 1) Anular cierre actual via hook (PIN + audit trail con REGULARIZE_REASON)
+      const ok = await handleVoidClosureWithReason(
+        {
+          id: closure.id,
+          barberName: closure.barberName || regularizingBarber.barberName,
+          fechaCierre: format(validDate, 'yyyy-MM-dd'),
+        },
+        REGULARIZE_REASON
+      );
+      if (!ok) return;
 
-      // 2) Registrar anulación con motivo automático
-      const { error: insertError } = await supabase
-        .from('anulaciones_cierre')
-        .insert({
-          ingreso_id: closure.id,
-          barbero_nombre: closure.barberName || regularizingBarber.barberName,
-          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
-          anulado_por_id: user.id,
-          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
-          anulado_por_email: user.email || '',
-          organization_id: organization.id,
-          motivo: REGULARIZE_REASON,
-        });
-      if (insertError) throw insertError;
-
-      // 3) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
+      // 2) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
       const success = await saveCashClosing({
         barber: regularizingBarber,
         transactions: summary.transactions,
@@ -576,10 +521,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Digital</p>
-                <p className="text-2xl font-bold text-secondary">${summary.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-status-info-foreground">${summary.totalMercadoPago.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-secondary" />
+              <div className="w-10 h-10 rounded-lg bg-status-info-bg flex items-center justify-center">
+                <CreditCard className="h-5 w-5 text-status-info" />
               </div>
             </div>
           </CardContent>
@@ -604,15 +549,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       <div className="space-y-4">
         <h2 className="text-lg font-medium text-foreground flex items-center gap-2">
           <User className="h-5 w-5 text-muted-foreground" />
-          Cierre por Barbero
+          Cierre por barbero
         </h2>
 
         {barberSummaries.length === 0 ? (
           <Card className="border border-border bg-card">
             <CardContent className="py-12">
               <div className="text-center text-muted-foreground">
-                <User className="h-10 w-10 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Sin actividad</p>
+                <User className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">Todavía no hay actividad.</p>
                 <p className="text-sm mt-1">Los cierres por barbero aparecerán aquí</p>
               </div>
             </CardContent>
@@ -696,10 +641,10 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm text-muted-foreground flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-secondary" />
+                      <CreditCard className="h-4 w-4 text-status-info" />
                       Digital
                     </span>
-                    <span className="font-semibold text-secondary">${barber.totalMercadoPago.toLocaleString()}</span>
+                    <span className="font-semibold text-status-info-foreground">${barber.totalMercadoPago.toLocaleString()}</span>
                   </div>
                   {hayProductosConBarbero && (
                     <div className="flex items-center justify-between py-2 border-b border-border">
@@ -733,24 +678,26 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
-                        <Button 
+                        <Button
                           variant="destructive"
-                          className="w-full" 
+                          className="w-full"
                           onClick={() => {
                             const closureData = closedBarbersData.get(barber.barberId);
                             if (closureData) {
-                              handleVoidClosureClick(closureData);
+                              setVoidingClosure({
+                                ...closureData,
+                                fechaCierre: format(validDate, 'yyyy-MM-dd'),
+                              });
                             }
                           }}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
-                          Anular Cierre
+                          Anular cierre
                         </Button>
                       ) : (
-                        <Badge variant="secondary" className="w-full justify-center py-2">
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Caja Cerrada
-                        </Badge>
+                        <div className="flex w-full justify-center py-1">
+                          <StatusPill status="success" label="Caja cerrada" icon={CheckCircle} />
+                        </div>
                       )
                     ) : isPastDate ? (
                       <Badge variant="outline" className="w-full justify-center py-2 text-muted-foreground">
@@ -763,7 +710,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         onClick={() => handleClosingClick(barber)}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
-                        Cerrar Caja
+                        Cerrar caja
                       </Button>
                     )}
                   </div>
@@ -805,18 +752,17 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         <CardHeader>
           <CardTitle className="text-base font-medium flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
-            Transacciones del Día
+            Transacciones del día
           </CardTitle>
         </CardHeader>
         <CardContent>
           {summary.transactions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              <Receipt className="h-10 w-10 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Sin transacciones</p>
+              <Receipt className="h-8 w-8 mx-auto mb-3 opacity-50" />
+              <p className="font-medium">Todavía no hay transacciones.</p>
               <p className="text-sm mt-1">Los cobros aparecerán aquí</p>
             </div>
           ) : (
-            <TooltipProvider>
               <div className="space-y-2">
                 {summary.transactions.map((tx) => {
                   const isVoided = tx.estado === 'anulado';
@@ -831,11 +777,12 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   return (
                     <div
                       key={tx.id}
-                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center ${
-                        isVoided 
-                          ? 'bg-destructive/10 border border-destructive/20' 
+                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center cursor-pointer ${
+                        isVoided
+                          ? 'bg-destructive/10 border border-destructive/20 hover:bg-destructive/15'
                           : 'bg-muted/50 hover:bg-muted'
                       }`}
+                      onClick={() => setDetailTransaction(tx)}
                     >
                       <div className="flex-shrink-0">
                         {isVoided ? (
@@ -845,15 +792,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                         ) : isMixed ? (
                           <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center gap-0.5">
                             <Banknote className="h-3 w-3 text-success" />
-                            <CreditCard className="h-3 w-3 text-secondary" />
+                            <CreditCard className="h-3 w-3 text-status-info" />
                           </div>
                         ) : tx.paymentMethod === 'efectivo' ? (
                           <div className="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center">
                             <Banknote className="h-4 w-4 text-success" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
-                            <CreditCard className="h-4 w-4 text-secondary" />
+                          <div className="w-8 h-8 rounded-lg bg-status-info-bg flex items-center justify-center">
+                            <CreditCard className="h-4 w-4 text-status-info" />
                           </div>
                         )}
                       </div>
@@ -863,26 +810,20 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             {tx.serviceName || (tx.productos && tx.productos.length > 0 ? 'Venta de productos' : '—')}
                           </span>
                           {tx.extras.length > 0 && (
-                            <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded">
-                              +{tx.extras.length}
-                            </span>
+                            <Badge variant="secondary">+{tx.extras.length}</Badge>
                           )}
                           {isMixed && !isVoided && (
-                            <Badge variant="outline" className="text-[10px] py-0 h-4">
-                              Mixto
-                            </Badge>
+                            <Badge variant="category" color="default" size="sm">Mixto</Badge>
                           )}
                           {isVoided && (
-                            <Badge variant="destructive" className="text-xs">
-                              Anulado
-                            </Badge>
+                            <StatusPill status="error" label="Anulado" />
                           )}
                         </div>
                         <p className={`text-sm ${isVoided ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
                           {(tx.barberName || '—')} • {format(new Date(tx.createdAt), 'HH:mm')}
                           {isMixed && !isVoided && (
                             <span className="ml-2">
-                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-secondary">Dig. ${mpAmt.toLocaleString()}</span>
+                              • <span className="text-success">Ef. ${efectivoAmt.toLocaleString()}</span> / <span className="text-status-info-foreground">Dig. ${mpAmt.toLocaleString()}</span>
                             </span>
                           )}
                           {isVoided && tx.anuladoPor && (
@@ -901,32 +842,22 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                             </p>
                           )}
                         </div>
-                        {!isVoided && onVoidTransaction && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className={`h-8 w-8 border-destructive/30 ${canVoid ? 'text-destructive hover:text-destructive hover:bg-destructive/10' : 'text-muted-foreground/50 cursor-not-allowed opacity-50'}`}
-                                onClick={() => canVoid && setVoidingTransaction(tx)}
-                                disabled={!canVoid}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {canVoid 
-                                ? 'Anular transacción' 
-                                : 'No se puede anular: caja cerrada'}
-                            </TooltipContent>
-                          </Tooltip>
+                        {!isVoided && onVoidTransaction ? (
+                          <button
+                            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted border-[0.5px] border-border"
+                            onClick={(e) => { e.stopPropagation(); setDetailTransaction(tx); }}
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Ver detalle</span>
+                          </button>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" />
                         )}
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </TooltipProvider>
           )}
         </CardContent>
       </Card>
@@ -945,8 +876,17 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           await onVoidTransaction(voidingTransaction.id, voidedBy, voidedById);
           toast.success(`Transacción anulada por ${voidedBy}`);
           setVoidingTransaction(null);
+          setDetailTransaction(null);
           checkClosedBarbers();
         }}
+      />
+
+      <TransactionDetailDrawer
+        transaction={detailTransaction}
+        open={!!detailTransaction}
+        onOpenChange={(open) => { if (!open) setDetailTransaction(null); }}
+        canVoid={detailTransaction ? canVoidTransaction(detailTransaction) : false}
+        onVoidRequest={() => { if (detailTransaction) setVoidingTransaction(detailTransaction); }}
       />
 
       {/* Cash Closing Dialog */}
@@ -955,7 +895,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-primary" />
-              Cierre de Caja - {closingBarber?.barberName}
+              Cierre de caja: {closingBarber?.barberName}
             </DialogTitle>
             <p className="text-sm text-muted-foreground capitalize">
               {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
@@ -970,9 +910,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                 <p className="text-xl font-bold text-success">${closingBarber?.totalEfectivo.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">{barberTransactions.efectivo.length} servicios</p>
               </div>
-              <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
+              <div className="p-4 rounded-lg bg-status-info-bg border border-status-info/20">
                 <p className="text-sm text-muted-foreground">Digital</p>
-                <p className="text-xl font-bold text-secondary">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-xl font-bold text-status-info-foreground">${closingBarber?.totalMercadoPago.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground mt-1">{barberTransactions.digital.length} servicios</p>
               </div>
               <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
@@ -1021,7 +961,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             {barberTransactions.digital.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-medium flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-secondary" />
+                  <CreditCard className="h-4 w-4 text-status-info" />
                   Digital ({barberTransactions.digital.length})
                 </h4>
                 <div className="space-y-2 rounded-lg border border-border p-3 bg-muted/30">
@@ -1045,7 +985,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           )}
                           <p className="text-xs text-muted-foreground">{format(new Date(tx.createdAt), 'HH:mm')}</p>
                         </div>
-                        <span className="font-semibold text-secondary">${amt.toLocaleString()}</span>
+                        <span className="font-semibold text-status-info-foreground">${amt.toLocaleString()}</span>
                       </div>
                     );
                   })}
@@ -1089,81 +1029,21 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
               ) : (
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
-              {isSaving ? 'Guardando...' : 'Confirmar Cierre'}
+              {isSaving ? 'Guardando...' : 'Confirmar cierre'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Void Closure Confirmation Dialog */}
-      <Dialog open={!!voidingClosure} onOpenChange={(open) => {
-        if (!open) {
-          setVoidingClosure(null);
-          setVoidReason('');
-        }
-      }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <XCircle className="h-5 w-5" />
-              Anular Cierre de Caja
-            </DialogTitle>
-            <DialogDescription>
-              Esta acción anulará el cierre de caja de <span className="font-semibold">{voidingClosure?.barberName}</span> para el día{' '}
-              <span className="font-semibold">{format(validDate, "d 'de' MMMM yyyy", { locale: es })}</span>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="void-reason" className="text-sm font-medium">
-                Motivo de la anulación <span className="text-destructive">*</span>
-              </Label>
-              <Select value={voidReason} onValueChange={setVoidReason}>
-                <SelectTrigger id="void-reason">
-                  <SelectValue placeholder="Selecciona un motivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {VOID_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Al anular el cierre:
-              </p>
-              <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
-                <li>El registro se marcará como eliminado</li>
-                <li>Se guardará un registro de quién realizó la anulación</li>
-                <li>El barbero podrá realizar un nuevo cierre de caja</li>
-              </ul>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setVoidingClosure(null); setVoidReason(''); }} disabled={isVoidingClosure}>
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive"
-              disabled={isVoidingClosure || !voidReason}
-              onClick={handleVoidClosure}
-            >
-              {isVoidingClosure ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <XCircle className="h-4 w-4 mr-2" />
-              )}
-              {isVoidingClosure ? 'Anulando...' : 'Confirmar Anulación'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VoidClosureDialog
+        open={!!voidingClosure}
+        voidingClosure={voidingClosure}
+        voidReason={voidReason}
+        onVoidReasonChange={setVoidReason}
+        onConfirm={handleVoidClosure}
+        onCancel={() => { setVoidingClosure(null); setVoidReason(''); }}
+        isLoading={isVoidingClosure}
+      />
 
       {/* Backfill Wizard */}
       <BackfillWizard
@@ -1194,6 +1074,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             <AlertDialogAction
               disabled={isRegularizing}
               onClick={(e) => { e.preventDefault(); handleRegularize(); }}
+              className="bg-status-warning text-white hover:bg-status-warning/90"
             >
               {isRegularizing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -171,9 +171,9 @@ export function StockMovementDialog({ open, item, tipo, onClose, onSaved }: Prop
         )}
 
         {seraNegativo && cantidadValida && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 dark:text-amber-300">
+          <div className="flex items-start gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3">
+            <AlertTriangle className="h-4 w-4 text-status-warning shrink-0 mt-0.5" />
+            <p className="text-xs text-status-warning-foreground">
               El stock quedará en negativo. Está permitido pero conviene revisar el conteo físico.
             </p>
           </div>

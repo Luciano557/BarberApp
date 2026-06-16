@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -112,80 +112,93 @@ export function MultiDayClosingSummary() {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleOpen}>
+      <Button size="sm" onClick={handleOpen}>
         <CalendarRange className="h-4 w-4 mr-2" />
         Resumen por rango
       </Button>
 
-      <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Resumen por rango de fechas</DialogTitle>
-            <DialogDescription>
-              Seleccioná un rango de fechas para ver el resumen de cierres agrupado por barbero.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Desde</p>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !desde && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {desde ? format(desde, 'dd/MM/yyyy') : 'Fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={desde}
-                    onSelect={setDesde}
-                    locale={es}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+      <DrawerForm
+        open={open}
+        onOpenChange={(o) => { if (!o) handleClose(); }}
+        title="Resumen por rango de fechas"
+        size="lg"
+        footer={
+          <Button variant="ghost" onClick={handleClose}>
+            Cerrar
+          </Button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Consultar período</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Seleccioná fechas y obtené un resumen completo.
+              </p>
             </div>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Desde</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !desde && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {desde ? format(desde, 'dd/MM/yyyy') : 'Fecha'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={desde}
+                      onSelect={setDesde}
+                      locale={es}
+                      disabled={(date) => date > new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Hasta</p>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !hasta && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {hasta ? format(hasta, 'dd/MM/yyyy') : 'Fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={hasta}
-                    onSelect={setHasta}
-                    locale={es}
-                    disabled={(date) => date > new Date() || (desde ? date < desde : false)}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Hasta</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !hasta && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {hasta ? format(hasta, 'dd/MM/yyyy') : 'Fecha'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={hasta}
+                      onSelect={setHasta}
+                      locale={es}
+                      disabled={(date) => date > new Date() || (desde ? date < desde : false)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <Button onClick={handleConsultar} disabled={!desde || !hasta || loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Consultar
+              </Button>
             </div>
-
-            <Button onClick={handleConsultar} disabled={!desde || !hasta || loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Consultar
-            </Button>
           </div>
 
           {results && results.length === 0 && (
-            <p className="text-muted-foreground text-sm text-center py-8">No hay cierres en el rango seleccionado.</p>
+            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+              <CalendarRange className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm font-medium">Todavía no hay cierres en este rango.</p>
+            </div>
           )}
 
           {results && results.length > 0 && (
-            <div className="space-y-4 mt-4">
-              {/* Totals card */}
+            <div className="space-y-4">
               <Card className="border-2 border-primary/30 bg-primary/5">
                 <CardContent className="pt-4 pb-4">
                   <p className="text-sm font-semibold text-primary mb-3">Totales generales</p>
@@ -198,10 +211,10 @@ export function MultiDayClosingSummary() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 text-secondary" />
+                      <CreditCard className="h-4 w-4 text-status-info" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Mercado Pago</p>
-                        <p className="font-semibold text-foreground">${totals!.mercadoPago.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Digital</p>
+                        <p className="font-semibold text-status-info-foreground">${totals!.mercadoPago.toLocaleString()}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -229,7 +242,6 @@ export function MultiDayClosingSummary() {
                 </CardContent>
               </Card>
 
-              {/* Per-barber cards */}
               {results.map(r => (
                 <Card key={r.barberId} className="border border-border">
                   <CardContent className="pt-4 pb-4">
@@ -240,8 +252,8 @@ export function MultiDayClosingSummary() {
                         <p className="font-medium text-success">${r.efectivo.toLocaleString()}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Mercado Pago</p>
-                        <p className="font-medium text-secondary">${r.mercadoPago.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">Digital</p>
+                        <p className="font-medium text-status-info-foreground">${r.mercadoPago.toLocaleString()}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Facturado</p>
@@ -261,8 +273,8 @@ export function MultiDayClosingSummary() {
               ))}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DrawerForm>
     </>
   );
 }

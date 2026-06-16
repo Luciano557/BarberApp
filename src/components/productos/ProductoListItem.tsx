@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { MoreVertical, PackagePlus, Settings2, History, AlertTriangle } from 'lucide-react';
+import { MoreVertical, PackagePlus, Settings2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
+import { TagPill } from '@/components/ui/TagPill';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ProductoConSucursal } from './types';
@@ -57,14 +58,13 @@ export function ProductoListItem({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-foreground truncate">{item.producto.nombre}</span>
             {!activeInSucursal && (
-              <Badge variant="secondary" className="text-xs">
-                {sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
-              </Badge>
+              <StatusPill
+                status="neutral"
+                label={sinConfig ? 'No configurado' : 'Inactivo en sucursal'}
+              />
             )}
             {stockNegativo && (
-              <Badge variant="destructive" className="text-xs gap-1">
-                <AlertTriangle className="h-3 w-3" /> Stock negativo
-              </Badge>
+              <StatusPill status="error" label="Stock negativo" />
             )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
@@ -83,12 +83,10 @@ export function ProductoListItem({
 
         <div className="flex items-center gap-2 justify-end">
           {item.marca && (
-            <Badge variant="category">{item.marca.nombre}</Badge>
+            <TagPill label={item.marca.nombre} />
           )}
           {stockBajo && !stockNegativo && (
-            <Badge variant="category" className="bg-amber-50 text-amber-800 border border-amber-200">
-              Stock bajo
-            </Badge>
+            <StatusPill status="warning" label="Stock bajo" />
           )}
           <button
             onClick={() => setDrawerOpen(true)}
@@ -109,14 +107,14 @@ export function ProductoListItem({
           <div className="flex w-full flex-col gap-1.5">
             <Button
               variant="ghost"
-              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              className="w-full justify-start bg-muted/50 border-border text-foreground hover:bg-muted"
               onClick={() => { setDrawerOpen(false); onAgregarStock(); }}
             >
               <PackagePlus className="h-4 w-4 mr-2" /> Agregar stock
             </Button>
             <Button
               variant="ghost"
-              className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#374151] hover:bg-muted"
+              className="w-full justify-start bg-muted/50 border-border text-foreground hover:bg-muted"
               onClick={() => { setDrawerOpen(false); onAjustarStock(); }}
             >
               <Settings2 className="h-4 w-4 mr-2" /> Ajustar stock
@@ -144,7 +142,7 @@ export function ProductoListItem({
             {activeInSucursal ? (
               <Button
                 variant="ghost"
-                className="w-full justify-start bg-[#f9fafb] border-[0.5px] border-[#e5e7eb] text-[#92400e] hover:bg-muted"
+                className="w-full justify-start bg-status-warning text-white hover:bg-status-warning/90"
                 onClick={() => { setDrawerOpen(false); setDeactivateConfirm(true); }}
               >
                 Desactivar en sucursal
@@ -160,8 +158,8 @@ export function ProductoListItem({
                 </Button>
                 {onDelete && ps && (
                   <Button
-                    variant="ghost"
-                    className="w-full justify-start bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
+                    variant="destructive"
+                    className="w-full justify-start"
                     onClick={() => { setDrawerOpen(false); setDeleteConfirm(true); }}
                   >
                     Eliminar
@@ -183,7 +181,7 @@ export function ProductoListItem({
             </div>
             <div className="text-xs text-muted-foreground mt-1.5 uppercase tracking-wide">Stock actual</div>
             {stockBajo && !stockNegativo && (
-              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium">Bajo el mínimo</div>
+              <div className="mt-2 text-xs text-status-warning-foreground font-medium">Bajo el mínimo</div>
             )}
             {stockNegativo && (
               <div className="mt-2 text-xs text-destructive font-medium">Stock negativo</div>
@@ -225,7 +223,7 @@ export function ProductoListItem({
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { onToggleActive(false); setDeactivateConfirm(false); }}
-              className="bg-amber-500 text-white hover:bg-amber-600"
+              className="bg-status-warning text-white hover:bg-status-warning/90"
             >
               Desactivar
             </AlertDialogAction>

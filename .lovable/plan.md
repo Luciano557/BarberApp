@@ -1,168 +1,61 @@
-# Plan corregido — Migración `tareas_recurrentes`
 
-## Confirmación de funciones auxiliares
-- `public.get_user_barbero_id(_user_id uuid)` — definida en `supabase/migrations/20260109143656_e112717a-9844-4e18-8157-4bb409c26781.sql:42`.
-- `public.update_updated_at_column()` — definida en `supabase/migrations/20260108144448_13ab8691-72e2-4c75-8310-39d7c1352ddf.sql:43`.
+## Auditoría — `supabase/functions/reschedule-turno/index.ts`
 
-Ambas se usan extensivamente en el resto del esquema, son seguras de invocar.
+Confirmado: tiene los mismos huecos que tenía `validate-turno`.
 
-## Cambios respecto a la versión anterior
-1. `asignado_a` → ahora FK a `public.barberos(id) ON DELETE SET NULL` (antes apuntaba a `auth.users`).
-2. Política `Barber view scoped tareas_recurrentes` → compara `asignado_a = public.get_user_barbero_id(auth.uid())` (antes `= auth.uid()`).
-3. Agregado `updated_at timestamptz NOT NULL DEFAULT now()` + trigger `update_tareas_recurrentes_updated_at` con `public.update_updated_at_column()`.
-4. Sin cambios en estructura, índices, GRANTs, resto de RLS, FKs de org/sucursal, CHECK de `assignment_scope`, ni en la política de `sucursal_account` (queda permitiendo `individual` y `team`).
+### Qué hace hoy
 
-## Archivo SQL completo y corregido
+1. **Parámetros** (línea 45): `turno_id`, `nueva_fecha`, `nueva_hora_inicio`, `telefono`. `barbero_id`, `sucursal_id`, `organization_id`, `servicio_id` se leen del turno existente (línea 67-71). Autoriza por match exacto de `cliente_telefono` (línea 80).
+2. **Anticipación mínima** (líneas 135-143): igual lógica que validate-turno (`slotInstantMs` + `anticipacion_minima_reserva_min`). **No incluye `antMin` en el payload** ni respeta convención nueva.
+3. **Horario de apertura (`horarios_trabajo`)**: **NO valida**. Mismo agujero.
+4. **Bloqueos de agenda**: **NO valida**. Mismo agujero.
+5. **Buffers (líneas 145-159)**: usa `buffer_antes_min` / `buffer_despues_min` reales — ya alineado con validate-turno corregido. OK.
+6. **`hora_fin`** (línea 145): `nueva_hora_inicio + duracion` (servicio o `duracion_base_min`). Igual que validate-turno.
+7. **Otros chequeos**: `modificacion_limite_min` (líneas 125-133, código `modify_limit`), estado válido (`pendiente`/`confirmado`), turno no pasado.
 
-Ruta: `supabase/migrations/<timestamp>_tareas_recurrentes.sql`
+### Frontend — `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
 
-```sql
--- =========================================================================
--- Etapa: Tareas recurrentes (motor real de recurrencia)
--- Crea la tabla tareas_recurrentes (receta/plantilla) y vincula tareas
--- generadas via columna recurrencia_id. Replica el patrón de
--- gastos_recurrentes y las RLS vigentes sobre public.tareas.
--- NO modifica datos. NO crea cron ni funciones de generación.
--- =========================================================================
+Maneja `slot_taken` y `time_limit` (este último no existe en el backend, que devuelve `modify_limit`). El resto cae a toast genérico sin recovery. Mismo problema que tenía ConfirmacionStep.
 
--- ---------- 1. Tabla tareas_recurrentes ----------
-CREATE TABLE public.tareas_recurrentes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  sucursal_id uuid NOT NULL REFERENCES public.sucursales(id) ON DELETE CASCADE,
-  titulo text NOT NULL,
-  descripcion text,
-  assignment_scope text NOT NULL DEFAULT 'individual'
-    CHECK (assignment_scope IN ('individual','team')),
-  asignado_a uuid REFERENCES public.barberos(id) ON DELETE SET NULL,
-  asignado_nombre text,
-  hora text,
-  repeat_preset text NOT NULL DEFAULT 'never',
-  repeat_frequency text,
-  repeat_interval integer DEFAULT 1,
-  repeat_byweekday integer[],
-  fecha_inicio date NOT NULL,
-  proxima_fecha date NOT NULL,
-  activo boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
-);
+---
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.tareas_recurrentes TO authenticated;
-GRANT ALL ON public.tareas_recurrentes TO service_role;
+## Plan
 
--- ---------- 2. Trigger updated_at ----------
-CREATE TRIGGER update_tareas_recurrentes_updated_at
-  BEFORE UPDATE ON public.tareas_recurrentes
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+### A. `supabase/functions/reschedule-turno/index.ts`
 
--- ---------- 3. Alter tareas: enlace a la receta ----------
-ALTER TABLE public.tareas
-  ADD COLUMN IF NOT EXISTS recurrencia_id uuid
-    REFERENCES public.tareas_recurrentes(id) ON DELETE SET NULL;
+Replicar los chequeos nuevos de validate-turno, en este orden, después de calcular `nueva_hora_fin` y antes del chequeo de conflictos:
 
--- ---------- 4. Índices ----------
-CREATE INDEX IF NOT EXISTS idx_tareas_recurrentes_org_suc_activo
-  ON public.tareas_recurrentes (organization_id, sucursal_id, activo);
+1. Calcular `dbDow` desde `nueva_fecha` (`jsDow===0 ? 7 : jsDow`).
+2. Query a `horarios_trabajo` (org, sucursal, `dia_semana=dbDow`, `activo=true`, `barbero_id.eq.${turno.barbero_id},barbero_id.is.null`).
+3. Resolver overrides: si hay filas con `barbero_id === turno.barbero_id`, usarlas; si no, las de `barbero_id IS NULL`.
+4. Verificar que `[nueva_hora_inicio, nueva_hora_fin]` esté contenido en algún intervalo → si no, `409 outside_working_hours` con mensaje "Ese horario está fuera del horario de atención del barbero."
+5. Query a `bloqueos_agenda` (org, sucursal, `fecha_inicio<=nueva_fecha`, `fecha_fin>=nueva_fecha`); filtrar a `barbero_id === turno.barbero_id || null`; verificar solapamiento (`todo_el_dia` o `[bStart,bEnd)` vs slot) → si bloquea, `409 slot_blocked` con mensaje "Ese horario está bloqueado en la agenda."
+6. Agregar `antMin` al payload de `slot_too_soon` (línea 139-142).
 
-CREATE INDEX IF NOT EXISTS idx_tareas_recurrentes_proxima_fecha_activo
-  ON public.tareas_recurrentes (proxima_fecha)
-  WHERE activo = true;
+### B. `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
 
-CREATE INDEX IF NOT EXISTS idx_tareas_recurrencia_id
-  ON public.tareas (recurrencia_id)
-  WHERE recurrencia_id IS NOT NULL;
+Extender el manejo de errores igual que `ConfirmacionStep`:
 
--- ---------- 5. RLS ----------
-ALTER TABLE public.tareas_recurrentes ENABLE ROW LEVEL SECURITY;
+- `slot_taken` → toast + `setStep("horario")` (ya existe).
+- `slot_too_soon` → "Ese horario quedó muy cerca. Elegí otro." + `setStep("horario")`.
+- `outside_working_hours` → "Ese horario ya no está disponible. Elegí otro." + `setStep("horario")`.
+- `slot_blocked` → "Ese horario quedó bloqueado. Elegí otro." + `setStep("horario")`.
+- `modify_limit` → "Este turno ya no puede modificarse." (reemplaza el branch erróneo `time_limit`).
+- Resto → toast genérico (sin cambio).
 
--- Owner / General Manager / Manager: ver
-CREATE POLICY "Owner GM Manager view org tareas_recurrentes"
-ON public.tareas_recurrentes FOR SELECT TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND (
-    public.has_role(auth.uid(), 'owner'::app_role)
-    OR public.has_role(auth.uid(), 'general_manager'::app_role)
-    OR public.has_role(auth.uid(), 'manager'::app_role)
-  )
-);
+### Orden
 
--- Owner / Manager: insert / update / delete (mismo criterio que tareas)
-CREATE POLICY "Owner/Manager can insert tareas_recurrentes"
-ON public.tareas_recurrentes FOR INSERT TO authenticated
-WITH CHECK (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND (public.has_role(auth.uid(), 'owner'::app_role)
-       OR public.has_role(auth.uid(), 'manager'::app_role))
-);
+1. Backend (A) primero.
+2. Frontend (B) después.
 
-CREATE POLICY "Owner/Manager can update tareas_recurrentes"
-ON public.tareas_recurrentes FOR UPDATE TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND (public.has_role(auth.uid(), 'owner'::app_role)
-       OR public.has_role(auth.uid(), 'manager'::app_role))
-);
+### Riesgos / efectos colaterales
 
-CREATE POLICY "Owner/Manager can delete tareas_recurrentes"
-ON public.tareas_recurrentes FOR DELETE TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND (public.has_role(auth.uid(), 'owner'::app_role)
-       OR public.has_role(auth.uid(), 'manager'::app_role))
-);
+- +2 queries por reagendamiento (~50-100ms). Aceptable.
+- El override de `horarios_trabajo` por barbero debe respetarse igual que en get-availability/validate-turno para evitar falsos negativos.
+- Comparación de borde: usar `<=` en `hora_inicio` del intervalo y `>=` en `hora_fin` (slot puede terminar exacto en el cierre).
 
--- Barber: ve recetas que le generan tareas (individual a su barbero
--- o team de su sucursal). No puede modificar.
-CREATE POLICY "Barber view scoped tareas_recurrentes"
-ON public.tareas_recurrentes FOR SELECT TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND public.has_role(auth.uid(), 'barber'::app_role)
-  AND (
-    (assignment_scope = 'individual'
-      AND asignado_a = public.get_user_barbero_id(auth.uid()))
-    OR (assignment_scope = 'team'
-      AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid())))
-  )
-);
+### Qué NO tocar
 
--- Sucursal account: ve / crea / edita recetas de su sucursal
--- (permite individual y team, confirmado)
-CREATE POLICY "Sucursal account view tareas_recurrentes"
-ON public.tareas_recurrentes FOR SELECT TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND public.is_sucursal_account(auth.uid())
-  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
-);
-
-CREATE POLICY "Sucursal account insert tareas_recurrentes"
-ON public.tareas_recurrentes FOR INSERT TO authenticated
-WITH CHECK (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND public.is_sucursal_account(auth.uid())
-  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
-);
-
-CREATE POLICY "Sucursal account update tareas_recurrentes"
-ON public.tareas_recurrentes FOR UPDATE TO authenticated
-USING (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND public.is_sucursal_account(auth.uid())
-  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
-)
-WITH CHECK (
-  organization_id = public.get_user_organization_id(auth.uid())
-  AND sucursal_id IN (SELECT public.get_user_sucursal_ids(auth.uid()))
-);
-```
-
-## Inconsistencias nuevas detectadas
-- **Alineación con `tareas.asignado_a_id`**: ahora `tareas_recurrentes.asignado_a` y `tareas.asignado_a_id` apuntan ambos a `barberos(id)`, pero los nombres de columna difieren. Es consistente con el brief original, pero cuando se construya el motor conviene mapear `asignado_a → asignado_a_id` al generar la tarea hija. Solo a tener en cuenta, no requiere cambio en la migración.
-- **Sucursal account y scope `team`**: confirmado por vos. Sin cambio. Si más adelante quisieras restringirlo, se hace con una policy adicional.
-- **No se incluye trigger de notificaciones** para la nueva tabla (la receta no es una tarea visible; las notificaciones deberían dispararse desde el motor cuando se genere la tarea hija). Confirmar cuando armemos el motor.
-
-Esperando tu aprobación para pasar a build mode y aplicar la migración.
+- Autorización por teléfono, validación de estado, `modificacion_limite_min`, lógica de timezone.
+- Manejo de `23P01` en el update.
+- Resto de `RescheduleFlow` (UI de selección de fecha/horario, paso `done`).

@@ -389,7 +389,7 @@ export function ProductoDialog({ open, producto, marcas, sucursalId, onClose, on
               </div>
             )}
             {comisionModo !== 'ninguna' && !precioCosto && (
-              <p className="text-xs text-amber-600 dark:text-amber-500">
+              <p className="text-xs text-status-warning-foreground">
                 Falta el precio de costo. Completalo en la pestaña Precio y stock para que el producto genere comisión.
               </p>
             )}

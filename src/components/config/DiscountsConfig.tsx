@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, MoreVertical, BadgePercent } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { TagPill } from '@/components/ui/TagPill';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
 import { DrawerForm } from '@/components/ui/drawer-form';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { TabBadge } from '@/components/ui/TabBadge';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 function validateDiscountName(name: string): string | null {
   const trimmed = name.trim();
@@ -168,14 +170,18 @@ export function DiscountsConfig({
   const activos = filtered.filter(d => flagFor(d));
   const inactivos = filtered.filter(d => !flagFor(d));
   const editingDiscount = editingId ? (discounts.find(d => d.id === editingId) ?? null) : null;
+
+  const isDefaultView = activeTab === 'activos' && typeFilter === 'todos';
+  const { visible, expanded, toggle, showDivider, hiddenCount } =
+    useShowMore(activos, { isDefaultView });
   const editingIsActive = editingDiscount ? flagFor(editingDiscount) : false;
   const canToggle = !!onToggleActive && !(!isGlobal && editingDiscount?.globalActive === false);
 
   const Form = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Nombre</label>
           <Input
             placeholder="Ej: Promo Amigo"
             value={newLabel}
@@ -183,8 +189,8 @@ export function DiscountsConfig({
             maxLength={80}
           />
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Aplica a</label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Aplica a</label>
           <Select value={newAppliesTo} onValueChange={(v) => setNewAppliesTo(v as DiscountAppliesTo)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -193,8 +199,8 @@ export function DiscountsConfig({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Tipo</label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Tipo</label>
           <Select value={newType} onValueChange={(v) => setNewType(v as 'percentage' | 'fixed')}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -203,8 +209,8 @@ export function DiscountsConfig({
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{newType === 'percentage' ? 'Porcentaje' : 'Monto'}</label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{newType === 'percentage' ? 'Porcentaje' : 'Monto'}</label>
           <Input
             type="number"
             inputMode="decimal"
@@ -217,8 +223,8 @@ export function DiscountsConfig({
         </div>
         {newType === 'percentage' && (
           <>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Tipo de Redondeo</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tipo de Redondeo</label>
               <Select value={newRounding} onValueChange={(v) => setNewRounding(v as 'cliente' | 'negocio' | 'matematico')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -228,8 +234,8 @@ export function DiscountsConfig({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Unidad de Redondeo</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Unidad de Redondeo</label>
               <Select value={newRoundingUnit.toString()} onValueChange={(v) => setNewRoundingUnit(parseInt(v))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -244,7 +250,7 @@ export function DiscountsConfig({
           </>
         )}
         <div className="space-y-1.5 sm:col-span-2">
-          <label className="text-xs font-medium text-muted-foreground">Aplica con método de pago</label>
+          <label className="text-sm font-medium">Aplica con método de pago</label>
           <Select value={newPaymentMethod} onValueChange={(v) => setNewPaymentMethod(v as 'todos' | 'efectivo' | 'mercado_pago')}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -261,9 +267,6 @@ export function DiscountsConfig({
   const renderRow = (d: Discount) => {
     const appliesTo = d.appliesTo || 'servicios';
     const categoryLabel = appliesTo === 'productos' ? 'Productos' : 'Servicios';
-    const categoryClass = appliesTo === 'productos'
-      ? 'bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]'
-      : 'bg-[#EEF2FF] text-[#3730A3] border border-[#C7D2FE]';
     const valueLabel = d.type === 'fixed'
       ? `$${d.value.toLocaleString('es-AR')}`
       : `${d.value}%`;
@@ -274,7 +277,7 @@ export function DiscountsConfig({
             <span className="font-medium text-foreground">{d.label}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            <Badge variant="category" className={categoryClass}>{categoryLabel}</Badge>
+            <TagPill label={categoryLabel} />
             <Badge variant="category">{valueLabel}</Badge>
           </div>
           <div className="flex items-center justify-end">
@@ -292,43 +295,33 @@ export function DiscountsConfig({
   };
 
   return (
-    <Card className="border border-border bg-card">
-      <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-md bg-muted p-2">
-              <BadgePercent className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-base">
-                {isGlobal ? 'Reglas de descuento' : 'Descuentos disponibles'}
-              </CardTitle>
-              <CardDescription>
-                {isGlobal
-                  ? 'Por porcentaje o monto fijo. Pueden aplicar a servicios, productos o ambos.'
-                  : 'Activá o desactivá los descuentos para esta sucursal.'}
-              </CardDescription>
-            </div>
-          </div>
-          {!isAdding && !editingId && (
+    <>
+      <CatalogSectionCard
+        icon={BadgePercent}
+        title={isGlobal ? 'Reglas de descuento' : 'Descuentos disponibles'}
+        description={isGlobal
+          ? 'Por porcentaje o monto fijo. Pueden aplicar a servicios, productos o ambos.'
+          : 'Activá o desactivá los descuentos para esta sucursal.'}
+        actions={
+          !isAdding && !editingId ? (
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}>
-          <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-            <TabsTrigger value="activos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Activos<TabBadge count={activos.length} />
-            </TabsTrigger>
-            <TabsTrigger value="inactivos" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-              Inactivos<TabBadge count={inactivos.length} />
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="activos" className="mt-4 space-y-4">
+          ) : undefined
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'activos', label: 'Activos', count: activos.length },
+              { value: 'inactivos', label: 'Inactivos', count: inactivos.length },
+            ]}
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as 'activos' | 'inactivos')}
+          />
+        }
+      >
+        {activeTab === 'activos' && (
+          <div className="space-y-4" role="tabpanel">
             <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
               {([
                 { v: 'todos' as TypeFilter, label: 'Todos' },
@@ -366,12 +359,17 @@ export function DiscountsConfig({
               </div>
             ) : (
               <div className="space-y-2">
-                {activos.map(renderRow)}
+                {visible.map(renderRow)}
+                {showDivider && (
+                  <ShowMoreDivider count={hiddenCount} onClick={toggle} expanded={expanded} label="descuentos más" />
+                )}
               </div>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="inactivos" className="mt-4 space-y-4">
+        {activeTab === 'inactivos' && (
+          <div className="space-y-4" role="tabpanel">
             <div className="flex w-full flex-wrap items-center gap-1 rounded-lg bg-muted p-1 sm:w-fit">
               {([
                 { v: 'todos' as TypeFilter, label: 'Todos' },
@@ -403,9 +401,9 @@ export function DiscountsConfig({
                 </p>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
+          </div>
+        )}
+      </CatalogSectionCard>
 
       <DrawerForm
         open={isAdding || editingId !== null}
@@ -438,7 +436,7 @@ export function DiscountsConfig({
                     setEditingId(null);
                     resetForm();
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -457,13 +455,12 @@ export function DiscountsConfig({
                     Activar
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     onClick={() => {
                       setDeleteConfirm(editingDiscount);
                       setEditingId(null);
                       resetForm();
                     }}
-                    className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                   >
                     Eliminar
                   </Button>
@@ -503,13 +500,13 @@ export function DiscountsConfig({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeactivate} className="bg-amber-500 text-white hover:bg-amber-600">
+            <AlertDialogAction onClick={handleConfirmDeactivate} className="bg-status-warning text-white hover:bg-status-warning/90">
               Desactivar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </>
   );
 }
 

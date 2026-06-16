@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Tag, History, Search, Package } from 'lucide-react';
+import { Plus, Tag, Search, Package } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -13,7 +15,6 @@ import { ProductoDialog } from './ProductoDialog';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
 import { StockMovementDialog } from './StockMovementDialog';
 import { StockHistoryDialog } from './StockHistoryDialog';
-import { TabBadge } from '@/components/ui/TabBadge';
 
 interface ProductosConfigProps {
   sucursalId: string;
@@ -90,6 +91,10 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   const activeCount = items.filter(it => it.sucursal?.activo === true).length;
   const inactiveCount = items.length - activeCount;
 
+  const isDefaultView = activeSubTab === 'active' && search.trim() === '';
+  const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
+    useShowMore(filteredItems, { isDefaultView });
+
   const handleDeleteProductoSucursal = async (item: ProductoConSucursal) => {
     if (!item.sucursal) return;
     const { error } = await supabase
@@ -131,29 +136,21 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Package className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Productos de esta sucursal</CardTitle>
-                <CardDescription>Activá productos, configurá precios, costos y gestioná el stock.</CardDescription>
-              </div>
-            </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setMarcasDialog(true)}>
-                <Tag className="h-4 w-4 mr-1" /> Marcas
-              </Button>
-              <Button size="sm" className="w-full sm:w-auto" onClick={() => setProductoDialog({ open: true, producto: null })}>
-                <Plus className="h-4 w-4 mr-1" /> Nuevo producto
-              </Button>
-            </div>
+      <CatalogSectionCard
+        icon={Package}
+        title="Productos de esta sucursal"
+        description="Activá productos, configurá precios, costos y gestioná el stock."
+        actions={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setMarcasDialog(true)}>
+              <Tag className="h-4 w-4 mr-1" /> Marcas
+            </Button>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => setProductoDialog({ open: true, producto: null })}>
+              <Plus className="h-4 w-4 mr-1" /> Nuevo producto
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        }
+        search={
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -164,32 +161,35 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
               maxLength={80}
             />
           </div>
-
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos<TabBadge count={activeCount} />
-              </TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos<TabBadge count={inactiveCount} />
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value={activeSubTab} className="mt-4 space-y-2">
-              {loading ? (
-                <p className="text-sm text-muted-foreground text-center py-6">Cargando...</p>
-              ) : filteredItems.length === 0 ? (
-                <div className="text-center py-8 space-y-2">
-                  <p className="text-sm text-muted-foreground">
-                    {productos.length === 0
-                      ? 'Todavía no hay productos. Creá el primero para empezar.'
-                      : activeSubTab === 'active'
-                        ? 'No hay productos activos en esta sucursal.'
-                        : 'No hay productos inactivos.'}
-                  </p>
-                </div>
-              ) : (
-                filteredItems.map(item => (
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activos', count: activeCount },
+              { value: 'inactive', label: 'Inactivos', count: inactiveCount },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        <div className="space-y-2" role="tabpanel">
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Cargando...</p>
+          ) : filteredItems.length === 0 ? (
+            <div className="text-center py-8 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {productos.length === 0
+                  ? 'Todavía no hay productos. Creá el primero para empezar.'
+                  : activeSubTab === 'active'
+                    ? 'No hay productos activos en esta sucursal.'
+                    : 'No hay productos inactivos.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              {visible.map((item, idx) => {
+                const row = (
                   <ProductoListItem
                     key={item.producto.id}
                     item={item}
@@ -201,12 +201,19 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
                     onVerHistorial={() => setHistoryDialog({ open: true, producto: item })}
                     onDelete={() => handleDeleteProductoSucursal(item)}
                   />
-                ))
+                );
+                if (expanded && idx >= threshold) {
+                  return <div key={`sm-${item.producto.id}`} className="animate-item-in">{row}</div>;
+                }
+                return row;
+              })}
+              {showDivider && (
+                <ShowMoreDivider count={hiddenCount} onClick={toggle} expanded={expanded} label="productos más" />
               )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            </>
+          )}
+        </div>
+      </CatalogSectionCard>
 
       <ProductoDialog
         open={productoDialog.open}

@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import {
   Users, User, MapPin, CalendarDays, Repeat,
   Pause, Play, Pencil, Trash2,
@@ -61,13 +61,9 @@ export function RecurrenteCard({
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-medium text-sm leading-snug text-foreground line-clamp-2">{receta.titulo}</h3>
           {receta.activo ? (
-            <Badge variant="outline" className="text-status-success-foreground border-status-success bg-status-success-bg gap-1">
-              <Play className="w-3 h-3" />Activa
-            </Badge>
+            <StatusPill status="success" label="Activa" />
           ) : (
-            <Badge variant="outline" className="gap-1">
-              <Pause className="w-3 h-3" />Pausada
-            </Badge>
+            <StatusPill status="neutral" label="Pausada" />
           )}
         </div>
 

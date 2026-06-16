@@ -12,6 +12,7 @@ import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
@@ -372,15 +373,15 @@ export function SucursalesConfig() {
 
       <div className="space-y-3">
         {allSucursales.map((suc) => (
-          <Card key={suc.id} className={!suc.activa ? 'opacity-60' : ''}>
+          <Card key={suc.id} className={!suc.activa ? 'bg-muted/40 border-dashed' : ''}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <MapPin className="h-5 w-5 text-primary" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${suc.activa ? 'bg-primary/10' : 'bg-muted'}`}>
+                    <MapPin className={`h-5 w-5 ${suc.activa ? 'text-primary' : 'text-muted-foreground'}`} />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{suc.nombre}</p>
+                    <p className={`font-medium ${suc.activa ? 'text-foreground' : 'text-muted-foreground'}`}>{suc.nombre}</p>
                     {suc.direccion && <p className="text-sm text-muted-foreground">{suc.direccion}</p>}
                     {!suc.activa && fechaDesactMap[suc.id] && (
                       <p className="text-xs text-muted-foreground mt-0.5">
@@ -390,7 +391,7 @@ export function SucursalesConfig() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant={suc.activa ? 'default' : 'secondary'}>{suc.activa ? 'Activa' : 'Inactiva'}</Badge>
+                  <StatusPill status={suc.activa ? 'success' : 'neutral'} label={suc.activa ? 'Activa' : 'Inactiva'} icon={suc.activa ? undefined : Power} />
                   {(isOwner || isGeneralManager || (isManager && sucursales.some(s => s.id === suc.id))) && (
                     <Button variant="outline" size="sm" onClick={() => setCuentaSucursal(suc)} className="px-3 py-1.5 text-xs font-medium">
                       <KeyRound className="h-3.5 w-3.5 mr-1.5" />
@@ -410,7 +411,7 @@ export function SucursalesConfig() {
                     onClick={() => openToggleDialog(suc)}
                     title={suc.activa ? 'Desactivar sucursal' : 'Reactivar sucursal'}
                   >
-                    <Power className={`h-4 w-4 ${suc.activa ? 'text-destructive' : 'text-muted-foreground'}`} />
+                    <Power className={`h-4 w-4 ${suc.activa ? 'text-destructive' : 'text-success'}`} />
                   </Button>
 
                 </div>
@@ -610,7 +611,7 @@ export function SucursalesConfig() {
               </AlertDialogHeader>
 
               {toggleTarget.isDeactivating && toggleTarget.futureTurnos !== null && toggleTarget.futureTurnos > 0 && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning-foreground">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
                     Esta sucursal tiene {toggleTarget.futureTurnos} turno{toggleTarget.futureTurnos === 1 ? '' : 's'} futuro{toggleTarget.futureTurnos === 1 ? '' : 's'} que quedará{toggleTarget.futureTurnos === 1 ? '' : 'n'} sin atender.

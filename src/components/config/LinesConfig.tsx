@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { Plus, MoreVertical, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { DrawerForm } from '@/components/ui/drawer-form';
-import { TabBadge } from '@/components/ui/TabBadge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 const LINE_COLORS = [
   { label: 'Azul', value: '#3B82F6' },
@@ -104,7 +103,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
           key={c.value}
           type="button"
           onClick={() => setColor(color === c.value ? '' : c.value)}
-          className={`w-7 h-7 rounded-full border-2 transition-colors ${color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+          className={`w-8 h-8 rounded-full border-2 transition-colors ${color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
           style={{ backgroundColor: c.value }}
           title={c.label}
         />
@@ -134,57 +133,56 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Tag className="h-5 w-5 text-muted-foreground" />
+      <CatalogSectionCard
+        icon={Tag}
+        title="Agrupación de servicios"
+        description="Organizan el menú de cobro y facilitan la búsqueda de servicios."
+        actions={
+          !isAdding && !editingId && activeSubTab === 'active' ? (
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => { resetForm(); setIsAdding(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          ) : undefined
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activas', count: active.length },
+              { value: 'inactive', label: 'Inactivas', count: inactive.length },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        {activeSubTab === 'active' && (
+          <div className="space-y-2" role="tabpanel">
+            {active.map(renderLine)}
+            {active.length === 0 && !isAdding && (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                <Tag className="h-8 w-8 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium">No hay categorías activas</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Las categorías agrupan tus servicios en la pantalla de cobro.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
+                  Agregar categoría
+                </Button>
               </div>
-              <div>
-                <CardTitle className="text-base">Agrupación de servicios</CardTitle>
-                <CardDescription>Organizan el menú de cobro y facilitan la búsqueda de servicios.</CardDescription>
-              </div>
-            </div>
-            {!isAdding && !editingId && activeSubTab === 'active' && (
-              <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
-                <Plus className="h-4 w-4 mr-1" /> Agregar
-              </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">Activas<TabBadge count={active.length} /></TabsTrigger>
-              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">Inactivas<TabBadge count={inactive.length} /></TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-2">
-              {active.map(renderLine)}
-              {active.length === 0 && !isAdding && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-                  <Tag className="h-8 w-8 text-muted-foreground/50" />
-                  <div>
-                    <p className="text-sm font-medium">No hay categorías activas</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Las categorías agrupan tus servicios en la pantalla de cobro.
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
-                    Agregar categoría
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-2">
-              {inactive.map(renderLine)}
-              {inactive.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay líneas inactivas</p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        )}
+        {activeSubTab === 'inactive' && (
+          <div className="space-y-2" role="tabpanel">
+            {inactive.map(renderLine)}
+            {inactive.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay líneas inactivas</p>
+            )}
+          </div>
+        )}
+      </CatalogSectionCard>
 
       <DrawerForm
         open={isAdding || editingId !== null}
@@ -218,7 +216,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
                     setToggleConfirm({ line: editingLine, action: 'deactivate' });
                     setEditingId(null); resetForm();
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -237,12 +235,11 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
                   </Button>
                   {onDelete && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingLine);
                         setEditingId(null); resetForm();
                       }}
-                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                     >
                       Eliminar
                     </Button>
@@ -254,8 +251,8 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
         }
       >
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -263,8 +260,8 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
               maxLength={80}
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Color (opcional)</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Color (opcional)</label>
             {ColorPicker}
           </div>
         </div>
@@ -284,7 +281,10 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
+            <AlertDialogAction
+              onClick={handleConfirmToggle}
+              className={toggleConfirm?.action === 'deactivate' ? 'bg-status-warning text-white hover:bg-status-warning/90' : undefined}
+            >
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
             </AlertDialogAction>
           </AlertDialogFooter>

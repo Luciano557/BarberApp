@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { formatMinutesToText } from "../_shared/formatMinutes.ts";
 import { canonicalPhoneOrNull } from "../_shared/phone.ts";
 
 const corsHeaders = {
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
     }
 
     const [configRes, servicioRes, orgRes, sucRes] = await Promise.all([
-      supabase.from("agenda_config").select("modificacion_limite_hs, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
+      supabase.from("agenda_config").select("modificacion_limite_min, buffer_antes_min, buffer_despues_min, duracion_base_min, anticipacion_minima_reserva_min")
         .eq("organization_id", turno.organization_id).eq("sucursal_id", turno.sucursal_id).single(),
       supabase.from("servicios").select("duracion_min").eq("id", turno.servicio_id).single(),
       supabase.from("organizations").select("timezone").eq("id", turno.organization_id).single(),
@@ -106,25 +107,25 @@ Deno.serve(async (req) => {
     }
 
     const timezone = sucRes.data?.timezone || orgRes.data?.timezone || "America/Argentina/Buenos_Aires";
-    const limiteHs = configRes.data?.modificacion_limite_hs ?? 2;
+    const limiteMin = (configRes.data as any)?.modificacion_limite_min ?? 120;
     const duracion = servicioRes.data?.duracion_min || configRes.data?.duracion_base_min || 30;
 
     const nowInTz = new Date().toLocaleString("en-US", { timeZone: timezone });
     const nowDate = new Date(nowInTz);
     const originalDateTime = new Date(`${turno.fecha}T${turno.hora_inicio}`);
-    const hoursUntilOriginal = (originalDateTime.getTime() - nowDate.getTime()) / (1000 * 60 * 60);
+    const minutesUntilOriginal = (originalDateTime.getTime() - nowDate.getTime()) / 60000;
 
-    if (hoursUntilOriginal <= 0) {
+    if (minutesUntilOriginal <= 0) {
       return new Response(JSON.stringify({ error: "Cannot reschedule a past turno" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (hoursUntilOriginal < limiteHs) {
+    if (minutesUntilOriginal < limiteMin) {
       return new Response(JSON.stringify({
         error: "modify_limit",
-        message: `Solo podés reprogramar con al menos ${limiteHs} horas de anticipación.`,
+        message: `Solo podés reprogramar con al menos ${formatMinutesToText(limiteMin)} de anticipación.`,
       }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -138,10 +139,71 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         error: "slot_too_soon",
         message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+        antMin,
       }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const nueva_hora_fin = minutesToTime(timeToMinutes(nueva_hora_inicio) + duracion);
+
+    // Validar horario de apertura del barbero/sucursal para ese día
+    const [Y, M, D] = nueva_fecha.split("-").map(Number);
+    const jsDow = new Date(Date.UTC(Y, M - 1, D)).getUTCDay();
+    const dbDow = jsDow === 0 ? 7 : jsDow;
+
+    const { data: horariosData } = await supabase
+      .from("horarios_trabajo")
+      .select("barbero_id, hora_inicio, hora_fin")
+      .eq("organization_id", turno.organization_id)
+      .eq("sucursal_id", turno.sucursal_id)
+      .eq("dia_semana", dbDow)
+      .eq("activo", true)
+      .or(`barbero_id.eq.${turno.barbero_id},barbero_id.is.null`);
+
+    const horariosAll = horariosData || [];
+    const horariosOverride = horariosAll.filter((h: any) => h.barbero_id === turno.barbero_id);
+    const horariosResolved = horariosOverride.length > 0
+      ? horariosOverride
+      : horariosAll.filter((h: any) => h.barbero_id === null);
+
+    const slotStartMin = timeToMinutes(nueva_hora_inicio);
+    const slotEndMin = timeToMinutes(nueva_hora_fin);
+    const inWorkingHours = horariosResolved.some((h: any) =>
+      timeToMinutes(h.hora_inicio) <= slotStartMin && timeToMinutes(h.hora_fin) >= slotEndMin
+    );
+
+    if (!inWorkingHours) {
+      return new Response(JSON.stringify({
+        error: "outside_working_hours",
+        message: "Ese horario está fuera del horario de atención del barbero.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Validar bloqueos de agenda
+    const { data: bloqueosData } = await supabase
+      .from("bloqueos_agenda")
+      .select("barbero_id, hora_inicio, hora_fin, todo_el_dia")
+      .eq("organization_id", turno.organization_id)
+      .eq("sucursal_id", turno.sucursal_id)
+      .lte("fecha_inicio", nueva_fecha)
+      .gte("fecha_fin", nueva_fecha);
+
+    const bloqueosRelevant = (bloqueosData || []).filter(
+      (b: any) => b.barbero_id === turno.barbero_id || b.barbero_id === null
+    );
+    const isBlocked = bloqueosRelevant.some((b: any) => {
+      if (b.todo_el_dia) return true;
+      if (!b.hora_inicio || !b.hora_fin) return false;
+      const bStart = timeToMinutes(b.hora_inicio);
+      const bEnd = timeToMinutes(b.hora_fin);
+      return bStart < slotEndMin && bEnd > slotStartMin;
+    });
+
+    if (isBlocked) {
+      return new Response(JSON.stringify({
+        error: "slot_blocked",
+        message: "Ese horario está bloqueado en la agenda.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const bufferBefore = configRes.data?.buffer_antes_min || 0;
     const bufferAfter = configRes.data?.buffer_despues_min || 0;
@@ -166,6 +228,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     const { error: updateError } = await supabase
       .from("turnos")

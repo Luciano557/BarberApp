@@ -2,6 +2,7 @@ import { Repeat, Trash2, Pause, Play } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { GastoRecurrente } from '@/hooks/useGastosRecurrentes';
 import { getRepeatLabel } from '@/components/tareas/RepeatPicker';
@@ -62,9 +63,7 @@ export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props
                 </TableCell>
                 <TableCell className="text-sm">{r.proxima_fecha}</TableCell>
                 <TableCell>
-                  <Badge variant={r.activo ? 'default' : 'secondary'}>
-                    {r.activo ? 'Activo' : 'Pausado'}
-                  </Badge>
+                  <StatusPill status={r.activo ? 'success' : 'neutral'} label={r.activo ? 'Activo' : 'Pausado'} />
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-1">

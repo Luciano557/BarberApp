@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Clock, FileX, MessageSquare } from 'lucide-react';
+import { Calendar as CalendarIcon, User, Clock, FileX, MessageSquare, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -11,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Barber } from '@/types/barbershop';
-import { Loader2 } from 'lucide-react';
 
 interface AnulacionRecord {
   id: string;
@@ -43,7 +43,7 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
 
   const fetchRecords = async () => {
     if (!organization?.id) return;
-    
+
     setIsLoading(true);
     let query = supabase
       .from('anulaciones_cierre')
@@ -87,29 +87,30 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
 
   const hasActiveFilters = selectedBarber !== 'all' || startDate || endDate;
 
-  // Get unique barber names from records for filter
   const barberOptions = Array.from(new Set(barbers.map(b => `${b.firstName} ${b.lastName}`)));
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       {externalOpen === undefined && (
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-2">
-            <FileX className="h-4 w-4" />
-            Anulaciones
-          </Button>
-        </DialogTrigger>
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setOpen(true)}>
+          <FileX className="h-4 w-4" />
+          Anulaciones
+        </Button>
       )}
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Historial de Anulaciones de Cierre
-          </DialogTitle>
-        </DialogHeader>
 
+      <DrawerForm
+        open={open}
+        onOpenChange={setOpen}
+        title="Historial de anulaciones de cierre"
+        size="md"
+        footer={
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 py-4 border-b">
+        <div className="flex flex-wrap items-center gap-3 pb-4 border-b">
           <Select value={selectedBarber} onValueChange={setSelectedBarber}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Todos los barberos" />
@@ -168,16 +169,18 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
         </div>
 
         {/* Records List */}
-        <div className="space-y-3 py-4">
+        <div className="space-y-3 pt-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : records.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <FileX className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Sin anulaciones registradas</p>
-              <p className="text-sm mt-1">Las anulaciones de cierres de caja aparecerán aquí</p>
+            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+              <FileX className="h-8 w-8 text-muted-foreground/50" />
+              <div>
+                <p className="text-sm font-medium">Todavía no hay anulaciones registradas.</p>
+                <p className="text-xs text-muted-foreground mt-1">Las anulaciones de cierres de caja aparecerán aquí.</p>
+              </div>
             </div>
           ) : (
             records.map((record) => (
@@ -193,9 +196,7 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
                         </div>
                         <span className="font-semibold text-foreground">{record.barbero_nombre}</span>
                         {record.motivo?.startsWith('Se registraron ventas después del cierre') && (
-                          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded border border-destructive/30 text-destructive">
-                            Regularización
-                          </span>
+                          <Badge variant="category" color="default">Regularización</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -230,7 +231,7 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
             ))
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </DrawerForm>
+    </>
   );
 }

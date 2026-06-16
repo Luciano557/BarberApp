@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfigMenu } from './config/ConfigMenu';
 import { TareasConfig } from './config/TareasConfig';
@@ -30,7 +30,7 @@ interface ConfigurationPanelProps {
 }
 
 export function ConfigurationPanel({ initialSection, onSectionChange }: ConfigurationPanelProps = {}) {
-  const { canManageConfig } = useAuth();
+  const { canManageConfig, signOut } = useAuth();
   // Roles no administrativos solo ven Mi cuenta — entran directo a esa sección.
   const initial: ConfigSection = !canManageConfig ? 'mi-cuenta' : (initialSection ?? 'menu');
   const [activeSection, setActiveSection] = useState<ConfigSection>(initial);
@@ -83,6 +83,17 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
       {canManageConfig && activeSection === 'tareas' && <TareasConfig />}
       {canManageConfig && activeSection === 'notificaciones' && <NotificationsConfig />}
       {activeSection === 'mi-cuenta' && <MiCuentaConfig />}
+
+      <div className="mt-8 border-t border-border pt-6 pb-2 px-1">
+        <button
+          type="button"
+          onClick={signOut}
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 w-full"
+        >
+          <LogOut className="h-4 w-4" />
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   );
 }

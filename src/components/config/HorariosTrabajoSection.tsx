@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/components/ui/StatusPill';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -381,11 +382,11 @@ function DayCardsGrid({
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{d.full}</span>
                 {ranges.length === 0 ? (
-                  <Badge variant="secondary" className="text-[10px] h-5 px-2">Sin horario</Badge>
+                  <StatusPill status="neutral" label="Sin horario" />
                 ) : open ? (
-                  <Badge variant="default" className="text-[10px] h-5 px-2">Abierto</Badge>
+                  <StatusPill status="success" label="Abierto" />
                 ) : (
-                  <Badge variant="outline" className="text-[10px] h-5 px-2">Pausado</Badge>
+                  <StatusPill status="warning" label="Pausado" />
                 )}
               </div>
               <div className="min-h-[40px] space-y-0.5">
@@ -611,9 +612,9 @@ export function HorariosTrabajoSection({ sucursalId, organizationId, barbers }: 
                       <div className="flex items-center gap-2">
                         <span>{b.firstName} {b.lastName}</span>
                         {barbersWithOverride.has(b.id) ? (
-                          <Badge variant="default" className="text-[10px] h-4 px-1.5">Horario propio</Badge>
+                          <StatusPill status="success" label="Horario propio" />
                         ) : (
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">Usa sucursal</Badge>
+                          <StatusPill status="neutral" label="Usa sucursal" />
                         )}
                       </div>
                     </SelectItem>

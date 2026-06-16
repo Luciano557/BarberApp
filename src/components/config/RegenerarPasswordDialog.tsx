@@ -73,8 +73,8 @@ export function RegenerarPasswordDialog({ open, onOpenChange, sucursalId, sucurs
                 </div>
               </div>
 
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 flex gap-2 text-xs text-foreground">
-                <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 flex gap-2 text-xs text-foreground">
+                <AlertTriangle className="h-4 w-4 text-status-warning shrink-0 mt-0.5" />
                 <span>
                   Esta contraseña solo se muestra ahora. Si cerrás este diálogo sin copiarla, vas a tener que regenerarla.
                 </span>

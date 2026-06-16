@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Loader2, ChevronDown, Info } from 'lucide-react';
 import { Service, Extra, Discount, Line, Barber } from '@/types/barbershop';
 import { ServicesConfig } from './config/ServicesConfig';
@@ -75,6 +75,7 @@ export function MiNegocioGeneralTabContent({
   const { isOwner, isGeneralManager } = useAuth();
   const canManageEquipo = isOwner || isGeneralManager;
   const [cuentasOpen, setCuentasOpen] = useState(false);
+  const [serviciosTab, setServiciosTab] = useState<'services' | 'lines' | 'extras'>('services');
 
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
@@ -92,8 +93,8 @@ export function MiNegocioGeneralTabContent({
 
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
-      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary mb-2">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/70" />
+      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary shadow-sm">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
         <p>
           Acá definís la base de tu negocio: el catálogo de servicios, el equipo, los descuentos y los métodos de pago que aplican a todas las sucursales. Cada sucursal puede después activar y ajustar lo que necesite por su cuenta.
         </p>
@@ -104,10 +105,8 @@ export function MiNegocioGeneralTabContent({
         <span>Cargando configuración…</span>
       </div>
 
-      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">Configuración general</h2>
-
       {/* Anchor nav — solo desktop */}
-      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+      <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
         <div className="flex items-center gap-1 overflow-x-auto">
           <button onClick={() => { setCuentasOpen(true); scrollTo('seccion-cuentas'); }} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Cuentas de sucursal
@@ -167,64 +166,68 @@ export function MiNegocioGeneralTabContent({
 
         {/* Servicios */}
         <section id="seccion-servicios" className="border-t pt-6 mt-8">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Servicios</h3>
+          <h3 className="text-base font-medium text-foreground mb-4">Servicios</h3>
+          <div className="space-y-4">
+            <SegmentedControl
+              options={[
+                { value: 'services', label: 'Servicios' },
+                { value: 'lines', label: 'Categorías' },
+                { value: 'extras', label: 'Extras' },
+              ]}
+              value={serviciosTab}
+              onChange={(v) => setServiciosTab(v as 'services' | 'lines' | 'extras')}
+            />
+
+            {serviciosTab === 'services' && (
+              <div role="tabpanel" className="animate-fade-in">
+                <ServicesConfig
+                  mode="global"
+                  services={services}
+                  lines={lines}
+                  onAdd={guarded(onAddService)}
+                  onUpdate={guarded(onUpdateService)}
+                  onAddLine={onAddLine}
+                  onUpdateLine={guarded(onUpdateLine)}
+                  onDeleteLine={guarded(onDeleteLine)}
+                  onDelete={guarded(onDeleteService)}
+                />
+              </div>
+            )}
+
+            {serviciosTab === 'lines' && (
+              <div role="tabpanel" className="animate-fade-in">
+                <LinesConfig
+                  lines={lines}
+                  onAdd={onAddLine}
+                  onUpdate={guarded(onUpdateLine)}
+                  onDelete={guarded(onDeleteLine)}
+                />
+              </div>
+            )}
+
+            {serviciosTab === 'extras' && (
+              <div role="tabpanel" className="animate-fade-in">
+                <ExtrasConfig
+                  mode="global"
+                  extras={extras}
+                  onAdd={guarded(onAddExtra)}
+                  onUpdate={guarded(onUpdateExtra)}
+                  onDelete={guarded(onDeleteExtra)}
+                />
+              </div>
+            )}
           </div>
-          <Tabs defaultValue="services" className="w-full">
-            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
-              <TabsTrigger value="services" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Servicios</TabsTrigger>
-              <TabsTrigger value="lines" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Categorías</TabsTrigger>
-              <TabsTrigger value="extras" className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">Extras</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="services" className="mt-4 space-y-6 sm:mt-6 animate-fade-in">
-              <ServicesConfig
-                mode="global"
-                services={services}
-                lines={lines}
-                onAdd={guarded(onAddService)}
-                onUpdate={guarded(onUpdateService)}
-                onAddLine={onAddLine}
-                onUpdateLine={guarded(onUpdateLine)}
-                onDeleteLine={guarded(onDeleteLine)}
-                onDelete={guarded(onDeleteService)}
-              />
-            </TabsContent>
-
-            <TabsContent value="lines" className="mt-4 sm:mt-6 animate-fade-in">
-              <LinesConfig
-                lines={lines}
-                onAdd={onAddLine}
-                onUpdate={guarded(onUpdateLine)}
-                onDelete={guarded(onDeleteLine)}
-              />
-            </TabsContent>
-
-            <TabsContent value="extras" className="mt-4 sm:mt-6 animate-fade-in">
-              <ExtrasConfig
-                mode="global"
-                extras={extras}
-                onAdd={guarded(onAddExtra)}
-                onUpdate={guarded(onUpdateExtra)}
-                onDelete={guarded(onDeleteExtra)}
-              />
-            </TabsContent>
-          </Tabs>
         </section>
 
         {/* Productos */}
         <section id="seccion-productos" className="border-t pt-6 mt-8">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Productos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Productos</h3>
           <ProductosGlobalConfig />
         </section>
 
         {/* Descuentos */}
         <section id="seccion-descuentos" className="border-t pt-6 mt-8">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Descuentos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Descuentos</h3>
           <DiscountsConfig
             mode="global"
             discounts={discounts}

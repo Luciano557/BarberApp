@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Scissors, BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Shield, UserCheck, Building2, Lock, Receipt, ClipboardList, CalendarClock, Users, Menu } from 'lucide-react';
+import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, ChevronRight, Lock, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { usePinProtection } from '@/hooks/usePinProtection';
@@ -15,6 +15,18 @@ interface AppSidebarProps {
   onTabChange: (tab: string) => void;
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Dueño',
+  general_manager: 'Enc. General',
+  manager: 'Enc. Sucursal',
+  barber: 'Barbero',
+  sucursal_account: 'Cuenta de sucursal',
+};
+
+// Agrupación visual bajo "Gestión". Es solo presentación: los permisos que
+// deciden qué ítems existen no cambian.
+const MGMT_IDS = new Set(['mi-negocio', 'config']);
+
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
@@ -26,51 +38,110 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     if (isMobile) setCollapsed(true);
   }, [isMobile]);
 
+  // En mobile el drawer siempre muestra la versión completa: `collapsed` solo
+  // lo desliza fuera de pantalla. El riel compacto es exclusivo de desktop.
+  const railMode = !isMobile && collapsed;
+
   const navItems = [
-    ...(canOperarCajaYGastos ? [{ id: 'registro', label: 'Cobrar', icon: Scissors }] : []),
+    ...(canOperarCajaYGastos ? [{ id: 'registro', label: 'Cobrar', icon: CreditCard }] : []),
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
-    ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Receipt }] : []),
+    ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Wallet }] : []),
     ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
     ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock }] : []),
     ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
-    ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Building2 }] : []),
+    ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Store }] : []),
     ...(canViewConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
 
-  const getRoleBadges = () => {
-    const badgeMap: Record<string, { label: string; icon: typeof Shield; variant: 'default' | 'secondary' | 'outline' }> = {
-      owner: { label: 'Dueño', icon: Shield, variant: 'default' },
-      general_manager: { label: 'Enc. General', icon: Shield, variant: 'default' },
-      manager: { label: 'Enc. Sucursal', icon: UserCheck, variant: 'secondary' },
-      barber: { label: 'Barbero', icon: Scissors, variant: 'outline' },
-      sucursal_account: { label: 'Cuenta de sucursal', icon: Building2, variant: 'secondary' },
-    };
-    return roles
-      .filter(r => r !== 'otros')
-      .map(r => badgeMap[r])
-      .filter(Boolean);
-  };
+  const principalItems = navItems.filter((i) => !MGMT_IDS.has(i.id));
+  const gestionItems = navItems.filter((i) => MGMT_IDS.has(i.id));
 
-  const roleBadges = getRoleBadges();
+  const isPremium = organization?.plan === 'premium';
+  const planLabel = !organization
+    ? null
+    : organization.plan === 'premium'
+      ? 'Premium'
+      : organization.plan === 'profesional'
+        ? 'Profesional'
+        : 'Básico';
 
-  const getPlanBadge = () => {
-    if (!organization) return null;
-    switch (organization.plan) {
-      case 'premium':
-        return { label: 'Premium', variant: 'default' as const };
-      case 'profesional':
-        return { label: 'Profesional', variant: 'secondary' as const };
-      default:
-        return { label: 'Básico', variant: 'outline' as const };
-    }
-  };
+  const displayName = profile?.full_name || profile?.email || 'Usuario';
+  const initials =
+    (profile?.full_name || profile?.email || 'U')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s.charAt(0).toUpperCase())
+      .join('') || 'U';
 
-  const planBadge = getPlanBadge();
+  const primaryRole = roles.find((r) => r !== 'otros');
+  const primaryRoleLabel = primaryRole ? ROLE_LABELS[primaryRole] ?? null : null;
 
   const handleTabChange = (tab: string) => {
     onTabChange(tab);
     if (isMobile) setCollapsed(true);
   };
+
+  const renderNavItem = (item: { id: string; label: string; icon: typeof CreditCard }, index: number) => {
+    const active = activeTab === item.id;
+    const Icon = item.icon;
+    return (
+      <li
+        key={item.id}
+        className="animate-item-in [animation-fill-mode:backwards]"
+        style={{ animationDelay: `${index * 25}ms` }}
+      >
+        <button
+          onClick={() => handleTabChange(item.id)}
+          data-onboarding-id={item.id === 'mi-negocio' ? 'mi-negocio-nav' : undefined}
+          aria-current={active ? 'page' : undefined}
+          title={railMode ? item.label : undefined}
+          className={cn(
+            'group flex w-full items-center transition-colors duration-150',
+            railMode
+              ? 'justify-center'
+              : cn(
+                  'gap-2.5 rounded-[10px] px-2 py-1.5 text-sm',
+                  active
+                    ? 'bg-primary font-semibold text-primary-foreground'
+                    : 'font-medium text-muted-foreground hover:bg-[#F4F5F7] hover:text-foreground',
+                ),
+          )}
+        >
+          {railMode ? (
+            <span
+              className={cn(
+                'grid h-10 w-10 shrink-0 place-items-center rounded-[10px] transition-colors',
+                active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
+              )}
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+          ) : active ? (
+            <>
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary-foreground/15 text-primary-foreground">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="truncate">{item.label}</span>
+            </>
+          ) : (
+            <>
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </>
+          )}
+        </button>
+      </li>
+    );
+  };
+
+  const sectionLabel = (text: string) => (
+    <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {text}
+    </p>
+  );
 
   return (
     <>
@@ -79,7 +150,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           variant="outline"
           size="icon"
           onClick={() => setCollapsed(false)}
-          className="fixed left-4 top-4 z-40 h-11 w-11 rounded-full border bg-background/95 shadow-sm backdrop-blur"
+          className="fixed left-4 top-4 z-40 h-11 w-11 rounded-full border bg-background/95 backdrop-blur"
           aria-label="Abrir navegación"
         >
           <Menu className="h-5 w-5" />
@@ -90,182 +161,183 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         <button
           type="button"
           aria-label="Cerrar navegación"
-          className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-[hsl(var(--color-950))]/50 backdrop-blur-sm animate-fade-in"
           onClick={() => setCollapsed(true)}
         />
       )}
 
       <aside
         className={cn(
-          "border-r border-sidebar-border bg-sidebar flex flex-col",
+          'flex flex-col border-r border-[#EEEFF2] bg-background',
           isMobile
-            ? "fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200"
-            : "h-full z-10 transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]",
+            ? 'fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
+            : 'z-10 h-full transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]',
           isMobile
-            ? (collapsed ? "-translate-x-full" : "translate-x-0")
-            : (collapsed ? "w-16" : "w-56")
+            ? (collapsed ? '-translate-x-full' : 'translate-x-0')
+            : (collapsed ? 'w-16' : 'w-56'),
         )}
       >
-      {/* Logo & Organization */}
-      <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-3">
-        <div className={cn("flex items-center gap-2 min-w-0", collapsed && "mx-auto gap-0")}>
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <Building2 className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <div
-            className={cn(
-              "min-w-0 flex-1 overflow-hidden transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
-              collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
-            )}
-          >
-            <span className="font-semibold text-sidebar-foreground text-sm block truncate">
-              {organization?.name || 'Barbería'}
-            </span>
-            {planBadge && (
-              <Badge variant={planBadge.variant} className="text-[10px] px-1.5 py-0">
-                {planBadge.label}
-              </Badge>
-            )}
-          </div>
-        </div>
-        {isMobile && !collapsed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(true)}
-            className="h-8 w-8 shrink-0"
-            aria-label="Cerrar navegación"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
-
-      {/* Sucursal Selector */}
-      <SucursalSelector collapsed={collapsed} />
-
-      {/* User Info */}
-      {!collapsed && profile && (
-        <div className="px-3 py-3 border-b border-sidebar-border">
-          <p className="text-sm font-medium text-sidebar-foreground truncate">
-            {profile.full_name || profile.email}
-          </p>
-          {roleBadges.map((badge, i) => (
-            <Badge key={i} variant={badge.variant} className="mt-1 text-xs mr-1">
-              <badge.icon className="w-3 h-3 mr-1" />
-              {badge.label}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="flex-1 p-2">
-        <ul className="space-y-1">
-          {navItems.map((item) => (
-            <li key={item.id}>
-              <button
-                onClick={() => handleTabChange(item.id)}
-                data-onboarding-id={item.id === 'mi-negocio' ? 'mi-negocio-nav' : undefined}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 relative",
-                  collapsed && "justify-center gap-0 px-2",
-                  activeTab === item.id
-                    ? "bg-accent text-primary"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent"
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                {activeTab === item.id && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
-                )}
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                <span
-                  className={cn(
-                    "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
-                    collapsed ? "max-w-0 opacity-0" : "max-w-[200px] opacity-100"
-                  )}
-                >
-                  {item.label}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      {/* Notifications */}
-      {canViewTareas && (
-        <div className="p-2 border-t border-sidebar-border">
-          <NotificationsBell
-            collapsed={collapsed}
-            onNavigate={() => handleTabChange('tareas')}
-          />
-        </div>
-      )}
-
-      {/* Lock, Logout & Toggle */}
-      <div className="p-2 border-t border-sidebar-border space-y-1">
-        {requiresPin && isUnlocked && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={lock}
-            className={cn(
-              "w-full h-9 text-muted-foreground hover:text-foreground justify-start",
-              collapsed && "px-2 justify-center"
-            )}
-            title={collapsed ? `Bloquear (${unlockedBy})` : undefined}
-          >
-            <Lock className="h-4 w-4" />
-            <span
-              className={cn(
-                "ml-2 text-xs overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
-                collapsed ? "ml-0 max-w-0 opacity-0" : "max-w-[140px] opacity-100"
-              )}
+        {/* Brand identity — header blanco con logo tile navy */}
+        {railMode ? (
+          <div className="flex items-center justify-center bg-background py-4">
+            <div
+              className="grid h-10 w-10 place-items-center rounded-[10px] bg-primary"
+              title={organization?.name || 'Barbería'}
             >
-              Bloquear
-            </span>
-          </Button>
+              <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
+            </div>
+          </div>
+        ) : (
+          <div className="bg-background px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary">
+                <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
+                  {organization?.name || 'Barbería'}
+                </p>
+                {planLabel && (
+                  isPremium ? (
+                    <span className="mt-1.5 inline-flex items-center rounded-full bg-[#C39A45] px-2 py-0.5 text-[10px] font-semibold text-white">
+                      PREMIUM
+                    </span>
+                  ) : (
+                    <span className="mt-1.5 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                      {planLabel}
+                    </span>
+                  )
+                )}
+              </div>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setCollapsed(true)}
+                  aria-label="Cerrar navegación"
+                  className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-[#F4F5F7] hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {/* Wrapper-only styling del selector de sucursal (chip navy claro).
+                El componente interno se recolorea vía overrides de descendiente
+                para no tocar SucursalSelector. */}
+            <div className="mt-3 w-full rounded-lg border border-primary/15 bg-primary/5 [&_[role=combobox]]:border-0 [&_[role=combobox]]:bg-transparent [&_[role=combobox]]:text-primary [&_[role=combobox]_svg]:text-primary [&>div]:border-0 [&>div]:bg-transparent [&>div]:text-primary [&>div]:ring-0">
+              <SucursalSelector collapsed={false} />
+            </div>
+          </div>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={signOut}
-          className={cn(
-            "w-full h-9 text-muted-foreground hover:text-destructive justify-start",
-            collapsed && "px-2 justify-center"
+
+        {railMode && <SucursalSelector collapsed />}
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
+          {principalItems.length > 0 && (
+            <div>
+              {!railMode && sectionLabel('Principal')}
+              <ul className="space-y-0.5">
+                {principalItems.map((item, i) => renderNavItem(item, i))}
+              </ul>
+            </div>
           )}
-        >
-          <LogOut className="h-4 w-4" />
-          <span
-            className={cn(
-              "ml-2 text-xs overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 [transition-timing-function:var(--ease-out-quint)]",
-              collapsed ? "ml-0 max-w-0 opacity-0" : "max-w-[140px] opacity-100"
-            )}
-          >
-            Cerrar sesión
-          </span>
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            "w-full h-9 text-muted-foreground hover:text-foreground",
-            collapsed && "px-2"
+
+          {gestionItems.length > 0 && (
+            <div className="mt-3">
+              {!railMode
+                ? sectionLabel('Gestión')
+                : principalItems.length > 0 && <div className="mx-2 my-2 h-px bg-[#EEEFF2]" />}
+              <ul className="space-y-0.5">
+                {gestionItems.map((item, i) => renderNavItem(item, principalItems.length + i))}
+              </ul>
+            </div>
           )}
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
+        </nav>
+
+        {/* User & session */}
+        <div className="border-t border-[#EEEFF2] p-2">
+          {railMode ? (
+            <div className="flex flex-col items-center gap-1.5 py-2">
+              <Avatar className="h-9 w-9" title={displayName}>
+                <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              {canViewTareas && (
+                <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
+                  <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
+                </div>
+              )}
+              {requiresPin && isUnlocked && (
+                <button
+                  type="button"
+                  onClick={lock}
+                  title={`Bloquear (${unlockedBy})`}
+                  aria-label="Bloquear"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Lock className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCollapsed(false)}
+                title="Expandir"
+                aria-label="Expandir navegación"
+                className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/85"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
             <>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              <span className="text-xs">{isMobile ? 'Cerrar menú' : 'Colapsar'}</span>
+              <div className="flex items-center gap-2.5 px-2 py-2">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+                  {primaryRoleLabel && (
+                    <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {primaryRoleLabel}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {canViewTareas && (
+                    <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
+                      <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
+                    </div>
+                  )}
+                  {requiresPin && isUnlocked && (
+                    <button
+                      type="button"
+                      onClick={lock}
+                      title={`Bloquear (${unlockedBy})`}
+                      aria-label="Bloquear"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <Lock className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {!isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setCollapsed(true)}
+                  title="Colapsar"
+                  aria-label="Colapsar"
+                  className="mt-1 flex w-full items-center justify-center rounded-lg bg-primary py-2 text-primary-foreground transition-colors hover:bg-primary/85"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
             </>
           )}
-        </Button>
-      </div>
+        </div>
       </aside>
     </>
   );

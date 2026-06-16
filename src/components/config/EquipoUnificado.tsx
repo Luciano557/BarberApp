@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
 import { Plus, Edit2, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
-import { TabBadge } from '@/components/ui/TabBadge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 import { formatPhoneDisplay } from '@/lib/phone';
@@ -11,7 +10,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Barber, CompensationType, TeamRole, getBarberDisplayName } from '@/types/barbershop';
@@ -1186,85 +1185,81 @@ export function EquipoUnificado({
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-base">
-                  {isGeneralMode ? 'Miembros del negocio' : 'Equipo'}
-                </CardTitle>
-                {isGeneralMode && (
-                  <CardDescription>Cargos, compensación y acceso al sistema para todo el equipo.</CardDescription>
-                )}
-              </div>
-            </div>
-            {!isAdding && !editingId && activeSubTab === 'active' && (
+      <CatalogSectionCard
+        icon={Users}
+        title={isGeneralMode ? 'Miembros del negocio' : 'Equipo'}
+        description={isGeneralMode ? 'Cargos, compensación y acceso al sistema para todo el equipo.' : undefined}
+        actions={
+          !isAdding && !editingId && activeSubTab === 'active'
+            ? (
               <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Agregar
               </Button>
+            )
+            : undefined
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activos', count: activeBarbers.length },
+              { value: 'inactive', label: 'Historial', count: inactiveBarbers.length },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        {activeSubTab === 'active' ? (
+          <div className="space-y-3" role="tabpanel">
+            {(() => {
+              const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
+              return (
+                <>
+                  {visiblesActivos.map((b, idx) => {
+                    const item = renderBarberItem(b);
+                    if (!mostrarTodosActivos || idx === 0) return item;
+                    return <div key={`w-${b.id}`} className="animate-item-in">{item}</div>;
+                  })}
+                  {sortedActive.length === 0 && !isAdding && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                      <Users className="h-8 w-8 text-muted-foreground/50" />
+                      <div>
+                        <p className="text-sm font-medium">Todavía no hay miembros en el equipo</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Agregá el primer miembro para gestionar roles, compensación y acceso al sistema.
+                        </p>
+                      </div>
+                      {!editingId && (
+                        <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                          Agregar miembro
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {sortedActive.length > 1 && (
+                    <ShowMoreDivider
+                      count={sortedActive.length - 1}
+                      onClick={() => setMostrarTodosActivos(!mostrarTodosActivos)}
+                      expanded={mostrarTodosActivos}
+                    />
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        ) : (
+          <div className="space-y-3" role="tabpanel">
+            {sortedInactive.map(b => (
+              <div key={`hist-${b.id}`} className="bg-card border border-border/60 rounded-lg overflow-hidden mb-2">
+                {renderHistorialItem(b)}
+              </div>
+            ))}
+            {sortedInactive.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay miembros en el historial</p>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeBarbers.length} /></TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Historial<TabBadge count={inactiveBarbers.length} /></TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-3">
-              {(() => {
-                const visiblesActivos = mostrarTodosActivos ? sortedActive : sortedActive.slice(0, 1);
-                return (
-                  <>
-                    {visiblesActivos.map((b, idx) => {
-                      const item = renderBarberItem(b);
-                      if (!mostrarTodosActivos || idx === 0) return item;
-                      return <div key={`w-${b.id}`} className="animate-item-in">{item}</div>;
-                    })}
-                    {sortedActive.length === 0 && !isAdding && (
-                      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-                        <Users className="h-8 w-8 text-muted-foreground/50" />
-                        <div>
-                          <p className="text-sm font-medium">Todavía no hay miembros en el equipo</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Agregá el primer miembro para gestionar roles, compensación y acceso al sistema.
-                          </p>
-                        </div>
-                        {!editingId && (
-                          <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
-                            Agregar miembro
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                    {sortedActive.length > 1 && (
-                      <ShowMoreDivider
-                        count={sortedActive.length - 1}
-                        onClick={() => setMostrarTodosActivos(!mostrarTodosActivos)}
-                        expanded={mostrarTodosActivos}
-                      />
-                    )}
-                  </>
-                );
-              })()}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-3">
-              {sortedInactive.map(b => (
-                <div key={`hist-${b.id}`} className="bg-card border border-border/60 rounded-lg overflow-hidden mb-2">
-                  {renderHistorialItem(b)}
-                </div>
-              ))}
-              {sortedInactive.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay miembros en el historial</p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        )}
+      </CatalogSectionCard>
 
       <DrawerForm
         open={isAdding || editingId !== null}
@@ -1330,7 +1325,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+              {confirmRegen?.isRegistered && <AlertTriangle className="h-4 w-4 text-status-warning" />}
               {confirmRegen?.isRegistered ? 'Regenerar acceso' : 'Generar acceso'}
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1383,8 +1378,8 @@ export function EquipoUnificado({
                 {finalizarTarget?.loading ? (
                   <p className="text-xs">Verificando turnos futuros…</p>
                 ) : finalizarTarget && finalizarTarget.futureTurnos !== null && finalizarTarget.futureTurnos > 0 ? (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
                     <span>
                       Tiene <strong>{finalizarTarget.futureTurnos}</strong> turno{finalizarTarget.futureTurnos === 1 ? '' : 's'} futuro{finalizarTarget.futureTurnos === 1 ? '' : 's'} agendado{finalizarTarget.futureTurnos === 1 ? '' : 's'}. Al finalizar la actividad esos turnos quedarán asignados a este barbero. Reasignalos o cancelalos antes si corresponde.
                     </span>
@@ -1432,7 +1427,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-status-warning" />
               Reemplazar Encargado de Sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -1486,7 +1481,7 @@ export function EquipoUnificado({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-status-warning" />
               Corregir encargado de sucursal
             </AlertDialogTitle>
             <AlertDialogDescription>

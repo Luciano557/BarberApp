@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck, UserX, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck, UserX, ChevronDown, MoreVertical, User, Phone, Mail, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -29,7 +29,6 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
-import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
   sucursalId: string;
@@ -45,6 +44,9 @@ interface BarberoMini {
   apellido: string;
   rol_equipo: string | null;
   activo: boolean;
+  telefono: string | null;
+  comision: number;
+  access_email: string | null;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -105,7 +107,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       if (ids.length > 0) {
         const { data, error } = await supabase
           .from('barberos')
-          .select('id, nombre, apellido, rol_equipo, activo')
+          .select('id, nombre, apellido, rol_equipo, activo, telefono, comision, access_email')
           .eq('organization_id', organizationId)
           .eq('activo', true)
           .in('id', ids);
@@ -176,6 +178,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   // --- Activar: abre Sheet con barbero preseleccionado ---
   const [activateBarberoId, setActivateBarberoId] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [drawerBarberoId, setDrawerBarberoId] = useState<string | null>(null);
 
   const activatePrincipal = async (row: BarberoSucursalRow) => {
     setActivatingId(row.id);
@@ -262,53 +265,13 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
             </div>
           </div>
           <div className="self-start">
-            {isActive && vigente && barbero ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDeactivate(barbero, vigente)}
-              >
-                Desactivar
-              </Button>
-            ) : (
-              principal && principal.sucursal_id === sucursalId ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={activatingId === principal.id}
-                  onClick={() => activatePrincipal(principal)}
-                >
-                  {activatingId === principal.id ? (
-                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Activando...</>
-                  ) : (
-                    'Activar'
-                  )}
-                </Button>
-              ) : (
-                (canCreateTemporal || canCreateRecurrente) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {canCreateTemporal && (
-                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setTemporalOpen(true); }}>
-                          <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
-                        </DropdownMenuItem>
-                      )}
-                      {canCreateRecurrente && (
-                        <DropdownMenuItem onClick={() => { setActivateBarberoId(barberoId); setRecurrenteOpen(true); }}>
-                          <Repeat className="h-4 w-4 mr-2" /> Asignación automática
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )
-              )
-            )}
+            <button
+              onClick={() => setDrawerBarberoId(barberoId)}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+              title="Opciones"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
 
@@ -351,6 +314,14 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       </div>
     );
   };
+
+  // Computed values for the barbero info drawer
+  const drawerBarbero = drawerBarberoId ? barberos[drawerBarberoId] : undefined;
+  const drawerList = drawerBarberoId ? (grouped[drawerBarberoId] ?? []) : [];
+  const drawerVigente = drawerBarberoId ? pickVigenteHoy(drawerList) : null;
+  const drawerPrincipal = drawerList.find(r => r.tipo === 'principal');
+  const drawerIsActive = drawerBarberoId ? isActivoBarbero(drawerList) : false;
+  const drawerRole = drawerBarbero?.rol_equipo ? ROLE_LABELS[drawerBarbero.rol_equipo] ?? drawerBarbero.rol_equipo : null;
 
   // --- Sheets / dialogs ---
   const [temporalOpen, setTemporalOpen] = useState(false);
@@ -400,20 +371,12 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   };
 
   return (
-    <Card className="border border-border bg-card">
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="rounded-md bg-muted p-2">
-            <CalendarCheck className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <div>
-            <CardTitle className="text-base">Disponibilidad del equipo</CardTitle>
-            <CardDescription>Quién está disponible hoy y asignaciones temporales o automáticas.</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+    <>
+      <CatalogSectionCard
+        icon={CalendarCheck}
+        title="Disponibilidad del equipo"
+        description="Quién está disponible hoy y asignaciones temporales o automáticas."
+      >
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
             <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipo…
@@ -429,36 +392,38 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
             </p>
           </div>
         ) : (
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Activos<TabBadge count={activeIds.length} />
-              </TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">
-                Inactivos<TabBadge count={inactiveIds.length} />
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-3">
-              {activeIds.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">No hay miembros activos en esta sucursal hoy.</p>
-                </div>
-              ) : (
-                activeIds.map(id => renderBarberoCard(id, true))
+          <>
+            <SegmentedControl
+              options={[
+                { value: 'active', label: 'Activos', count: activeIds.length },
+                { value: 'inactive', label: 'Inactivos', count: inactiveIds.length },
+              ]}
+              value={activeSubTab}
+              onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+            />
+            <div className="space-y-3" role="tabpanel">
+              {activeSubTab === 'active' && (
+                activeIds.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No hay miembros activos en esta sucursal hoy.</p>
+                  </div>
+                ) : (
+                  activeIds.map(id => renderBarberoCard(id, true))
+                )
               )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-3">
-              {inactiveIds.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-6 text-center">
-                  <p className="text-sm text-muted-foreground">No hay miembros inactivos en esta sucursal.</p>
-                </div>
-              ) : (
-                inactiveIds.map(id => renderBarberoCard(id, false))
+              {activeSubTab === 'inactive' && (
+                inactiveIds.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No hay miembros inactivos en esta sucursal.</p>
+                  </div>
+                ) : (
+                  inactiveIds.map(id => renderBarberoCard(id, false))
+                )
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          </>
         )}
-      </CardContent>
+      </CatalogSectionCard>
 
 
       {/* Sheets */}
@@ -468,7 +433,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
         organizationId={organizationId}
         sucursalId={sucursalId}
         initialBarberoId={activateBarberoId ?? undefined}
-        onCreated={fetchAll}
+        onCreated={async () => { setDrawerBarberoId(null); await fetchAll(); }}
       />
       {canCreateRecurrente && (
         <RecurrenteSheet
@@ -477,7 +442,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           organizationId={organizationId}
           sucursalId={sucursalId}
           initialBarberoId={activateBarberoId ?? undefined}
-          onCreated={fetchAll}
+          onCreated={async () => { setDrawerBarberoId(null); await fetchAll(); }}
         />
       )}
 
@@ -487,7 +452,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               {deleteFutureCount != null && deleteFutureCount > 0 && (
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertTriangle className="h-4 w-4 text-status-warning" />
               )}
               Eliminar asignación
             </AlertDialogTitle>
@@ -501,7 +466,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={deleting || deleteFutureCount == null}>
+            <AlertDialogAction onClick={confirmDelete} disabled={deleting || deleteFutureCount == null} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? 'Eliminando…' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -532,8 +497,8 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                 {deactivateFutureCount == null ? (
                   <p className="text-xs">Verificando turnos futuros…</p>
                 ) : deactivateFutureCount > 0 ? (
-                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-foreground">
-                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs text-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
                     <span>
                       Tiene <strong>{deactivateFutureCount}</strong> turno{deactivateFutureCount === 1 ? '' : 's'} futuro{deactivateFutureCount === 1 ? '' : 's'} en esta sucursal. Esos turnos pueden quedar sin barbero disponible.
                     </span>
@@ -544,13 +509,139 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deactivating}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeactivate} disabled={deactivating || deactivateFutureCount == null}>
+            <AlertDialogAction onClick={confirmDeactivate} disabled={deactivating || deactivateFutureCount == null} className="bg-status-warning text-white hover:bg-status-warning/90">
               {deactivating ? 'Desactivando…' : 'Desactivar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+      {/* Barbero info drawer */}
+      <DrawerForm
+        open={drawerBarberoId !== null}
+        onOpenChange={(o) => { if (!o) setDrawerBarberoId(null); }}
+        title={drawerBarbero ? `${drawerBarbero.nombre} ${drawerBarbero.apellido}` : ''}
+        size="sm"
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" onClick={() => setDrawerBarberoId(null)}>Cerrar</Button>
+            {drawerIsActive && drawerVigente && drawerBarbero ? (
+              <Button
+                variant="ghost"
+                className="bg-status-warning text-white hover:bg-status-warning/90"
+                onClick={() => {
+                  void openDeactivate(drawerBarbero!, drawerVigente!);
+                  setDrawerBarberoId(null);
+                }}
+              >
+                Desactivar
+              </Button>
+            ) : !drawerIsActive && drawerPrincipal && drawerPrincipal.sucursal_id === sucursalId ? (
+              <Button
+                disabled={activatingId === drawerPrincipal.id}
+                onClick={() => {
+                  void activatePrincipal(drawerPrincipal!);
+                  setDrawerBarberoId(null);
+                }}
+              >
+                Activar
+              </Button>
+            ) : !drawerIsActive && (canCreateTemporal || canCreateRecurrente) ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Activar <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canCreateTemporal && (
+                    <DropdownMenuItem onClick={() => {
+                      setActivateBarberoId(drawerBarberoId!);
+                      setTemporalOpen(true);
+                      setDrawerBarberoId(null);
+                    }}>
+                      <CalendarIcon className="h-4 w-4 mr-2" /> Asignación temporal
+                    </DropdownMenuItem>
+                  )}
+                  {canCreateRecurrente && (
+                    <DropdownMenuItem onClick={() => {
+                      setActivateBarberoId(drawerBarberoId!);
+                      setRecurrenteOpen(true);
+                      setDrawerBarberoId(null);
+                    }}>
+                      <Repeat className="h-4 w-4 mr-2" /> Asignación automática
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          {/* Context card — rol + estado; el nombre está en el título del drawer */}
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <User className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                {drawerRole && (
+                  <span className="text-sm font-medium text-foreground">{drawerRole}</span>
+                )}
+                {drawerIsActive ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-status-success-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
+                    Activo
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                    Inactivo
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Campos de contacto — filas horizontales */}
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm text-muted-foreground">Teléfono</span>
+              <span className="text-sm text-foreground">{drawerBarbero?.telefono ?? '—'}</span>
+            </div>
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm text-muted-foreground">Email</span>
+              <span className="max-w-[180px] truncate text-sm text-foreground">
+                {drawerBarbero?.access_email ?? '—'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 px-3 py-2.5">
+              <Percent className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-sm text-muted-foreground">Comisión</span>
+              <span className="text-sm text-foreground">
+                {drawerBarbero?.comision != null ? `${drawerBarbero.comision}%` : '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* Asignación vigente */}
+          <div className="space-y-1.5 border-t border-border pt-4">
+            <p className="text-xs font-medium text-muted-foreground">Asignación vigente</p>
+            {drawerVigente ? (
+              <Badge variant="secondary" className="text-xs">
+                {drawerVigente.tipo === 'principal' && 'Principal'}
+                {drawerVigente.tipo === 'recurrente' && `Recurrente (${formatDiasSemana(drawerVigente.dias_semana)})`}
+                {drawerVigente.tipo === 'temporal' && `Temporal hasta ${formatShortDate(drawerVigente.fecha_fin)}`}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs text-muted-foreground">Sin asignación vigente hoy</Badge>
+            )}
+          </div>
+        </div>
+      </DrawerForm>
+    </>
 
   );
 }

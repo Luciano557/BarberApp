@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Plus, MoreVertical, Clock, Scissors } from 'lucide-react';
+import { useShowMore } from '@/hooks/useShowMore';
+import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -12,9 +12,10 @@ import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
 import { LineQuickEditPopover } from './LineQuickEditPopover';
 import { DrawerForm } from '@/components/ui/drawer-form';
-import { TabBadge } from '@/components/ui/TabBadge';
-import { Badge } from '@/components/ui/badge';
+import { TagPill } from '@/components/ui/TagPill';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
+import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 interface ServicesConfigProps {
   services: Service[];
@@ -117,6 +118,9 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   const editingService = editingId ? (services.find(s => s.id === editingId) ?? null) : null;
   const editingIsActive = editingService ? flagFor(editingService) : false;
 
+  const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
+    useShowMore(activeServices, { isDefaultView: activeSubTab === 'active' });
+
   const handleAdd = () => {
     const nameErr = validateName(newName);
     if (nameErr) { toast.error(nameErr); return; }
@@ -210,18 +214,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           <span className="min-w-0 break-words font-medium text-foreground sm:truncate">{service.name}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground sm:justify-end">
-          {linkedLine?.color && (
-            <Badge
-              variant="category"
-              className="border"
-              style={{
-                backgroundColor: `${linkedLine.color}1A`,
-                borderColor: `${linkedLine.color}40`,
-                color: linkedLine.color,
-              }}
-            >
-              {linkedLine.name}
-            </Badge>
+          {linkedLine && (
+            <TagPill label={linkedLine.name} />
           )}
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />{service.durationMin || 30} min
@@ -246,65 +240,74 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
 
   return (
     <>
-      <Card className="border border-border bg-card">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-md bg-muted p-2">
-                <Scissors className="h-5 w-5 text-muted-foreground" />
+      <CatalogSectionCard
+        icon={Scissors}
+        title={isGlobal ? 'Catálogo de servicios' : 'Servicios de esta sucursal'}
+        description={isGlobal
+          ? 'Nombre, duración y categoría. Los precios se configuran en cada sucursal.'
+          : 'Activá los servicios disponibles y configurá el precio.'}
+        actions={
+          !isAdding && !editingId && activeSubTab === 'active' && canCreate ? (
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Agregar
+            </Button>
+          ) : undefined
+        }
+        tabs={
+          <SegmentedControl
+            options={[
+              { value: 'active', label: 'Activos', count: activeServices.length },
+              { value: 'inactive', label: 'Inactivos', count: inactiveServices.length },
+            ]}
+            value={activeSubTab}
+            onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+          />
+        }
+      >
+        {activeSubTab === 'active' && (
+          <div className="space-y-2" role="tabpanel">
+            {visible.map((s, idx) => {
+              const item = renderServiceItem(s);
+              if (expanded && idx >= threshold) {
+                return <div key={`sm-${s.id}`} className="animate-item-in">{item}</div>;
+              }
+              return item;
+            })}
+            {showDivider && (
+              <ShowMoreDivider
+                count={hiddenCount}
+                onClick={toggle}
+                expanded={expanded}
+                label="servicios más"
+              />
+            )}
+            {activeServices.length === 0 && !isAdding && (
+              <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+                <Scissors className="h-8 w-8 text-muted-foreground/50" />
+                <div>
+                  <p className="text-sm font-medium">No hay servicios activos</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Agregá el primer servicio para que aparezca en el cobro.
+                  </p>
+                </div>
+                {canCreate && (
+                  <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                    Agregar servicio
+                  </Button>
+                )}
               </div>
-              <div>
-                <CardTitle className="text-base">
-                  {isGlobal ? 'Catálogo de servicios' : 'Servicios de esta sucursal'}
-                </CardTitle>
-                <CardDescription>
-                  {isGlobal
-                    ? 'Nombre, duración y categoría. Los precios se configuran en cada sucursal.'
-                    : 'Activá los servicios disponibles y configurá el precio.'}
-                </CardDescription>
-              </div>
-            </div>
-            {!isAdding && !editingId && activeSubTab === 'active' && canCreate && (
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
-                <Plus className="h-4 w-4 mr-1" /> Agregar
-              </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-md bg-muted/50 p-1">
-              <TabsTrigger value="active" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Activos<TabBadge count={activeServices.length} /></TabsTrigger>
-              <TabsTrigger value="inactive" className="group min-h-8 whitespace-normal px-2 text-xs data-[state=active]:bg-card">Inactivos<TabBadge count={inactiveServices.length} /></TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-4 space-y-2">
-              {activeServices.map(renderServiceItem)}
-              {activeServices.length === 0 && !isAdding && (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-                  <Scissors className="h-8 w-8 text-muted-foreground/50" />
-                  <div>
-                    <p className="text-sm font-medium">No hay servicios activos</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Agregá el primer servicio para que aparezca en el cobro.
-                    </p>
-                  </div>
-                  {canCreate && (
-                    <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
-                      Agregar servicio
-                    </Button>
-                  )}
-                </div>
-              )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-4 space-y-2">
-              {inactiveServices.map(renderServiceItem)}
-              {inactiveServices.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No hay servicios inactivos</p>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        )}
+        {activeSubTab === 'inactive' && (
+          <div className="space-y-2" role="tabpanel">
+            {inactiveServices.map(renderServiceItem)}
+            {inactiveServices.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No hay servicios inactivos</p>
+            )}
+          </div>
+        )}
+      </CatalogSectionCard>
 
       <DrawerForm
         open={isAdding || editingId !== null}
@@ -341,7 +344,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     setToggleConfirm({ service: editingService, action: 'deactivate' });
                     setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
                   }}
-                  className="bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                  className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
                   Desactivar
                 </Button>
@@ -360,12 +363,11 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                   </Button>
                   {onDelete && (
                     <Button
-                      variant="ghost"
+                      variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingService);
                         setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
                       }}
-                      className="bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400 dark:hover:bg-red-950/50"
                     >
                       Eliminar
                     </Button>
@@ -378,25 +380,25 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
       >
         {isAdding ? (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre</label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
             </div>
             {!isGlobal && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Precio</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Precio</label>
                 <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
               </div>
             )}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Duración</label>
-              <div className="flex items-center gap-1">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Duración</label>
+              <div className="flex items-center gap-2">
                 <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
-                <span className="text-xs text-muted-foreground">min</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Línea</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Línea</label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
                   <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
@@ -419,25 +421,25 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nombre</label>
               <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} disabled={structureLocked} />
             </div>
             {!isGlobal && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Precio</label>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Precio</label>
                 <CurrencyInput value={newPrice} onChange={setNewPrice} />
               </div>
             )}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Duración</label>
-              <div className="flex items-center gap-1">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Duración</label>
+              <div className="flex items-center gap-2">
                 <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} disabled={structureLocked} />
-                <span className="text-xs text-muted-foreground">min</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Línea</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Línea</label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select value={editLineId || 'none'} onValueChange={setEditLineId} disabled={structureLocked}>
                   <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
@@ -478,7 +480,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmToggle}>
+            <AlertDialogAction
+              onClick={handleConfirmToggle}
+              className={toggleConfirm?.action === 'deactivate' ? 'bg-status-warning text-white hover:bg-status-warning/90' : undefined}
+            >
               {toggleConfirm?.action === 'deactivate' ? 'Desactivar' : 'Activar'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -509,7 +514,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           <div className="space-y-4">
             <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} maxLength={80} />
             <div>
-              <label className="text-sm font-medium text-foreground mb-2 block">Color (opcional)</label>
+              <label className="text-sm font-medium mb-2 block">Color (opcional)</label>
               <div className="flex flex-wrap gap-2">
                 {LINE_COLORS.map(c => (
                   <button

@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Phone, Edit2, Building2, Power, AlertTriangle, KeyRound, Info } from 'lucide-react';
+import { StatusPill } from '@/components/ui/StatusPill';
+import { MapPin, Phone, Building2, AlertTriangle, KeyRound, Info, MoreVertical } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { CuentaSucursalBlock } from '@/components/config/CuentaSucursalBlock';
@@ -68,6 +68,7 @@ export function SucursalTabContent({
   const { isOwner, isGeneralManager, isManager } = useAuth();
   const { sucursales: sucursalesAsignadas } = useSucursal();
   const canManageServiceStructure = isOwner || isGeneralManager;
+  const canManageSucursalInfo = isOwner || isGeneralManager;
   const canManageCuentaSucursal =
     isOwner ||
     isGeneralManager ||
@@ -201,6 +202,10 @@ export function SucursalTabContent({
   };
 
   const isInactive = !sucursal.activa;
+  const isDirty =
+    infoForm.nombre !== sucursal.nombre ||
+    infoForm.direccion !== (sucursal.direccion || '') ||
+    infoForm.telefono !== (sucursal.telefono || '');
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -209,17 +214,13 @@ export function SucursalTabContent({
   return (
     <div className="mt-4 space-y-6 sm:mt-6">
       {/* Banner contextual de la vista Sucursal */}
-      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary mb-2">
-        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/70" />
-        <p>
-          En esta sección configurás todo lo que aplica específicamente a esta sucursal: precios, stock, disponibilidad del equipo y métodos de pago. El catálogo base, los cargos y la compensación se definen desde la vista General.
-        </p>
+      <div className="flex items-start gap-3 rounded-lg border border-secondary bg-secondary px-4 py-3 text-sm text-primary shadow-sm">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
+        <p>Configurá lo específico de esta sucursal: precios, stock, equipo y métodos de pago. El catálogo base y la compensación se definen desde la vista General.</p>
       </div>
 
-      <h2 className="text-xl font-semibold text-foreground mb-2 mt-4">{sucursal.nombre}</h2>
-
       {/* Anchor nav — solo desktop */}
-      <nav className="hidden md:block sticky top-0 z-10 bg-background border-b border-border/50 py-2">
+      <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
         <div className="flex items-center gap-1 overflow-x-auto">
           <button onClick={() => scrollTo('seccion-informacion')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Información
@@ -246,16 +247,22 @@ export function SucursalTabContent({
       <div id="seccion-informacion">
         <Card data-onboarding-id="info-sucursal-card">
           <CardHeader>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-0.5">
                   <Building2 className="w-5 h-5 text-primary" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 space-y-1.5">
                   <CardTitle className="min-w-0 text-base leading-tight">{sucursal.nombre}</CardTitle>
+                  <StatusPill
+                    key={String(sucursal.activa)}
+                    status={sucursal.activa ? 'success' : 'neutral'}
+                    label={sucursal.activa ? 'Activa' : 'Inactiva'}
+                    className="animate-pop-in"
+                  />
                 </div>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              <div className="flex items-center gap-2 sm:shrink-0">
                 {canManageCuentaSucursal && (
                   <Button
                     variant="outline"
@@ -267,83 +274,27 @@ export function SucursalTabContent({
                     <KeyRound className="h-4 w-4 mr-1" /> Cuenta de sucursal
                   </Button>
                 )}
-                {!isEditingInfo && (
+                {canManageSucursalInfo && (
                   <Button
-                    variant="outline"
-                    size="sm"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
                     onClick={() => setIsEditingInfo(true)}
-                    className="w-full justify-center sm:w-auto"
                   >
-                    <Edit2 className="h-4 w-4 mr-1" /> Editar
+                    <MoreVertical className="h-4 w-4" />
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`w-full justify-center sm:w-auto ${isInactive ? '' : 'text-destructive border-destructive/30 hover:bg-destructive/10'}`}
-                  disabled={isTogglingActive}
-                  onClick={openToggleDialog}
-                >
-                  <Power className="h-4 w-4 mr-1" />
-                  {isInactive ? 'Reactivar' : 'Desactivar'}
-                </Button>
-                <AlertDialog
-                  open={showToggleDialog}
-                  onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
-                >
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        {isInactive
-                          ? `Reactivar ${sucursal.nombre}`
-                          : `Desactivar ${sucursal.nombre}`}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {isInactive
-                          ? 'La sucursal volverá a estar operativa.'
-                          : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
-                      <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <p>
-                          Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
-                        </p>
-                      </div>
-                    )}
-
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
-                        disabled={isTogglingActive}
-                        className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-                      >
-                        {isTogglingActive
-                          ? 'Procesando...'
-                          : (isInactive ? 'Reactivar' : 'Desactivar')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div>
-                <Badge key={String(sucursal.activa)} variant={sucursal.activa ? 'default' : 'secondary'} className="animate-pop-in">
-                  {sucursal.activa ? 'Activa' : 'Inactiva'}
-                </Badge>
-              </div>
-              <div className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.direccion || 'Sin dirección'}</span>
               </div>
-              <div className="flex items-start gap-2">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+              <div className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 break-words text-sm text-muted-foreground">{sucursal.telefono || 'Sin teléfono'}</span>
               </div>
             </div>
@@ -382,9 +333,7 @@ export function SucursalTabContent({
 
         {/* Servicios */}
         <section id="seccion-servicios" className="border-t pt-6 mt-6" data-onboarding-id="catalogo-section">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Servicios</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Servicios</h3>
           <CobrarConfig
             services={services} extras={extras} lines={lines}
             onAddService={onAddService} onUpdateService={onUpdateService}
@@ -397,17 +346,13 @@ export function SucursalTabContent({
 
         {/* Productos */}
         <section id="seccion-productos" className="border-t pt-6 mt-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Productos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Productos</h3>
           <ProductosConfig sucursalId={sucursal.id} />
         </section>
 
         {/* Descuentos */}
         <section id="seccion-descuentos" className="border-t pt-6 mt-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold">Descuentos</h3>
-          </div>
+          <h3 className="text-base font-medium text-foreground mb-4">Descuentos</h3>
           <DiscountsConfig
             discounts={discounts}
             onAdd={onAddDiscount}
@@ -424,6 +369,48 @@ export function SucursalTabContent({
 
       </div>
 
+      <AlertDialog
+        open={showToggleDialog}
+        onOpenChange={(o) => { if (!o && !isTogglingActive) setShowToggleDialog(false); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {isInactive
+                ? `Reactivar ${sucursal.nombre}`
+                : `Desactivar ${sucursal.nombre}`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isInactive
+                ? 'La sucursal volverá a estar operativa.'
+                : 'Los barberos de esta sucursal quedarán bloqueados y no podrán operar hasta que los asignes a otra sucursal o reactives esta.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {!isInactive && futureTurnosCount !== null && futureTurnosCount > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning-foreground">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Esta sucursal tiene {futureTurnosCount} turno{futureTurnosCount === 1 ? '' : 's'} futuro{futureTurnosCount === 1 ? '' : 's'} que quedará{futureTurnosCount === 1 ? '' : 'n'} sin atender.
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleToggleActive(); }}
+              disabled={isTogglingActive}
+              className={!isInactive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+            >
+              {isTogglingActive
+                ? 'Procesando...'
+                : (isInactive ? 'Reactivar' : 'Desactivar')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <DrawerForm
         open={isEditingInfo}
         onOpenChange={(o) => {
@@ -435,35 +422,81 @@ export function SucursalTabContent({
         title="Editar información"
         size="sm"
         footer={
-          <div className="flex w-full justify-between">
+          <div className="flex w-full items-center justify-between">
             <Button
-              variant="ghost"
-              disabled={isSavingInfo}
-              onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }}
+              variant={isInactive ? 'outline' : 'destructive'}
+              disabled={isDirty || isSavingInfo}
+              title={isDirty ? 'Guardá los cambios antes de continuar' : undefined}
+              onClick={() => {
+                void openToggleDialog();
+                setIsEditingInfo(false);
+                setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' });
+              }}
             >
-              Cancelar
+              {isInactive ? 'Reactivar' : 'Desactivar'}
             </Button>
-            <Button
-              disabled={isSavingInfo || !infoForm.nombre.trim()}
-              onClick={handleSaveInfo}
-            >
-              {isSavingInfo ? 'Guardando...' : 'Guardar'}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                disabled={isSavingInfo}
+                onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={isSavingInfo || !infoForm.nombre.trim()}
+                onClick={handleSaveInfo}
+              >
+                {isSavingInfo ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
           </div>
         }
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nombre</Label>
-            <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
+        <div className="space-y-5">
+          {/* Context card — qué sucursal se está editando */}
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span className="truncate text-sm font-medium text-foreground">{sucursal.nombre}</span>
+                {sucursal.activa ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-status-success-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
+                    Activa
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                    Inactiva
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Dirección</Label>
-            <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
-          </div>
-          <div className="space-y-2">
-            <Label>Teléfono</Label>
-            <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" />
+
+          {/* Campos editables */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nombre</Label>
+              <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                Dirección
+              </Label>
+              <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                Teléfono
+              </Label>
+              <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" maxLength={20} />
+            </div>
           </div>
         </div>
       </DrawerForm>

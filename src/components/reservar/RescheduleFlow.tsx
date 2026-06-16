@@ -51,13 +51,29 @@ export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
       });
 
       if (error || data?.error) {
-        if (data?.error === "slot_taken") {
+        const code = data?.error;
+        if (code === "slot_taken") {
           toast.error("Ese horario ya fue reservado. Elegí otro.");
           setStep("horario");
           return;
         }
-        if (data?.error === "time_limit") {
-          toast.error("Este turno ya no puede modificarse.");
+        if (code === "slot_too_soon") {
+          toast.error("Ese horario quedó muy cerca. Elegí otro.");
+          setStep("horario");
+          return;
+        }
+        if (code === "outside_working_hours") {
+          toast.error("Ese horario ya no está disponible. Elegí otro.");
+          setStep("horario");
+          return;
+        }
+        if (code === "slot_blocked") {
+          toast.error("Ese horario quedó bloqueado. Elegí otro.");
+          setStep("horario");
+          return;
+        }
+        if (code === "modify_limit") {
+          toast.error(data?.message || "Este turno ya no puede modificarse.");
           return;
         }
         toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");

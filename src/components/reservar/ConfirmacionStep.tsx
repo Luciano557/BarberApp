@@ -44,8 +44,24 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
       });
 
       if (fnError || data?.error) {
-        if (data?.error === "slot_taken") {
+        const code = data?.error;
+        if (code === "slot_taken") {
           toast.error("Ese horario ya fue reservado. Elegí otro.");
+          onSlotTaken();
+          return;
+        }
+        if (code === "slot_too_soon") {
+          toast.error("Ese horario quedó muy cerca. Elegí otro.");
+          onSlotTaken();
+          return;
+        }
+        if (code === "outside_working_hours") {
+          toast.error("Ese horario ya no está disponible. Elegí otro.");
+          onSlotTaken();
+          return;
+        }
+        if (code === "slot_blocked") {
+          toast.error("Ese horario quedó bloqueado. Elegí otro.");
           onSlotTaken();
           return;
         }
