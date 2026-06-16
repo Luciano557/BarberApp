@@ -63,10 +63,10 @@ const STEPS: Step[] = ['barber', 'service', 'extras', 'discount', 'payment'];
 
 const STEP_INFO = {
   barber: { title: 'Barbero', subtitle: 'Elegí quién atendió o sumá productos', icon: User },
-  service: { title: 'Servicio', subtitle: 'Selecciona el servicio principal', icon: Scissors },
-  extras: { title: 'Extras', subtitle: 'Agrega extras opcionales', icon: Sparkles },
-  discount: { title: 'Descuento', subtitle: 'Aplica un descuento si corresponde (solo servicios)', icon: Tag },
-  payment: { title: 'Método de Pago', subtitle: 'Selecciona cómo paga el cliente', icon: Wallet },
+  service: { title: 'Servicio', subtitle: 'Elegí el servicio principal', icon: Scissors },
+  extras: { title: 'Extras', subtitle: 'Sumá extras opcionales al servicio', icon: Sparkles },
+  discount: { title: 'Descuento', subtitle: 'Aplicá un descuento al servicio si corresponde', icon: Tag },
+  payment: { title: 'Método de Pago', subtitle: 'Elegí cómo paga el cliente', icon: Wallet },
 };
 
 export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], sucursalId, onSubmit, onNavigateToTareas, onNavigateToTeamSetup }: PaymentRegistrationProps) {
@@ -86,6 +86,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   // Productos
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -585,14 +586,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
 
       if (result) {
-        const summaryLabel = hasService ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
-        toast({
-          title: "✅ Cobro guardado correctamente",
-          description: recargoTotal > 0
-            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
-            : `$${total.toLocaleString()} - ${summaryLabel}`,
-        });
+        setShowSuccessOverlay(true);
         resetForm();
+        setTimeout(() => setShowSuccessOverlay(false), 2200);
       } else {
         toast({
           title: "❌ No se pudo guardar el cobro",
@@ -699,15 +695,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
 
       if (result) {
-        const isServiceSale = !!service?.id;
-        const summaryLabel = isServiceSale ? service!.name : `${cart.length} producto${cart.length > 1 ? 's' : ''}`;
-        toast({
-          title: '✅ Cobro guardado correctamente',
-          description: recargoTotal > 0
-            ? `$${totalACobrar.toLocaleString()} (incluye recargo $${recargoTotal.toLocaleString()}) - ${summaryLabel}`
-            : `$${total.toLocaleString()} - ${summaryLabel}`,
-        });
+        setShowSuccessOverlay(true);
         resetForm();
+        setTimeout(() => setShowSuccessOverlay(false), 2200);
       } else {
         toast({
           title: '❌ No se pudo guardar el cobro',
@@ -822,16 +812,16 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center gap-1">
+      <div className="flex gap-1">
         {STEPS.map((step, index) => (
-          <div key={step} className="flex items-center flex-1">
+          <div key={step} className="flex flex-col gap-1.5 flex-1 min-w-0">
             <button
               onClick={() => {
                 if (index <= currentStepIndex) {
                   setCurrentStep(step);
                 }
               }}
-              className={`flex-1 h-1.5 rounded-full transition-colors ${
+              className={`h-1.5 w-full rounded-full transition-colors ${
                 index < currentStepIndex
                   ? 'bg-secondary cursor-pointer'
                   : index === currentStepIndex
@@ -839,7 +829,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                   : 'bg-border'
               }`}
             />
-            {index < STEPS.length - 1 && <div className="w-1" />}
           </div>
         ))}
       </div>
@@ -852,9 +841,6 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         <div className="flex-1">
           <h2 className="text-lg font-medium text-foreground">{STEP_INFO[currentStep].title}</h2>
           <p className="text-sm text-muted-foreground">{STEP_INFO[currentStep].subtitle}</p>
-        </div>
-        <div className="self-start text-xs text-muted-foreground sm:self-auto sm:text-sm">
-          {currentStepIndex + 1}/{STEPS.length}
         </div>
       </div>
 
@@ -1083,8 +1069,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                               ? 'border-secondary bg-secondary/5'
                               : 'border-border bg-card hover:bg-muted/50'
                           } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          style={group.lineColor ? { borderLeftWidth: '3px', borderLeftColor: selectedService === service.id ? undefined : group.lineColor } : undefined}
-                        >
+                          >
                           <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
                             {idx}
                           </span>
@@ -1154,7 +1139,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                           <Badge variant="outline" className="text-xs">Precio pendiente</Badge>
                         </div>
                       ) : (
-                        <p className="text-sm font-semibold text-muted-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
+                        <p className="text-sm font-semibold text-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
                       )}
                     </div>
                   </button>
@@ -1193,7 +1178,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
               className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
                 selectedDiscount === 'none'
                   ? 'border-secondary bg-secondary/5'
-                  : 'border-border bg-card hover:bg-muted/50'
+                  : 'border-dashed border-border bg-card hover:bg-muted/50'
               }`}
             >
               <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
@@ -1298,7 +1283,11 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                       <button
                         key={m.method}
                         onClick={() => handleSelectPayment(m.method)}
-                        className={`relative p-6 rounded-lg border transition-colors ${hoverClass} ${
+                        style={{
+                          opacity: 0,
+                          animation: `payment-card-in 280ms var(--ease-out-quint) ${idx * 60}ms forwards`,
+                        }}
+                        className={`relative p-6 rounded-lg border transition-colors active:scale-[0.97] ${hoverClass} ${
                           isSelected ? selectedClass : 'border-border bg-card hover:bg-muted/50'
                         }`}
                       >
@@ -1590,6 +1579,32 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         </AlertDialogContent>
       </AlertDialog>
 
+      {showSuccessOverlay && (
+        <div
+          className="animate-overlay-show fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(10, 16, 36, 0.72)' }}
+          aria-live="polite"
+          aria-label="Cobro registrado exitosamente"
+        >
+          <div
+            className="animate-confirm-card-in flex flex-col items-center gap-5 rounded-2xl px-12 py-10 text-center"
+            style={{ background: '#1E2A4A', maxWidth: '300px', width: '90%' }}
+          >
+            <div
+              className="animate-confirm-icon-pop flex items-center justify-center rounded-full"
+              style={{ width: 64, height: 64, background: 'rgba(255,255,255,0.1)' }}
+            >
+              <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+            </div>
+            <div className="animate-confirm-text-in flex flex-col gap-1">
+              <p className="text-xl font-medium text-white">Cobro registrado</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
+                El cobro fue registrado con éxito
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

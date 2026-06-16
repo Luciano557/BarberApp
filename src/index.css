@@ -296,6 +296,45 @@
       transform: translateX(0);
     }
   }
+
+  @keyframes overlay-show {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes confirm-card-in {
+    from { opacity: 0; transform: scale(0.88) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @keyframes confirm-icon-pop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes confirm-text-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes payment-card-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .animate-overlay-show {
+    animation: overlay-show 280ms var(--ease-out-quint) forwards;
+  }
+  .animate-confirm-card-in {
+    animation: confirm-card-in 380ms var(--ease-out-quint) 60ms both;
+  }
+  .animate-confirm-icon-pop {
+    animation: confirm-icon-pop 380ms var(--ease-out-quint) 180ms both;
+  }
+  .animate-confirm-text-in {
+    animation: confirm-text-in 320ms var(--ease-out-quint) 260ms both;
+  }
 }
 
 /* Accesibilidad: anular movimiento si el usuario lo pide. */
@@ -306,6 +345,15 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .animate-overlay-show,
+  .animate-confirm-card-in,
+  .animate-confirm-icon-pop,
+  .animate-confirm-text-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
