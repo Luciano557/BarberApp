@@ -112,7 +112,7 @@ export function MultiDayClosingSummary() {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleOpen}>
+      <Button size="sm" onClick={handleOpen}>
         <CalendarRange className="h-4 w-4 mr-2" />
         Resumen por rango
       </Button>
@@ -122,61 +122,69 @@ export function MultiDayClosingSummary() {
           <DialogHeader>
             <DialogTitle>Resumen por rango de fechas</DialogTitle>
             <DialogDescription>
-              Seleccioná un rango de fechas para ver el resumen de cierres agrupado por barbero.
+              Resumen de cierres agrupado por barbero para el período seleccionado.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-wrap gap-4 items-end">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Desde</p>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !desde && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {desde ? format(desde, 'dd/MM/yyyy') : 'Fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={desde}
-                    onSelect={setDesde}
-                    locale={es}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+          <div className="rounded-lg border border-border bg-muted/40 p-4 space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Consultar Período</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Seleccioná fechas y obtené un resumen completo.
+              </p>
             </div>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Desde</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !desde && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {desde ? format(desde, 'dd/MM/yyyy') : 'Fecha'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={desde}
+                      onSelect={setDesde}
+                      locale={es}
+                      disabled={(date) => date > new Date()}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Hasta</p>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-[160px] justify-start text-left font-normal", !hasta && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {hasta ? format(hasta, 'dd/MM/yyyy') : 'Fecha'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={hasta}
-                    onSelect={setHasta}
-                    locale={es}
-                    disabled={(date) => date > new Date() || (desde ? date < desde : false)}
-                    initialFocus
-                    className={cn("p-3 pointer-events-auto")}
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-foreground">Hasta</p>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-[150px] justify-start text-left font-normal", !hasta && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {hasta ? format(hasta, 'dd/MM/yyyy') : 'Fecha'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={hasta}
+                      onSelect={setHasta}
+                      locale={es}
+                      disabled={(date) => date > new Date() || (desde ? date < desde : false)}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <Button onClick={handleConsultar} disabled={!desde || !hasta || loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Consultar
+              </Button>
             </div>
-
-            <Button onClick={handleConsultar} disabled={!desde || !hasta || loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Consultar
-            </Button>
           </div>
 
           {results && results.length === 0 && (
