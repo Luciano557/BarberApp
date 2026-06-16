@@ -9,7 +9,7 @@ interface DrawerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  size: "sm" | "md";
+  size: "sm" | "md" | "lg";
   children: React.ReactNode;
   footer: React.ReactNode;
 }
@@ -28,7 +28,7 @@ export function DrawerForm({ open, onOpenChange, title, size, children, footer }
             "data-[state=closed]:duration-200 data-[state=open]:duration-300",
             "[animation-timing-function:cubic-bezier(0.23,1,0.32,1)]",
             "w-[calc(100%-48px)]",
-            size === "sm" ? "sm:w-[380px]" : "sm:w-[520px]",
+            size === "sm" ? "sm:w-[380px]" : size === "md" ? "sm:w-[520px]" : "sm:w-[680px]",
           )}
         >
           {/* Header */}

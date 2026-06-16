@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, Trash2, RotateCcw } from 'lucide-react';
+import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,6 +14,11 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSucursal } from '@/contexts/SucursalContext';
+import { useVoidClosure } from '@/hooks/useVoidClosure';
+import { VoidClosureDialog } from './VoidClosureDialog';
 
 interface CashClosingRecord {
   id: number;
@@ -49,6 +54,26 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
+  const { user, profile } = useAuth();
+  const { organization } = useOrganization();
+  const { currentSucursal } = useSucursal();
+
+  const {
+    voidingClosure,
+    setVoidingClosure,
+    voidReason,
+    setVoidReason,
+    handleVoidClosure,
+    isVoiding,
+  } = useVoidClosure({
+    currentSucursalId: currentSucursal?.id ?? null,
+    organizationId: organization?.id ?? '',
+    userId: user?.id ?? '',
+    userFullName: profile?.full_name || user?.email || 'Usuario',
+    userEmail: user?.email || '',
+    onSuccess: () => fetchRecords(),
+  });
+
   const fetchRecords = async () => {
     setLoading(true);
     try {
@@ -57,7 +82,6 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
         .select('id, created_at, closed_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado, entry_mode, backfilled_at, backfill_reason')
         .order('created_at', { ascending: false });
 
-      // Filter by barbero_id (UUID) instead of text - more reliable
       if (selectedBarber !== 'all') {
         query = query.eq('barbero_id', selectedBarber);
       }
@@ -97,71 +121,40 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
     setEndDate(undefined);
   };
 
-  const handleAnular = async (record: CashClosingRecord) => {
-    const { error } = await supabase
-      .from('ingresos')
-      .update({ estado: 'eliminado' })
-      .eq('id', record.id);
-
-    if (error) {
-      console.error('Error anulando cierre:', error);
-      toast.error('Error al anular el cierre de caja');
-      return;
-    }
-
-    toast.success(`Cierre de ${record.barbero} anulado correctamente`);
-    fetchRecords();
-  };
-
-  const handleRestaurar = async (record: CashClosingRecord) => {
-    const { error } = await supabase
-      .from('ingresos')
-      .update({ estado: 'activo' })
-      .eq('id', record.id);
-
-    if (error) {
-      console.error('Error restaurando cierre:', error);
-      toast.error('Error al restaurar el cierre de caja');
-      return;
-    }
-
-    toast.success(`Cierre de ${record.barbero} restaurado correctamente`);
-    fetchRecords();
-  };
-
   const hasFilters = selectedBarber !== 'all' || startDate || endDate;
 
-  // Build barber options from the barbers prop - use id (UUID) as value
   const barberOptions = barbers.map(b => ({
     id: b.id,
     name: `${b.firstName} ${b.lastName}`
   }));
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       {externalOpen === undefined && (
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">
-            <History className="h-4 w-4 mr-2" />
-            Historial
-          </Button>
-        </DialogTrigger>
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <History className="h-4 w-4 mr-2" />
+          Historial
+        </Button>
       )}
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5 text-primary" />
-            Historial de Cierres de Caja
-          </DialogTitle>
-        </DialogHeader>
 
+      <DrawerForm
+        open={open}
+        onOpenChange={setOpen}
+        title="Historial de cierres de caja"
+        size="lg"
+        footer={
+          <Button variant="ghost" onClick={() => setOpen(false)}>
+            Cerrar
+          </Button>
+        }
+      >
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 py-3 border-b border-border">
+        <div className="flex flex-wrap items-center gap-3 pb-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Filtros:</span>
           </div>
-          
+
           <Select value={selectedBarber} onValueChange={setSelectedBarber}>
             <SelectTrigger className="w-[180px]">
               <User className="h-4 w-4 mr-2" />
@@ -220,16 +213,18 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
         </div>
 
         {/* Records List */}
-        <div className="flex-1 overflow-y-auto py-4 space-y-3">
+        <div className="space-y-3 pt-4">
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <p>Cargando...</p>
             </div>
           ) : records.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <History className="h-10 w-10 mx-auto mb-4 opacity-50" />
-              <p className="font-medium">Sin registros</p>
-              <p className="text-sm mt-1">No se encontraron cierres de caja</p>
+            <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+              <History className="h-8 w-8 text-muted-foreground/50" />
+              <div>
+                <p className="text-sm font-medium">Todavía no hay cierres de caja.</p>
+                <p className="text-xs text-muted-foreground mt-1">Los cierres registrados aparecerán aquí.</p>
+              </div>
             </div>
           ) : (
             records.map((record) => (
@@ -270,54 +265,36 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
                         status={record.estado === 'activo' ? 'success' : 'neutral'}
                         label={record.estado || 'activo'}
                       />
-                      {record.estado === 'eliminado' ? (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary">
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Restaurar cierre de caja?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción restaurará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} y volverá a contabilizarse.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleRestaurar(record)}>
-                                Restaurar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      ) : (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>¿Anular cierre de caja?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta acción marcará el cierre de {record.barbero} del {format(new Date(record.created_at), "d 'de' MMMM", { locale: es })} como eliminado. El registro no se borrará pero ya no se contabilizará.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleAnular(record)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Anular
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                      {record.estado !== 'eliminado' && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted border-[0.5px] border-border"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setVoidingClosure({
+                                  id: record.id,
+                                  barberName: record.barbero || 'Sin barbero',
+                                  fechaCierre: format(new Date(record.created_at), 'yyyy-MM-dd'),
+                                });
+                              }}
+                            >
+                              Anular cierre
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
                     <div>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -329,9 +306,9 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
                     <div>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <CreditCard className="h-3 w-3" />
-                        Mercado Pago
+                        Digital
                       </p>
-                      <p className="font-semibold text-secondary">${(record.mp || 0).toLocaleString()}</p>
+                      <p className="font-semibold text-status-info-foreground">${(record.mp || 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Total</p>
@@ -347,7 +324,17 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
             ))
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </DrawerForm>
+
+      <VoidClosureDialog
+        open={!!voidingClosure}
+        voidingClosure={voidingClosure}
+        voidReason={voidReason}
+        onVoidReasonChange={setVoidReason}
+        onConfirm={handleVoidClosure}
+        onCancel={() => { setVoidingClosure(null); setVoidReason(''); }}
+        isLoading={isVoiding}
+      />
+    </>
   );
 }

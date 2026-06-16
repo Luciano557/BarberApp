@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { Transaction, Barber, Service, Line, isDigitalMethod } from '@/types/barbershop';
 import { format, addDays, subDays, isToday, isBefore, startOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -16,6 +15,8 @@ import { calcComisionProductos, ProductoCfg } from '@/lib/comisionProductos';
 import { CashClosingHistory } from './CashClosingHistory';
 import { AnulacionesCierreHistory } from './AnulacionesCierreHistory';
 import { VoidTransactionDialog } from './VoidTransactionDialog';
+import { VoidClosureDialog } from './VoidClosureDialog';
+import { useVoidClosure } from '@/hooks/useVoidClosure';
 import { BackfillWizard } from './BackfillWizard';
 import { MultiDayClosingSummary } from './MultiDayClosingSummary';
 import { TransactionDetailDrawer } from './TransactionDetailDrawer';
@@ -70,9 +71,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const [detailTransaction, setDetailTransaction] = useState<Transaction | null>(null);
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
-  const [voidingClosure, setVoidingClosure] = useState<{ id: number; barberName: string } | null>(null);
-  const [isVoidingClosure, setIsVoidingClosure] = useState(false);
-  const [voidReason, setVoidReason] = useState<string>('');
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [regularizingBarber, setRegularizingBarber] = useState<BarberSummary | null>(null);
   const [isRegularizing, setIsRegularizing] = useState(false);
@@ -151,6 +149,23 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   useEffect(() => {
     checkClosedBarbers();
   }, [checkClosedBarbers]);
+
+  const {
+    voidingClosure,
+    setVoidingClosure,
+    voidReason,
+    setVoidReason,
+    handleVoidClosure,
+    handleVoidClosureWithReason,
+    isVoiding: isVoidingClosure,
+  } = useVoidClosure({
+    currentSucursalId: currentSucursal?.id ?? null,
+    organizationId: organization?.id ?? '',
+    userId: user?.id ?? '',
+    userFullName: profile?.full_name || user?.email || 'Usuario',
+    userEmail: user?.email || '',
+    onSuccess: () => checkClosedBarbers(),
+  });
 
   // Check if a transaction can be voided (barber's cash not closed)
   const canVoidTransaction = useCallback((tx: Transaction): boolean => {
@@ -360,12 +375,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     setClosingBarber(barber);
   }, []);
 
-  // Anular cierre: dialog de motivo abre directamente; al confirmar, la lógica
-  // de anulación valida lo que corresponda. Cuentas personales no ven PIN.
-  const handleVoidClosureClick = useCallback((closureData: { id: number; barberName: string }) => {
-    setVoidingClosure(closureData);
-  }, []);
-
   // Regularizar cierre: abre el AlertDialog directamente.
   const handleRegularizeClick = useCallback((barber: BarberSummary) => {
     setRegularizingBarber(barber);
@@ -379,58 +388,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     setHistoryOpen(true);
   }, [requirePinForAction, currentSucursal?.id]);
 
-  const VOID_REASONS = [
-    'Servicios duplicados o faltantes',
-    'Se registraron ventas después del cierre',
-    'Diferencia entre caja física y sistema detectada post-cierre',
-    'Falla del sistema durante el cierre',
-  ];
-
-  // Handle voiding a cash closing
-  const handleVoidClosure = async () => {
-    if (!voidingClosure || !user || !organization || !voidReason) return;
-
-    const gate = await requirePinForAction('anular_cierre_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-
-    setIsVoidingClosure(true);
-    try {
-      // Update ingreso status to 'eliminado'
-      const { error: updateError } = await supabase
-        .from('ingresos')
-        .update({ estado: 'eliminado' })
-        .eq('id', voidingClosure.id);
-
-      if (updateError) throw updateError;
-
-      // Create anulacion record with reason
-      const { error: insertError } = await supabase
-        .from('anulaciones_cierre')
-        .insert({
-          ingreso_id: voidingClosure.id,
-          barbero_nombre: voidingClosure.barberName,
-          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
-          anulado_por_id: user.id,
-          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
-          anulado_por_email: user.email || '',
-          organization_id: organization.id,
-          motivo: voidReason,
-        });
-
-      if (insertError) throw insertError;
-
-      toast.success('Cierre de caja anulado correctamente');
-      setVoidingClosure(null);
-      setVoidReason('');
-      checkClosedBarbers(); // Refresh the closed barbers state
-    } catch (error) {
-      console.error('Error voiding closure:', error);
-      toast.error('Error al anular el cierre de caja');
-    } finally {
-      setIsVoidingClosure(false);
-    }
-  };
-
   const REGULARIZE_REASON = 'Se registraron ventas después del cierre. El cierre fue regularizado automáticamente para incluir las ventas posteriores.';
 
   // Regularizar cierre: anular el cierre actual con auditoría y crear uno nuevo actualizado
@@ -442,34 +399,20 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       return;
     }
 
-    const gate = await requirePinForAction('regularizar_cierre_caja', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
-
     setIsRegularizing(true);
     try {
-      // 1) Anular cierre actual (mismo patrón que handleVoidClosure)
-      const { error: updateError } = await supabase
-        .from('ingresos')
-        .update({ estado: 'eliminado' })
-        .eq('id', closure.id);
-      if (updateError) throw updateError;
+      // 1) Anular cierre actual via hook (PIN + audit trail con REGULARIZE_REASON)
+      const ok = await handleVoidClosureWithReason(
+        {
+          id: closure.id,
+          barberName: closure.barberName || regularizingBarber.barberName,
+          fechaCierre: format(validDate, 'yyyy-MM-dd'),
+        },
+        REGULARIZE_REASON
+      );
+      if (!ok) return;
 
-      // 2) Registrar anulación con motivo automático
-      const { error: insertError } = await supabase
-        .from('anulaciones_cierre')
-        .insert({
-          ingreso_id: closure.id,
-          barbero_nombre: closure.barberName || regularizingBarber.barberName,
-          fecha_cierre: format(validDate, 'yyyy-MM-dd'),
-          anulado_por_id: user.id,
-          anulado_por_nombre: profile?.full_name || user.email || 'Usuario',
-          anulado_por_email: user.email || '',
-          organization_id: organization.id,
-          motivo: REGULARIZE_REASON,
-        });
-      if (insertError) throw insertError;
-
-      // 3) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
+      // 2) Crear nuevo cierre actualizado (saveCashClosing filtra internamente por barber.barberId)
       const success = await saveCashClosing({
         barber: regularizingBarber,
         transactions: summary.transactions,
@@ -735,13 +678,16 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   <div className="-mx-6 px-6 pb-4 pt-3">
                     {closedBarbers.has(barber.barberId) ? (
                       canVoidClosure ? (
-                        <Button 
+                        <Button
                           variant="destructive"
-                          className="w-full" 
+                          className="w-full"
                           onClick={() => {
                             const closureData = closedBarbersData.get(barber.barberId);
                             if (closureData) {
-                              handleVoidClosureClick(closureData);
+                              setVoidingClosure({
+                                ...closureData,
+                                fechaCierre: format(validDate, 'yyyy-MM-dd'),
+                              });
                             }
                           }}
                         >
@@ -1089,75 +1035,15 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </DialogContent>
       </Dialog>
 
-      {/* Void Closure Confirmation Dialog */}
-      <Dialog open={!!voidingClosure} onOpenChange={(open) => {
-        if (!open) {
-          setVoidingClosure(null);
-          setVoidReason('');
-        }
-      }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <XCircle className="h-5 w-5" />
-              Anular cierre de caja
-            </DialogTitle>
-            <DialogDescription>
-              Esta acción anulará el cierre de caja de <span className="font-semibold">{voidingClosure?.barberName}</span> para el día{' '}
-              <span className="font-semibold">{format(validDate, "d 'de' MMMM yyyy", { locale: es })}</span>.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="void-reason" className="text-sm font-medium">
-                Motivo de la anulación <span className="text-destructive">*</span>
-              </Label>
-              <Select value={voidReason} onValueChange={setVoidReason}>
-                <SelectTrigger id="void-reason">
-                  <SelectValue placeholder="Selecciona un motivo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {VOID_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Al anular el cierre:
-              </p>
-              <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
-                <li>El registro se marcará como eliminado</li>
-                <li>Se guardará un registro de quién realizó la anulación</li>
-                <li>El barbero podrá realizar un nuevo cierre de caja</li>
-              </ul>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => { setVoidingClosure(null); setVoidReason(''); }} disabled={isVoidingClosure}>
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive"
-              disabled={isVoidingClosure || !voidReason}
-              onClick={handleVoidClosure}
-            >
-              {isVoidingClosure ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <XCircle className="h-4 w-4 mr-2" />
-              )}
-              {isVoidingClosure ? 'Anulando...' : 'Confirmar anulación'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <VoidClosureDialog
+        open={!!voidingClosure}
+        voidingClosure={voidingClosure}
+        voidReason={voidReason}
+        onVoidReasonChange={setVoidReason}
+        onConfirm={handleVoidClosure}
+        onCancel={() => { setVoidingClosure(null); setVoidReason(''); }}
+        isLoading={isVoidingClosure}
+      />
 
       {/* Backfill Wizard */}
       <BackfillWizard
