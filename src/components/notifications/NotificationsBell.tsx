@@ -354,18 +354,26 @@ export function NotificationsBell({ collapsed, onNavigate }: NotificationsBellPr
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
-            size="sm"
             className={cn(
-              'w-full h-9 text-muted-foreground hover:text-foreground justify-start relative',
-              collapsed && 'px-2 justify-center',
+              'group w-full h-auto justify-start gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-sidebar-foreground',
+              collapsed && 'justify-center gap-0 px-2',
             )}
             title={collapsed ? `Notificaciones${unreadCount ? ` (${badgeLabel})` : ''}` : undefined}
           >
-            <span className="relative inline-flex">
-              <Bell className="h-4 w-4" />
-              {badge}
+            <span className="relative inline-flex shrink-0">
+              <Bell className="h-5 w-5 transition-transform duration-150 group-hover:scale-[1.06]" />
+              {collapsed && badge}
             </span>
-            {!collapsed && <span className="ml-2 text-xs">Notificaciones</span>}
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left">Notificaciones</span>
+                {unreadCount > 0 && (
+                  <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-destructive-foreground">
+                    {badgeLabel}
+                  </span>
+                )}
+              </>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent
