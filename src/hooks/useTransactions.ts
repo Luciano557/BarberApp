@@ -219,6 +219,47 @@ export function useTransactions() {
     loadTransactionsByDate(selectedDate);
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
 
+  // Auto-rollover del día activo de Caja cuando la app cruza la medianoche
+  // estando abierta. Solo avanza si el usuario seguía viendo "hoy" (no si
+  // navegó manualmente a una fecha pasada).
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  useEffect(() => {
+    const tz = organization?.timezone || null;
+    let lastTodayKey = getLocalDayKey(new Date(), tz);
+
+    const maybeRollover = () => {
+      const nowKey = getLocalDayKey(new Date(), tz);
+      if (nowKey === lastTodayKey) return;
+      const selectedKey = getLocalDayKey(selectedDateRef.current, tz);
+      const wasOnToday = selectedKey === lastTodayKey;
+      lastTodayKey = nowKey;
+      if (wasOnToday) {
+        setSelectedDate(new Date());
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') maybeRollover();
+    };
+    const onFocus = () => maybeRollover();
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(maybeRollover, 60_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(interval);
+    };
+  }, [organization?.timezone]);
+
+
+
   const addTransaction = useCallback(async (
     transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & {
       productos?: ProductoCartInput[];
