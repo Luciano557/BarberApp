@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Transaction, PaymentMethod } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,6 +6,23 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
+
+// Devuelve la clave de día calendario (YYYY-MM-DD) para una fecha en un timezone dado.
+// Se usa para detectar el cruce de medianoche en el timezone de la organización
+// cuando la app permanece abierta de un día para el otro.
+function getLocalDayKey(date: Date, timezone?: string | null): string {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return fmt.format(date);
+  } catch {
+    return format(date, 'yyyy-MM-dd');
+  }
+}
 
 interface VentaInsert {
   barbero_id: string | null;
