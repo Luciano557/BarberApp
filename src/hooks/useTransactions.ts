@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Transaction, PaymentMethod } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,6 +6,23 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { format } from 'date-fns';
 import { getStartOfDayLocal, getEndOfDayLocal, formatDateForQuery } from '@/lib/dateUtils';
+
+// Devuelve la clave de día calendario (YYYY-MM-DD) para una fecha en un timezone dado.
+// Se usa para detectar el cruce de medianoche en el timezone de la organización
+// cuando la app permanece abierta de un día para el otro.
+function getLocalDayKey(date: Date, timezone?: string | null): string {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone || undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return fmt.format(date);
+  } catch {
+    return format(date, 'yyyy-MM-dd');
+  }
+}
 
 interface VentaInsert {
   barbero_id: string | null;
@@ -201,6 +218,47 @@ export function useTransactions() {
   useEffect(() => {
     loadTransactionsByDate(selectedDate);
   }, [selectedDate, loadTransactionsByDate, currentSucursal]);
+
+  // Auto-rollover del día activo de Caja cuando la app cruza la medianoche
+  // estando abierta. Solo avanza si el usuario seguía viendo "hoy" (no si
+  // navegó manualmente a una fecha pasada).
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
+  useEffect(() => {
+    const tz = organization?.timezone || null;
+    let lastTodayKey = getLocalDayKey(new Date(), tz);
+
+    const maybeRollover = () => {
+      const nowKey = getLocalDayKey(new Date(), tz);
+      if (nowKey === lastTodayKey) return;
+      const selectedKey = getLocalDayKey(selectedDateRef.current, tz);
+      const wasOnToday = selectedKey === lastTodayKey;
+      lastTodayKey = nowKey;
+      if (wasOnToday) {
+        setSelectedDate(new Date());
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') maybeRollover();
+    };
+    const onFocus = () => maybeRollover();
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    const interval = window.setInterval(maybeRollover, 60_000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(interval);
+    };
+  }, [organization?.timezone]);
+
+
 
   const addTransaction = useCallback(async (
     transaction: Omit<Transaction, 'id' | 'createdAt' | 'productos'> & {

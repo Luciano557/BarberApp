@@ -317,18 +317,28 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     [barberSummaries]
   );
 
-  // Detección de cierres desactualizados: ventas activas posteriores a closed_at por barbero
+  // Detección de cierres desactualizados: ventas activas posteriores a closed_at por barbero.
+  // Defensa en profundidad: solo cuentan transacciones cuyo createdAt cae dentro del día
+  // calendario de validDate en el timezone de la organización. Evita falsos positivos si la
+  // app cruza la medianoche con transacciones de otro día aún en memoria.
   const staleByBarber = useMemo(() => {
+    const tz = organization?.timezone || null;
+    const dayStartMs = new Date(getStartOfDayLocal(validDate, tz)).getTime();
+    const dayEndMs = new Date(getEndOfDayLocal(validDate, tz)).getTime();
     const result: Record<string, { count: number; total: number; lastAt: string }> = {};
     closedBarbersData.forEach((data, barberId) => {
       if (!data.closed_at) return;
       const closedAtMs = new Date(data.closed_at).getTime();
       if (Number.isNaN(closedAtMs)) return;
-      const posteriores = summary.transactions.filter(tx =>
-        tx.estado !== 'anulado' &&
-        tx.barberId === barberId &&
-        new Date(tx.createdAt).getTime() > closedAtMs
-      );
+      const posteriores = summary.transactions.filter(tx => {
+        if (tx.estado === 'anulado') return false;
+        if (tx.barberId !== barberId) return false;
+        const txMs = new Date(tx.createdAt).getTime();
+        if (Number.isNaN(txMs)) return false;
+        // Mismo día calendario que validDate (en TZ de la organización)
+        if (txMs < dayStartMs || txMs > dayEndMs) return false;
+        return txMs > closedAtMs;
+      });
       if (posteriores.length === 0) return;
       const total = posteriores.reduce((s, tx) => s + (tx.total || 0), 0);
       const lastAt = posteriores.reduce((acc, tx) => {
@@ -342,7 +352,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       };
     });
     return result;
-  }, [closedBarbersData, summary.transactions]);
+  }, [closedBarbersData, summary.transactions, validDate, organization?.timezone]);
 
   // Check if selected date is in the past (for backfill CTA)
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
