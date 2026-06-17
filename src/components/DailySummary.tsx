@@ -844,7 +844,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                       <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start">
                         <div className="text-right">
                           <p className={`font-semibold ${isVoided ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                            ${tx.total.toLocaleString()}
+                            ${(tx.totalCobrado ?? tx.total).toLocaleString()}
                           </p>
                           {tx.discount > 0 && (
                             <p className="text-xs text-muted-foreground">

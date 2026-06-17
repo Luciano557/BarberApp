@@ -1,70 +1,71 @@
-# Auditoría + Plan — Badge "Cierre desactualizado" en Caja
+# Plan de fix — Caja: modal de anulación + monto con recargo
 
-## Parte 1 — Auditoría
-
-### 1. Dónde se renderiza el badge
-- `src/components/DailySummary.tsx` líneas 579–620.
-- Se muestra cuando `closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId]`.
-
-### 2. Lógica que marca "desactualizado"
-- `src/components/DailySummary.tsx` líneas 320–345 (`staleByBarber`).
-- Para cada barbero con cierre, filtra `summary.transactions` cuyo `createdAt > closed_at` y `estado !== 'anulado'`. Si hay al menos una, marca el cierre como desactualizado.
-- Compara timestamps absolutos (ms) — no valida que `tx.createdAt` y `closed_at` pertenezcan al mismo día calendario en el timezone de la organización.
-
-### 3. Origen de las fechas comparadas
-- `closed_at` viene de `ingresos` cargados en `checkClosedBarbers` (líneas 115–146) usando `validDate` (= `selectedDate`) con `getStartOfDayLocal/getEndOfDayLocal` y el timezone de la organización.
-- `summary.transactions` viene de `useTransactions` (`src/hooks/useTransactions.ts`):
-  - `selectedDate` se inicializa con `new Date()` UNA sola vez al montar el hook (línea 52).
-  - `loadTransactionsByDate(selectedDate)` recarga solo cuando cambia `selectedDate` o `currentSucursal` (líneas 201–203).
-  - `addTransaction` agrega la nueva venta al state local sin importar a qué día pertenezca su `fecha_hora`.
-
-### 4. ¿Hay re-cálculo automático al cambiar el día?
-- No. Ni `useTransactions` ni `DailySummary` escuchan `visibilitychange`, `focus`, ni un timer de medianoche. El único disparador es cambiar manualmente `selectedDate` (navegación o F5, que re-monta y vuelve a hacer `useState(new Date())`).
-
-### 5. Variable de "día activo"
-- `selectedDate` en `useTransactions`. Representa el día de Caja, pero queda congelado al valor con el que montó el hook. Si la app permaneció abierta y cruzó medianoche, sigue apuntando a "ayer" hasta que algo lo cambie.
-
-### Causa raíz del bug
-La app abierta el lunes a la noche cierra caja → `closed_at = lunes 22:00`. Pasa la medianoche con la app abierta. El usuario sigue operando el martes: cada nueva venta (`fecha_hora = martes`) entra al state vía `addTransaction`, **pero `selectedDate` sigue siendo lunes**. `staleByBarber` compara `closed_at` del lunes contra `createdAt` del martes y, como martes > lunes 22:00, marca el cierre del lunes como desactualizado. F5 lo arregla porque `useState(new Date())` reinicia `selectedDate` al día real, recarga ventas del martes y deja Caja vacía sin cierres a evaluar.
+Dos cambios acotados, sólo de UI/presentación. No se toca lógica de negocio, guardado, ni BD.
 
 ---
 
-## Parte 2 — Plan de fix (sin tocar lógica de cierres/montos)
+## Bug 1 — Motivo de anulación: pasar de Textarea a Select
 
-Dos capas: la primera resuelve el problema de fondo (rollover de día), la segunda blinda el badge contra cualquier comparación cruzada futura.
+**Archivo:** `src/components/VoidTransactionDialog.tsx`
 
-### A. Rollover automático del día activo de Caja
-Archivo: `src/hooks/useTransactions.ts`.
+**Hallazgo:** El motivo se captura hoy con `<Textarea>` libre (líneas 73–84), validando sólo que no esté vacío. El valor se pasa tal cual a `onConfirm(reason)`, que en `DailySummary.tsx` (líneas 880–891) sólo lo usa para llamar a `onVoidTransaction(id, voidedBy, voidedById)` — el motivo no se persiste por ese path actualmente, así que cambiar el formato del input no rompe ninguna lectura aguas abajo.
 
-1. Mantener una ref con el "día de calendario" (en timezone de la organización) correspondiente al `selectedDate` actual.
-2. Agregar un `useEffect` que:
-   - Suscribe a `document.visibilitychange` y `window.focus`.
-   - Programa un timer que se dispara al próximo cambio de día local (calculado vs `organization.timezone`).
-   - Cuando se dispara, si `selectedDate` era "hoy" antes del cruce, llama `setSelectedDate(new Date())` para forzar reload de ventas y closures.
-3. Importante: solo auto-actualizar si el usuario estaba en el día de hoy. Si navegó a una fecha pasada, no tocar `selectedDate`.
+**Cambio propuesto:**
 
-Esto garantiza que tras un cambio de día la lista de transacciones se recargue contra el nuevo día calendario, alineada con los cierres del mismo día.
+1. Reemplazar el `<Textarea>` por un `<Select>` (shadcn/ui, ya disponible en `src/components/ui/select.tsx`) con estas 5 opciones fijas, en este orden:
+   - Error en el método de pago
+   - Cobro incorrecto
+   - Cliente canceló después de pagar
+   - Servicio no realizado
+   - Otros
+2. Estado: cambiar `reason` de string libre a una de esas 5 etiquetas. Mantener `reason.trim().length === 0` ⇒ deshabilita "Confirmar anulación" (placeholder "Seleccioná un motivo").
+3. Eliminar `REASON_MAX`, el contador `{reason.length}/{REASON_MAX}` y el import de `Textarea`. Importar `Select, SelectTrigger, SelectValue, SelectContent, SelectItem`.
+4. Mantener intactos: props del componente, firma de `onConfirm(reason: string)`, flujo de PIN, toasts, copy del header/description, botones del footer.
 
-### B. Blindaje del badge (defensa en profundidad)
-Archivo: `src/components/DailySummary.tsx`, función `staleByBarber` (líneas 320–345).
+**Nota:** Si más adelante se decide persistir el motivo, ya queda normalizado a un set cerrado de etiquetas, lo cual es deseable para reportes.
 
-1. Calcular el rango `[startOfDayLocal(validDate), endOfDayLocal(validDate)]` (ya disponibles vía `getStartOfDayLocal/getEndOfDayLocal` + `organization.timezone`).
-2. Antes de comparar `createdAt > closed_at`, exigir además que `tx.createdAt` caiga dentro de ese rango. Si no, ignorar la transacción para el cálculo del badge.
-3. Mantener intacta la condición original `createdAt > closed_at` y el filtro `estado !== 'anulado'`.
+---
 
-Con esto, aunque por alguna otra ruta queden transacciones de otro día en memoria, el badge no se dispara por comparación cruzada de días.
+## Bug 2 — Vista de Caja muestra base sin recargo
 
-### Orden de aplicación
-1. Aplicar A (rollover) — resuelve el bug reportado en la práctica.
-2. Aplicar B (blindaje del badge) — evita reapariciones del falso positivo en escenarios análogos.
+**Archivo:** `src/components/DailySummary.tsx`
 
-### Lo que NO se toca
-- Lógica de `saveCashClosing`, `handleVoidClosure`, `handleRegularize`, montos, comisiones.
-- Query de `ingresos` ni de `venta`.
-- Comportamiento de Caja para el día de hoy (la navegación manual, el cierre, anulaciones y regularizar siguen igual).
-- `closed_at`, `createdAt` ni el modelo de datos.
+**Hallazgo:**
 
-### Riesgos / efectos colaterales
-- A puede provocar un reload visible justo después de medianoche si la pestaña vuelve a foco; es el comportamiento deseado y equivale a un F5 automático.
-- Si el usuario tenía una venta a medio cobrar al cruzar medianoche, el reload no debe ejecutarse mientras haya un diálogo de cobro abierto: condicionar el auto-rollover a que no esté abierto el flujo de cobrar/cerrar (`closingBarber`, dialogs activos). Verificar al implementar.
-- B es puramente un filtro extra; no puede generar falsos negativos para cierres del mismo día (siempre que el TZ usado sea el de la organización, igual que en `checkClosedBarbers`).
+- En `src/types/barbershop.ts` la `Transaction` tiene:
+  - `total` → **BASE** de la venta (servicios + productos − descuentos).
+  - `totalCobrado` → `total + recargoTotal` (lo que efectivamente entra a caja).
+- En `useTransactions.ts` (línea 164) ya se hidrata `totalCobrado` desde `ventas.total_cobrado` con fallback a `baseTotal + recargoTotal`.
+- `TransactionDetailDrawer.tsx` (línea 34) ya usa el patrón correcto: `transaction?.totalCobrado ?? transaction?.total`.
+- En la **lista de transacciones del día** (`DailySummary.tsx` línea 847) se renderiza `${tx.total.toLocaleString()}` — éste es el bug visual: ignora el recargo.
+
+**Cambio propuesto (única línea afectada para el monto visible):**
+
+- Línea 847: reemplazar
+  ```tsx
+  ${tx.total.toLocaleString()}
+  ```
+  por
+  ```tsx
+  ${(tx.totalCobrado ?? tx.total).toLocaleString()}
+  ```
+
+Con el fallback a `tx.total` preservamos retrocompatibilidad con transacciones viejas anteriores al recargo (donde `totalCobrado` puede no existir).
+
+**No se toca:**
+- Cálculo de comisiones, splits por método (`efectivoAmt` / `mpAmt` ya vienen de `tx.payments` que sí incluyen recargo en `amount`).
+- `staleByBarber`, lógica de cierre, ni nada de `useTransactions.ts`.
+- El campo `tx.discount` (línea 851) que sigue mostrándose igual.
+
+---
+
+## Orden de aplicación
+1. `VoidTransactionDialog.tsx` — Select de motivos.
+2. `DailySummary.tsx` — un solo string interpolado.
+
+## Riesgos
+- **Bug 1:** ninguno funcional; cambio puro de input. Si en el futuro se persiste el motivo, el valor será una de 5 strings fijas (deseable).
+- **Bug 2:** ninguno; `tx.totalCobrado` ya está calculado y poblado en el hook, el resto del módulo (drawer, splits por método de pago) ya lo trata correctamente. El fallback `?? tx.total` cubre datos legacy.
+
+## Qué NO tocar
+- Edge functions, migraciones, `useTransactions.ts`, lógica de PIN, lógica de cierre, comisiones, `TransactionDetailDrawer`, y cualquier otro consumo de `tx.total` fuera de la línea 847.
