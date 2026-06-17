@@ -1,61 +1,70 @@
+# Auditoría + Plan — Badge "Cierre desactualizado" en Caja
 
-## Auditoría — `supabase/functions/reschedule-turno/index.ts`
+## Parte 1 — Auditoría
 
-Confirmado: tiene los mismos huecos que tenía `validate-turno`.
+### 1. Dónde se renderiza el badge
+- `src/components/DailySummary.tsx` líneas 579–620.
+- Se muestra cuando `closedBarbers.has(barber.barberId) && staleByBarber[barber.barberId]`.
 
-### Qué hace hoy
+### 2. Lógica que marca "desactualizado"
+- `src/components/DailySummary.tsx` líneas 320–345 (`staleByBarber`).
+- Para cada barbero con cierre, filtra `summary.transactions` cuyo `createdAt > closed_at` y `estado !== 'anulado'`. Si hay al menos una, marca el cierre como desactualizado.
+- Compara timestamps absolutos (ms) — no valida que `tx.createdAt` y `closed_at` pertenezcan al mismo día calendario en el timezone de la organización.
 
-1. **Parámetros** (línea 45): `turno_id`, `nueva_fecha`, `nueva_hora_inicio`, `telefono`. `barbero_id`, `sucursal_id`, `organization_id`, `servicio_id` se leen del turno existente (línea 67-71). Autoriza por match exacto de `cliente_telefono` (línea 80).
-2. **Anticipación mínima** (líneas 135-143): igual lógica que validate-turno (`slotInstantMs` + `anticipacion_minima_reserva_min`). **No incluye `antMin` en el payload** ni respeta convención nueva.
-3. **Horario de apertura (`horarios_trabajo`)**: **NO valida**. Mismo agujero.
-4. **Bloqueos de agenda**: **NO valida**. Mismo agujero.
-5. **Buffers (líneas 145-159)**: usa `buffer_antes_min` / `buffer_despues_min` reales — ya alineado con validate-turno corregido. OK.
-6. **`hora_fin`** (línea 145): `nueva_hora_inicio + duracion` (servicio o `duracion_base_min`). Igual que validate-turno.
-7. **Otros chequeos**: `modificacion_limite_min` (líneas 125-133, código `modify_limit`), estado válido (`pendiente`/`confirmado`), turno no pasado.
+### 3. Origen de las fechas comparadas
+- `closed_at` viene de `ingresos` cargados en `checkClosedBarbers` (líneas 115–146) usando `validDate` (= `selectedDate`) con `getStartOfDayLocal/getEndOfDayLocal` y el timezone de la organización.
+- `summary.transactions` viene de `useTransactions` (`src/hooks/useTransactions.ts`):
+  - `selectedDate` se inicializa con `new Date()` UNA sola vez al montar el hook (línea 52).
+  - `loadTransactionsByDate(selectedDate)` recarga solo cuando cambia `selectedDate` o `currentSucursal` (líneas 201–203).
+  - `addTransaction` agrega la nueva venta al state local sin importar a qué día pertenezca su `fecha_hora`.
 
-### Frontend — `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
+### 4. ¿Hay re-cálculo automático al cambiar el día?
+- No. Ni `useTransactions` ni `DailySummary` escuchan `visibilitychange`, `focus`, ni un timer de medianoche. El único disparador es cambiar manualmente `selectedDate` (navegación o F5, que re-monta y vuelve a hacer `useState(new Date())`).
 
-Maneja `slot_taken` y `time_limit` (este último no existe en el backend, que devuelve `modify_limit`). El resto cae a toast genérico sin recovery. Mismo problema que tenía ConfirmacionStep.
+### 5. Variable de "día activo"
+- `selectedDate` en `useTransactions`. Representa el día de Caja, pero queda congelado al valor con el que montó el hook. Si la app permaneció abierta y cruzó medianoche, sigue apuntando a "ayer" hasta que algo lo cambie.
+
+### Causa raíz del bug
+La app abierta el lunes a la noche cierra caja → `closed_at = lunes 22:00`. Pasa la medianoche con la app abierta. El usuario sigue operando el martes: cada nueva venta (`fecha_hora = martes`) entra al state vía `addTransaction`, **pero `selectedDate` sigue siendo lunes**. `staleByBarber` compara `closed_at` del lunes contra `createdAt` del martes y, como martes > lunes 22:00, marca el cierre del lunes como desactualizado. F5 lo arregla porque `useState(new Date())` reinicia `selectedDate` al día real, recarga ventas del martes y deja Caja vacía sin cierres a evaluar.
 
 ---
 
-## Plan
+## Parte 2 — Plan de fix (sin tocar lógica de cierres/montos)
 
-### A. `supabase/functions/reschedule-turno/index.ts`
+Dos capas: la primera resuelve el problema de fondo (rollover de día), la segunda blinda el badge contra cualquier comparación cruzada futura.
 
-Replicar los chequeos nuevos de validate-turno, en este orden, después de calcular `nueva_hora_fin` y antes del chequeo de conflictos:
+### A. Rollover automático del día activo de Caja
+Archivo: `src/hooks/useTransactions.ts`.
 
-1. Calcular `dbDow` desde `nueva_fecha` (`jsDow===0 ? 7 : jsDow`).
-2. Query a `horarios_trabajo` (org, sucursal, `dia_semana=dbDow`, `activo=true`, `barbero_id.eq.${turno.barbero_id},barbero_id.is.null`).
-3. Resolver overrides: si hay filas con `barbero_id === turno.barbero_id`, usarlas; si no, las de `barbero_id IS NULL`.
-4. Verificar que `[nueva_hora_inicio, nueva_hora_fin]` esté contenido en algún intervalo → si no, `409 outside_working_hours` con mensaje "Ese horario está fuera del horario de atención del barbero."
-5. Query a `bloqueos_agenda` (org, sucursal, `fecha_inicio<=nueva_fecha`, `fecha_fin>=nueva_fecha`); filtrar a `barbero_id === turno.barbero_id || null`; verificar solapamiento (`todo_el_dia` o `[bStart,bEnd)` vs slot) → si bloquea, `409 slot_blocked` con mensaje "Ese horario está bloqueado en la agenda."
-6. Agregar `antMin` al payload de `slot_too_soon` (línea 139-142).
+1. Mantener una ref con el "día de calendario" (en timezone de la organización) correspondiente al `selectedDate` actual.
+2. Agregar un `useEffect` que:
+   - Suscribe a `document.visibilitychange` y `window.focus`.
+   - Programa un timer que se dispara al próximo cambio de día local (calculado vs `organization.timezone`).
+   - Cuando se dispara, si `selectedDate` era "hoy" antes del cruce, llama `setSelectedDate(new Date())` para forzar reload de ventas y closures.
+3. Importante: solo auto-actualizar si el usuario estaba en el día de hoy. Si navegó a una fecha pasada, no tocar `selectedDate`.
 
-### B. `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
+Esto garantiza que tras un cambio de día la lista de transacciones se recargue contra el nuevo día calendario, alineada con los cierres del mismo día.
 
-Extender el manejo de errores igual que `ConfirmacionStep`:
+### B. Blindaje del badge (defensa en profundidad)
+Archivo: `src/components/DailySummary.tsx`, función `staleByBarber` (líneas 320–345).
 
-- `slot_taken` → toast + `setStep("horario")` (ya existe).
-- `slot_too_soon` → "Ese horario quedó muy cerca. Elegí otro." + `setStep("horario")`.
-- `outside_working_hours` → "Ese horario ya no está disponible. Elegí otro." + `setStep("horario")`.
-- `slot_blocked` → "Ese horario quedó bloqueado. Elegí otro." + `setStep("horario")`.
-- `modify_limit` → "Este turno ya no puede modificarse." (reemplaza el branch erróneo `time_limit`).
-- Resto → toast genérico (sin cambio).
+1. Calcular el rango `[startOfDayLocal(validDate), endOfDayLocal(validDate)]` (ya disponibles vía `getStartOfDayLocal/getEndOfDayLocal` + `organization.timezone`).
+2. Antes de comparar `createdAt > closed_at`, exigir además que `tx.createdAt` caiga dentro de ese rango. Si no, ignorar la transacción para el cálculo del badge.
+3. Mantener intacta la condición original `createdAt > closed_at` y el filtro `estado !== 'anulado'`.
 
-### Orden
+Con esto, aunque por alguna otra ruta queden transacciones de otro día en memoria, el badge no se dispara por comparación cruzada de días.
 
-1. Backend (A) primero.
-2. Frontend (B) después.
+### Orden de aplicación
+1. Aplicar A (rollover) — resuelve el bug reportado en la práctica.
+2. Aplicar B (blindaje del badge) — evita reapariciones del falso positivo en escenarios análogos.
+
+### Lo que NO se toca
+- Lógica de `saveCashClosing`, `handleVoidClosure`, `handleRegularize`, montos, comisiones.
+- Query de `ingresos` ni de `venta`.
+- Comportamiento de Caja para el día de hoy (la navegación manual, el cierre, anulaciones y regularizar siguen igual).
+- `closed_at`, `createdAt` ni el modelo de datos.
 
 ### Riesgos / efectos colaterales
-
-- +2 queries por reagendamiento (~50-100ms). Aceptable.
-- El override de `horarios_trabajo` por barbero debe respetarse igual que en get-availability/validate-turno para evitar falsos negativos.
-- Comparación de borde: usar `<=` en `hora_inicio` del intervalo y `>=` en `hora_fin` (slot puede terminar exacto en el cierre).
-
-### Qué NO tocar
-
-- Autorización por teléfono, validación de estado, `modificacion_limite_min`, lógica de timezone.
-- Manejo de `23P01` en el update.
-- Resto de `RescheduleFlow` (UI de selección de fecha/horario, paso `done`).
+- A puede provocar un reload visible justo después de medianoche si la pestaña vuelve a foco; es el comportamiento deseado y equivale a un F5 automático.
+- Si el usuario tenía una venta a medio cobrar al cruzar medianoche, el reload no debe ejecutarse mientras haya un diálogo de cobro abierto: condicionar el auto-rollover a que no esté abierto el flujo de cobrar/cerrar (`closingBarber`, dialogs activos). Verificar al implementar.
+- B es puramente un filtro extra; no puede generar falsos negativos para cierres del mismo día (siempre que el TZ usado sea el de la organización, igual que en `checkClosedBarbers`).
