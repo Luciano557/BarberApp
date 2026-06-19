@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Transaction } from '@/types/barbershop';
 
@@ -19,7 +19,13 @@ interface VoidTransactionDialogProps {
   onConfirm: (reason: string) => Promise<void> | void;
 }
 
-const REASON_MAX = 240;
+const VOID_REASONS = [
+  'Error en el método de pago',
+  'Cobro incorrecto',
+  'Cliente canceló después de pagar',
+  'Servicio no realizado',
+  'Otros',
+] as const;
 
 export function VoidTransactionDialog({
   open,
@@ -27,7 +33,7 @@ export function VoidTransactionDialog({
   transaction,
   onConfirm,
 }: VoidTransactionDialogProps) {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
   const handleClose = () => {
@@ -70,18 +76,16 @@ export function VoidTransactionDialog({
           <Label htmlFor="void-reason" className="text-sm">
             Motivo de la anulación
           </Label>
-          <Textarea
-            id="void-reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value.slice(0, REASON_MAX))}
-            placeholder="Indicá brevemente por qué se anula la transacción"
-            maxLength={REASON_MAX}
-            rows={3}
-            disabled={submitting}
-          />
-          <p className="text-xs text-muted-foreground text-right">
-            {reason.length}/{REASON_MAX}
-          </p>
+          <Select value={reason} onValueChange={setReason} disabled={submitting}>
+            <SelectTrigger id="void-reason">
+              <SelectValue placeholder="Seleccioná un motivo" />
+            </SelectTrigger>
+            <SelectContent>
+              {VOID_REASONS.map((r) => (
+                <SelectItem key={r} value={r}>{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <DialogFooter className="gap-2">

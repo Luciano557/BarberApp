@@ -165,6 +165,67 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({
         error: "slot_too_soon",
         message: "Este horario ya no está disponible. Elegí un turno con mayor anticipación.",
+        antMin,
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Validar horario de apertura del barbero/sucursal para ese día
+    const [Y, M, D] = fecha.split("-").map(Number);
+    const jsDow = new Date(Date.UTC(Y, M - 1, D)).getUTCDay();
+    const dbDow = jsDow === 0 ? 7 : jsDow;
+
+    const { data: horariosData } = await supabase
+      .from("horarios_trabajo")
+      .select("barbero_id, hora_inicio, hora_fin")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
+      .eq("dia_semana", dbDow)
+      .eq("activo", true)
+      .or(`barbero_id.eq.${barbero_id},barbero_id.is.null`);
+
+    const horariosAll = horariosData || [];
+    const horariosOverride = horariosAll.filter((h: any) => h.barbero_id === barbero_id);
+    const horariosResolved = horariosOverride.length > 0
+      ? horariosOverride
+      : horariosAll.filter((h: any) => h.barbero_id === null);
+
+    const slotStartMin = timeToMinutes(hora_inicio);
+    const slotEndMin = timeToMinutes(hora_fin);
+    const inWorkingHours = horariosResolved.some((h: any) =>
+      timeToMinutes(h.hora_inicio) <= slotStartMin && timeToMinutes(h.hora_fin) >= slotEndMin
+    );
+
+    if (!inWorkingHours) {
+      return new Response(JSON.stringify({
+        error: "outside_working_hours",
+        message: "Ese horario está fuera del horario de atención del barbero.",
+      }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Validar bloqueos de agenda
+    const { data: bloqueosData } = await supabase
+      .from("bloqueos_agenda")
+      .select("barbero_id, hora_inicio, hora_fin, todo_el_dia")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
+      .lte("fecha_inicio", fecha)
+      .gte("fecha_fin", fecha);
+
+    const bloqueosRelevant = (bloqueosData || []).filter(
+      (b: any) => b.barbero_id === barbero_id || b.barbero_id === null
+    );
+    const isBlocked = bloqueosRelevant.some((b: any) => {
+      if (b.todo_el_dia) return true;
+      if (!b.hora_inicio || !b.hora_fin) return false;
+      const bStart = timeToMinutes(b.hora_inicio);
+      const bEnd = timeToMinutes(b.hora_fin);
+      return bStart < slotEndMin && bEnd > slotStartMin;
+    });
+
+    if (isBlocked) {
+      return new Response(JSON.stringify({
+        error: "slot_blocked",
+        message: "Ese horario está bloqueado en la agenda.",
       }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -190,6 +251,7 @@ Deno.serve(async (req) => {
         { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
 
     // ===== CRM sync: phone-first match within org =====
     let clienteId: string | null = null;
