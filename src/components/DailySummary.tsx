@@ -38,6 +38,9 @@ interface DailySummaryProps {
     totalEfectivo: number;
     totalMercadoPago: number;
     total: number;
+    totalEfectivoCobrado: number;
+    totalDigitalCobrado: number;
+    totalCobrado: number;
     transactions: Transaction[];
   };
   barbers: Barber[];
@@ -69,6 +72,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const requirePinForAction = useRequirePinForAction();
   const [voidingTransaction, setVoidingTransaction] = useState<Transaction | null>(null);
   const [detailTransaction, setDetailTransaction] = useState<Transaction | null>(null);
+  const [txFilter, setTxFilter] = useState<'todas' | 'efectivo' | 'digital'>('todas');
   const [closedBarbers, setClosedBarbers] = useState<Set<string>>(new Set());
   const [closedBarbersData, setClosedBarbersData] = useState<Map<string, { id: number; barberName: string; closed_at: string | null }>>(new Map());
   const [backfillOpen, setBackfillOpen] = useState(false);
@@ -149,6 +153,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   useEffect(() => {
     checkClosedBarbers();
   }, [checkClosedBarbers]);
+
+  // Reset transaction filter when the selected date changes
+  useEffect(() => {
+    setTxFilter('todas');
+  }, [selectedDate]);
 
   const {
     voidingClosure,
@@ -348,9 +357,24 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
 
   // Check which barbers are missing closings (for backfill)
-  const barbersWithoutClosing = useMemo(() => 
+  const barbersWithoutClosing = useMemo(() =>
     barbers.filter(b => !closedBarbers.has(b.id)),
     [barbers, closedBarbers]
+  );
+
+  // Transactions filtered by selected method chip
+  const txFiltradas = useMemo(
+    () =>
+      txFilter === 'todas'
+        ? summary.transactions
+        : summary.transactions.filter(tx =>
+            tx.payments?.some(p =>
+              txFilter === 'efectivo'
+                ? p.method === 'efectivo'
+                : isDigitalMethod(p.method)
+            ) ?? false
+          ),
+    [txFilter, summary.transactions]
   );
 
   // Navegación libre entre fechas: el PIN ya no aplica a navegación.
@@ -438,8 +462,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     <div className="space-y-6 animate-fade-in sm:space-y-8">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Cierre de Caja</h1>
-          <p className="text-muted-foreground text-sm mt-1 capitalize">
+          <h1 className="text-3xl font-bold text-foreground">Cierre de Caja</h1>
+          <p className="text-sm font-medium text-muted-foreground mt-1 capitalize">
             {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
           </p>
         </div>
@@ -475,7 +499,6 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <MultiDayClosingSummary />
             <AnulacionesCierreHistory barbers={barbers} />
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleHistoryClick}>
               <Clock className="h-4 w-4 mr-2" />
@@ -486,59 +509,68 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </div>
       </div>
 
+      {/* Banner Consultar Período */}
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div>
+          <p className="font-semibold text-foreground">Consultar Período</p>
+          <p className="text-sm text-muted-foreground">Seleccioná fechas y obtené un resumen completo.</p>
+        </div>
+        <MultiDayClosingSummary />
+      </div>
+
       {/* General Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border border-border bg-card">
-          <CardContent className="pt-6">
+      <div className="grid gap-3 grid-cols-3 md:grid-cols-4">
+        <Card className="col-span-3 md:col-span-1 bg-primary border-primary shadow-md rounded-2xl">
+          <CardContent className="p-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total General</p>
-                <p className="text-2xl font-bold text-foreground">${summary.total.toLocaleString()}</p>
+                <p className="text-sm text-primary-foreground/70">Total General</p>
+                <p className="text-3xl font-bold text-primary-foreground">${summary.totalCobrado.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-4 w-4 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+        <Card className="col-span-1 border border-border bg-card rounded-2xl shadow-sm">
+          <CardContent className="p-3 md:pt-6">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Efectivo</p>
-                <p className="text-2xl font-bold text-success">${summary.totalEfectivo.toLocaleString()}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Efectivo</p>
+                <p className="text-base md:text-xl font-bold text-success">${summary.totalEfectivoCobrado.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                <Banknote className="h-5 w-5 text-success" />
+              <div className="w-9 h-9 rounded-lg bg-success/10 flex items-center justify-center shrink-0">
+                <Banknote className="h-4 w-4 text-success" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+        <Card className="col-span-1 border border-border bg-card rounded-2xl shadow-sm">
+          <CardContent className="p-3 md:pt-6">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Digital</p>
-                <p className="text-2xl font-bold text-status-info-foreground">${summary.totalMercadoPago.toLocaleString()}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Digital</p>
+                <p className="text-base md:text-xl font-bold text-status-info-foreground">${summary.totalDigitalCobrado.toLocaleString()}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-status-info-bg flex items-center justify-center">
-                <CreditCard className="h-5 w-5 text-status-info" />
+              <div className="w-9 h-9 rounded-lg bg-status-info-bg flex items-center justify-center shrink-0">
+                <CreditCard className="h-4 w-4 text-status-info" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-border bg-card">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+        <Card className="col-span-1 border border-border bg-card rounded-2xl shadow-sm">
+          <CardContent className="p-3 md:pt-6">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Servicios</p>
-                <p className="text-2xl font-bold text-foreground">{summary.count}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Servicios</p>
+                <p className="text-base md:text-xl font-bold text-status-purple">{summary.count}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <Receipt className="h-5 w-5 text-muted-foreground" />
+              <div className="w-9 h-9 rounded-lg bg-status-purple-bg flex items-center justify-center shrink-0">
+                <Receipt className="h-4 w-4 text-status-purple" />
               </div>
             </div>
           </CardContent>
@@ -553,7 +585,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         </h2>
 
         {barberSummaries.length === 0 ? (
-          <Card className="border border-border bg-card">
+          <Card className="border border-border bg-card rounded-2xl">
             <CardContent className="py-12">
               <div className="text-center text-muted-foreground">
                 <User className="h-8 w-8 mx-auto mb-3 opacity-50" />
@@ -565,11 +597,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {barberSummaries.map((barber) => (
-              <Card key={barber.barberId} className="border border-border bg-card">
+              <Card key={barber.barberId} className="border border-border bg-card rounded-2xl shadow-sm overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-semibold flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                         <span className="text-sm font-bold text-primary">
                           {barber.barberName.charAt(0).toUpperCase()}
                         </span>
@@ -723,7 +755,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
       {/* Backfill CTA - show when past date and barbers without closing */}
       {isPastDate && canBackfill && barbersWithoutClosing.length > 0 && (
-        <Card className="border border-dashed border-primary/40 bg-primary/5">
+        <Card className="border border-dashed border-primary/40 bg-primary/5 rounded-2xl">
           <CardContent className="py-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
@@ -748,7 +780,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
       )}
 
       {/* Transactions List */}
-      <Card className="border border-border bg-card">
+      <Card className="border border-border bg-card rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle className="text-base font-medium flex items-center gap-2">
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -756,6 +788,24 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {summary.transactions.length > 0 && (
+            <div className="flex gap-2 mb-4">
+              {(['todas', 'efectivo', 'digital'] as const).map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setTxFilter(f)}
+                  className={
+                    txFilter === f
+                      ? 'px-3 py-1.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground border border-primary transition-colors'
+                      : 'px-3 py-1.5 rounded-full text-xs font-semibold bg-background text-muted-foreground border border-border hover:bg-muted transition-colors'
+                  }
+                >
+                  {f === 'todas' ? 'Todas' : f === 'efectivo' ? 'Efectivo' : 'Digital'}
+                </button>
+              ))}
+            </div>
+          )}
           {summary.transactions.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Receipt className="h-8 w-8 mx-auto mb-3 opacity-50" />
@@ -764,7 +814,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
             </div>
           ) : (
               <div className="space-y-2">
-                {summary.transactions.map((tx) => {
+                {txFiltradas.map((tx) => {
                   const isVoided = tx.estado === 'anulado';
                   const canVoid = !isVoided && canVoidTransaction(tx);
                   const txPayments = tx.payments && tx.payments.length > 0
@@ -777,7 +827,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                   return (
                     <div
                       key={tx.id}
-                      className={`flex flex-col gap-3 rounded-lg p-4 transition-colors sm:flex-row sm:items-center cursor-pointer ${
+                      className={`flex flex-col gap-3 rounded-xl p-4 transition-colors sm:flex-row sm:items-center cursor-pointer ${
                         isVoided
                           ? 'bg-destructive/10 border border-destructive/20 hover:bg-destructive/15'
                           : 'bg-muted/50 hover:bg-muted'
@@ -800,7 +850,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                           </div>
                         ) : (
                           <div className="w-8 h-8 rounded-lg bg-status-info-bg flex items-center justify-center">
-                            <CreditCard className="h-4 w-4 text-status-info" />
+                            <CreditCard className="h-4 w-4 text-status-info-foreground" />
                           </div>
                         )}
                       </div>
@@ -857,6 +907,11 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
                     </div>
                   );
                 })}
+                {txFiltradas.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No hay transacciones con ese medio de pago.
+                  </p>
+                )}
               </div>
           )}
         </CardContent>

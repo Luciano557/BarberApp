@@ -1284,10 +1284,9 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
                         key={m.method}
                         onClick={() => handleSelectPayment(m.method)}
                         style={{
-                          opacity: 0,
-                          animation: `payment-card-in 280ms var(--ease-out-quint) ${idx * 60}ms forwards`,
+                          animation: `payment-card-in 280ms var(--ease-out-quint) ${idx * 60}ms both`,
                         }}
-                        className={`relative p-6 rounded-lg border transition-colors active:scale-[0.97] ${hoverClass} ${
+                        className={`relative p-6 rounded-lg border transition-[transform,colors] active:scale-[0.97] ${hoverClass} ${
                           isSelected ? selectedClass : 'border-border bg-card hover:bg-muted/50'
                         }`}
                       >
@@ -1587,7 +1586,7 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
           aria-label="Cobro registrado exitosamente"
         >
           <div
-            className="animate-confirm-card-in flex flex-col items-center gap-5 rounded-2xl px-12 py-10 text-center"
+            className="animate-confirm-card-in flex flex-col items-center gap-5 rounded-2xl px-8 py-8 sm:px-12 sm:py-10 text-center"
             style={{ background: '#1E2A4A', maxWidth: '300px', width: '90%' }}
           >
             <div
