@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Barber, Service, Line } from '@/types/barbershop';
-import { useBackfillClosing, BackfillServiceItem, BackfillQuickData } from '@/hooks/useBackfillClosing';
+import { Barber, Service, Line, PaymentMethod, PAYMENT_METHODS } from '@/types/barbershop';
+import { useBackfillClosing, BackfillServiceItem } from '@/hooks/useBackfillClosing';
+import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import {
   CalendarClock, User, FileText, Package, Eye, CheckCircle,
   Loader2, ChevronLeft, ChevronRight, Banknote, CreditCard, Plus, Minus, Check,
@@ -22,8 +23,7 @@ interface GridItem {
   servicioNombre: string;
   lineaId: string | null;
   unitPrice: number;
-  qtyEfectivo: number;
-  qtyDigital: number;
+  qty: Record<PaymentMethod, number>;
 }
 
 interface BackfillWizardProps {
@@ -53,6 +53,9 @@ const STEPS = [
   { icon: CheckCircle, label: 'Confirmar' },
 ];
 
+const emptyQty = (): Record<PaymentMethod, number> =>
+  Object.fromEntries(PAYMENT_METHODS.map(m => [m, 0])) as Record<PaymentMethod, number>;
+
 export function BackfillWizard({ open, onOpenChange, date, barbers, services, lines: _lines, closedBarberIds, onComplete }: BackfillWizardProps) {
   const [step, setStep] = useState(0);
   const [selectedBarberId, setSelectedBarberId] = useState('');
@@ -60,9 +63,13 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
   const [note, setNote] = useState('');
   const [loadMode, setLoadMode] = useState<'detailed' | 'quick'>('quick');
   const [items, setItems] = useState<GridItem[]>([]);
-  const [quickData, setQuickData] = useState<BackfillQuickData>({ totalEfectivo: 0, totalMercadoPago: 0, cantidadServicios: 0 });
+  const [quickAmounts, setQuickAmounts] = useState<Record<PaymentMethod, number>>(emptyQty());
+  const [quickCantidad, setQuickCantidad] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+
   const { saveBackfill } = useBackfillClosing();
+  const { methods, loading: methodsLoading, getRecargoPct } = usePaymentMethodsConfig();
+  const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
 
   const availableBarbers = useMemo(() =>
     barbers.filter(b => !closedBarberIds.has(b.id)),
@@ -86,55 +93,99 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
         servicioNombre: s.name,
         lineaId: s.lineId || null,
         unitPrice: s.price,
-        qtyEfectivo: 0,
-        qtyDigital: 0,
+        qty: emptyQty(),
       })));
     }
   };
 
   const totals = useMemo(() => {
     if (loadMode === 'quick') {
-      const total = quickData.totalEfectivo + quickData.totalMercadoPago;
-      const commission = selectedBarber ? Math.round(total * (selectedBarber.commission / 100)) : 0;
-      return { efectivo: quickData.totalEfectivo, mp: quickData.totalMercadoPago, total, services: quickData.cantidadServicios, commission };
+      let efectivoBase = 0, digitalBase = 0;
+      let efectivoCobrado = 0, digitalCobrado = 0;
+      let recargosTotal = 0;
+      Object.entries(quickAmounts).forEach(([method, cobrado]) => {
+        if (!cobrado) return;
+        const recargoPct = getRecargoPct(method as PaymentMethod);
+        const base = recargoPct > 0
+          ? Math.round(cobrado * 100 / (100 + recargoPct))
+          : cobrado;
+        const recargoMonto = cobrado - base;
+        recargosTotal += recargoMonto;
+        if (method === 'efectivo') {
+          efectivoBase += base;
+          efectivoCobrado += cobrado;
+        } else {
+          digitalBase += base;
+          digitalCobrado += cobrado;
+        }
+      });
+      const totalBase = efectivoBase + digitalBase;
+      const totalCobrado = efectivoCobrado + digitalCobrado;
+      const commission = selectedBarber
+        ? Math.round(totalBase * (selectedBarber.commission / 100))
+        : 0;
+      return { efectivoBase, digitalBase, totalBase, efectivoCobrado, digitalCobrado, totalCobrado, recargosTotal, services: quickCantidad, commission };
     }
-    let efectivo = 0, mp = 0, serviceCount = 0;
+    let efectivoBase = 0, digitalBase = 0;
+    let efectivoCobrado = 0, digitalCobrado = 0;
+    let recargosTotal = 0;
+    let serviceCount = 0;
     items.forEach(item => {
-      efectivo += item.qtyEfectivo * item.unitPrice;
-      mp += item.qtyDigital * item.unitPrice;
-      serviceCount += item.qtyEfectivo + item.qtyDigital;
+      PAYMENT_METHODS.forEach(method => {
+        const qty = item.qty[method] || 0;
+        if (qty === 0) return;
+        const base = qty * item.unitPrice;
+        const recargoPct = getRecargoPct(method);
+        const recargoMonto = Math.round(base * recargoPct / 100);
+        recargosTotal += recargoMonto;
+        serviceCount += qty;
+        if (method === 'efectivo') {
+          efectivoBase += base;
+          efectivoCobrado += base + recargoMonto;
+        } else {
+          digitalBase += base;
+          digitalCobrado += base + recargoMonto;
+        }
+      });
     });
-    const total = efectivo + mp;
-    const commission = selectedBarber ? Math.round(total * (selectedBarber.commission / 100)) : 0;
-    return { efectivo, mp, total, services: serviceCount, commission };
-  }, [loadMode, quickData, items, selectedBarber]);
+    const totalBase = efectivoBase + digitalBase;
+    const totalCobrado = efectivoCobrado + digitalCobrado;
+    const commission = selectedBarber
+      ? Math.round(totalBase * (selectedBarber.commission / 100))
+      : 0;
+    return { efectivoBase, digitalBase, totalBase, efectivoCobrado, digitalCobrado, totalCobrado, recargosTotal, services: serviceCount, commission };
+  }, [loadMode, quickAmounts, quickCantidad, items, selectedBarber, getRecargoPct]);
 
   const canAdvance = () => {
     switch (step) {
       case 0: return !!selectedBarberId;
       case 1: return !!reason;
-      case 2: return totals.total > 0 || totals.services > 0;
+      case 2: return totals.totalCobrado > 0 || totals.services > 0;
       case 3: return true;
       default: return false;
     }
   };
 
   const toBackfillItems = (grid: GridItem[]): BackfillServiceItem[] =>
-    grid.flatMap(item => {
-      const out: BackfillServiceItem[] = [];
-      if (item.qtyEfectivo > 0)
-        out.push({ servicioId: item.servicioId, servicioNombre: item.servicioNombre, lineaId: item.lineaId, qty: item.qtyEfectivo, unitPrice: item.unitPrice, paymentMethod: 'efectivo' });
-      if (item.qtyDigital > 0)
-        out.push({ servicioId: item.servicioId, servicioNombre: item.servicioNombre, lineaId: item.lineaId, qty: item.qtyDigital, unitPrice: item.unitPrice, paymentMethod: 'mercado_pago' });
-      return out;
-    });
+    grid.flatMap(item =>
+      PAYMENT_METHODS
+        .filter(m => (item.qty[m] || 0) > 0)
+        .map(m => ({
+          servicioId: item.servicioId,
+          servicioNombre: item.servicioNombre,
+          lineaId: item.lineaId,
+          qty: item.qty[m],
+          unitPrice: item.unitPrice,
+          paymentMethod: m,
+        }))
+    );
 
-  const updateGridQty = (idx: number, method: 'efectivo' | 'digital', delta: number) => {
-    setItems(prev => prev.map((item, i) => {
-      if (i !== idx) return item;
-      if (method === 'efectivo') return { ...item, qtyEfectivo: Math.max(0, item.qtyEfectivo + delta) };
-      return { ...item, qtyDigital: Math.max(0, item.qtyDigital + delta) };
-    }));
+  const updateGridQty = (idx: number, method: PaymentMethod, delta: number) => {
+    setItems(prev => prev.map((item, i) =>
+      i === idx
+        ? { ...item, qty: { ...item.qty, [method]: Math.max(0, (item.qty[method] || 0) + delta) } }
+        : item
+    ));
   };
 
   const handleNext = () => {
@@ -157,8 +208,13 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
       reason,
       note,
       mode: loadMode,
-      items: loadMode === 'detailed' ? toBackfillItems(items.filter(i => i.qtyEfectivo > 0 || i.qtyDigital > 0)) : [],
-      quickData: loadMode === 'quick' ? quickData : null,
+      items: loadMode === 'detailed' ? toBackfillItems(items) : [],
+      quickData: loadMode === 'quick'
+        ? { amounts: quickAmounts, cantidadServicios: quickCantidad }
+        : null,
+      methodSurcharges: Object.fromEntries(
+        methods.map(m => [m.method, m.recargoPct])
+      ) as Record<PaymentMethod, number>,
     });
     setIsSaving(false);
     if (success) {
@@ -174,7 +230,8 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
     setNote('');
     setLoadMode('quick');
     setItems([]);
-    setQuickData({ totalEfectivo: 0, totalMercadoPago: 0, cantidadServicios: 0 });
+    setQuickAmounts(emptyQty());
+    setQuickCantidad(0);
     onOpenChange(false);
   };
 
@@ -184,7 +241,11 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
         side="right"
         className={cn(
           "flex flex-col p-0 gap-0",
-          step === 2 && loadMode === 'detailed' ? "sm:max-w-3xl" : "sm:max-w-2xl"
+          step === 2 && loadMode === 'detailed'
+            ? activeMethods.length > 2
+              ? "sm:max-w-4xl"
+              : "sm:max-w-3xl"
+            : "sm:max-w-2xl"
         )}
       >
         {/* Header */}
@@ -309,195 +370,214 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
           {/* Step 2 — Servicios */}
           {step === 2 && (
             <div className="space-y-4">
-              <Tabs value={loadMode} onValueChange={(v) => {
-                setLoadMode(v as 'detailed' | 'quick');
-                if (v === 'detailed') initDetailedItems();
-              }}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="quick" className="flex-1">Carga rápida</TabsTrigger>
-                  <TabsTrigger value="detailed" className="flex-1">Por servicio</TabsTrigger>
-                </TabsList>
+              {methodsLoading && activeMethods.length === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <Tabs value={loadMode} onValueChange={(v) => {
+                  setLoadMode(v as 'detailed' | 'quick');
+                  if (v === 'detailed') initDetailedItems();
+                }}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="quick" className="flex-1">Carga rápida</TabsTrigger>
+                    <TabsTrigger value="detailed" className="flex-1">Por servicio</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="quick" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <TabsContent value="quick" className="space-y-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {activeMethods.map(m => (
+                        <div key={m.method} className="space-y-2">
+                          <Label className="text-sm flex items-center gap-1.5">
+                            {m.method === 'efectivo'
+                              ? <Banknote className="h-4 w-4 text-success" />
+                              : <CreditCard className="h-4 w-4 text-status-info-foreground" />
+                            }
+                            {m.label}
+                            {m.recargoPct > 0 && (
+                              <span className="text-xs text-muted-foreground">(+{m.recargoPct}%)</span>
+                            )}
+                          </Label>
+                          <CurrencyInput
+                            value={quickAmounts[m.method] ? String(quickAmounts[m.method]) : ''}
+                            onChange={(v) => setQuickAmounts(prev => ({ ...prev, [m.method]: Number(v) || 0 }))}
+                            placeholder="0"
+                          />
+                        </div>
+                      ))}
+                    </div>
                     <div className="space-y-2">
-                      <Label className="text-sm flex items-center gap-1.5">
-                        <Banknote className="h-4 w-4 text-success" /> Total Efectivo
-                      </Label>
-                      <CurrencyInput
-                        value={quickData.totalEfectivo ? String(quickData.totalEfectivo) : ''}
-                        onChange={(v) => setQuickData(prev => ({ ...prev, totalEfectivo: Number(v) || 0 }))}
+                      <Label className="text-sm">Cantidad de servicios</Label>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={quickCantidad || ''}
+                        onChange={(e) => setQuickCantidad(Number(e.target.value) || 0)}
                         placeholder="0"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm flex items-center gap-1.5">
-                        <CreditCard className="h-4 w-4 text-status-info-foreground" /> Total Digital
-                      </Label>
-                      <CurrencyInput
-                        value={quickData.totalMercadoPago ? String(quickData.totalMercadoPago) : ''}
-                        onChange={(v) => setQuickData(prev => ({ ...prev, totalMercadoPago: Number(v) || 0 }))}
-                        placeholder="0"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Cantidad de servicios</Label>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      value={quickData.cantidadServicios || ''}
-                      onChange={(e) => setQuickData(prev => ({ ...prev, cantidadServicios: Number(e.target.value) || 0 }))}
-                      placeholder="0"
-                    />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="detailed" className="mt-4">
-                  <p className="text-xs text-muted-foreground mb-3">Indicá cantidad por método de pago para cada servicio realizado.</p>
-
-                  {/* Desktop: tabla */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full min-w-[480px]">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[45%]">Servicio</th>
-                          <th className="py-2 w-[27.5%]">
-                            <span className="flex items-center justify-center gap-1 text-xs font-medium text-success">
-                              <Banknote className="h-3.5 w-3.5" /> Efectivo
-                            </span>
-                          </th>
-                          <th className="py-2 w-[27.5%]">
-                            <span className="flex items-center justify-center gap-1 text-xs font-medium text-status-info-foreground">
-                              <CreditCard className="h-3.5 w-3.5" /> Digital
-                            </span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((item, idx) => (
-                          <tr key={idx} className="border-b border-border/40">
-                            <td className="py-3 pr-4">
-                              <span className="text-sm font-medium">{item.servicioNombre}</span>
-                              <span className="text-xs text-muted-foreground block">${item.unitPrice.toLocaleString()}</span>
-                            </td>
-                            <td className="py-2 px-2">
-                              <div className={cn(
-                                "flex items-center justify-center gap-2 py-1.5 rounded-md",
-                                item.qtyEfectivo > 0 ? "bg-success/10 border border-success/20" : "bg-muted/30"
-                              )}>
-                                <button
-                                  onClick={() => updateGridQty(idx, 'efectivo', -1)}
-                                  disabled={item.qtyEfectivo === 0}
-                                  className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="w-5 text-center text-sm font-semibold tabular-nums">{item.qtyEfectivo}</span>
-                                <button
-                                  onClick={() => updateGridQty(idx, 'efectivo', 1)}
-                                  className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </td>
-                            <td className="py-2 px-2">
-                              <div className={cn(
-                                "flex items-center justify-center gap-2 py-1.5 rounded-md",
-                                item.qtyDigital > 0 ? "bg-status-info-bg border border-status-info/20" : "bg-muted/30"
-                              )}>
-                                <button
-                                  onClick={() => updateGridQty(idx, 'digital', -1)}
-                                  disabled={item.qtyDigital === 0}
-                                  className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </button>
-                                <span className="w-5 text-center text-sm font-semibold tabular-nums">{item.qtyDigital}</span>
-                                <button
-                                  onClick={() => updateGridQty(idx, 'digital', 1)}
-                                  className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="border-t-2 border-border">
-                        <tr>
-                          <td className="py-3 text-sm font-semibold text-muted-foreground">Total por método</td>
-                          <td className="text-center font-bold text-success py-3">${totals.efectivo.toLocaleString()}</td>
-                          <td className="text-center font-bold text-status-info-foreground py-3">${totals.mp.toLocaleString()}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* Mobile: cards */}
-                  <div className="block sm:hidden space-y-3">
-                    {items.map((item, idx) => (
-                      <div key={idx} className="rounded-lg border border-border p-3 space-y-2">
-                        <div>
-                          <span className="text-sm font-medium">{item.servicioNombre}</span>
-                          <span className="text-xs text-muted-foreground block">${item.unitPrice.toLocaleString()}</span>
+                    {totals.totalCobrado > 0 && (
+                      <div className="mt-2 p-3 rounded-lg bg-muted/50 border border-border space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Total cobrado</span>
+                          <span className="font-semibold">${totals.totalCobrado.toLocaleString()}</span>
                         </div>
-                        <div className={cn(
-                          "flex items-center justify-between p-2 rounded-md",
-                          item.qtyEfectivo > 0 ? "bg-success/10 border border-success/20" : "bg-muted/30 border border-border"
-                        )}>
-                          <span className="text-xs font-medium text-success flex items-center gap-1">
-                            <Banknote className="h-3 w-3" /> Efectivo
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => updateGridQty(idx, 'efectivo', -1)}
-                              disabled={item.qtyEfectivo === 0}
-                              className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-5 text-center text-sm font-semibold tabular-nums">{item.qtyEfectivo}</span>
-                            <button
-                              onClick={() => updateGridQty(idx, 'efectivo', 1)}
-                              className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
+                        {totals.recargosTotal > 0 && (
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Incluye recargos</span>
+                            <span>+${totals.recargosTotal.toLocaleString()}</span>
                           </div>
-                        </div>
-                        <div className={cn(
-                          "flex items-center justify-between p-2 rounded-md",
-                          item.qtyDigital > 0 ? "bg-status-info-bg border border-status-info/20" : "bg-muted/30 border border-border"
-                        )}>
-                          <span className="text-xs font-medium text-status-info-foreground flex items-center gap-1">
-                            <CreditCard className="h-3 w-3" /> Digital
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => updateGridQty(idx, 'digital', -1)}
-                              disabled={item.qtyDigital === 0}
-                              className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="w-5 text-center text-sm font-semibold tabular-nums">{item.qtyDigital}</span>
-                            <button
-                              onClick={() => updateGridQty(idx, 'digital', 1)}
-                              className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="detailed" className="mt-4">
+                    <p className="text-xs text-muted-foreground mb-3">Indicá cantidad por método de pago para cada servicio realizado.</p>
+
+                    {/* Desktop: tabla dinámica */}
+                    <div className="hidden sm:block overflow-x-auto">
+                      <table className="w-full min-w-[480px]">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left text-xs font-medium text-muted-foreground py-2 pr-4 w-[40%]">Servicio</th>
+                            {activeMethods.map(m => (
+                              <th key={m.method} className="text-center text-xs font-medium py-2">
+                                <span className={cn(
+                                  "flex items-center justify-center gap-1",
+                                  m.method === 'efectivo' ? "text-success" : "text-status-info-foreground"
+                                )}>
+                                  {m.method === 'efectivo'
+                                    ? <Banknote className="h-3.5 w-3.5" />
+                                    : <CreditCard className="h-3.5 w-3.5" />
+                                  }
+                                  {m.label}
+                                  {m.recargoPct > 0 && (
+                                    <span className="text-muted-foreground text-[10px]">+{m.recargoPct}%</span>
+                                  )}
+                                </span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.map((item, idx) => (
+                            <tr key={idx} className="border-b border-border/40">
+                              <td className="py-3 pr-4">
+                                <span className="text-sm font-medium">{item.servicioNombre}</span>
+                                <span className="text-xs text-muted-foreground block">${item.unitPrice.toLocaleString()}</span>
+                              </td>
+                              {activeMethods.map(m => {
+                                const qty = item.qty[m.method] || 0;
+                                const isEfectivo = m.method === 'efectivo';
+                                return (
+                                  <td key={m.method} className="py-2 px-2">
+                                    <div className={cn(
+                                      "flex items-center justify-center gap-2 py-1.5 rounded-md",
+                                      qty > 0
+                                        ? isEfectivo
+                                          ? "bg-success/10 border border-success/20"
+                                          : "bg-status-info-bg border border-status-info/20"
+                                        : "bg-muted/30"
+                                    )}>
+                                      <button
+                                        onClick={() => updateGridQty(idx, m.method, -1)}
+                                        disabled={qty === 0}
+                                        className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </button>
+                                      <span className="w-5 text-center text-sm font-semibold tabular-nums">{qty}</span>
+                                      <button
+                                        onClick={() => updateGridQty(idx, m.method, 1)}
+                                        className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="border-t-2 border-border">
+                          <tr>
+                            <td className="py-3 text-sm font-semibold text-muted-foreground">Total por método</td>
+                            {activeMethods.map(m => {
+                              const isEfectivo = m.method === 'efectivo';
+                              const base = items.reduce((acc, item) => acc + (item.qty[m.method] || 0) * item.unitPrice, 0);
+                              const cobrado = base + Math.round(base * getRecargoPct(m.method) / 100);
+                              return (
+                                <td key={m.method} className={cn(
+                                  "text-center font-bold py-3 text-sm",
+                                  isEfectivo ? "text-success" : "text-status-info-foreground"
+                                )}>
+                                  ${cobrado.toLocaleString()}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {/* Mobile: cards apiladas */}
+                    <div className="block sm:hidden space-y-3">
+                      {items.map((item, idx) => (
+                        <div key={idx} className="rounded-lg border border-border p-3 space-y-2">
+                          <div>
+                            <span className="text-sm font-medium">{item.servicioNombre}</span>
+                            <span className="text-xs text-muted-foreground block">${item.unitPrice.toLocaleString()}</span>
+                          </div>
+                          {activeMethods.map(m => {
+                            const qty = item.qty[m.method] || 0;
+                            const isEfectivo = m.method === 'efectivo';
+                            return (
+                              <div key={m.method} className={cn(
+                                "flex items-center justify-between p-2 rounded-md",
+                                qty > 0
+                                  ? isEfectivo
+                                    ? "bg-success/10 border border-success/20"
+                                    : "bg-status-info-bg border border-status-info/20"
+                                  : "bg-muted/30 border border-border"
+                              )}>
+                                <span className={cn(
+                                  "text-xs font-medium flex items-center gap-1",
+                                  isEfectivo ? "text-success" : "text-status-info-foreground"
+                                )}>
+                                  {isEfectivo
+                                    ? <Banknote className="h-3 w-3" />
+                                    : <CreditCard className="h-3 w-3" />
+                                  }
+                                  {m.label}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => updateGridQty(idx, m.method, -1)}
+                                    disabled={qty === 0}
+                                    className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <span className="w-5 text-center text-sm font-semibold tabular-nums">{qty}</span>
+                                  <button
+                                    onClick={() => updateGridQty(idx, m.method, 1)}
+                                    className="h-6 w-6 rounded border border-border flex items-center justify-center hover:bg-muted"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              )}
             </div>
           )}
 
@@ -528,22 +608,28 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
                     <Banknote className="h-3.5 w-3.5 text-success" /> Efectivo
                   </p>
-                  <p className="text-xl font-bold text-success">${totals.efectivo.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-success">${totals.efectivoCobrado.toLocaleString()}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-status-info-bg border border-status-info/20">
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1">
                     <CreditCard className="h-3.5 w-3.5 text-status-info-foreground" /> Digital
                   </p>
-                  <p className="text-xl font-bold text-status-info-foreground">${totals.mp.toLocaleString()}</p>
+                  <p className="text-xl font-bold text-status-info-foreground">${totals.digitalCobrado.toLocaleString()}</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between p-4 rounded-lg bg-primary text-primary-foreground">
                 <span className="font-semibold">Total del día</span>
-                <span className="text-xl font-bold">${totals.total.toLocaleString()}</span>
+                <span className="text-xl font-bold">${totals.totalCobrado.toLocaleString()}</span>
               </div>
 
               <div className="space-y-2 pt-1">
+                {totals.recargosTotal > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Recargos incluidos</span>
+                    <span className="text-muted-foreground">+${totals.recargosTotal.toLocaleString()}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Comisión ({selectedBarber?.commission}%)</span>
                   <span className="font-medium">${totals.commission.toLocaleString()}</span>

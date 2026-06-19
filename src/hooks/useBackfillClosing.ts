@@ -7,6 +7,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { getEndOfDayLocal, getStartOfDayLocal } from '@/lib/dateUtils';
+import { PaymentMethod } from '@/types/barbershop';
 
 export interface BackfillServiceItem {
   servicioId: string;
@@ -14,12 +15,11 @@ export interface BackfillServiceItem {
   lineaId: string | null;
   qty: number;
   unitPrice: number;
-  paymentMethod: 'efectivo' | 'mercado_pago';
+  paymentMethod: PaymentMethod;
 }
 
 export interface BackfillQuickData {
-  totalEfectivo: number;
-  totalMercadoPago: number;
+  amounts: Record<PaymentMethod, number>;
   cantidadServicios: number;
 }
 
@@ -33,6 +33,7 @@ export interface BackfillData {
   mode: 'detailed' | 'quick';
   items: BackfillServiceItem[];
   quickData: BackfillQuickData | null;
+  methodSurcharges: Record<PaymentMethod, number>;
 }
 
 export function useBackfillClosing() {
@@ -51,7 +52,7 @@ export function useBackfillClosing() {
       return false;
     }
 
-    const { barberId, barberName, commissionPct, date, reason, note, mode, items, quickData } = data;
+    const { barberId, barberName, commissionPct, date, reason, note, mode, items, quickData, methodSurcharges } = data;
 
     // Check for duplicate
     const tz = organization?.timezone || null;
@@ -78,37 +79,60 @@ export function useBackfillClosing() {
       return false;
     }
 
-    // Calculate totals
-    let efectivo = 0;
-    let mp = 0;
+    // Calculate totals — mirrors useCashClosing.ts bucketing convention
+    // efectivo → efectivoBase/Cobrado; everything else → mpBase/digitalCobrado
+    let efectivoBase = 0, mpBase = 0;
+    let efectivoCobrado = 0, digitalCobrado = 0;
+    let recargosTotal = 0;
     let cantidadDeServicios = 0;
 
     if (mode === 'detailed') {
       items.forEach(item => {
-        const subtotal = item.qty * item.unitPrice;
-        if (item.paymentMethod === 'efectivo') {
-          efectivo += subtotal;
-        } else {
-          mp += subtotal;
-        }
+        const base = item.qty * item.unitPrice;
+        const recargoPct = methodSurcharges[item.paymentMethod] ?? 0;
+        const recargoMonto = Math.round(base * recargoPct / 100);
+        recargosTotal += recargoMonto;
         cantidadDeServicios += item.qty;
+        if (item.paymentMethod === 'efectivo') {
+          efectivoBase += base;
+          efectivoCobrado += base + recargoMonto;
+        } else {
+          mpBase += base;
+          digitalCobrado += base + recargoMonto;
+        }
       });
     } else if (quickData) {
-      efectivo = quickData.totalEfectivo;
-      mp = quickData.totalMercadoPago;
+      // D1: usuario ingresa COBRADO → deducimos BASE (base = round(cobrado * 100 / (100 + pct)))
+      Object.entries(quickData.amounts).forEach(([method, cobrado]) => {
+        if (!cobrado || cobrado === 0) return;
+        const recargoPct = methodSurcharges[method as PaymentMethod] ?? 0;
+        const base = recargoPct > 0
+          ? Math.round(cobrado * 100 / (100 + recargoPct))
+          : cobrado;
+        const recargoMonto = cobrado - base;
+        recargosTotal += recargoMonto;
+        if (method === 'efectivo') {
+          efectivoBase += base;
+          efectivoCobrado += cobrado;
+        } else {
+          mpBase += base;
+          digitalCobrado += cobrado;
+        }
+      });
       cantidadDeServicios = quickData.cantidadServicios;
     }
 
-    const totalFacturado = efectivo + mp;
-    const sueldo = Math.round(totalFacturado * (commissionPct / 100));
+    const totalFacturado = efectivoBase + mpBase;           // BASE — comisionable
+    const totalCobrado = efectivoCobrado + digitalCobrado;  // real cobrado con recargos
+    const sueldo = Math.round(totalFacturado * (commissionPct / 100)); // SIEMPRE sobre BASE
     const dia = format(date, 'EEEE', { locale: es });
     const identificador = crypto.randomUUID();
 
     const insertData = {
       barbero: barberName,
       barbero_id: barberId,
-      mp,
-      efectivo,
+      mp: mpBase,
+      efectivo: efectivoBase,
       total_facturado: totalFacturado,
       total_sin_descuento: totalFacturado,
       perdida: 0,
@@ -133,6 +157,10 @@ export function useBackfillClosing() {
       backfilled_by: user.id,
       backfill_reason: reason,
       backfill_note: note || null,
+      recargos_total: recargosTotal,
+      total_cobrado: totalCobrado,
+      efectivo_cobrado: efectivoCobrado,
+      digital_cobrado: digitalCobrado,
     };
 
     const { data: insertedIngreso, error: insertError } = await supabase
