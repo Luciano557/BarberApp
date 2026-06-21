@@ -33,6 +33,8 @@ export interface Servicio {
   nombre: string;
   duracion_min: number;
   precio: number;
+  linea_id: string | null;
+  linea_color: string | null;
 }
 
 export interface Horario {
@@ -78,7 +80,7 @@ export function useAgendaData(
         .gte('fecha_fin', fromStr),
       supabase
         .from('servicios')
-        .select('id, nombre, duracion_min, precio')
+        .select('id, nombre, duracion_min, precio, linea_id, lineas(color)')
         .eq('organization_id', organizationId)
         .eq('activo', true)
         .eq('eliminado', false),
@@ -90,7 +92,16 @@ export function useAgendaData(
     ]);
     setTurnos(turnosRes.data || []);
     setBloqueos(bloqueosRes.data || []);
-    setServicios(serviciosRes.data || []);
+    setServicios(
+      (serviciosRes.data || []).map((s: any) => ({
+        id: s.id,
+        nombre: s.nombre,
+        duracion_min: s.duracion_min,
+        precio: s.precio,
+        linea_id: s.linea_id ?? null,
+        linea_color: (s.lineas as { color: string | null } | null)?.color ?? null,
+      })),
+    );
     setHorarios(horariosRes.data || []);
     setLoading(false);
   }, [sucursalId, organizationId, fromStr, toStr]);
