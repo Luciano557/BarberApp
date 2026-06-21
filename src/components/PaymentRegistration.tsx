@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -86,7 +87,30 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  type OverlayPhase = 'idle' | 'visible' | 'exiting';
+  const [overlayPhase, setOverlayPhase] = useState<OverlayPhase>('idle');
+  const overlayTimersRef = useRef<{ hold?: ReturnType<typeof setTimeout>; exit?: ReturnType<typeof setTimeout> }>({});
+
+  const triggerSuccessOverlay = useCallback(() => {
+    if (overlayTimersRef.current.hold) clearTimeout(overlayTimersRef.current.hold);
+    if (overlayTimersRef.current.exit) clearTimeout(overlayTimersRef.current.exit);
+
+    setOverlayPhase('visible');
+
+    overlayTimersRef.current.hold = setTimeout(() => {
+      setOverlayPhase('exiting');
+      overlayTimersRef.current.exit = setTimeout(() => {
+        setOverlayPhase('idle');
+      }, 220);
+    }, 2000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (overlayTimersRef.current.hold) clearTimeout(overlayTimersRef.current.hold);
+      if (overlayTimersRef.current.exit) clearTimeout(overlayTimersRef.current.exit);
+    };
+  }, []);
   // Productos
   const [cart, setCart] = useState<CartItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -586,9 +610,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
 
       if (result) {
-        setShowSuccessOverlay(true);
+        triggerSuccessOverlay();
         resetForm();
-        setTimeout(() => setShowSuccessOverlay(false), 2200);
       } else {
         toast({
           title: "❌ No se pudo guardar el cobro",
@@ -695,9 +718,8 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       });
 
       if (result) {
-        setShowSuccessOverlay(true);
+        triggerSuccessOverlay();
         resetForm();
-        setTimeout(() => setShowSuccessOverlay(false), 2200);
       } else {
         toast({
           title: '❌ No se pudo guardar el cobro',
@@ -1578,31 +1600,36 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
         </AlertDialogContent>
       </AlertDialog>
 
-      {showSuccessOverlay && (
+      {overlayPhase !== 'idle' && createPortal(
         <div
-          className="animate-overlay-show fixed inset-0 z-50 flex items-center justify-center"
+          className={`fixed inset-0 z-50 flex items-center justify-center ${
+            overlayPhase === 'exiting' ? 'animate-overlay-hide' : 'animate-overlay-show'
+          }`}
           style={{ background: 'rgba(10, 16, 36, 0.72)' }}
           aria-live="polite"
           aria-label="Cobro registrado exitosamente"
         >
           <div
-            className="animate-confirm-card-in flex flex-col items-center gap-5 rounded-2xl px-8 py-8 sm:px-12 sm:py-10 text-center"
+            className={`flex flex-col items-center gap-5 rounded-2xl px-8 py-8 sm:px-12 sm:py-10 text-center ${
+              overlayPhase === 'exiting' ? 'animate-confirm-card-out' : 'animate-confirm-card-in'
+            }`}
             style={{ background: '#1E2A4A', maxWidth: '300px', width: '90%' }}
           >
             <div
-              className="animate-confirm-icon-pop flex items-center justify-center rounded-full"
+              className={overlayPhase !== 'exiting' ? 'animate-confirm-icon-pop flex items-center justify-center rounded-full' : 'flex items-center justify-center rounded-full'}
               style={{ width: 64, height: 64, background: 'rgba(255,255,255,0.1)' }}
             >
               <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
             </div>
-            <div className="animate-confirm-text-in flex flex-col gap-1">
+            <div className={overlayPhase !== 'exiting' ? 'animate-confirm-text-in flex flex-col gap-1' : 'flex flex-col gap-1'}>
               <p className="text-xl font-medium text-white">Cobro registrado</p>
               <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
                 El cobro fue registrado con éxito
               </p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
