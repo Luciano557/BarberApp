@@ -518,7 +518,7 @@ export function AgendaDayView({
                         key={t.id}
                         {...turnoHandlers}
                         className={cn(
-                          'absolute z-30 rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
+                          'absolute z-30 rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{
@@ -532,14 +532,14 @@ export function AgendaDayView({
                           WebkitTouchCallout: 'none',
                         }}
                       >
-                        <div className="text-[10px] font-mono text-muted-foreground">
+                        <div className="text-[10px] font-mono text-muted-foreground leading-tight">
                           {formatHHMM(t.hora_inicio)} → {formatHHMM(t.hora_fin)}
                         </div>
-                        <div className="text-xs font-medium text-foreground truncate">
+                        <div className="text-xs font-medium text-foreground truncate leading-tight">
                           {t.cliente_nombre || 'Sin nombre'}
                         </div>
                         {height >= 45 && (
-                          <div className="text-[10px] text-muted-foreground truncate">
+                          <div className="text-[10px] text-muted-foreground truncate leading-tight">
                             {servicio?.nombre || 'Servicio'}
                           </div>
                         )}

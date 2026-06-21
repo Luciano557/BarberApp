@@ -11,4 +11,4 @@ export const minutesToTime = (m: number): string => {
 
 export const formatHHMM = (t: string) => t.slice(0, 5);
 
-export const PX_PER_MIN = 1.2; // 72px por hora
+export const PX_PER_MIN = 2.05; // ~123px por hora
