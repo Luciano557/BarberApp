@@ -5,6 +5,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   :root {
     /* Color scale - Vittro indigo */
     --color-50: 231 80% 95%;
