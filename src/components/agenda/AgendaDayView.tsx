@@ -364,9 +364,9 @@ export function AgendaDayView({
   ]);
 
   return (
-    <div ref={outerRef} className="border rounded-lg bg-card overflow-hidden">
+    <div ref={outerRef} className="bg-card overflow-clip">
       {/* Header */}
-      <div className="flex border-b bg-muted/30 sticky top-0 z-20">
+      <div className="flex border-b bg-muted/30 sticky top-0 z-40">
         <div className="shrink-0 border-r" style={{ width: TIME_RAIL_WIDTH }} />
         <div ref={headerScrollRef} className="flex overflow-x-auto scrollbar-hide" onScroll={handleHeaderScroll}>
           {activeBarbers.map((b) => (
@@ -475,7 +475,7 @@ export function AgendaDayView({
                       return (
                         <div
                           key={bl.id}
-                          className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                          className="absolute inset-0 z-[15] flex items-center justify-center pointer-events-none"
                           style={{ backgroundColor: 'hsl(var(--muted) / 0.96)' }}
                         >
                           <span className="relative z-30 text-[10px] font-medium text-foreground/80 rotate-90">
@@ -490,7 +490,7 @@ export function AgendaDayView({
                     return (
                       <div
                         key={bl.id}
-                        className="absolute left-0 right-0 z-20 border-l-2 border-muted-foreground/45 pointer-events-none"
+                        className="absolute left-0 right-0 z-[15] border-l-2 border-muted-foreground/45 pointer-events-none"
                         style={{
                           top,
                           height,
@@ -518,7 +518,7 @@ export function AgendaDayView({
                         key={t.id}
                         {...turnoHandlers}
                         className={cn(
-                          'absolute z-30 rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
+                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{
@@ -553,7 +553,7 @@ export function AgendaDayView({
             {/* Now line */}
             {isToday && nowMin >= rangeStart && nowMin <= rangeEnd && (
               <div
-                className="absolute left-0 right-0 h-px bg-destructive z-10 pointer-events-none"
+                className="absolute left-0 right-0 h-px bg-destructive z-[5] pointer-events-none"
                 style={{ top: (nowMin - rangeStart) * PX_PER_MIN }}
               >
                 <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-destructive" />
