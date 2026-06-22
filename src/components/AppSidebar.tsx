@@ -172,10 +172,17 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           isMobile
             ? 'fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
             : 'z-10 h-full transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]',
-          isMobile
-            ? (collapsed ? '-translate-x-full' : 'translate-x-0')
-            : (collapsed ? 'w-16' : 'w-56'),
+          !isMobile && (collapsed ? 'w-16' : 'w-56'),
         )}
+        style={
+          isMobile
+            ? {
+                transform: collapsed ? 'translate3d(-100%, 0, 0)' : 'translate3d(0, 0, 0)',
+                willChange: 'transform',
+                maxWidth: '100vw',
+              }
+            : undefined
+        }
       >
         {/* Brand identity — header blanco con logo tile navy */}
         {railMode ? (

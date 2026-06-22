@@ -67,6 +67,11 @@ export function AgendaDayView({
   const lastAutoContextRef = useRef<string | null>(null);
   const isProgrammaticScrollRef = useRef(false);
   const manualScrollBaseContextRef = useRef<string | null>(null);
+  const outerRef = useRef<HTMLDivElement | null>(null);
+  const headerScrollRef = useRef<HTMLDivElement | null>(null);
+  const bodyColumnsScrollRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingScrollRef = useRef(false);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const dateStr = format(date, 'yyyy-MM-dd');
   const dayOfWeek = ((date.getDay() + 6) % 7) + 1; // ISO: 1=Mon..7=Sun
@@ -225,8 +230,39 @@ export function AgendaDayView({
     [baseAutoContextKey, rangeStart, rangeEnd, generalWorkRangesSignature],
   );
 
-  const COL_WIDTH = 160;
+  const MIN_COL_WIDTH = 160;
   const TIME_RAIL_WIDTH = 56;
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const colWidth = useMemo(() => {
+    if (activeBarbers.length === 0 || containerWidth === 0) return MIN_COL_WIDTH;
+    return Math.max(MIN_COL_WIDTH, (containerWidth - TIME_RAIL_WIDTH) / activeBarbers.length);
+  }, [containerWidth, activeBarbers.length]);
+
+  const handleHeaderScroll = useCallback(() => {
+    if (isSyncingScrollRef.current) return;
+    isSyncingScrollRef.current = true;
+    if (bodyColumnsScrollRef.current && headerScrollRef.current) {
+      bodyColumnsScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+  }, []);
+
+  const handleBodyColumnsScroll = useCallback(() => {
+    if (isSyncingScrollRef.current) return;
+    isSyncingScrollRef.current = true;
+    if (headerScrollRef.current && bodyColumnsScrollRef.current) {
+      headerScrollRef.current.scrollLeft = bodyColumnsScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => { isSyncingScrollRef.current = false; });
+  }, []);
 
   // Resolve drop target via DOM hit-test on data-col-root columns.
   const resolveDrop = useCallback((x: number, y: number): { barberoId: string; horaInicio: string } | null => {
@@ -328,16 +364,16 @@ export function AgendaDayView({
   ]);
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
+    <div ref={outerRef} className="bg-card overflow-clip">
       {/* Header */}
-      <div className="flex border-b bg-muted/30 sticky top-0 z-20">
+      <div className="flex border-b bg-muted/30 sticky top-0 z-40">
         <div className="shrink-0 border-r" style={{ width: TIME_RAIL_WIDTH }} />
-        <div className="flex overflow-x-auto">
+        <div ref={headerScrollRef} className="flex overflow-x-auto scrollbar-hide" onScroll={handleHeaderScroll}>
           {activeBarbers.map((b) => (
             <div
               key={b.id}
               className="shrink-0 px-3 py-2 border-r flex items-center gap-2"
-              style={{ width: COL_WIDTH, borderLeft: `3px solid ${colors[b.id]}` }}
+              style={{ width: colWidth, borderLeft: `3px solid ${colors[b.id]}` }}
             >
               <span className="text-sm font-medium truncate">{b.firstName} {b.lastName}</span>
             </div>
@@ -353,7 +389,7 @@ export function AgendaDayView({
         ref={gridScrollRef}
         onScroll={handleGridScroll}
         className="overflow-y-auto overscroll-contain"
-        style={{ maxHeight: 'clamp(420px, 72vh, 860px)' }}
+        style={{ maxHeight: 'clamp(500px, 75vh, 900px)' }}
       >
         <div className="flex relative" style={{ height: totalHeight }}>
           {/* Time rail */}
@@ -370,7 +406,7 @@ export function AgendaDayView({
           </div>
 
           {/* Columns */}
-          <div className="flex overflow-x-auto relative flex-1">
+          <div ref={bodyColumnsScrollRef} className="flex overflow-x-auto relative flex-1" onScroll={handleBodyColumnsScroll}>
             {activeBarbers.map((b) => {
               const barberTurnos = turnosByBarber[b.id] || [];
               const layouts = computeLayouts(barberTurnos);
@@ -382,7 +418,7 @@ export function AgendaDayView({
                 <BarberColumn
                   key={b.id}
                   barberId={b.id}
-                  width={COL_WIDTH}
+                  width={colWidth}
                   works={works}
                 >
                   {/* Outside-of-hours visual reference (general schedule only) */}
@@ -439,7 +475,7 @@ export function AgendaDayView({
                       return (
                         <div
                           key={bl.id}
-                          className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+                          className="absolute inset-0 z-[15] flex items-center justify-center pointer-events-none"
                           style={{ backgroundColor: 'hsl(var(--muted) / 0.96)' }}
                         >
                           <span className="relative z-30 text-[10px] font-medium text-foreground/80 rotate-90">
@@ -454,7 +490,7 @@ export function AgendaDayView({
                     return (
                       <div
                         key={bl.id}
-                        className="absolute left-0 right-0 z-20 border-l-2 border-muted-foreground/45 pointer-events-none"
+                        className="absolute left-0 right-0 z-[15] border-l-2 border-muted-foreground/45 pointer-events-none"
                         style={{
                           top,
                           height,
@@ -473,6 +509,7 @@ export function AgendaDayView({
                     const widthPct = 100 / layout.count;
                     const leftPct = widthPct * layout.idx;
                     const servicio = servicios.find((s) => s.id === t.servicio_id);
+                    const borderColor = servicio?.linea_color ?? 'hsl(var(--border))';
                     const isPending = t.estado === 'pendiente';
                     const turnoHandlers = getTurnoHandlers(t);
 
@@ -481,7 +518,7 @@ export function AgendaDayView({
                         key={t.id}
                         {...turnoHandlers}
                         className={cn(
-                          'absolute z-30 rounded-md p-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
+                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{
@@ -489,21 +526,23 @@ export function AgendaDayView({
                           height,
                           left: `calc(${leftPct}% + 2px)`,
                           width: `calc(${widthPct}% - 4px)`,
-                          borderLeft: `3px solid ${colors[b.id]}`,
+                          borderLeft: `3px solid ${borderColor}`,
                           touchAction: 'pan-y',
                           WebkitUserSelect: 'none',
                           WebkitTouchCallout: 'none',
                         }}
                       >
-                        <div className="text-[10px] font-mono text-muted-foreground">
-                          {formatHHMM(t.hora_inicio)}
+                        <div className="text-[10px] font-mono text-muted-foreground leading-tight">
+                          {formatHHMM(t.hora_inicio)} → {formatHHMM(t.hora_fin)}
                         </div>
-                        <div className="text-xs font-medium text-foreground truncate">
+                        <div className="text-xs font-medium text-foreground truncate leading-tight">
                           {t.cliente_nombre || 'Sin nombre'}
                         </div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {servicio?.nombre || 'Servicio'}
-                        </div>
+                        {height >= 45 && (
+                          <div className="text-[10px] text-muted-foreground truncate leading-tight">
+                            {servicio?.nombre || 'Servicio'}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -514,7 +553,7 @@ export function AgendaDayView({
             {/* Now line */}
             {isToday && nowMin >= rangeStart && nowMin <= rangeEnd && (
               <div
-                className="absolute left-0 right-0 h-px bg-destructive z-10 pointer-events-none"
+                className="absolute left-0 right-0 h-px bg-destructive z-[5] pointer-events-none"
                 style={{ top: (nowMin - rangeStart) * PX_PER_MIN }}
               >
                 <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-destructive" />

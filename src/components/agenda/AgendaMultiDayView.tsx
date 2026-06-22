@@ -35,7 +35,7 @@ export function AgendaMultiDayView({
   const today = new Date();
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden">
+    <div className="bg-card overflow-clip">
       <div className="flex border-b bg-muted/30">
         <div className="shrink-0 border-r" style={{ width: TIME_RAIL_WIDTH }} />
         <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${daysCount}, minmax(0, 1fr))` }}>

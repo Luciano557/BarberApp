@@ -5,6 +5,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   :root {
     /* Color scale - Vittro indigo */
     --color-50: 231 80% 95%;
@@ -335,6 +339,23 @@
   .animate-confirm-text-in {
     animation: confirm-text-in 320ms var(--ease-out-quint) 260ms both;
   }
+
+  @keyframes overlay-hide {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+
+  @keyframes confirm-card-out {
+    from { opacity: 1; transform: scale(1) translateY(0); }
+    to   { opacity: 0; transform: scale(0.94) translateY(-6px); }
+  }
+
+  .animate-overlay-hide {
+    animation: overlay-hide 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+  .animate-confirm-card-out {
+    animation: confirm-card-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
 }
 
 /* Accesibilidad: anular movimiento si el usuario lo pide. */
@@ -348,7 +369,9 @@
   }
 
   .animate-overlay-show,
+  .animate-overlay-hide,
   .animate-confirm-card-in,
+  .animate-confirm-card-out,
   .animate-confirm-icon-pop,
   .animate-confirm-text-in {
     animation: none;

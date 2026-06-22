@@ -125,9 +125,9 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   }, [view, date, fromDate, toDate]);
 
   return (
-    <div className="space-y-4">
+    <div className="border rounded-lg overflow-clip">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 flex-wrap border-b bg-muted/30 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setDate(new Date())}>Hoy</Button>
           <div className="flex">

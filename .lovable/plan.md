@@ -1,61 +1,71 @@
+# Plan de fix — Caja: modal de anulación + monto con recargo
 
-## Auditoría — `supabase/functions/reschedule-turno/index.ts`
-
-Confirmado: tiene los mismos huecos que tenía `validate-turno`.
-
-### Qué hace hoy
-
-1. **Parámetros** (línea 45): `turno_id`, `nueva_fecha`, `nueva_hora_inicio`, `telefono`. `barbero_id`, `sucursal_id`, `organization_id`, `servicio_id` se leen del turno existente (línea 67-71). Autoriza por match exacto de `cliente_telefono` (línea 80).
-2. **Anticipación mínima** (líneas 135-143): igual lógica que validate-turno (`slotInstantMs` + `anticipacion_minima_reserva_min`). **No incluye `antMin` en el payload** ni respeta convención nueva.
-3. **Horario de apertura (`horarios_trabajo`)**: **NO valida**. Mismo agujero.
-4. **Bloqueos de agenda**: **NO valida**. Mismo agujero.
-5. **Buffers (líneas 145-159)**: usa `buffer_antes_min` / `buffer_despues_min` reales — ya alineado con validate-turno corregido. OK.
-6. **`hora_fin`** (línea 145): `nueva_hora_inicio + duracion` (servicio o `duracion_base_min`). Igual que validate-turno.
-7. **Otros chequeos**: `modificacion_limite_min` (líneas 125-133, código `modify_limit`), estado válido (`pendiente`/`confirmado`), turno no pasado.
-
-### Frontend — `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
-
-Maneja `slot_taken` y `time_limit` (este último no existe en el backend, que devuelve `modify_limit`). El resto cae a toast genérico sin recovery. Mismo problema que tenía ConfirmacionStep.
+Dos cambios acotados, sólo de UI/presentación. No se toca lógica de negocio, guardado, ni BD.
 
 ---
 
-## Plan
+## Bug 1 — Motivo de anulación: pasar de Textarea a Select
 
-### A. `supabase/functions/reschedule-turno/index.ts`
+**Archivo:** `src/components/VoidTransactionDialog.tsx`
 
-Replicar los chequeos nuevos de validate-turno, en este orden, después de calcular `nueva_hora_fin` y antes del chequeo de conflictos:
+**Hallazgo:** El motivo se captura hoy con `<Textarea>` libre (líneas 73–84), validando sólo que no esté vacío. El valor se pasa tal cual a `onConfirm(reason)`, que en `DailySummary.tsx` (líneas 880–891) sólo lo usa para llamar a `onVoidTransaction(id, voidedBy, voidedById)` — el motivo no se persiste por ese path actualmente, así que cambiar el formato del input no rompe ninguna lectura aguas abajo.
 
-1. Calcular `dbDow` desde `nueva_fecha` (`jsDow===0 ? 7 : jsDow`).
-2. Query a `horarios_trabajo` (org, sucursal, `dia_semana=dbDow`, `activo=true`, `barbero_id.eq.${turno.barbero_id},barbero_id.is.null`).
-3. Resolver overrides: si hay filas con `barbero_id === turno.barbero_id`, usarlas; si no, las de `barbero_id IS NULL`.
-4. Verificar que `[nueva_hora_inicio, nueva_hora_fin]` esté contenido en algún intervalo → si no, `409 outside_working_hours` con mensaje "Ese horario está fuera del horario de atención del barbero."
-5. Query a `bloqueos_agenda` (org, sucursal, `fecha_inicio<=nueva_fecha`, `fecha_fin>=nueva_fecha`); filtrar a `barbero_id === turno.barbero_id || null`; verificar solapamiento (`todo_el_dia` o `[bStart,bEnd)` vs slot) → si bloquea, `409 slot_blocked` con mensaje "Ese horario está bloqueado en la agenda."
-6. Agregar `antMin` al payload de `slot_too_soon` (línea 139-142).
+**Cambio propuesto:**
 
-### B. `src/components/reservar/RescheduleFlow.tsx` (líneas 53-65)
+1. Reemplazar el `<Textarea>` por un `<Select>` (shadcn/ui, ya disponible en `src/components/ui/select.tsx`) con estas 5 opciones fijas, en este orden:
+   - Error en el método de pago
+   - Cobro incorrecto
+   - Cliente canceló después de pagar
+   - Servicio no realizado
+   - Otros
+2. Estado: cambiar `reason` de string libre a una de esas 5 etiquetas. Mantener `reason.trim().length === 0` ⇒ deshabilita "Confirmar anulación" (placeholder "Seleccioná un motivo").
+3. Eliminar `REASON_MAX`, el contador `{reason.length}/{REASON_MAX}` y el import de `Textarea`. Importar `Select, SelectTrigger, SelectValue, SelectContent, SelectItem`.
+4. Mantener intactos: props del componente, firma de `onConfirm(reason: string)`, flujo de PIN, toasts, copy del header/description, botones del footer.
 
-Extender el manejo de errores igual que `ConfirmacionStep`:
+**Nota:** Si más adelante se decide persistir el motivo, ya queda normalizado a un set cerrado de etiquetas, lo cual es deseable para reportes.
 
-- `slot_taken` → toast + `setStep("horario")` (ya existe).
-- `slot_too_soon` → "Ese horario quedó muy cerca. Elegí otro." + `setStep("horario")`.
-- `outside_working_hours` → "Ese horario ya no está disponible. Elegí otro." + `setStep("horario")`.
-- `slot_blocked` → "Ese horario quedó bloqueado. Elegí otro." + `setStep("horario")`.
-- `modify_limit` → "Este turno ya no puede modificarse." (reemplaza el branch erróneo `time_limit`).
-- Resto → toast genérico (sin cambio).
+---
 
-### Orden
+## Bug 2 — Vista de Caja muestra base sin recargo
 
-1. Backend (A) primero.
-2. Frontend (B) después.
+**Archivo:** `src/components/DailySummary.tsx`
 
-### Riesgos / efectos colaterales
+**Hallazgo:**
 
-- +2 queries por reagendamiento (~50-100ms). Aceptable.
-- El override de `horarios_trabajo` por barbero debe respetarse igual que en get-availability/validate-turno para evitar falsos negativos.
-- Comparación de borde: usar `<=` en `hora_inicio` del intervalo y `>=` en `hora_fin` (slot puede terminar exacto en el cierre).
+- En `src/types/barbershop.ts` la `Transaction` tiene:
+  - `total` → **BASE** de la venta (servicios + productos − descuentos).
+  - `totalCobrado` → `total + recargoTotal` (lo que efectivamente entra a caja).
+- En `useTransactions.ts` (línea 164) ya se hidrata `totalCobrado` desde `ventas.total_cobrado` con fallback a `baseTotal + recargoTotal`.
+- `TransactionDetailDrawer.tsx` (línea 34) ya usa el patrón correcto: `transaction?.totalCobrado ?? transaction?.total`.
+- En la **lista de transacciones del día** (`DailySummary.tsx` línea 847) se renderiza `${tx.total.toLocaleString()}` — éste es el bug visual: ignora el recargo.
 
-### Qué NO tocar
+**Cambio propuesto (única línea afectada para el monto visible):**
 
-- Autorización por teléfono, validación de estado, `modificacion_limite_min`, lógica de timezone.
-- Manejo de `23P01` en el update.
-- Resto de `RescheduleFlow` (UI de selección de fecha/horario, paso `done`).
+- Línea 847: reemplazar
+  ```tsx
+  ${tx.total.toLocaleString()}
+  ```
+  por
+  ```tsx
+  ${(tx.totalCobrado ?? tx.total).toLocaleString()}
+  ```
+
+Con el fallback a `tx.total` preservamos retrocompatibilidad con transacciones viejas anteriores al recargo (donde `totalCobrado` puede no existir).
+
+**No se toca:**
+- Cálculo de comisiones, splits por método (`efectivoAmt` / `mpAmt` ya vienen de `tx.payments` que sí incluyen recargo en `amount`).
+- `staleByBarber`, lógica de cierre, ni nada de `useTransactions.ts`.
+- El campo `tx.discount` (línea 851) que sigue mostrándose igual.
+
+---
+
+## Orden de aplicación
+1. `VoidTransactionDialog.tsx` — Select de motivos.
+2. `DailySummary.tsx` — un solo string interpolado.
+
+## Riesgos
+- **Bug 1:** ninguno funcional; cambio puro de input. Si en el futuro se persiste el motivo, el valor será una de 5 strings fijas (deseable).
+- **Bug 2:** ninguno; `tx.totalCobrado` ya está calculado y poblado en el hook, el resto del módulo (drawer, splits por método de pago) ya lo trata correctamente. El fallback `?? tx.total` cubre datos legacy.
+
+## Qué NO tocar
+- Edge functions, migraciones, `useTransactions.ts`, lógica de PIN, lógica de cierre, comisiones, `TransactionDetailDrawer`, y cualquier otro consumo de `tx.total` fuera de la línea 847.
