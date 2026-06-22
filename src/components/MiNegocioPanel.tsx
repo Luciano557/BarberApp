@@ -286,7 +286,11 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       sueldo_fijo: barber.fixedSalary || null,
       rol_equipo: barber.teamRole || 'barbero',
     });
-    if (error) { toast.error('Error al agregar barbero'); return; }
+    if (error) {
+      console.error('[addBarberToSucursal] Error de Supabase:', error);
+      toast.error('Error al agregar barbero');
+      return;
+    }
     toast.success('Barbero agregado');
     await fetchAllBarbers();
   }, [organization?.id, fetchAllBarbers]);
