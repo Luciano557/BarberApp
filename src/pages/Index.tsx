@@ -183,7 +183,11 @@ const Index = () => {
       <OnboardingTooltip />
 
       <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
-        <div className={cn("mx-auto px-4 py-16 sm:px-6 sm:py-6 md:px-8 md:py-8", activeTab === 'tareas' ? "max-w-4xl lg:max-w-6xl" : "max-w-4xl")}>
+        <div className={cn("mx-auto px-4 py-16 sm:px-6 sm:py-6 md:px-8 md:py-8", activeTab === 'tareas'
+            ? "max-w-4xl lg:max-w-6xl"
+            : activeTab === 'turnos-agenda'
+              ? "max-w-none px-4 md:px-4"
+              : "max-w-4xl")}>
           {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}
