@@ -389,7 +389,7 @@ export function AgendaDayView({
         ref={gridScrollRef}
         onScroll={handleGridScroll}
         className="overflow-y-auto overscroll-contain"
-        style={{ maxHeight: 'clamp(500px, 75vh, 900px)' }}
+        style={{ maxHeight: 'clamp(600px, calc(100vh - 180px), 1100px)' }}
       >
         <div className="flex relative" style={{ height: totalHeight }}>
           {/* Time rail */}
