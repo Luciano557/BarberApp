@@ -543,6 +543,31 @@ export function AgendaDayView({
                             {servicio?.nombre || 'Servicio'}
                           </div>
                         )}
+                        {t.eligio_barbero && (
+                          <div
+                            title="Eligió barbero específico"
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: 14,
+                              height: 14,
+                              borderRadius: '50%',
+                              backgroundColor: colors[t.barbero_id] ?? 'hsl(var(--primary))',
+                              boxShadow: '0 0 0 2px #fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              zIndex: 2,
+                            }}
+                          >
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                              <circle cx="4" cy="2.5" r="1.5" fill="white"/>
+                              <path d="M1 7c0-1.657 1.343-3 3-3s3 1.343 3 3" stroke="white" strokeWidth="1"/>
+                            </svg>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

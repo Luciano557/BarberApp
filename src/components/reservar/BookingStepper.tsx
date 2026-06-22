@@ -23,6 +23,7 @@ export interface BookingState {
   servicioPrecio: number;
   barberoId: string | null;
   barberoNombre: string;
+  eligioBarbero: boolean;
   fecha: string;
   horaInicio: string;
   horaFin: string;
@@ -50,6 +51,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     servicioPrecio: 0,
     barberoId: null,
     barberoNombre: "",
+    eligioBarbero: false,
     fecha: "",
     horaInicio: "",
     horaFin: "",
@@ -119,7 +121,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       const updated = { ...b };
       if (fromStep <= 0) { updated.sucursalId = null; updated.sucursalNombre = ""; }
       if (fromStep <= 1) { updated.servicioId = null; updated.servicioNombre = ""; updated.servicioPrecio = 0; }
-      if (fromStep <= 2) { updated.barberoId = null; updated.barberoNombre = ""; }
+      if (fromStep <= 2) { updated.barberoId = null; updated.barberoNombre = ""; updated.eligioBarbero = false; }
       if (fromStep <= 3) { updated.fecha = ""; updated.horaInicio = ""; updated.horaFin = ""; }
       if (fromStep <= 4) { updated.cliente = null; }
       return updated;
@@ -238,7 +240,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           <BarberoStep
             barberos={orgData.barberos.filter((b) => b.sucursal_id === booking.sucursalId)}
             onSelect={(id, nombre) => {
-              setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible" }));
+              setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible", eligioBarbero: id !== null }));
               setStep(3);
             }}
           />

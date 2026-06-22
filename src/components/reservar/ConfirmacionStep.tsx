@@ -40,6 +40,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           cliente_telefono: cliente.telefono,
           cliente_email: cliente.email,
           cliente_fecha_nacimiento: cliente.birth_date,
+          eligio_barbero: booking.eligioBarbero,
         },
       });
 

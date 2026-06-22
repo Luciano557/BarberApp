@@ -256,6 +256,7 @@ export function NewAppointmentDialog({
         timezone: sucursalTimezone || 'America/Argentina/Buenos_Aires',
         estado: 'pendiente',
         notas: notas.trim().slice(0, 1500) || null,
+        eligio_barbero: true,
       });
       if (turnoErr) throw turnoErr;
 
