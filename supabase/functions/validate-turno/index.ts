@@ -53,7 +53,9 @@ Deno.serve(async (req) => {
       cliente_telefono,
       cliente_email,
       cliente_fecha_nacimiento,
+      eligio_barbero,
     } = body;
+    const eligioBarberoFinal = eligio_barbero ?? false;
 
     if (!organization_id || !sucursal_id || !barbero_id || !servicio_id || !fecha || !hora_inicio) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -360,6 +362,7 @@ Deno.serve(async (req) => {
         user_id: null,
         estado: "pendiente",
         timezone,
+        eligio_barbero: eligioBarberoFinal,
       })
       .select()
       .single();

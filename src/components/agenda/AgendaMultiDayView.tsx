@@ -184,7 +184,7 @@ export function AgendaMultiDayView({
                         key={t.id}
                         onClick={() => onTurnoClick(t)}
                         className={cn(
-                          'absolute rounded-md py-1 px-1.5 overflow-hidden bg-card select-none cursor-pointer hover:shadow-sm transition-all z-20 text-left',
+                          'absolute rounded-md py-1 px-1.5 overflow-hidden bg-card select-none cursor-pointer hover:shadow-sm transition duration-150 ease-out active:scale-[0.97] z-20 text-left',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{

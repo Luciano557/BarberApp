@@ -190,42 +190,48 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
 
       {/* Vista */}
       {view === 'day' && (
-        <AgendaDayView
-          date={date}
-          barbers={barbers}
-          turnos={turnos}
-          bloqueos={bloqueos}
-          servicios={servicios}
-          horarios={horarios}
-          onTurnoClick={setDetailTurno}
-          onSlotClick={handleSlotClick}
-          onMoveTurno={handleMoveTurno}
-          canDrag={canDrag}
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+          <AgendaDayView
+            date={date}
+            barbers={barbers}
+            turnos={turnos}
+            bloqueos={bloqueos}
+            servicios={servicios}
+            horarios={horarios}
+            onTurnoClick={setDetailTurno}
+            onSlotClick={handleSlotClick}
+            onMoveTurno={handleMoveTurno}
+            canDrag={canDrag}
+          />
+        </div>
       )}
       {view === '3days' && (
-        <AgendaMultiDayView
-          startDate={fromDate}
-          daysCount={3}
-          barbers={barbers}
-          turnos={turnos}
-          bloqueos={bloqueos}
-          servicios={servicios}
-          onTurnoClick={setDetailTurno}
-          onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+          <AgendaMultiDayView
+            startDate={fromDate}
+            daysCount={3}
+            barbers={barbers}
+            turnos={turnos}
+            bloqueos={bloqueos}
+            servicios={servicios}
+            onTurnoClick={setDetailTurno}
+            onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
+          />
+        </div>
       )}
       {view === 'week' && (
-        <AgendaMultiDayView
-          startDate={fromDate}
-          daysCount={7}
-          barbers={barbers}
-          turnos={turnos}
-          bloqueos={bloqueos}
-          servicios={servicios}
-          onTurnoClick={setDetailTurno}
-          onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+          <AgendaMultiDayView
+            startDate={fromDate}
+            daysCount={7}
+            barbers={barbers}
+            turnos={turnos}
+            bloqueos={bloqueos}
+            servicios={servicios}
+            onTurnoClick={setDetailTurno}
+            onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
+          />
+        </div>
       )}
 
       <NewAppointmentDialog

@@ -518,7 +518,7 @@ export function AgendaDayView({
                         key={t.id}
                         {...turnoHandlers}
                         className={cn(
-                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
+                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition duration-150 ease-out active:scale-[0.97] overflow-hidden bg-card select-none',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{
@@ -601,14 +601,16 @@ export function AgendaDayView({
       {/* Drag ghost */}
       {ghost && (
         <div
-          className="fixed z-[100] pointer-events-none rounded-md border bg-card px-2 py-1 text-xs shadow-md"
+          className="fixed z-[100] pointer-events-none"
           style={{
             left: 0,
             top: 0,
             transform: `translate(${ghost.x + 12}px, ${ghost.y + 12}px)`,
           }}
         >
-          <span className="font-medium text-foreground">{ghost.label}</span>
+          <div className="animate-in zoom-in-95 fade-in duration-[120ms] ease-out rounded-md border bg-card px-2 py-1 text-xs shadow-md">
+            <span className="font-medium text-foreground">{ghost.label}</span>
+          </div>
         </div>
       )}
     </div>
