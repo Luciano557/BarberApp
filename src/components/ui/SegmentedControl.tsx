@@ -14,11 +14,25 @@ interface SegmentedControlProps {
 }
 
 export function SegmentedControl({ options, value, onChange, className }: SegmentedControlProps) {
+  const activeIndex = options.findIndex((o) => o.value === value);
+
   return (
     <div
       role="tablist"
-      className={cn('inline-flex w-full rounded-md border border-border bg-muted/50 p-0.5', className)}
+      className={cn('relative inline-flex w-full rounded-md border border-border bg-muted/50 p-0.5', className)}
     >
+      {/* Pill deslizante */}
+      {activeIndex >= 0 && (
+        <div
+          aria-hidden
+          className="absolute top-0.5 bottom-0.5 rounded-[calc(var(--radius)-2px)] bg-primary shadow-sm transition-transform duration-200 ease-out"
+          style={{
+            width: `calc(${100 / options.length}% - 4px)`,
+            transform: `translateX(calc(${activeIndex} * 100%))`,
+          }}
+        />
+      )}
+
       {options.map((opt) => {
         const isActive = opt.value === value;
         return (
@@ -29,9 +43,9 @@ export function SegmentedControl({ options, value, onChange, className }: Segmen
             aria-selected={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-[calc(var(--radius)-2px)] px-3 py-1.5 text-xs font-medium transition-colors',
+              'relative z-10 flex flex-1 items-center justify-center gap-1.5 rounded-[calc(var(--radius)-2px)] px-3 py-1.5 text-xs font-medium transition-colors duration-150',
               isActive
-                ? 'bg-primary text-primary-foreground shadow-sm'
+                ? 'text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >

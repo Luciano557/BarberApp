@@ -518,7 +518,7 @@ export function AgendaDayView({
                         key={t.id}
                         {...turnoHandlers}
                         className={cn(
-                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition-all overflow-hidden bg-card select-none',
+                          'absolute z-20 hover:z-[25] rounded-md py-1 px-1.5 cursor-pointer hover:shadow-sm transition duration-150 ease-out active:scale-[0.97] overflow-hidden bg-card select-none',
                           isPending ? 'border border-dashed' : 'border',
                         )}
                         style={{
@@ -541,6 +541,31 @@ export function AgendaDayView({
                         {height >= 45 && (
                           <div className="text-[10px] text-muted-foreground truncate leading-tight">
                             {servicio?.nombre || 'Servicio'}
+                          </div>
+                        )}
+                        {t.eligio_barbero && (
+                          <div
+                            title="Eligió barbero específico"
+                            style={{
+                              position: 'absolute',
+                              top: 4,
+                              right: 4,
+                              width: 14,
+                              height: 14,
+                              borderRadius: '50%',
+                              backgroundColor: colors[t.barbero_id] ?? 'hsl(var(--primary))',
+                              boxShadow: '0 0 0 2px #fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              zIndex: 2,
+                            }}
+                          >
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                              <circle cx="4" cy="2.5" r="1.5" fill="white"/>
+                              <path d="M1 7c0-1.657 1.343-3 3-3s3 1.343 3 3" stroke="white" strokeWidth="1"/>
+                            </svg>
                           </div>
                         )}
                       </div>
@@ -576,14 +601,16 @@ export function AgendaDayView({
       {/* Drag ghost */}
       {ghost && (
         <div
-          className="fixed z-[100] pointer-events-none rounded-md border bg-card px-2 py-1 text-xs shadow-md"
+          className="fixed z-[100] pointer-events-none"
           style={{
             left: 0,
             top: 0,
             transform: `translate(${ghost.x + 12}px, ${ghost.y + 12}px)`,
           }}
         >
-          <span className="font-medium text-foreground">{ghost.label}</span>
+          <div className="animate-in zoom-in-95 fade-in duration-[120ms] ease-out rounded-md border bg-card px-2 py-1 text-xs shadow-md">
+            <span className="font-medium text-foreground">{ghost.label}</span>
+          </div>
         </div>
       )}
     </div>

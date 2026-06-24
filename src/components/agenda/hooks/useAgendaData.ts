@@ -15,6 +15,7 @@ export interface Turno {
   servicio_id: string;
   estado: string;
   notas: string | null;
+  eligio_barbero: boolean;
 }
 
 export interface Bloqueo {
@@ -66,7 +67,7 @@ export function useAgendaData(
     const [turnosRes, bloqueosRes, serviciosRes, horariosRes] = await Promise.all([
       supabase
         .from('turnos')
-        .select('id, fecha, hora_inicio, hora_fin, cliente_nombre, cliente_telefono, cliente_email, cliente_id, barbero_id, servicio_id, estado, notas')
+        .select('id, fecha, hora_inicio, hora_fin, cliente_nombre, cliente_telefono, cliente_email, cliente_id, barbero_id, servicio_id, estado, notas, eligio_barbero')
         .eq('sucursal_id', sucursalId)
         .gte('fecha', fromStr)
         .lte('fecha', toStr)
