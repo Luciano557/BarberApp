@@ -3230,6 +3230,7 @@ export type Database = {
           cliente_nombre: string | null
           cliente_telefono: string | null
           created_at: string
+          eligio_barbero: boolean
           estado: string
           fecha: string
           hora_fin: string
@@ -3253,6 +3254,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          eligio_barbero?: boolean
           estado?: string
           fecha: string
           hora_fin: string
@@ -3276,6 +3278,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          eligio_barbero?: boolean
           estado?: string
           fecha?: string
           hora_fin?: string
