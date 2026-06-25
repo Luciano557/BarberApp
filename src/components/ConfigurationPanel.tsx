@@ -21,7 +21,7 @@ const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
   pin: 'PIN de Seguridad',
   tareas: 'Tareas y Peticiones',
-  plan: 'Plan y Facturación',
+  plan: 'Plan y Suscripcion',
   payments: 'Métodos de pago y recargos',
   mercadopago: 'MercadoPago Point',
   notificaciones: 'Notificaciones',

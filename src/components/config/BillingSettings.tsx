@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscriptionAccess, type BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 import { getFunctionErrorMessage } from '@/lib/functionErrors';
+import { PLAN_BENEFITS, PLAN_SUMMARY } from '@/lib/planAccess';
 import { supabaseUntyped } from '@/lib/supabaseUntyped';
 import { cn } from '@/lib/utils';
 
@@ -358,15 +359,22 @@ export function BillingSettings() {
                   )}
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex gap-2">
-                      <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-status-success-foreground" />
-                      <span>Acceso mensual para todo el negocio</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-status-success-foreground" />
-                      <span>Preparado para limites por plan</span>
-                    </li>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {PLAN_SUMMARY[plan.code]}
+                  </p>
+
+                  <ul className="space-y-3 text-sm">
+                    {PLAN_BENEFITS[plan.code].map((benefit) => (
+                      <li key={benefit.title} className="flex gap-2.5">
+                        <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-status-success-foreground" />
+                        <span>
+                          <span className="block font-medium text-foreground">{benefit.title}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                            {benefit.description}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
                   </ul>
 
                   <Button

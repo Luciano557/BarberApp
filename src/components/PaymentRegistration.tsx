@@ -348,7 +348,7 @@ export function PaymentRegistration({
     }
 
     toast({
-      title: 'Plan y Facturacion',
+      title: 'Plan y Suscripcion',
       description: 'Abrilo desde Configuracion para cambiar el plan del negocio.',
     });
   }, [onNavigateToBilling, toast]);
