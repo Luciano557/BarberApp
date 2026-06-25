@@ -1698,11 +1698,13 @@ export type Database = {
           activo: boolean
           color: string | null
           created_at: string
+          descripcion: string | null
           eliminado: boolean
           eliminado_at: string | null
           eliminado_por: string | null
           id: string
           nombre: string
+          orden: number
           organization_id: string | null
           updated_at: string
         }
@@ -1710,11 +1712,13 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          descripcion?: string | null
           eliminado?: boolean
           eliminado_at?: string | null
           eliminado_por?: string | null
           id?: string
           nombre: string
+          orden?: number
           organization_id?: string | null
           updated_at?: string
         }
@@ -1722,11 +1726,13 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          descripcion?: string | null
           eliminado?: boolean
           eliminado_at?: string | null
           eliminado_por?: string | null
           id?: string
           nombre?: string
+          orden?: number
           organization_id?: string | null
           updated_at?: string
         }
@@ -2795,6 +2801,7 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
+          descripcion: string | null
           duracion_min: number
           eliminado: boolean
           eliminado_at: string | null
@@ -2810,6 +2817,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           created_at?: string
+          descripcion?: string | null
           duracion_min?: number
           eliminado?: boolean
           eliminado_at?: string | null
@@ -2825,6 +2833,7 @@ export type Database = {
         Update: {
           activo?: boolean
           created_at?: string
+          descripcion?: string | null
           duracion_min?: number
           eliminado?: boolean
           eliminado_at?: string | null
