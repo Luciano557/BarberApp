@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, ChevronRight, Lock, Menu, X } from 'lucide-react';
+import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, ChevronRight, Lock, Menu, X, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -9,6 +9,7 @@ import { usePinProtection } from '@/hooks/usePinProtection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SucursalSelector } from '@/components/SucursalSelector';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 
 interface AppSidebarProps {
   activeTab: string;
@@ -32,6 +33,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(isMobile);
   const { profile, roles, isOwner, isGeneralManager, isManager, isBarber, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, signOut } = useAuth();
   const { organization } = useOrganization();
+  const { access: subscriptionAccess } = useSubscriptionAccess();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
 
   useEffect(() => {
@@ -64,6 +66,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       : organization.plan === 'profesional'
         ? 'Profesional'
         : 'Básico';
+
+  const daysUntilBillingEnds = subscriptionAccess?.days_until_access_ends ?? null;
+  const showBillingNotice =
+    subscriptionAccess?.has_access === true &&
+    daysUntilBillingEnds !== null &&
+    daysUntilBillingEnds > 0 &&
+    daysUntilBillingEnds <= 3;
 
   const displayName = profile?.full_name || profile?.email || 'Usuario';
   const initials =
@@ -214,6 +223,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                       {planLabel}
                     </span>
                   )
+                )}
+                {showBillingNotice && (
+                  <span className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning-foreground">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {daysUntilBillingEnds === 1 ? 'Vence en 1 dia' : `Vence en ${daysUntilBillingEnds} dias`}
+                    </span>
+                  </span>
                 )}
               </div>
               {isMobile && (

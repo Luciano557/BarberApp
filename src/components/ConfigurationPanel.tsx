@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { ConfigMenu } from './config/ConfigMenu';
 import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
-import { OrganizationSettings } from './OrganizationSettings';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
 import { MercadoPagoConnect } from './config/MercadoPagoConnect';
 import { NotificationsConfig } from './config/NotificationsConfig';
 import { MiCuentaConfig } from './config/MiCuentaConfig';
+import { BillingSettings } from './config/BillingSettings';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'mercadopago' | 'notificaciones' | 'mi-cuenta';
@@ -17,7 +17,7 @@ const sectionTitles: Record<ConfigSection, string> = {
   menu: 'Configuración',
   pin: 'PIN de Seguridad',
   tareas: 'Tareas y Peticiones',
-  plan: 'Plan y Suscripción',
+  plan: 'Plan y Facturación',
   payments: 'Métodos de pago y recargos',
   mercadopago: 'MercadoPago Point',
   notificaciones: 'Notificaciones',
@@ -76,7 +76,7 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
       </div>
 
       {canManageConfig && activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}
-      {canManageConfig && activeSection === 'plan' && <OrganizationSettings />}
+      {canManageConfig && activeSection === 'plan' && <BillingSettings />}
       {canManageConfig && activeSection === 'payments' && <PaymentMethodsConfig sucursalId={null} />}
       {canManageConfig && activeSection === 'mercadopago' && <MercadoPagoConnect />}
       {canManageConfig && activeSection === 'pin' && <PinConfigSection />}
