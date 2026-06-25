@@ -325,8 +325,10 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
             setNewPrice('');
             setNewDuration('30');
             setNewLineId('');
+            setNewDescripcion('');
             setEditDuration('30');
             setEditLineId('');
+            setEditDescripcion('');
           }
         }}
         title={isAdding ? 'Agregar servicio' : 'Editar servicio'}
@@ -334,7 +336,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
         footer={
           isAdding ? (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" onClick={() => { setIsAdding(false); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); }}>Cancelar</Button>
+              <Button variant="ghost" onClick={() => { setIsAdding(false); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setNewDescripcion(''); }}>Cancelar</Button>
               <Button onClick={handleAdd}>Guardar</Button>
             </div>
           ) : editingService ? (
@@ -348,7 +350,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                   variant="ghost"
                   onClick={() => {
                     setToggleConfirm({ service: editingService, action: 'deactivate' });
-                    setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                    setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
                   }}
                   className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
@@ -361,7 +363,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     onClick={() => {
                       onUpdate(editingService.id, { active: true });
                       toast.success('Servicio activado');
-                      setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                      setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
                     }}
                     className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   >
@@ -372,7 +374,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                       variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingService);
-                        setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId('');
+                        setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
                       }}
                     >
                       Eliminar
@@ -402,6 +404,17 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                 <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
                 <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
               </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Descripción (opcional)</label>
+              <Textarea
+                maxLength={240}
+                value={newDescripcion}
+                onChange={(e) => setNewDescripcion(e.target.value)}
+                placeholder="Ej: Corte con detalles de terminación, shaver y experiencia completa."
+              />
+              <p className="text-xs text-muted-foreground text-right">{newDescripcion.length}/240</p>
+              <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Línea</label>
@@ -443,6 +456,18 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                 <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} disabled={structureLocked} />
                 <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
               </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Descripción (opcional)</label>
+              <Textarea
+                maxLength={240}
+                value={editDescripcion}
+                onChange={(e) => setEditDescripcion(e.target.value)}
+                disabled={structureLocked}
+                placeholder="Ej: Corte con detalles de terminación, shaver y experiencia completa."
+              />
+              <p className="text-xs text-muted-foreground text-right">{editDescripcion.length}/240</p>
+              <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Línea</label>
