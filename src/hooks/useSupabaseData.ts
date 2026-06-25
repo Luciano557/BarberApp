@@ -54,6 +54,8 @@ function dbToLine(row: any): Line {
     name: row.nombre,
     color: row.color || undefined,
     active: row.activo,
+    descripcion: row.descripcion ?? undefined,
+    orden: typeof row.orden === 'number' ? row.orden : undefined,
   };
 }
 
@@ -74,6 +76,7 @@ function dbToService(row: any, lines: Line[], branchRow?: ServicioSucursalRow): 
     lineName: line?.name,
     sucursalId: row.sucursal_id || undefined,
     active: operativeActive,
+    descripcion: row.descripcion ?? undefined,
     globalActive,
     branchActive,
     sucursalConfigId: branchRow?.id,
@@ -190,7 +193,7 @@ export function useSupabaseData() {
     try {
       const linesData = await runQuery<any[]>(
         'lineas',
-        supabase.from('lineas').select('*').eq('eliminado', false).order('nombre') as any
+        supabase.from('lineas').select('*').eq('eliminado', false).order('orden', { ascending: true }).order('nombre', { ascending: true }) as any
       );
       const fetchedLines = linesData.map(dbToLine);
       setLines(fetchedLines);
