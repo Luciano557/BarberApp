@@ -364,17 +364,22 @@ export function useSupabaseData() {
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
 
       // 1. Insert global SIN propagar precio. precio=0 placeholder, sucursal_id=null.
+      const insertPayload: any = {
+        nombre: normalizedName,
+        precio: 0,
+        duracion_min: service.durationMin || 30,
+        activo: true,
+        linea_id: service.lineId || null,
+        organization_id: organization.id,
+        sucursal_id: null,
+      };
+      if (service.descripcion !== undefined) {
+        const trimmed = (service.descripcion ?? '').trim();
+        insertPayload.descripcion = trimmed ? trimmed : null;
+      }
       const { data, error } = await supabase
         .from('servicios')
-        .insert({
-          nombre: normalizedName,
-          precio: 0,
-          duracion_min: service.durationMin || 30,
-          activo: true,
-          linea_id: service.lineId || null,
-          organization_id: organization.id,
-          sucursal_id: null,
-        })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;
@@ -437,11 +442,15 @@ export function useSupabaseData() {
 
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
-      // 1. Globales: nombre / duracion_min / linea_id (NUNCA precio ni activo si hay sucursal)
+      // 1. Globales: nombre / duracion_min / linea_id / descripcion (NUNCA precio ni activo si hay sucursal)
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
+      if (updates.descripcion !== undefined) {
+        const trimmed = (updates.descripcion ?? '').trim();
+        dbUpdates.descripcion = trimmed ? trimmed : null;
+      }
       // Sin sucursal: active toggle global directo
       if (!sucursalId && updates.active !== undefined) dbUpdates.activo = updates.active;
 
