@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscriptionAccess, type BillingPlanCode } from '@/hooks/useSubscriptionAccess';
+import { getFunctionErrorMessage } from '@/lib/functionErrors';
 import { supabaseUntyped } from '@/lib/supabaseUntyped';
 import { cn } from '@/lib/utils';
 
@@ -134,8 +135,9 @@ export function BillingSettings() {
       window.location.href = data.init_point;
     } catch (err) {
       console.error('[billing-settings] checkout error:', err);
+      const message = await getFunctionErrorMessage(err, 'Reintenta en unos segundos.');
       toast.error('No pudimos abrir Mercado Pago', {
-        description: 'Reintenta en unos segundos.',
+        description: message,
       });
     } finally {
       setBusyAction(null);
@@ -160,7 +162,10 @@ export function BillingSettings() {
       await refreshAccess();
     } catch (err) {
       console.error('[billing-settings] change plan error:', err);
-      toast.error('No pudimos cambiar el plan');
+      const message = await getFunctionErrorMessage(err, 'Reintenta en unos segundos.');
+      toast.error('No pudimos cambiar el plan', {
+        description: message,
+      });
     } finally {
       setBusyAction(null);
     }
@@ -178,7 +183,10 @@ export function BillingSettings() {
       await refreshAccess();
     } catch (err) {
       console.error('[billing-settings] cancel error:', err);
-      toast.error('No pudimos cancelar la suscripcion');
+      const message = await getFunctionErrorMessage(err, 'Reintenta en unos segundos.');
+      toast.error('No pudimos cancelar la suscripcion', {
+        description: message,
+      });
     } finally {
       setBusyAction(null);
     }
@@ -200,7 +208,10 @@ export function BillingSettings() {
       await refreshAccess();
     } catch (err) {
       console.error('[billing-settings] reactivate error:', err);
-      toast.error('No pudimos reactivar la suscripcion');
+      const message = await getFunctionErrorMessage(err, 'Reintenta en unos segundos.');
+      toast.error('No pudimos reactivar la suscripcion', {
+        description: message,
+      });
     } finally {
       setBusyAction(null);
     }

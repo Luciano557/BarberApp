@@ -64,20 +64,3 @@ Un viaje completo de la información sigue este ciclo:
 4. **Transporte:** Se dispara el Request contra el cliente Typescript de Supabase.
 5. **Validation y Persistencia:** Supabase valida el usuario (JWT), evalúa la condición de las sentencias RLS en la base de datos (Postgres), y escribe la nueva fila.
 6. **Retorno:** La promesa se resuelve en el frontend. El estado local o de caché subyacente se invalida re-poblando la data nueva, causando un re-render o mostrando un Toast de feedback en la pantalla.
-
----
-
-## 6. Puntos de Extensión Estratégicos
-¿Cómo incorporar a partir de aquí un **nuevo módulo de integración de pagos y facturación (AFIP / Stripe / MercadoPago, etc.)** sin romper patrones actuales?
-
-### Frontend
-- **Vista de Facturación:** Crear un nuevo directorio (ej. `src/components/facturacion/`), que incluya los formularios respectivos de control tributario / cajas y linkear el Entry Point correspondiente (`FacturacionPanel.tsx`) como nueva pestaña dentro del gestor general Index.tsx.
-- **Capa Repo:** Desarrollar un `src/hooks/usePagos.ts` aislado que contenga exclusivamente el registro y petición de generación del pago.
-
-### Backend y Seguridad Sensible (*Lo más crìtico*)
-- Generar recibos de pago interactuando con una pasarela fiscal externa requiere almacenar y pasar llaves secretas. **NUNCA** debes invocar librerías nativas transaccionales o Secret API Keys directo desde de tus llamadas de Supabase en React. 
-- Debes crear servicios *Serverless* aislando esta lógica en **Supabase Edge Functions** en la ruta `supabase/functions/pagos/` o `supabase/functions/facturacion-fiscal/`.  Allí ejecutarás el cobro y registrarás el movimiento fiscal en tu motor. 
-- En el frontend, el hook únicamente hará uso de `supabase.functions.invoke('pagos', body)` esperando el resultado de la confirmación del edge endpoint.
-- **Modelo de DB:** Agregar progresivamente el schema de migraciones SQL en migrations definiendo tablas requeridas (ej: `facturas`, `log_transacciones`, configuraciones de pasarela vinculadas vía FK al respectivo `organization_id`), recordando estipular sus políticas RLS con `CREATE POLICY`.
-
----
