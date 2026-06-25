@@ -171,6 +171,15 @@ Deno.serve(async (req) => {
       precio: r.precio,
       duracion_min: r.servicio.duracion_min,
       sucursal_id: r.sucursal_id,
+      descripcion: r.servicio.descripcion ?? null,
+      linea_id: r.servicio.linea_id ?? null,
+    }));
+    const lineas = (lineasRes?.data || []).map((l: any) => ({
+      id: l.id,
+      nombre: l.nombre,
+      descripcion: l.descripcion ?? null,
+      color: l.color ?? null,
+      orden: typeof l.orden === 'number' ? l.orden : 0,
     }));
     const sucursalesConServicios = new Set(rawRows.map((r: any) => r.sucursal_id));
     const sucursalesActivas = sucursalesRes.data || [];
