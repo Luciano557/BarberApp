@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -81,6 +82,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   const [newLineId, setNewLineId] = useState<string>('');
   const [editLineId, setEditLineId] = useState<string>('');
   const [editDuration, setEditDuration] = useState('30');
+  const [newDescripcion, setNewDescripcion] = useState('');
+  const [editDescripcion, setEditDescripcion] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
   const [newLineName, setNewLineName] = useState('');
