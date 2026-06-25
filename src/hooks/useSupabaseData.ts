@@ -507,6 +507,7 @@ export function useSupabaseData() {
           merged.lineId = updates.lineId || undefined;
           merged.lineName = updatedLine?.name;
         }
+        if (updates.descripcion !== undefined) merged.descripcion = (updates.descripcion ?? '').trim() || undefined;
         if (!sucursalId && updates.active !== undefined) {
           merged.active = updates.active;
           merged.globalActive = updates.active;
