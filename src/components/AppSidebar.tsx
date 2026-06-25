@@ -10,10 +10,24 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { SucursalSelector } from '@/components/SucursalSelector';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import {
+  getRequiredPlan,
+  planAllowsFeature,
+  PLAN_LABELS,
+  resolveEffectivePlan,
+  type PlanFeatureKey,
+} from '@/lib/planAccess';
 
 interface AppSidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+}
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: typeof CreditCard;
+  feature?: PlanFeatureKey;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -35,6 +49,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { organization } = useOrganization();
   const { access: subscriptionAccess } = useSubscriptionAccess();
   const { isUnlocked, requiresPin, lock, unlockedBy } = usePinProtection();
+  const effectivePlan = resolveEffectivePlan(subscriptionAccess, organization?.plan);
 
   useEffect(() => {
     if (isMobile) setCollapsed(true);
@@ -44,13 +59,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   // lo desliza fuera de pantalla. El riel compacto es exclusivo de desktop.
   const railMode = !isMobile && collapsed;
 
-  const navItems = [
+  const navItems: NavItem[] = [
     ...(canOperarCajaYGastos ? [{ id: 'registro', label: 'Cobrar', icon: CreditCard }] : []),
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
     ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Wallet }] : []),
-    ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList }] : []),
-    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock }] : []),
-    ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users }] : []),
+    ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList, feature: 'tasks' }] : []),
+    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock, feature: 'appointments' }] : []),
+    ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users, feature: 'clients' }] : []),
     ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Store }] : []),
     ...(canViewConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];
@@ -58,15 +73,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const principalItems = navItems.filter((i) => !MGMT_IDS.has(i.id));
   const gestionItems = navItems.filter((i) => MGMT_IDS.has(i.id));
 
-  const isPremium = organization?.plan === 'premium';
-  const planLabel = !organization
-    ? null
-    : organization.plan === 'premium'
-      ? 'Premium'
-      : organization.plan === 'profesional'
-        ? 'Profesional'
-        : 'Básico';
-
+  const isPremium = effectivePlan === 'premium';
+  const planLabel = organization ? PLAN_LABELS[effectivePlan] : null;
   const daysUntilBillingEnds = subscriptionAccess?.days_until_access_ends ?? null;
   const showBillingNotice =
     subscriptionAccess?.has_access === true &&
@@ -91,9 +99,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     if (isMobile) setCollapsed(true);
   };
 
-  const renderNavItem = (item: { id: string; label: string; icon: typeof CreditCard }, index: number) => {
+  const renderNavItem = (item: NavItem, index: number) => {
     const active = activeTab === item.id;
     const Icon = item.icon;
+    const isPlanLocked = item.feature ? !planAllowsFeature(effectivePlan, item.feature) : false;
+    const requiredPlan = item.feature ? getRequiredPlan(item.feature) : null;
+    const itemTitle = railMode
+      ? `${item.label}${isPlanLocked && requiredPlan ? `, requiere ${PLAN_LABELS[requiredPlan]}` : ''}`
+      : undefined;
     return (
       <li
         key={item.id}
@@ -104,7 +117,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           onClick={() => handleTabChange(item.id)}
           data-onboarding-id={item.id === 'mi-negocio' ? 'mi-negocio-nav' : undefined}
           aria-current={active ? 'page' : undefined}
-          title={railMode ? item.label : undefined}
+          title={itemTitle}
           className={cn(
             'group flex w-full items-center transition-colors duration-150',
             railMode
@@ -120,13 +133,23 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           {railMode ? (
             <span
               className={cn(
-                'grid h-10 w-10 shrink-0 place-items-center rounded-[10px] transition-colors',
+                'relative grid h-10 w-10 shrink-0 place-items-center rounded-[10px] transition-colors',
                 active
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
               )}
             >
               <Icon className="h-5 w-5" />
+              {isPlanLocked && (
+                <span
+                  className={cn(
+                    'absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full border border-background',
+                    active ? 'bg-primary-foreground text-primary' : 'bg-status-warning-bg text-status-warning-foreground',
+                  )}
+                >
+                  <Lock className="h-2.5 w-2.5" />
+                </span>
+              )}
             </span>
           ) : active ? (
             <>
@@ -134,11 +157,23 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 <Icon className="h-4 w-4" />
               </span>
               <span className="truncate">{item.label}</span>
+              {isPlanLocked && requiredPlan && (
+                <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] text-primary-foreground">
+                  <Lock className="h-3 w-3" />
+                  {PLAN_LABELS[requiredPlan]}
+                </span>
+              )}
             </>
           ) : (
             <>
               <Icon className="h-5 w-5 shrink-0" />
               <span className="truncate">{item.label}</span>
+              {isPlanLocked && requiredPlan && (
+                <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] text-status-warning-foreground">
+                  <Lock className="h-3 w-3" />
+                  {PLAN_LABELS[requiredPlan]}
+                </span>
+              )}
             </>
           )}
         </button>

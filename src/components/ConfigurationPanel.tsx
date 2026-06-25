@@ -10,6 +10,10 @@ import { NotificationsConfig } from './config/NotificationsConfig';
 import { MiCuentaConfig } from './config/MiCuentaConfig';
 import { BillingSettings } from './config/BillingSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { getRequiredPlan, planAllowsFeature, resolveEffectivePlan } from '@/lib/planAccess';
 
 type ConfigSection = 'menu' | 'pin' | 'tareas' | 'plan' | 'payments' | 'mercadopago' | 'notificaciones' | 'mi-cuenta';
 
@@ -31,6 +35,9 @@ interface ConfigurationPanelProps {
 
 export function ConfigurationPanel({ initialSection, onSectionChange }: ConfigurationPanelProps = {}) {
   const { canManageConfig, signOut } = useAuth();
+  const { organization } = useOrganization();
+  const { access: subscriptionAccess } = useSubscriptionAccess();
+  const effectivePlan = resolveEffectivePlan(subscriptionAccess, organization?.plan);
   // Roles no administrativos solo ven Mi cuenta — entran directo a esa sección.
   const initial: ConfigSection = !canManageConfig ? 'mi-cuenta' : (initialSection ?? 'menu');
   const [activeSection, setActiveSection] = useState<ConfigSection>(initial);
@@ -80,7 +87,20 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
       {canManageConfig && activeSection === 'payments' && <PaymentMethodsConfig sucursalId={null} />}
       {canManageConfig && activeSection === 'mercadopago' && <MercadoPagoConnect />}
       {canManageConfig && activeSection === 'pin' && <PinConfigSection />}
-      {canManageConfig && activeSection === 'tareas' && <TareasConfig />}
+      {canManageConfig && activeSection === 'tareas' && (
+        planAllowsFeature(effectivePlan, 'tasks') ? (
+          <TareasConfig />
+        ) : (
+          <PlanLockedFeature
+            title="Tareas esta disponible en Premium"
+            description="La configuracion de tareas y peticiones se habilita junto con el modulo de Tareas en el plan Premium."
+            requiredPlan={getRequiredPlan('tasks')}
+            currentPlan={effectivePlan}
+            onManagePlan={() => handleSelect('plan')}
+            variant="tasks"
+          />
+        )
+      )}
       {canManageConfig && activeSection === 'notificaciones' && <NotificationsConfig />}
       {activeSection === 'mi-cuenta' && <MiCuentaConfig />}
 

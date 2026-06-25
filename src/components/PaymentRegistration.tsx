@@ -17,6 +17,7 @@ import {
 import { Service, Extra, Barber, Discount, PaymentMethod, DiscountType, Line, getMethodLabel } from '@/types/barbershop';
 import { useTareas } from '@/hooks/useTareas';
 import { DailyTurnosViewer } from '@/components/DailyTurnosViewer';
+import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +28,7 @@ import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoP
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
+import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
 
@@ -39,6 +41,9 @@ interface PaymentRegistrationProps {
   sucursalId?: string | null;
   onNavigateToTareas?: () => void;
   onNavigateToTeamSetup?: () => void;
+  onNavigateToBilling?: () => void;
+  canViewDailyTurnos?: boolean;
+  currentPlan?: BillingPlanCode;
   onSubmit: (data: {
     barberId: string;
     barberName: string;
@@ -55,7 +60,7 @@ interface PaymentRegistrationProps {
     productos?: ProductoCartInput[];
     mpPaymentIntentId?: string | null;
     mpDeviceId?: string | null;
-  }) => Promise<any | null>;
+  }) => Promise<unknown | null>;
 }
 
 type Step = 'barber' | 'service' | 'extras' | 'discount' | 'payment';
@@ -70,7 +75,20 @@ const STEP_INFO = {
   payment: { title: 'Método de Pago', subtitle: 'Elegí cómo paga el cliente', icon: Wallet },
 };
 
-export function PaymentRegistration({ services, extras, barbers, discounts, lines = [], sucursalId, onSubmit, onNavigateToTareas, onNavigateToTeamSetup }: PaymentRegistrationProps) {
+export function PaymentRegistration({
+  services,
+  extras,
+  barbers,
+  discounts,
+  lines = [],
+  sucursalId,
+  onSubmit,
+  onNavigateToTareas,
+  onNavigateToTeamSetup,
+  onNavigateToBilling,
+  canViewDailyTurnos = true,
+  currentPlan = 'basico',
+}: PaymentRegistrationProps) {
   const { toast } = useToast();
   const { tareas } = useTareas();
   const { isOwner, isGeneralManager, isManager, isSucursalAccount } = useAuth();
@@ -322,6 +340,18 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       description: 'Abrí Mi Negocio y entrá en Equipo para añadir o activar miembros.',
     });
   }, [isSucursalAccount, onNavigateToTeamSetup, toast]);
+
+  const handleNavigateToBilling = useCallback(() => {
+    if (onNavigateToBilling) {
+      onNavigateToBilling();
+      return;
+    }
+
+    toast({
+      title: 'Plan y Facturacion',
+      description: 'Abrilo desde Configuracion para cambiar el plan del negocio.',
+    });
+  }, [onNavigateToBilling, toast]);
 
   const handleSelectService = useCallback((serviceId: string) => {
     if (!selectedBarber) {
@@ -1559,7 +1589,20 @@ export function PaymentRegistration({ services, extras, barbers, discounts, line
       )}
 
       {/* Daily Turnos Viewer — solo en el paso inicial */}
-      {currentStep === 'barber' && <DailyTurnosViewer />}
+      {currentStep === 'barber' && (
+        canViewDailyTurnos ? (
+          <DailyTurnosViewer />
+        ) : (
+          <PlanLockedFeature
+            title="Turnos requiere plan Profesional"
+            description="La agenda de turnos del dia se habilita desde el plan Profesional. Podes seguir registrando cobros con tu plan actual."
+            requiredPlan="profesional"
+            currentPlan={currentPlan}
+            onManagePlan={handleNavigateToBilling}
+            variant="agenda"
+          />
+        )
+      )}
 
       {sucursalId && (
         <ProductoPickerDialog
