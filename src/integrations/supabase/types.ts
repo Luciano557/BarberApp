@@ -4501,6 +4501,10 @@ export type Database = {
         }
         Returns: string
       }
+      reorder_lineas: {
+        Args: { p_ids: string[]; p_org_id: string }
+        Returns: undefined
+      }
       seed_payment_methods_for_org: {
         Args: { _org_id: string }
         Returns: undefined
