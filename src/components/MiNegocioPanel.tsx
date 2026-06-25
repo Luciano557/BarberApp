@@ -76,7 +76,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   const {
     allServices, allExtras, discounts, allLines,
     addService, updateService, addExtra, updateExtra,
-    addDiscount, updateDiscount, deleteDiscount, setDiscountActive, addLine, updateLine,
+    addDiscount, updateDiscount, deleteDiscount, setDiscountActive, addLine, updateLine, reorderLines,
     deleteService, deleteExtra, deleteLine,
     addServiceGlobal, updateServiceGlobal,
     addExtraGlobal, updateExtraGlobal,
@@ -461,6 +461,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
                   onToggleDiscountActive={setDiscountActiveGlobal}
                   onAddLine={addLine}
                   onUpdateLine={updateLine}
+                  onReorderLines={reorderLines}
                   onDeleteService={deleteService}
                   onDeleteExtra={deleteExtra}
                   onDeleteLine={deleteLine}

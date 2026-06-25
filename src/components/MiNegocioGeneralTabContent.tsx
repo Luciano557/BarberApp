@@ -33,6 +33,7 @@ interface MiNegocioGeneralTabContentProps {
   onToggleDiscountActive?: (id: string, activo: boolean) => void;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdateLine: (id: string, updates: Partial<Line>) => void;
+  onReorderLines?: (ids: string[]) => Promise<void>;
   onDeleteService: (id: string) => void;
   onDeleteExtra: (id: string) => void;
   onDeleteLine: (id: string) => void;
@@ -66,7 +67,7 @@ export function MiNegocioGeneralTabContent({
   onAddService, onUpdateService,
   onAddExtra, onUpdateExtra,
   onAddDiscount, onUpdateDiscount, onDeleteDiscount, onToggleDiscountActive,
-  onAddLine, onUpdateLine,
+  onAddLine, onUpdateLine, onReorderLines,
   onDeleteService, onDeleteExtra, onDeleteLine,
   organizationId, allBarbers, allSucursales,
   onAddBarberToSucursal, onUpdateBarber, onRefreshBarbers, onNavigateToMiNegocio,
@@ -201,6 +202,7 @@ export function MiNegocioGeneralTabContent({
                   onAdd={onAddLine}
                   onUpdate={guarded(onUpdateLine)}
                   onDelete={guarded(onDeleteLine)}
+                  onReorder={onReorderLines}
                 />
               </div>
             )}
