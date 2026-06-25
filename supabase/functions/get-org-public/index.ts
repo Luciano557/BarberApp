@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [sucursalesRes, bsRes, serviciosRes, portalRes] = await Promise.all([
+    const [sucursalesRes, bsRes, serviciosRes, portalRes, lineasRes] = await Promise.all([
       supabase
         .from("sucursales")
         .select("id, nombre")
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
         .eq("disponible", true),
       supabase
         .from("servicios_sucursales")
-        .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, eliminado)")
+        .select("sucursal_id, precio, activo, servicio:servicios!inner(id, nombre, duracion_min, descripcion, linea_id, eliminado)")
         .eq("organization_id", org.id)
         .eq("activo", true)
         .gt("precio", 0)
@@ -70,6 +70,14 @@ Deno.serve(async (req) => {
         .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
         .eq("organization_id", org.id)
         .maybeSingle(),
+      supabase
+        .from("lineas")
+        .select("id, nombre, descripcion, color, orden")
+        .eq("organization_id", org.id)
+        .eq("activo", true)
+        .or("eliminado.is.null,eliminado.eq.false")
+        .order("orden", { ascending: true })
+        .order("nombre", { ascending: true }),
     ]);
 
     const bsRows: { barbero_id: string; sucursal_id: string }[] = bsRes.data || [];
