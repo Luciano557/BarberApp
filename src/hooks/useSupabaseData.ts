@@ -1088,17 +1088,22 @@ export function useSupabaseData() {
     }
     try {
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
+      const insertPayload: any = {
+        nombre: normalizedName,
+        precio: 0,
+        duracion_min: service.durationMin || 30,
+        activo: service.active !== false,
+        linea_id: service.lineId || null,
+        organization_id: organization.id,
+        sucursal_id: null,
+      };
+      if (service.descripcion !== undefined) {
+        const trimmed = (service.descripcion ?? '').trim();
+        insertPayload.descripcion = trimmed ? trimmed : null;
+      }
       const { data, error } = await supabase
         .from('servicios')
-        .insert({
-          nombre: normalizedName,
-          precio: 0,
-          duracion_min: service.durationMin || 30,
-          activo: service.active !== false,
-          linea_id: service.lineId || null,
-          organization_id: organization.id,
-          sucursal_id: null,
-        })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;
@@ -1120,6 +1125,10 @@ export function useSupabaseData() {
       if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.descripcion !== undefined) {
+        const trimmed = (updates.descripcion ?? '').trim();
+        dbUpdates.descripcion = trimmed ? trimmed : null;
+      }
 
       if (Object.keys(dbUpdates).length === 0) return;
 
@@ -1136,6 +1145,7 @@ export function useSupabaseData() {
           merged.lineId = updates.lineId || undefined;
           merged.lineName = updatedLine?.name;
         }
+        if (updates.descripcion !== undefined) merged.descripcion = (updates.descripcion ?? '').trim() || undefined;
         if (updates.active !== undefined) {
           merged.globalActive = updates.active;
           const branchActive = merged.branchActive;
