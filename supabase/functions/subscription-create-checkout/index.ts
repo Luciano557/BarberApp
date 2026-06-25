@@ -35,6 +35,15 @@ interface CreatePreapprovalPayload {
   notification_url?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function hasPaidAccess(currentPeriodEnd: string | null | undefined): boolean {
+  if (!currentPeriodEnd) return true;
+  return new Date(currentPeriodEnd).getTime() > Date.now();
+}
+
 async function createMercadoPagoPreapproval(payload: CreatePreapprovalPayload) {
   let mpRes = await mpPlatformFetch('/preapproval', {
     method: 'POST',
@@ -105,7 +114,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const { data: existingSubscription } = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, status, current_plan_code, pending_plan_code, mercadopago_status, mercadopago_init_point, mercadopago_preapproval_id')
+      .select('id, status, current_plan_code, effective_plan_code, pending_plan_code, current_period_start, current_period_end, mercadopago_status, mercadopago_init_point, mercadopago_preapproval_id, mercadopago_external_reference, metadata')
       .eq('organization_id', context.organizationId)
       .maybeSingle();
 
@@ -171,20 +180,42 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'Mercado Pago no devolvio un checkout valido' }, 502);
     }
 
-    const subscriptionPatch = {
+    const existingMetadata = isRecord(existingSubscription?.metadata)
+      ? existingSubscription.metadata
+      : {};
+    const shouldPreserveCurrentProviderReference =
+      existingSubscription?.status === 'active' &&
+      Boolean(existingSubscription.current_plan_code) &&
+      Boolean(existingSubscription.mercadopago_preapproval_id) &&
+      hasPaidAccess(existingSubscription.current_period_end);
+
+    const metadata: Record<string, unknown> = {
+      ...existingMetadata,
+      checkout_requested_at: new Date().toISOString(),
+      checkout_requested_by: context.userId,
+      pending_mercadopago_preapproval_id: preapprovalId,
+      pending_mercadopago_external_reference: externalReference,
+    };
+
+    if (shouldPreserveCurrentProviderReference) {
+      metadata.previous_mercadopago_preapproval_id = existingSubscription?.mercadopago_preapproval_id ?? null;
+      metadata.previous_mercadopago_external_reference = existingSubscription?.mercadopago_external_reference ?? null;
+    }
+
+    const subscriptionPatch: Record<string, unknown> = {
       organization_id: context.organizationId,
       provider: 'mercadopago',
       pending_plan_code: plan.code,
-      mercadopago_preapproval_id: preapprovalId,
-      mercadopago_status: mpStatus,
       mercadopago_init_point: initPoint,
-      mercadopago_external_reference: externalReference,
       payer_email: context.userEmail,
-      metadata: {
-        checkout_requested_at: new Date().toISOString(),
-        checkout_requested_by: context.userId,
-      },
+      metadata,
     };
+
+    if (!shouldPreserveCurrentProviderReference) {
+      subscriptionPatch.mercadopago_preapproval_id = preapprovalId;
+      subscriptionPatch.mercadopago_status = mpStatus;
+      subscriptionPatch.mercadopago_external_reference = externalReference;
+    }
 
     const { data: savedSubscription, error: saveError } = await supabaseAdmin
       .from('organization_subscriptions')
@@ -197,12 +228,18 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'No se pudo guardar la suscripcion local' }, 500);
     }
 
+    const changeType = existingSubscription?.current_plan_code
+      ? existingSubscription.current_plan_code === plan.code
+        ? 'renewal'
+        : 'upgrade'
+      : 'initial_selection';
+
     await supabaseAdmin.from('subscription_plan_changes').insert({
       organization_id: context.organizationId,
       subscription_id: savedSubscription?.id ?? existingSubscription?.id ?? null,
       from_plan_code: savedSubscription?.current_plan_code ?? null,
       to_plan_code: plan.code,
-      change_type: savedSubscription?.current_plan_code ? 'renewal' : 'initial_selection',
+      change_type: changeType,
       requested_by: context.userId,
       effective_at: null,
       period_start: savedSubscription?.current_period_start ?? null,
@@ -211,6 +248,9 @@ serve(async (req: Request): Promise<Response> => {
       metadata: {
         mercadopago_preapproval_id: preapprovalId,
         mercadopago_external_reference: externalReference,
+        previous_mercadopago_preapproval_id: shouldPreserveCurrentProviderReference
+          ? existingSubscription?.mercadopago_preapproval_id ?? null
+          : null,
       },
     });
 
