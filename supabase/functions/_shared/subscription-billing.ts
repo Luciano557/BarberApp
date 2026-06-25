@@ -34,6 +34,7 @@ export function isBillingPlanCode(value: unknown): value is BillingPlanCode {
 export function appOrigin(req: Request): string {
   return (
     Deno.env.get('APP_ORIGIN') ||
+    Deno.env.get('MERCADOPAGO_APP_ORIGIN') ||
     req.headers.get('origin') ||
     'http://localhost:5173'
   ).replace(/\/$/, '');

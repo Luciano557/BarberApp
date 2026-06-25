@@ -222,6 +222,10 @@ serve(async (req: Request): Promise<Response> => {
     });
   } catch (err) {
     console.error('[subscription-create-checkout] error:', err);
-    return jsonResponse({ error: 'Error interno' }, 500);
+    const message = err instanceof Error && err.message.includes('MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN')
+      ? 'Falta configurar el Access Token de Mercado Pago para suscripciones.'
+      : 'Error interno';
+
+    return jsonResponse({ error: message }, 500);
   }
 });

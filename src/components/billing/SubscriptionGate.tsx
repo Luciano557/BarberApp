@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { BillingPlanCode, SubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { getFunctionErrorMessage } from '@/lib/functionErrors';
 import { supabaseUntyped } from '@/lib/supabaseUntyped';
 import { cn } from '@/lib/utils';
 
@@ -132,8 +133,9 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
       window.location.href = data.init_point;
     } catch (err) {
       console.error('[subscription-gate] checkout error:', err);
+      const message = await getFunctionErrorMessage(err, 'Reintenta en unos segundos.');
       toast.error('No pudimos abrir Mercado Pago', {
-        description: 'Reintenta en unos segundos.',
+        description: message,
       });
     } finally {
       setCheckoutPlan(null);

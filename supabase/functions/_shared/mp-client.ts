@@ -29,11 +29,13 @@ interface SupabaseAdminLike {
  * This is different from the per-organization OAuth token used for Point.
  */
 export function getPlatformAccessToken(): string | null {
-  return (
+  const token = (
     Deno.env.get('MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN') ||
     Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ||
     Deno.env.get('MP_ACCESS_TOKEN')
   );
+
+  return token?.trim() || null;
 }
 
 /**
@@ -130,7 +132,7 @@ export async function mpPlatformFetch(
   const accessToken = getPlatformAccessToken();
 
   if (!accessToken) {
-    throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
+    throw new Error('MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN is not configured');
   }
 
   return mpFetch(path, accessToken, options);
