@@ -1349,6 +1349,7 @@ export function useSupabaseData() {
     setDiscountActive,
     addLine,
     updateLine,
+    reorderLines,
     deleteService,
     deleteExtra,
     deleteLine,
