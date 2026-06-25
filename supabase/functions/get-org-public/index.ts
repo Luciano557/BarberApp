@@ -197,6 +197,7 @@ Deno.serve(async (req) => {
       sucursales,
       barberos,
       servicios,
+      lineas,
       portal,
     };
 
