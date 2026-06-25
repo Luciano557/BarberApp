@@ -7,13 +7,41 @@
 
 export const MP_BASE = 'https://api.mercadopago.com';
 
+interface MpConnectionRow {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+}
+
+interface SupabaseQueryLike extends PromiseLike<unknown> {
+  select(columns: string): SupabaseQueryLike;
+  update(values: Record<string, unknown>): SupabaseQueryLike;
+  eq(column: string, value: unknown): SupabaseQueryLike;
+  maybeSingle(): Promise<{ data: MpConnectionRow | null }>;
+}
+
+interface SupabaseAdminLike {
+  from(table: string): SupabaseQueryLike;
+}
+
+/**
+ * Access token for Vittro's own Mercado Pago seller account.
+ * This is different from the per-organization OAuth token used for Point.
+ */
+export function getPlatformAccessToken(): string | null {
+  return (
+    Deno.env.get('MERCADOPAGO_SUBSCRIPTIONS_ACCESS_TOKEN') ||
+    Deno.env.get('MERCADOPAGO_ACCESS_TOKEN') ||
+    Deno.env.get('MP_ACCESS_TOKEN')
+  );
+}
+
 /**
  * Retrieves a valid (refreshed if necessary) access token for the given org.
  * Returns null if the org has no MP connection.
  */
 export async function getAccessToken(
-  // deno-lint-ignore no-explicit-any
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseAdminLike,
   orgId: string,
 ): Promise<string | null> {
   const { data: conn } = await supabaseAdmin
@@ -92,6 +120,20 @@ export async function mpFetch(
     ...options,
     headers,
   });
+}
+
+/** Authenticated fetch using Vittro's own Mercado Pago account. */
+export async function mpPlatformFetch(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const accessToken = getPlatformAccessToken();
+
+  if (!accessToken) {
+    throw new Error('MERCADOPAGO_ACCESS_TOKEN is not configured');
+  }
+
+  return mpFetch(path, accessToken, options);
 }
 
 export interface MpApiError {

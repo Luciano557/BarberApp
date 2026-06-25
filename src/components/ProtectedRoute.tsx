@@ -4,6 +4,8 @@ import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { LoadingScreen, RecoverableErrorScreen } from './LoadingScreen';
+import { SubscriptionGate } from './billing/SubscriptionGate';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,6 +15,12 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { user, roles, isLoading, authError, mustChangePassword, signOut, refreshProfile } = useAuth();
   const { organization, isLoading: orgLoading, error: orgError, refreshOrganization } = useOrganization();
+  const {
+    access: subscriptionAccess,
+    isLoading: subscriptionLoading,
+    error: subscriptionError,
+    refreshAccess,
+  } = useSubscriptionAccess();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
 
@@ -32,11 +40,14 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   }
 
   // 1b. Mientras realmente se está inicializando, mostrar loader con fallback progresivo.
-  if (isLoading || orgLoading) {
+  if (isLoading || orgLoading || subscriptionLoading) {
     return (
       <LoadingScreen
         message="Verificando sesión..."
-        onRetry={() => refreshOrganization()}
+        onRetry={() => {
+          void refreshOrganization();
+          void refreshAccess();
+        }}
       />
     );
   }
@@ -76,6 +87,24 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   // 6. Validar slug en URL.
   if (orgSlug && organization && orgSlug !== organization.slug) {
     return <Navigate to={`/app/${organization.slug}`} replace />;
+  }
+
+  if (organization && subscriptionError) {
+    return (
+      <RecoverableErrorScreen
+        title="No pudimos verificar tu suscripciÃ³n"
+        description={subscriptionError}
+        onRetry={() => refreshAccess()}
+        onSignOut={async () => {
+          await signOut();
+          window.location.href = '/login';
+        }}
+      />
+    );
+  }
+
+  if (organization && subscriptionAccess && !subscriptionAccess.has_access) {
+    return <SubscriptionGate access={subscriptionAccess} onRetry={refreshAccess} />;
   }
 
   if (requiredRoles && requiredRoles.length > 0) {

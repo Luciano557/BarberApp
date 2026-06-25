@@ -24,8 +24,8 @@ export function ConfigMenu({ onSelect }: ConfigMenuProps) {
     {
       id: 'plan',
       icon: <Crown className="h-5 w-5" />,
-      title: 'Plan y Suscripción',
-      description: 'Ver plan actual, límites e información del negocio',
+      title: 'Plan y Facturación',
+      description: 'Suscripción, renovación y pagos del negocio',
     },
     {
       id: 'payments',

@@ -31,3 +31,18 @@ verify_jwt = false
 
 [functions.lookup-cliente-by-phone]
 verify_jwt = false
+
+[functions.subscription-create-checkout]
+verify_jwt = true
+
+[functions.subscription-change-plan]
+verify_jwt = true
+
+[functions.subscription-cancel]
+verify_jwt = true
+
+[functions.subscription-reactivate]
+verify_jwt = true
+
+[functions.subscription-mp-webhook]
+verify_jwt = false

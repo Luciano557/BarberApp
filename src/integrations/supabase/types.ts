@@ -1770,6 +1770,70 @@ export type Database = {
         }
         Relationships: []
       }
+      mercadopago_subscription_events: {
+        Row: {
+          action: string | null
+          created_at: string
+          data_id: string | null
+          id: string
+          organization_id: string | null
+          payload: Json
+          payment_id: string | null
+          processed_at: string | null
+          provider_event_id: string | null
+          subscription_id: string | null
+          topic: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string
+          data_id?: string | null
+          id?: string
+          organization_id?: string | null
+          payload?: Json
+          payment_id?: string | null
+          processed_at?: string | null
+          provider_event_id?: string | null
+          subscription_id?: string | null
+          topic?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string
+          data_id?: string | null
+          id?: string
+          organization_id?: string | null
+          payload?: Json
+          payment_id?: string | null
+          processed_at?: string | null
+          provider_event_id?: string | null
+          subscription_id?: string | null
+          topic?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mercadopago_subscription_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_subscription_events_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mercadopago_subscription_events_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimientos_stock: {
         Row: {
           cantidad: number
@@ -2116,6 +2180,123 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      organization_subscriptions: {
+        Row: {
+          billing_plan_code: string | null
+          cancel_at_period_end: boolean
+          cancelled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          current_plan_code: string | null
+          effective_plan_code: string
+          id: string
+          last_payment_at: string | null
+          mercadopago_external_reference: string | null
+          mercadopago_init_point: string | null
+          mercadopago_preapproval_id: string | null
+          mercadopago_status: string | null
+          metadata: Json
+          next_payment_date: string | null
+          organization_id: string
+          payer_email: string | null
+          pending_plan_code: string | null
+          provider: string
+          status: string
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          billing_plan_code?: string | null
+          cancel_at_period_end?: boolean
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          current_plan_code?: string | null
+          effective_plan_code?: string
+          id?: string
+          last_payment_at?: string | null
+          mercadopago_external_reference?: string | null
+          mercadopago_init_point?: string | null
+          mercadopago_preapproval_id?: string | null
+          mercadopago_status?: string | null
+          metadata?: Json
+          next_payment_date?: string | null
+          organization_id: string
+          payer_email?: string | null
+          pending_plan_code?: string | null
+          provider?: string
+          status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          billing_plan_code?: string | null
+          cancel_at_period_end?: boolean
+          cancelled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          current_plan_code?: string | null
+          effective_plan_code?: string
+          id?: string
+          last_payment_at?: string | null
+          mercadopago_external_reference?: string | null
+          mercadopago_init_point?: string | null
+          mercadopago_preapproval_id?: string | null
+          mercadopago_status?: string | null
+          metadata?: Json
+          next_payment_date?: string | null
+          organization_id?: string
+          payer_email?: string | null
+          pending_plan_code?: string | null
+          provider?: string
+          status?: string
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_billing_plan_code_fkey"
+            columns: ["billing_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_current_plan_code_fkey"
+            columns: ["current_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_effective_plan_code_fkey"
+            columns: ["effective_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_pending_plan_code_fkey"
+            columns: ["pending_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       organizations: {
         Row: {
@@ -2727,6 +2908,217 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_payments: {
+        Row: {
+          amount_ars: number
+          billing_plan_code: string | null
+          created_at: string
+          currency_id: string
+          due_at: string | null
+          id: string
+          mercadopago_authorized_payment_id: string | null
+          mercadopago_payment_id: string | null
+          mercadopago_preapproval_id: string | null
+          organization_id: string
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          plan_code: string | null
+          provider: string
+          raw_payload: Json
+          status: string
+          subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_ars: number
+          billing_plan_code?: string | null
+          created_at?: string
+          currency_id?: string
+          due_at?: string | null
+          id?: string
+          mercadopago_authorized_payment_id?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_preapproval_id?: string | null
+          organization_id: string
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          plan_code?: string | null
+          provider?: string
+          raw_payload?: Json
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_ars?: number
+          billing_plan_code?: string | null
+          created_at?: string
+          currency_id?: string
+          due_at?: string | null
+          id?: string
+          mercadopago_authorized_payment_id?: string | null
+          mercadopago_payment_id?: string | null
+          mercadopago_preapproval_id?: string | null
+          organization_id?: string
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          plan_code?: string | null
+          provider?: string
+          raw_payload?: Json
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_payments_billing_plan_code_fkey"
+            columns: ["billing_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "subscription_payments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_payments_plan_code_fkey"
+            columns: ["plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "subscription_payments_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plan_changes: {
+        Row: {
+          amount_ars: number | null
+          change_type: string
+          effective_at: string | null
+          from_plan_code: string | null
+          id: string
+          metadata: Json
+          organization_id: string
+          period_end: string | null
+          period_start: string | null
+          requested_at: string
+          requested_by: string | null
+          subscription_id: string | null
+          to_plan_code: string | null
+        }
+        Insert: {
+          amount_ars?: number | null
+          change_type: string
+          effective_at?: string | null
+          from_plan_code?: string | null
+          id?: string
+          metadata?: Json
+          organization_id: string
+          period_end?: string | null
+          period_start?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          subscription_id?: string | null
+          to_plan_code?: string | null
+        }
+        Update: {
+          amount_ars?: number | null
+          change_type?: string
+          effective_at?: string | null
+          from_plan_code?: string | null
+          id?: string
+          metadata?: Json
+          organization_id?: string
+          period_end?: string | null
+          period_start?: string | null
+          requested_at?: string
+          requested_by?: string | null
+          subscription_id?: string | null
+          to_plan_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_plan_changes_from_plan_code_fkey"
+            columns: ["from_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "subscription_plan_changes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_plan_changes_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_plan_changes_to_plan_code_fkey"
+            columns: ["to_plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          amount_ars: number
+          billing_period: string
+          code: string
+          created_at: string
+          description: string | null
+          is_active: boolean
+          metadata: Json
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          amount_ars: number
+          billing_period?: string
+          code: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name: string
+          sort_order: number
+          updated_at?: string
+        }
+        Update: {
+          amount_ars?: number
+          billing_period?: string
+          code?: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          metadata?: Json
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       sucursal_accounts: {
         Row: {
@@ -4010,6 +4402,10 @@ export type Database = {
       }
       current_user_has_pin: { Args: never; Returns: boolean }
       delete_mp_connection: { Args: { _org_id: string }; Returns: undefined }
+      ensure_organization_subscription: {
+        Args: { _org_id: string }
+        Returns: string
+      }
       get_mp_connection_status: {
         Args: { _org_id: string }
         Returns: {
@@ -4017,6 +4413,34 @@ export type Database = {
           is_connected: boolean
           mp_user_id: string
         }[]
+      }
+      get_organization_owner_id: { Args: { _org_id: string }; Returns: string }
+      get_organization_subscription_access: {
+        Args: { _org_id: string }
+        Returns: {
+          access_ends_at: string
+          block_reason: string
+          cancel_at_period_end: boolean
+          current_period_end: string
+          current_plan_code: string
+          days_until_access_ends: number
+          effective_plan_code: string
+          has_access: boolean
+          organization_id: string
+          pending_plan_code: string
+          status: string
+          subscription_id: string
+          trial_ends_at: string
+          trial_started_at: string
+        }[]
+      }
+      get_organization_trial_ends_at: {
+        Args: { _org_id: string }
+        Returns: string
+      }
+      get_organization_trial_started_at: {
+        Args: { _org_id: string }
+        Returns: string
       }
       get_user_barbero_id: { Args: { _user_id: string }; Returns: string }
       get_user_barbero_name: { Args: { _user_id: string }; Returns: string }
