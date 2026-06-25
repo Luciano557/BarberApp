@@ -76,6 +76,25 @@ function payloadDataId(payload: Record<string, unknown>, req: Request): string |
   return String(queryId ?? nestedId ?? directId ?? '') || null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function parseSubscriptionExternalReference(value: string | null | undefined): {
+  organizationId: string;
+  planCode: string;
+} | null {
+  if (!value) return null;
+
+  const match = value.match(/^sub_([0-9a-fA-F-]{36})_(basico|profesional|premium)_/);
+  if (!match) return null;
+
+  return {
+    organizationId: match[1],
+    planCode: match[2],
+  };
+}
+
 function eventTopic(payload: Record<string, unknown>): string {
   return String(payload.type ?? payload.topic ?? payload.action ?? 'unknown');
 }
@@ -148,12 +167,22 @@ async function syncPreapproval(
 
   const preapproval = await mpRes.json();
   const externalReference = preapproval.external_reference as string | undefined;
+  const parsedExternalReference = parseSubscriptionExternalReference(externalReference);
 
-  const { data: subscription } = await supabaseAdmin
+  let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
     .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, current_period_start, current_period_end')
     .or(`mercadopago_preapproval_id.eq.${preapprovalId},mercadopago_external_reference.eq.${externalReference ?? '__missing__'}`)
     .maybeSingle();
+
+  if (!subscription && parsedExternalReference) {
+    const fallback = await supabaseAdmin
+      .from('organization_subscriptions')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, current_period_start, current_period_end')
+      .eq('organization_id', parsedExternalReference.organizationId)
+      .maybeSingle();
+    subscription = fallback.data;
+  }
 
   if (!subscription) {
     console.warn('[subscription-mp-webhook] subscription not found for preapproval:', preapprovalId);
@@ -179,20 +208,22 @@ async function syncPreapproval(
     subscription.current_plan_code ??
     subscription.effective_plan_code ??
     'basico';
+  const shouldHoldPendingPlanUntilPayment = nextStatus === 'active' && Boolean(subscription.pending_plan_code);
+  const shouldApplyPlanFromPreapproval = nextStatus === 'active' && !shouldHoldPendingPlanUntilPayment;
   const subscriptionUpdate: Record<string, unknown> = {
-    status: nextStatus,
-    current_plan_code: nextStatus === 'active' ? nextPlan : subscription.current_plan_code,
-    effective_plan_code: nextStatus === 'active' ? nextPlan : subscription.effective_plan_code,
-    pending_plan_code: nextStatus === 'active' ? null : subscription.pending_plan_code,
+    status: shouldHoldPendingPlanUntilPayment ? subscription.status : nextStatus,
+    current_plan_code: shouldApplyPlanFromPreapproval ? nextPlan : subscription.current_plan_code,
+    effective_plan_code: shouldApplyPlanFromPreapproval ? nextPlan : subscription.effective_plan_code,
+    pending_plan_code: shouldApplyPlanFromPreapproval ? null : subscription.pending_plan_code,
     mercadopago_status: preapproval.status ?? null,
     mercadopago_init_point: preapproval.init_point ?? preapproval.sandbox_init_point ?? null,
     mercadopago_external_reference: externalReference ?? null,
     next_payment_date: nextPaymentDate?.toISOString() ?? null,
-    current_period_start: nextStatus === 'active' ? periodStart.toISOString() : subscription.current_period_start,
-    current_period_end: nextStatus === 'active' ? periodEnd?.toISOString() ?? null : subscription.current_period_end,
+    current_period_start: shouldApplyPlanFromPreapproval ? periodStart.toISOString() : subscription.current_period_start,
+    current_period_end: shouldApplyPlanFromPreapproval ? periodEnd?.toISOString() ?? null : subscription.current_period_end,
   };
 
-  if (nextStatus === 'active') {
+  if (shouldApplyPlanFromPreapproval) {
     subscriptionUpdate.billing_plan_code = nextPlan;
   }
 
@@ -236,11 +267,37 @@ async function syncAuthorizedPayment(
     return;
   }
 
-  const { data: subscription } = await supabaseAdmin
+  let externalReference =
+    typeof authorizedPayment.external_reference === 'string'
+      ? authorizedPayment.external_reference
+      : null;
+
+  if (!externalReference) {
+    const preapprovalRes = await mpPlatformFetch(`/preapproval/${preapprovalId}`);
+    if (preapprovalRes.ok) {
+      const preapproval = await preapprovalRes.json();
+      externalReference = typeof preapproval.external_reference === 'string'
+        ? preapproval.external_reference
+        : null;
+    }
+  }
+
+  const parsedExternalReference = parseSubscriptionExternalReference(externalReference);
+
+  let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('id, organization_id, current_plan_code, effective_plan_code, billing_plan_code, current_period_start, current_period_end')
+    .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, current_period_start, current_period_end, metadata')
     .eq('mercadopago_preapproval_id', String(preapprovalId))
     .maybeSingle();
+
+  if (!subscription && parsedExternalReference) {
+    const fallback = await supabaseAdmin
+      .from('organization_subscriptions')
+      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, current_period_start, current_period_end, metadata')
+      .eq('organization_id', parsedExternalReference.organizationId)
+      .maybeSingle();
+    subscription = fallback.data;
+  }
 
   if (!subscription) {
     console.warn('[subscription-mp-webhook] subscription not found for authorized payment:', authorizedPaymentId);
@@ -263,9 +320,11 @@ async function syncAuthorizedPayment(
     ).toISOString()
     : null;
   const planCode =
+    subscription.pending_plan_code ??
+    parsedExternalReference?.planCode ??
     subscription.billing_plan_code ??
-    subscription.effective_plan_code ??
     subscription.current_plan_code ??
+    subscription.effective_plan_code ??
     'basico';
 
   const { data: payment } = await supabaseAdmin
@@ -298,6 +357,11 @@ async function syncAuthorizedPayment(
     const periodStart = paidAt ? new Date(paidAt) : new Date();
     const periodEnd = nextPaymentDate ?? addMonths(periodStart, 1);
 
+    const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+    const previousPreapprovalId = typeof metadata.previous_mercadopago_preapproval_id === 'string'
+      ? metadata.previous_mercadopago_preapproval_id
+      : null;
+
     await supabaseAdmin
       .from('organization_subscriptions')
       .update({
@@ -306,17 +370,48 @@ async function syncAuthorizedPayment(
         effective_plan_code: planCode,
         billing_plan_code: planCode,
         pending_plan_code: null,
+        mercadopago_preapproval_id: String(preapprovalId),
+        mercadopago_external_reference: externalReference,
         current_period_start: periodStart.toISOString(),
         current_period_end: periodEnd.toISOString(),
         last_payment_at: paidAt,
+        metadata: {
+          ...metadata,
+          last_confirmed_mercadopago_preapproval_id: String(preapprovalId),
+          last_confirmed_mercadopago_external_reference: externalReference,
+          last_confirmed_plan_code: planCode,
+          last_confirmed_payment_at: paidAt,
+        },
       })
       .eq('id', subscription.id);
+
+    if (previousPreapprovalId && previousPreapprovalId !== String(preapprovalId)) {
+      const cancelPreviousRes = await mpPlatformFetch(`/preapproval/${previousPreapprovalId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+
+      if (!cancelPreviousRes.ok) {
+        const mpError = await readMpError(cancelPreviousRes);
+        console.warn('[subscription-mp-webhook] previous preapproval cancel failed:', cancelPreviousRes.status, mpError.payload);
+      }
+    }
   } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
+    const hasCurrentPaidAccess = Boolean(subscription.current_plan_code) && (
+      !subscription.current_period_end ||
+      new Date(subscription.current_period_end).getTime() > Date.now()
+    );
+
     await supabaseAdmin
       .from('organization_subscriptions')
-      .update({
-        status: 'past_due',
-      })
+      .update(hasCurrentPaidAccess
+        ? {
+            status: subscription.status === 'active' ? 'active' : subscription.status,
+            pending_plan_code: null,
+          }
+        : {
+            status: 'past_due',
+          })
       .eq('id', subscription.id);
   }
 

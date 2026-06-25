@@ -1,7 +1,7 @@
 /**
  * Changes the active subscription plan.
  *
- * Upgrade: applies immediately and updates the Mercado Pago recurring amount.
+ * Upgrade: requires a Mercado Pago checkout and is applied after payment confirmation.
  * Downgrade: stores pending_plan_code and applies after current_period_end.
  */
 
@@ -9,9 +9,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import {
   corsHeaders,
   jsonResponse,
-  mpErrorMessage,
-  mpPlatformFetch,
-  readMpError,
 } from '../_shared/mp-client.ts';
 import {
   getBillingContext,
@@ -133,68 +130,11 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
 
-    if (!subscription.mercadopago_preapproval_id) {
-      return jsonResponse({
-        error: 'La suscripcion no tiene una referencia de Mercado Pago',
-        requires_checkout: true,
-      }, 409);
-    }
-
-    const mpRes = await mpPlatformFetch(`/preapproval/${subscription.mercadopago_preapproval_id}`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        reason: `Vittro - Plan ${toPlan.name}`,
-        auto_recurring: {
-          transaction_amount: Number(toPlan.amount_ars),
-          currency_id: 'ARS',
-        },
-      }),
-    });
-
-    if (!mpRes.ok) {
-      const mpError = await readMpError(mpRes);
-      console.error('[subscription-change-plan] MP error:', mpRes.status, mpError.payload);
-      return jsonResponse({
-        error: mpErrorMessage(mpError, mpRes.status, 'No se pudo actualizar el plan en Mercado Pago'),
-        code: mpError.code,
-      }, mpRes.status >= 500 ? 502 : 422);
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from('organization_subscriptions')
-      .update({
-        current_plan_code: toPlan.code,
-        effective_plan_code: toPlan.code,
-        billing_plan_code: toPlan.code,
-        pending_plan_code: null,
-      })
-      .eq('id', subscription.id);
-
-    if (updateError) {
-      console.error('[subscription-change-plan] upgrade update error:', updateError);
-      return jsonResponse({ error: 'No se pudo actualizar la suscripcion local' }, 500);
-    }
-
-    await supabaseAdmin.from('subscription_plan_changes').insert({
-      organization_id: context.organizationId,
-      subscription_id: subscription.id,
-      from_plan_code: fromPlan.code,
-      to_plan_code: toPlan.code,
-      change_type: 'upgrade',
-      requested_by: context.userId,
-      effective_at: new Date().toISOString(),
-      period_start: subscription.current_period_start,
-      period_end: subscription.current_period_end,
-      amount_ars: Number(toPlan.amount_ars),
-      metadata: {
-        mercadopago_preapproval_id: subscription.mercadopago_preapproval_id,
-      },
-    });
-
     return jsonResponse({
       ok: true,
       change_type: 'upgrade',
-      effective_plan_code: toPlan.code,
+      plan_code: toPlan.code,
+      requires_checkout: true,
     });
   } catch (err) {
     console.error('[subscription-change-plan] error:', err);
