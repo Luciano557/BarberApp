@@ -9,14 +9,17 @@ import { MiNegocioPanel, type MiNegocioPanelHandle } from '@/components/MiNegoci
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
+import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { getRequiredPlan, planAllowsFeature, resolveEffectivePlan } from '@/lib/planAccess';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
@@ -27,7 +30,9 @@ const Index = () => {
   const isMobile = useIsMobile();
   const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const { organization } = useOrganization();
+  const { access: subscriptionAccess } = useSubscriptionAccess();
   const onboarding = useOnboarding();
+  const effectivePlan = resolveEffectivePlan(subscriptionAccess, organization?.plan);
 
   const rolesLoaded = roles.length > 0;
 
@@ -60,6 +65,11 @@ const Index = () => {
     setConfigInitialSection('payments');
     setActiveTab('config');
   };
+
+  const goToBilling = useCallback(() => {
+    setConfigInitialSection('plan');
+    setActiveTab('config');
+  }, []);
 
   useEffect(() => {
     if (!rolesLoaded) {
@@ -139,7 +149,9 @@ const Index = () => {
         try {
           localStorage.setItem(`vittro:miNegocio:activeTab:${organization.id}`, sucursalId);
           localStorage.setItem(`vittro:miNegocio:highlightBarbero:${organization.id}`, barberoId);
-        } catch { }
+        } catch {
+          // Ignore storage errors.
+        }
       }
       setActiveTab('mi-negocio');
     }
@@ -195,6 +207,9 @@ const Index = () => {
               onSubmit={addTransaction}
               onNavigateToTareas={() => setActiveTab('tareas')}
               onNavigateToTeamSetup={goToTeamSetup}
+              onNavigateToBilling={goToBilling}
+              canViewDailyTurnos={planAllowsFeature(effectivePlan, 'appointments')}
+              currentPlan={effectivePlan}
             />
           )}
 
@@ -211,11 +226,26 @@ const Index = () => {
           )}
 
           {activeTab === 'finanzas' && canViewFinanzas && (
-            <FinanzasPanel barbers={barbers} />
+            <FinanzasPanel
+              barbers={barbers}
+              currentPlan={effectivePlan}
+              onNavigateToBilling={goToBilling}
+            />
           )}
 
           {activeTab === 'tareas' && canViewTareas && (
-            <TareasPanel barbers={allBarbers} />
+            planAllowsFeature(effectivePlan, 'tasks') ? (
+              <TareasPanel barbers={allBarbers} />
+            ) : (
+              <PlanLockedFeature
+                title="Tareas esta disponible en Premium"
+                description="Organiza tareas internas, peticiones y recurrencias cuando el negocio pase al plan Premium."
+                requiredPlan={getRequiredPlan('tasks')}
+                currentPlan={effectivePlan}
+                onManagePlan={goToBilling}
+                variant="tasks"
+              />
+            )
           )}
 
           {/* Welcome / loading screen */}
@@ -247,11 +277,33 @@ const Index = () => {
           )}
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
-            <TurnosAgendaPanel />
+            planAllowsFeature(effectivePlan, 'appointments') ? (
+              <TurnosAgendaPanel />
+            ) : (
+              <PlanLockedFeature
+                title="Turnos requiere plan Profesional"
+                description="La agenda, la disponibilidad y los bloqueos se habilitan desde el plan Profesional."
+                requiredPlan={getRequiredPlan('appointments')}
+                currentPlan={effectivePlan}
+                onManagePlan={goToBilling}
+                variant="agenda"
+              />
+            )
           )}
 
           {activeTab === 'clientes' && canViewClientes && (
-            <ClientesPanel />
+            planAllowsFeature(effectivePlan, 'clients') ? (
+              <ClientesPanel />
+            ) : (
+              <PlanLockedFeature
+                title="Clientes requiere plan Profesional"
+                description="Activa el plan Profesional para gestionar la base de clientes y su historial."
+                requiredPlan={getRequiredPlan('clients')}
+                currentPlan={effectivePlan}
+                onManagePlan={goToBilling}
+                variant="clients"
+              />
+            )
           )}
 
           {activeTab === 'mi-negocio' && canViewMiNegocio && (
