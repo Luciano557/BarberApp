@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import type { BillingPlanCode, SubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { getFunctionErrorMessage } from '@/lib/functionErrors';
+import { PLAN_BENEFITS, PLAN_SUMMARY } from '@/lib/planAccess';
 import { supabaseUntyped } from '@/lib/supabaseUntyped';
 import { cn } from '@/lib/utils';
 
@@ -28,12 +29,6 @@ const PLAN_ACCENTS: Record<BillingPlanCode, string> = {
   basico: 'border-border',
   profesional: 'border-status-info/40 bg-status-info-bg/40',
   premium: 'border-status-warning/50 bg-status-warning-bg/50',
-};
-
-const PLAN_BULLETS: Record<BillingPlanCode, string[]> = {
-  basico: ['Acceso mensual al sistema', 'Gestion operativa del negocio'],
-  profesional: ['Acceso mensual al sistema', 'Plan preparado para funciones avanzadas'],
-  premium: ['Acceso mensual al sistema', 'Mayor cobertura para la segunda etapa'],
 };
 
 function formatPrice(value: number | string) {
@@ -145,6 +140,18 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
   return (
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl flex-col justify-center gap-6">
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary">
+            <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold leading-tight text-foreground">
+              {organization?.name || 'Barberia'}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Vittro</p>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
@@ -240,11 +247,20 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
                         )}
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <ul className="space-y-2 text-sm text-muted-foreground">
-                          {PLAN_BULLETS[plan.code].map((item) => (
-                            <li key={item} className="flex gap-2">
+                        <p className="text-sm leading-6 text-muted-foreground">
+                          {PLAN_SUMMARY[plan.code]}
+                        </p>
+
+                        <ul className="space-y-3 text-sm">
+                          {PLAN_BENEFITS[plan.code].map((benefit) => (
+                            <li key={benefit.title} className="flex gap-2.5">
                               <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-status-success-foreground" />
-                              <span>{item}</span>
+                              <span>
+                                <span className="block font-medium text-foreground">{benefit.title}</span>
+                                <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                                  {benefit.description}
+                                </span>
+                              </span>
                             </li>
                           ))}
                         </ul>

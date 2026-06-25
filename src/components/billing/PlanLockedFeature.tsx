@@ -175,7 +175,7 @@ export function PlanLockedFeature({
             {description ?? `Amplia al plan ${PLAN_LABELS[requiredPlan]} para usar esta funcion.`}
           </p>
           <Button onClick={onManagePlan} className="mt-4 w-full sm:w-auto">
-            Ver Plan y Facturacion
+            Ver Plan y Suscripcion
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>

@@ -16,6 +16,70 @@ export const PLAN_LABELS: Record<BillingPlanCode, string> = {
   premium: 'Premium',
 };
 
+export interface PlanBenefit {
+  title: string;
+  description: string;
+}
+
+export const PLAN_SUMMARY: Record<BillingPlanCode, string> = {
+  basico: 'Para operar el dia a dia con cobros y caja ordenados.',
+  profesional: 'Para sumar agenda, clientes y control de sueldos.',
+  premium: 'Para ver el negocio completo y gestionar decisiones avanzadas.',
+};
+
+export const PLAN_BENEFITS: Record<BillingPlanCode, PlanBenefit[]> = {
+  basico: [
+    {
+      title: 'Cobrar',
+      description: 'Registro de servicios, productos, descuentos y metodos de pago.',
+    },
+    {
+      title: 'Caja diaria',
+      description: 'Resumen de cobros, cierres y movimientos del dia.',
+    },
+    {
+      title: 'Operacion base',
+      description: 'Acceso mensual para que el equipo trabaje sin planillas.',
+    },
+  ],
+  profesional: [
+    {
+      title: 'Todo Basico',
+      description: 'Mantiene cobros, caja y operacion diaria.',
+    },
+    {
+      title: 'Turnos',
+      description: 'Agenda, disponibilidad, bloqueos y reservas por sucursal.',
+    },
+    {
+      title: 'Clientes',
+      description: 'Base de clientes con datos de contacto e historial.',
+    },
+    {
+      title: 'Sueldos',
+      description: 'Consulta y registro de sueldos del equipo.',
+    },
+  ],
+  premium: [
+    {
+      title: 'Todo Profesional',
+      description: 'Incluye agenda, clientes y sueldos.',
+    },
+    {
+      title: 'Estadisticas',
+      description: 'Facturacion, servicios, ticket promedio y rendimiento mensual.',
+    },
+    {
+      title: 'Finanzas avanzadas',
+      description: 'Gastos, inversiones y deudas en un solo lugar.',
+    },
+    {
+      title: 'Tareas y peticiones',
+      description: 'Asignaciones internas, recurrencias y seguimiento operativo.',
+    },
+  ],
+};
+
 const PLAN_RANK: Record<BillingPlanCode, number> = {
   basico: 1,
   profesional: 2,
