@@ -142,8 +142,9 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
       active: true,
       lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
       lineName: activeLines.find(l => l.id === newLineId)?.name,
+      descripcion: newDescripcion.trim() || undefined,
     });
-    setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setIsAdding(false);
+    setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setNewDescripcion(''); setIsAdding(false);
   };
 
   const handleUpdate = (id: string) => {
@@ -157,6 +158,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
       updates.durationMin = dur.value;
       updates.lineId = editLineId && editLineId !== 'none' ? editLineId : undefined;
       updates.lineName = activeLines.find(l => l.id === editLineId)?.name;
+      updates.descripcion = editDescripcion.trim() || undefined;
     }
     if (!isGlobal) {
       const v = validatePrice(newPrice);
@@ -164,7 +166,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
       updates.price = v.value;
     }
     onUpdate(id, updates);
-    setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30');
+    setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30'); setEditDescripcion('');
   };
 
   const startEdit = (service: Service) => {
@@ -173,6 +175,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
     setNewPrice(service.price ? String(service.price) : '');
     setEditDuration((service.durationMin || 30).toString());
     setEditLineId(service.lineId || '');
+    setEditDescripcion(service.descripcion ?? '');
   };
 
   const handleAddNewLine = async () => {
