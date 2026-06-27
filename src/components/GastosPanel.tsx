@@ -43,6 +43,7 @@ const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
     'Reposición de productos para venta',
     'Insumos administrativos',
     'Gastos operativos variables',
+    'Comisiones del personal',
     'Pagos de deudas',
     'Otros (variable)',
   ],
