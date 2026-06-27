@@ -76,14 +76,10 @@ export function useGastos() {
         await syncRecurrentesRef.current();
       }
       await fetchGastos();
-      const inserted = await syncAmortizaciones();
-      if (inserted) {
-        await fetchGastos();
-      }
       hasSynced.current = key;
     };
     run();
-  }, [fetchGastos, syncAmortizaciones]);
+  }, [fetchGastos]);
 
   const addGasto = async (data: {
     categoria: string;
