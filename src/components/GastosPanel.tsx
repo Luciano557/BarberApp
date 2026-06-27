@@ -34,6 +34,7 @@ const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
     'Seguro del local',
     'Honorarios profesionales',
     'Amortización de equipamiento',
+    'Pagos de deudas',
     'Otros (fijo)',
   ],
   variable: [
@@ -42,6 +43,7 @@ const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
     'Reposición de productos para venta',
     'Insumos administrativos',
     'Gastos operativos variables',
+    'Pagos de deudas',
     'Otros (variable)',
   ],
   semivariable: [
