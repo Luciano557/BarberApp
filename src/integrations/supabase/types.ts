@@ -1036,6 +1036,7 @@ export type Database = {
           inversion_id: string | null
           Monto: number | null
           organization_id: string | null
+          pago_deuda_id: string | null
           sucursal_id: string | null
           tipo_costo: string | null
         }
@@ -1053,6 +1054,7 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1070,6 +1072,7 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1079,6 +1082,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_pago_deuda_id_fkey"
+            columns: ["pago_deuda_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_deudas"
             referencedColumns: ["id"]
           },
           {
