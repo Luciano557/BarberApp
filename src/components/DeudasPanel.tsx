@@ -47,6 +47,7 @@ export function DeudasPanel() {
   const [showForm, setShowForm] = useState(false);
   const [deudaAEliminar, setDeudaAEliminar] = useState<Deuda | null>(null);
   const [deudaAPagar, setDeudaAPagar] = useState<Deuda | null>(null);
+  const [mostrarPagadas, setMostrarPagadas] = useState(false);
 
   // Monto por cuota calculado
   const montoCuotaCalculado = useMemo(() => {
