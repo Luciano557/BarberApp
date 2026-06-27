@@ -270,3 +270,130 @@ export function DeudasPanel() {
     </div>
   );
 }
+
+function RegistrarPagoDialog({
+  deuda,
+  onClose,
+  registrarPago,
+}: {
+  deuda: Deuda | null;
+  onClose: () => void;
+  registrarPago: (
+    deuda: Deuda,
+    monto: number,
+    fecha: string,
+    observacion?: string,
+  ) => Promise<boolean>;
+}) {
+  const saldoPendiente = deuda
+    ? Math.max(0, Number(deuda.monto_total) - Number(deuda.monto_pagado))
+    : 0;
+  const sugerido = deuda
+    ? Math.min(
+        saldoPendiente,
+        deuda.monto_cuota && deuda.monto_cuota > 0
+          ? Number(deuda.monto_cuota)
+          : saldoPendiente,
+      )
+    : 0;
+
+  const [monto, setMonto] = useState<string>('');
+  const [fecha, setFecha] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [observacion, setObservacion] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Reset on open
+  useMemo(() => {
+    if (deuda) {
+      setMonto(sugerido > 0 ? sugerido.toFixed(2) : '');
+      setFecha(format(new Date(), 'yyyy-MM-dd'));
+      setObservacion('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deuda?.id]);
+
+  const montoNum = parseFloat(monto);
+  const montoInvalido =
+    !isFinite(montoNum) ||
+    montoNum <= 0 ||
+    montoNum > saldoPendiente + 0.009;
+
+  const handleSubmit = async () => {
+    if (!deuda || montoInvalido) return;
+    setSubmitting(true);
+    const ok = await registrarPago(deuda, montoNum, fecha, observacion);
+    setSubmitting(false);
+    if (ok) onClose();
+  };
+
+  return (
+    <Dialog open={!!deuda} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Registrar pago</DialogTitle>
+          {deuda && (
+            <DialogDescription>
+              {deuda.acreedor} · Saldo pendiente ${formatARS(saldoPendiente)}
+              {deuda.cuotas_totales && deuda.cuotas_totales > 0 ? (
+                <> · Cuota {deuda.cuotas_pagadas + 1} de {deuda.cuotas_totales}</>
+              ) : null}
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-monto">Monto a pagar</Label>
+            <CurrencyInput
+              id="pago-monto"
+              value={monto}
+              onChange={setMonto}
+              placeholder="0,00"
+            />
+            {montoInvalido && monto !== '' && (
+              <p className="text-xs text-destructive">
+                {montoNum <= 0
+                  ? 'El monto debe ser mayor a 0'
+                  : 'No puede superar el saldo pendiente'}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-fecha">Fecha de pago</Label>
+            <Input
+              id="pago-fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pago-obs">Observación (opcional)</Label>
+            <Textarea
+              id="pago-obs"
+              value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              maxLength={240}
+              rows={2}
+              placeholder="Nota interna sobre este pago"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || montoInvalido || !fecha}
+          >
+            Registrar pago
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
