@@ -21,6 +21,16 @@ export interface Deuda {
   created_at: string;
 }
 
+export interface PagoDeuda {
+  id: string;
+  deuda_id: string;
+  monto: number;
+  fecha_pago: string;
+  numero_cuota: number | null;
+  observacion: string | null;
+  created_at: string;
+}
+
 export function useDeudas() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
