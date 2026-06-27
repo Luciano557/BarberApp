@@ -170,20 +170,24 @@ export function DeudasPanel() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-foreground">Deudas Pagadas</h3>
-        {deudasPagadas.length === 0 ? (
-          <Card>
-            <CardContent className="py-6 text-center text-muted-foreground text-sm">
-              Todavía no hay deudas pagadas.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {deudasPagadas.map(renderDeudaCard)}
-          </div>
-        )}
-      </div>
+      {deudasPagadas.length > 0 && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setMostrarPagadas((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {mostrarPagadas ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Deudas pagadas ({deudasPagadas.length})
+          </button>
+          {mostrarPagadas && (
+            <div className="space-y-3">
+              {deudasPagadas.map(renderDeudaCard)}
+            </div>
+          )}
+        </div>
+      )}
+
 
       <AlertDialog open={!!deudaAEliminar} onOpenChange={(open) => !open && setDeudaAEliminar(null)}>
         <AlertDialogContent>
