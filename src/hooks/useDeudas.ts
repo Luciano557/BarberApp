@@ -21,6 +21,16 @@ export interface Deuda {
   created_at: string;
 }
 
+export interface PagoDeuda {
+  id: string;
+  deuda_id: string;
+  monto: number;
+  fecha_pago: string;
+  numero_cuota: number | null;
+  observacion: string | null;
+  created_at: string;
+}
+
 export function useDeudas() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
@@ -169,12 +179,34 @@ export function useDeudas() {
     }
   };
 
+  const fetchPagosDeuda = useCallback(
+    async (deudaId: string): Promise<PagoDeuda[]> => {
+      if (!organization?.id) return [];
+      try {
+        const { data, error } = await supabase
+          .from('pagos_deudas')
+          .select('id, deuda_id, monto, fecha_pago, numero_cuota, observacion, created_at')
+          .eq('organization_id', organization.id)
+          .eq('deuda_id', deudaId)
+          .order('fecha_pago', { ascending: true });
+        if (error) throw error;
+        return (data as PagoDeuda[]) || [];
+      } catch (error: any) {
+        console.error('Error fetching pagos de deuda:', error);
+        toast.error('Error al cargar el historial de pagos');
+        return [];
+      }
+    },
+    [organization?.id],
+  );
+
   return {
     deudas,
     isLoading,
     addDeuda,
     registrarPago,
     deleteDeuda,
+    fetchPagosDeuda,
     refetch: fetchDeudas,
   };
 }

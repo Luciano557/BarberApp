@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Landmark, Trash2, Plus, CreditCard, CheckCircle2 } from 'lucide-react';
-import { useDeudas, type Deuda } from '@/hooks/useDeudas';
+import { useEffect, useState, useMemo } from 'react';
+import { Landmark, Trash2, Plus, CreditCard, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useDeudas, type Deuda, type PagoDeuda } from '@/hooks/useDeudas';
 import { useInversiones } from '@/hooks/useInversiones';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ function formatARS(n: number): string {
 }
 
 export function DeudasPanel() {
-  const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda } = useDeudas();
+  const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda, fetchPagosDeuda } = useDeudas();
   const { inversiones } = useInversiones();
 
   const [acreedor, setAcreedor] = useState('');
@@ -47,6 +47,7 @@ export function DeudasPanel() {
   const [showForm, setShowForm] = useState(false);
   const [deudaAEliminar, setDeudaAEliminar] = useState<Deuda | null>(null);
   const [deudaAPagar, setDeudaAPagar] = useState<Deuda | null>(null);
+  const [mostrarPagadas, setMostrarPagadas] = useState(false);
 
   // Monto por cuota calculado
   const montoCuotaCalculado = useMemo(() => {
@@ -90,66 +91,17 @@ export function DeudasPanel() {
   const deudasActivas = deudas.filter(d => d.estado !== 'pagada');
   const deudasPagadas = deudas.filter(d => d.estado === 'pagada');
 
-  const renderDeudaCard = (d: Deuda) => {
-    const pendiente = d.monto_total - d.monto_pagado;
-    const progreso = d.monto_total > 0 ? (d.monto_pagado / d.monto_total) * 100 : 0;
-    const invNombre = getInversionNombre(d.inversion_id);
-    const esPagada = d.estado === 'pagada';
+  const renderDeudaCard = (d: Deuda) => (
+    <DeudaCard
+      key={d.id}
+      deuda={d}
+      inversionNombre={getInversionNombre(d.inversion_id)}
+      fetchPagosDeuda={fetchPagosDeuda}
+      onRegistrarPago={() => setDeudaAPagar(d)}
+      onEliminar={() => setDeudaAEliminar(d)}
+    />
+  );
 
-    return (
-      <Card key={d.id} className={esPagada ? 'opacity-70' : ''}>
-        <CardContent className="py-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Landmark className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">{d.acreedor}</span>
-                <Badge variant={esPagada ? 'default' : 'secondary'} className="text-xs">
-                  {esPagada ? <><CheckCircle2 className="h-3 w-3 mr-1" /> Pagada</> : 'Activa'}
-                </Badge>
-                {invNombre && (
-                  <Badge variant="outline" className="text-xs">Inversión: {invNombre}</Badge>
-                )}
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  Total: ${d.monto_total.toLocaleString()}
-                  {d.cuotas_totales && ` · ${d.cuotas_pagadas}/${d.cuotas_totales} cuotas`}
-                  {d.monto_cuota && ` · $${d.monto_cuota.toLocaleString()}/cuota`}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Progress value={progreso} className="h-2 flex-1" />
-                  <span className="text-xs whitespace-nowrap">
-                    ${d.monto_pagado.toLocaleString()} / ${d.monto_total.toLocaleString()}
-                  </span>
-                </div>
-                {!esPagada && pendiente > 0 && (
-                  <p className="text-xs mt-1">Pendiente: ${pendiente.toLocaleString()}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 ml-2">
-              {!esPagada && (
-                <Button size="sm" variant="outline" onClick={() => setDeudaAPagar(d)}>
-                  <CreditCard className="h-3 w-3 mr-1" /> Registrar pago
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive h-8 w-8"
-                onClick={() => setDeudaAEliminar(d)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="space-y-8">
@@ -219,20 +171,24 @@ export function DeudasPanel() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-foreground">Deudas Pagadas</h3>
-        {deudasPagadas.length === 0 ? (
-          <Card>
-            <CardContent className="py-6 text-center text-muted-foreground text-sm">
-              Todavía no hay deudas pagadas.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {deudasPagadas.map(renderDeudaCard)}
-          </div>
-        )}
-      </div>
+      {deudasPagadas.length > 0 && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setMostrarPagadas((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {mostrarPagadas ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            Deudas pagadas ({deudasPagadas.length})
+          </button>
+          {mostrarPagadas && (
+            <div className="space-y-3">
+              {deudasPagadas.map(renderDeudaCard)}
+            </div>
+          )}
+        </div>
+      )}
+
 
       <AlertDialog open={!!deudaAEliminar} onOpenChange={(open) => !open && setDeudaAEliminar(null)}>
         <AlertDialogContent>
@@ -395,5 +351,156 @@ function RegistrarPagoDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DeudaCard({
+  deuda,
+  inversionNombre,
+  fetchPagosDeuda,
+  onRegistrarPago,
+  onEliminar,
+}: {
+  deuda: Deuda;
+  inversionNombre: string | null;
+  fetchPagosDeuda: (id: string) => Promise<PagoDeuda[]>;
+  onRegistrarPago: () => void;
+  onEliminar: () => void;
+}) {
+  const esPagada = deuda.estado === 'pagada';
+  const pendiente = Math.max(0, Number(deuda.monto_total) - Number(deuda.monto_pagado));
+  const progreso = deuda.monto_total > 0 ? (deuda.monto_pagado / deuda.monto_total) * 100 : 0;
+  const tieneCuotas = !!deuda.cuotas_totales && deuda.cuotas_totales > 0;
+
+  const [expandido, setExpandido] = useState(false);
+  const [pagos, setPagos] = useState<PagoDeuda[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  // Refresca el historial cuando cambia monto_pagado (nuevo pago) si está abierto
+  useEffect(() => {
+    if (!expandido) return;
+    let active = true;
+    setCargando(true);
+    fetchPagosDeuda(deuda.id).then((res) => {
+      if (!active) return;
+      setPagos(res);
+      setCargando(false);
+    });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandido, deuda.id, deuda.monto_pagado]);
+
+  const titulo = deuda.descripcion?.trim() || deuda.acreedor;
+  const subtitulo = deuda.descripcion?.trim() ? deuda.acreedor : null;
+
+  return (
+    <Card className={esPagada ? 'opacity-70' : ''}>
+      <CardContent className="py-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Landmark className="h-4 w-4 text-primary flex-shrink-0" />
+              <span className="font-medium text-foreground truncate">{titulo}</span>
+              <Badge variant={esPagada ? 'default' : 'secondary'} className="text-xs">
+                {esPagada ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Pagada
+                  </>
+                ) : (
+                  'Activa'
+                )}
+              </Badge>
+              {inversionNombre && (
+                <Badge variant="outline" className="text-xs">Inversión: {inversionNombre}</Badge>
+              )}
+            </div>
+            {subtitulo && (
+              <p className="text-xs text-muted-foreground">{subtitulo}</p>
+            )}
+
+            <div className="text-sm text-muted-foreground space-y-1">
+              {tieneCuotas && (
+                <p className="text-xs">
+                  {deuda.cuotas_pagadas} / {deuda.cuotas_totales} cuotas pagadas
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Progress value={progreso} className="h-2 flex-1" />
+                <span className="text-xs whitespace-nowrap">
+                  ${formatARS(deuda.monto_pagado)} / ${formatARS(deuda.monto_total)}
+                </span>
+              </div>
+              {!esPagada && (
+                <p className="text-xs">
+                  Pendiente: <span className="text-foreground font-medium">${formatARS(pendiente)}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {!esPagada && (
+              <Button size="sm" variant="outline" onClick={onRegistrarPago}>
+                <CreditCard className="h-3 w-3 mr-1" /> Registrar pago
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive h-8 w-8"
+              onClick={onEliminar}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="border-t pt-2">
+          <button
+            type="button"
+            onClick={() => setExpandido((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {expandido ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            {expandido ? 'Ocultar historial de pagos' : 'Ver historial de pagos'}
+          </button>
+
+          {expandido && (
+            <div className="mt-2">
+              {cargando ? (
+                <p className="text-xs text-muted-foreground">Cargando pagos…</p>
+              ) : !pagos || pagos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin pagos registrados.</p>
+              ) : (
+                <ul className="divide-y divide-border rounded-md border bg-muted/30">
+                  {pagos.map((p) => (
+                    <li key={p.id} className="px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-foreground">
+                          <span className="font-medium">${formatARS(Number(p.monto))}</span>
+                          {p.numero_cuota != null && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              Cuota {p.numero_cuota}
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(p.fecha_pago + 'T00:00:00'), 'dd/MM/yyyy')}
+                        </span>
+                      </div>
+                      {p.observacion && (
+                        <p className="text-xs text-muted-foreground mt-1">{p.observacion}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
