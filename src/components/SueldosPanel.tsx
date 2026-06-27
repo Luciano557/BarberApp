@@ -834,8 +834,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     try {
       // Normalize name to avoid spacing issues
       const nombreNormalizado = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
-      
-      const { error } = await supabase
+
+      // 1. Insert pago_sueldos y obtener el id
+      const { data: pagoInsertado, error } = await supabase
         .from('pagos_sueldos')
         .insert({
           barbero_id: selectedBarberId,
@@ -844,9 +845,42 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
           concepto: concepto || null,
           organization_id: organization.id,
           sucursal_id: currentSucursal?.id || null,
-        });
+        })
+        .select('id, fecha')
+        .single();
 
-      if (error) throw error;
+      if (error || !pagoInsertado) throw error ?? new Error('No se pudo registrar el pago');
+
+      const pagoSueldoId = pagoInsertado.id as string;
+
+      // 2. Generar egreso automático según modalidad del barbero
+      const esFijo = barber.compensationType === 'fijo';
+      const periodoRef = periodStartDate ?? new Date();
+      const mesAnio = format(periodoRef, "MMMM yyyy", { locale: es });
+      const fechaEgreso = (pagoInsertado.fecha as string) ?? new Date().toISOString();
+
+      const categoriaEgreso = esFijo ? 'Sueldos fijos del personal' : 'Comisiones del personal';
+      const tipoCostoEgreso: 'fijo' | 'variable' = esFijo ? 'fijo' : 'variable';
+      const prefijo = esFijo ? 'Sueldo' : 'Comisión';
+      const descripcionEgreso = `${prefijo} — ${nombreNormalizado} — ${mesAnio}`;
+
+      const { error: egresoError } = await supabase.from('Egresos').insert({
+        Fecha: fechaEgreso,
+        Categoria: categoriaEgreso,
+        Monto: montoNum,
+        Descripcion: descripcionEgreso,
+        tipo_costo: tipoCostoEgreso,
+        pago_sueldo_id: pagoSueldoId,
+        organization_id: organization.id,
+        sucursal_id: currentSucursal?.id || null,
+        estado: 'activo',
+      });
+
+      if (egresoError) {
+        // Rollback: borrar el pago para que no quede huérfano
+        await supabase.from('pagos_sueldos').delete().eq('id', pagoSueldoId);
+        throw egresoError;
+      }
 
       toast.success('Pago registrado correctamente');
       setIsDialogOpen(false);
