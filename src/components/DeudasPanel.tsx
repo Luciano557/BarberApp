@@ -90,66 +90,17 @@ export function DeudasPanel() {
   const deudasActivas = deudas.filter(d => d.estado !== 'pagada');
   const deudasPagadas = deudas.filter(d => d.estado === 'pagada');
 
-  const renderDeudaCard = (d: Deuda) => {
-    const pendiente = d.monto_total - d.monto_pagado;
-    const progreso = d.monto_total > 0 ? (d.monto_pagado / d.monto_total) * 100 : 0;
-    const invNombre = getInversionNombre(d.inversion_id);
-    const esPagada = d.estado === 'pagada';
+  const renderDeudaCard = (d: Deuda) => (
+    <DeudaCard
+      key={d.id}
+      deuda={d}
+      inversionNombre={getInversionNombre(d.inversion_id)}
+      fetchPagosDeuda={fetchPagosDeuda}
+      onRegistrarPago={() => setDeudaAPagar(d)}
+      onEliminar={() => setDeudaAEliminar(d)}
+    />
+  );
 
-    return (
-      <Card key={d.id} className={esPagada ? 'opacity-70' : ''}>
-        <CardContent className="py-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Landmark className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">{d.acreedor}</span>
-                <Badge variant={esPagada ? 'default' : 'secondary'} className="text-xs">
-                  {esPagada ? <><CheckCircle2 className="h-3 w-3 mr-1" /> Pagada</> : 'Activa'}
-                </Badge>
-                {invNombre && (
-                  <Badge variant="outline" className="text-xs">Inversión: {invNombre}</Badge>
-                )}
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p>
-                  Total: ${d.monto_total.toLocaleString()}
-                  {d.cuotas_totales && ` · ${d.cuotas_pagadas}/${d.cuotas_totales} cuotas`}
-                  {d.monto_cuota && ` · $${d.monto_cuota.toLocaleString()}/cuota`}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <Progress value={progreso} className="h-2 flex-1" />
-                  <span className="text-xs whitespace-nowrap">
-                    ${d.monto_pagado.toLocaleString()} / ${d.monto_total.toLocaleString()}
-                  </span>
-                </div>
-                {!esPagada && pendiente > 0 && (
-                  <p className="text-xs mt-1">Pendiente: ${pendiente.toLocaleString()}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 ml-2">
-              {!esPagada && (
-                <Button size="sm" variant="outline" onClick={() => setDeudaAPagar(d)}>
-                  <CreditCard className="h-3 w-3 mr-1" /> Registrar pago
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive h-8 w-8"
-                onClick={() => setDeudaAEliminar(d)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="space-y-8">
