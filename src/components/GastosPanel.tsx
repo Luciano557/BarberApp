@@ -34,6 +34,7 @@ const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
     'Seguro del local',
     'Honorarios profesionales',
     'Amortización de equipamiento',
+    'Pagos de deudas',
     'Otros (fijo)',
   ],
   variable: [
@@ -42,6 +43,7 @@ const CATEGORIAS_POR_TIPO: Record<TipoCosto, string[]> = {
     'Reposición de productos para venta',
     'Insumos administrativos',
     'Gastos operativos variables',
+    'Pagos de deudas',
     'Otros (variable)',
   ],
   semivariable: [
@@ -346,35 +348,49 @@ export function GastosPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {gastos.map((g) => (
-                  <TableRow key={g.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {g.Fecha ? format(new Date(g.Fecha), 'dd/MM/yyyy') : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {g.tipo_costo ? (
-                        <Badge variant={TIPO_BADGE_VARIANT[g.tipo_costo]}>
-                          {TIPO_LABELS[g.tipo_costo]}
-                        </Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{g.Categoria || '-'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{g.Descripcion || '-'}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      ${(g.Monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setAnularState({ id: g.id, motivo: '' })}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {gastos.map((g) => {
+                  const esAutomatico = !!(g.pago_deuda_id || g.gasto_recurrente_id || g.inversion_id);
+                  return (
+                    <TableRow key={g.id}>
+                      <TableCell className="whitespace-nowrap">
+                        {g.Fecha ? format(new Date(g.Fecha), 'dd/MM/yyyy') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {g.tipo_costo ? (
+                          <Badge variant={TIPO_BADGE_VARIANT[g.tipo_costo]}>
+                            {TIPO_LABELS[g.tipo_costo]}
+                          </Badge>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span>{g.Categoria || '-'}</span>
+                          {esAutomatico && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              Automático
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">{g.Descripcion || '-'}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        ${(g.Monto || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive disabled:opacity-30"
+                          disabled={esAutomatico}
+                          title={esAutomatico ? 'Este gasto se generó automáticamente y no se puede editar desde acá' : undefined}
+                          onClick={() => setAnularState({ id: g.id, motivo: '' })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
               <TableFooter>
                 <TableRow>

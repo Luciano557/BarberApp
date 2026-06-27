@@ -2372,7 +2372,7 @@ export type Database = {
         Row: {
           created_at: string
           deuda_id: string
-          egreso_id: string | null
+          egreso_id: number | null
           fecha_pago: string
           id: string
           monto: number
@@ -2384,7 +2384,7 @@ export type Database = {
         Insert: {
           created_at?: string
           deuda_id: string
-          egreso_id?: string | null
+          egreso_id?: number | null
           fecha_pago: string
           id?: string
           monto: number
@@ -2396,7 +2396,7 @@ export type Database = {
         Update: {
           created_at?: string
           deuda_id?: string
-          egreso_id?: string | null
+          egreso_id?: number | null
           fecha_pago?: string
           id?: string
           monto?: number
@@ -2411,6 +2411,13 @@ export type Database = {
             columns: ["deuda_id"]
             isOneToOne: false
             referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_deudas_egreso_id_fkey"
+            columns: ["egreso_id"]
+            isOneToOne: false
+            referencedRelation: "Egresos"
             referencedColumns: ["id"]
           },
         ]
