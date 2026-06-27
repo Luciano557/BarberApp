@@ -128,23 +128,70 @@ export function useDeudas() {
 
       const tieneCuotas = !!deuda.cuotas_totales && deuda.cuotas_totales > 0;
       const numeroCuota = tieneCuotas ? deuda.cuotas_pagadas + 1 : null;
+      const sucursalId =
+        (deuda as any).sucursal_id ?? currentSucursal?.id ?? null;
 
-      const { error: insertError } = await supabase.from('pagos_deudas').insert({
-        organization_id: deuda.organization_id,
-        sucursal_id: (deuda as any).sucursal_id ?? currentSucursal?.id ?? null,
-        deuda_id: deuda.id,
-        monto: montoPagado,
-        fecha_pago: fechaPago,
-        numero_cuota: numeroCuota,
-        observacion: observacion?.trim() ? observacion.trim() : null,
-      });
+      // 1. Insertar el pago en pagos_deudas
+      const { data: pagoInsertado, error: insertError } = await supabase
+        .from('pagos_deudas')
+        .insert({
+          organization_id: deuda.organization_id,
+          sucursal_id: sucursalId,
+          deuda_id: deuda.id,
+          monto: montoPagado,
+          fecha_pago: fechaPago,
+          numero_cuota: numeroCuota,
+          observacion: observacion?.trim() ? observacion.trim() : null,
+        })
+        .select('id')
+        .single();
       if (insertError) throw insertError;
 
+      const pagoDeudaId = pagoInsertado.id as string;
+
+      // 2. Crear el egreso automático. Rollback del pago si falla.
+      const tipoCosto: 'fijo' | 'variable' = tieneCuotas ? 'fijo' : 'variable';
+      const refTexto =
+        (deuda.descripcion?.trim() || deuda.acreedor || 'Deuda').trim();
+      const descripcionEgreso = tieneCuotas
+        ? `Cuota ${numeroCuota}/${deuda.cuotas_totales} — ${refTexto}`
+        : `Pago — ${refTexto}`;
+
+      const { data: egresoInsertado, error: egresoError } = await supabase
+        .from('Egresos')
+        .insert({
+          Fecha: `${fechaPago}T00:00:00`,
+          Categoria: 'Pagos de deudas',
+          Monto: montoPagado,
+          Descripcion: descripcionEgreso,
+          tipo_costo: tipoCosto,
+          pago_deuda_id: pagoDeudaId,
+          organization_id: deuda.organization_id,
+          sucursal_id: sucursalId,
+          estado: 'activo',
+        })
+        .select('id')
+        .single();
+
+      if (egresoError || !egresoInsertado) {
+        // Rollback: borrar el pago para no dejarlo huérfano
+        await supabase.from('pagos_deudas').delete().eq('id', pagoDeudaId);
+        throw egresoError ?? new Error('No se pudo crear el egreso');
+      }
+
+      // 3. Vincular bidireccionalmente egreso_id en pagos_deudas (best-effort)
+      await supabase
+        .from('pagos_deudas')
+        .update({ egreso_id: egresoInsertado.id })
+        .eq('id', pagoDeudaId);
+
+      // 4. Actualizar acumulados / estado en deudas
       const nuevoMontoPagado = Number(deuda.monto_pagado) + montoPagado;
       const nuevasCuotasPagadas = tieneCuotas
         ? deuda.cuotas_pagadas + 1
         : deuda.cuotas_pagadas;
-      const nuevoEstado = nuevoMontoPagado >= Number(deuda.monto_total) - 0.009 ? 'pagada' : 'activa';
+      const nuevoEstado =
+        nuevoMontoPagado >= Number(deuda.monto_total) - 0.009 ? 'pagada' : 'activa';
 
       const { error: updateError } = await supabase
         .from('deudas')
