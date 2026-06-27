@@ -350,7 +350,7 @@ export function GastosPanel() {
               </TableHeader>
               <TableBody>
                 {gastos.map((g) => {
-                  const esAutomatico = !!(g.pago_deuda_id || g.gasto_recurrente_id || g.inversion_id);
+                  const esAutomatico = !!(g.pago_deuda_id || g.pago_sueldo_id || g.gasto_recurrente_id || g.inversion_id);
                   return (
                     <TableRow key={g.id}>
                       <TableCell className="whitespace-nowrap">
