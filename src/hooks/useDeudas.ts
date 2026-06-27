@@ -99,23 +99,61 @@ export function useDeudas() {
     }
   };
 
-  const registrarPago = async (deuda: Deuda) => {
+  const registrarPago = async (
+    deuda: Deuda,
+    montoPagado: number,
+    fechaPago: string,
+    observacion?: string,
+  ) => {
     try {
-      const { error } = await supabase
+      const saldoPendiente = Number(deuda.monto_total) - Number(deuda.monto_pagado);
+      if (!isFinite(montoPagado) || montoPagado <= 0) {
+        toast.error('El monto debe ser mayor a 0');
+        return false;
+      }
+      if (montoPagado > saldoPendiente + 0.009) {
+        toast.error('El monto no puede superar el saldo pendiente');
+        return false;
+      }
+
+      const tieneCuotas = !!deuda.cuotas_totales && deuda.cuotas_totales > 0;
+      const numeroCuota = tieneCuotas ? deuda.cuotas_pagadas + 1 : null;
+
+      const { error: insertError } = await supabase.from('pagos_deudas').insert({
+        organization_id: deuda.organization_id,
+        sucursal_id: (deuda as any).sucursal_id ?? currentSucursal?.id ?? null,
+        deuda_id: deuda.id,
+        monto: montoPagado,
+        fecha_pago: fechaPago,
+        numero_cuota: numeroCuota,
+        observacion: observacion?.trim() ? observacion.trim() : null,
+      });
+      if (insertError) throw insertError;
+
+      const nuevoMontoPagado = Number(deuda.monto_pagado) + montoPagado;
+      const nuevasCuotasPagadas = tieneCuotas
+        ? deuda.cuotas_pagadas + 1
+        : deuda.cuotas_pagadas;
+      const nuevoEstado = nuevoMontoPagado >= Number(deuda.monto_total) - 0.009 ? 'pagada' : 'activa';
+
+      const { error: updateError } = await supabase
         .from('deudas')
         .update({
-          cuotas_pagadas: deuda.cuotas_totales ?? deuda.cuotas_pagadas,
-          monto_pagado: deuda.monto_total,
-          estado: 'pagada',
+          monto_pagado: nuevoMontoPagado,
+          cuotas_pagadas: nuevasCuotasPagadas,
+          estado: nuevoEstado,
         })
         .eq('id', deuda.id);
 
-      if (error) throw error;
-      toast.success('Deuda marcada como pagada');
+      if (updateError) throw updateError;
+
+      toast.success(nuevoEstado === 'pagada' ? 'Deuda saldada' : 'Pago registrado');
       await fetchDeudas();
+      return true;
     } catch (error: any) {
       console.error('Error registrando pago:', error);
       toast.error('Error al registrar pago');
+      return false;
     }
   };
 
