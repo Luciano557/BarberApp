@@ -1036,6 +1036,8 @@ export type Database = {
           inversion_id: string | null
           Monto: number | null
           organization_id: string | null
+          pago_deuda_id: string | null
+          pago_sueldo_id: string | null
           sucursal_id: string | null
           tipo_costo: string | null
         }
@@ -1053,6 +1055,8 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
+          pago_sueldo_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1070,6 +1074,8 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
+          pago_sueldo_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1079,6 +1085,20 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_pago_deuda_id_fkey"
+            columns: ["pago_deuda_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_deudas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_pago_sueldo_id_fkey"
+            columns: ["pago_sueldo_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_sueldos"
             referencedColumns: ["id"]
           },
           {
@@ -1698,11 +1718,13 @@ export type Database = {
           activo: boolean
           color: string | null
           created_at: string
+          descripcion: string | null
           eliminado: boolean
           eliminado_at: string | null
           eliminado_por: string | null
           id: string
           nombre: string
+          orden: number
           organization_id: string | null
           updated_at: string
         }
@@ -1710,11 +1732,13 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          descripcion?: string | null
           eliminado?: boolean
           eliminado_at?: string | null
           eliminado_por?: string | null
           id?: string
           nombre: string
+          orden?: number
           organization_id?: string | null
           updated_at?: string
         }
@@ -1722,11 +1746,13 @@ export type Database = {
           activo?: boolean
           color?: string | null
           created_at?: string
+          descripcion?: string | null
           eliminado?: boolean
           eliminado_at?: string | null
           eliminado_por?: string | null
           id?: string
           nombre?: string
+          orden?: number
           organization_id?: string | null
           updated_at?: string
         }
@@ -2352,6 +2378,60 @@ export type Database = {
         }
         Relationships: []
       }
+      pagos_deudas: {
+        Row: {
+          created_at: string
+          deuda_id: string
+          egreso_id: number | null
+          fecha_pago: string
+          id: string
+          monto: number
+          numero_cuota: number | null
+          observacion: string | null
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deuda_id: string
+          egreso_id?: number | null
+          fecha_pago: string
+          id?: string
+          monto: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deuda_id?: string
+          egreso_id?: number | null
+          fecha_pago?: string
+          id?: string
+          monto?: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_deudas_deuda_id_fkey"
+            columns: ["deuda_id"]
+            isOneToOne: false
+            referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_deudas_egreso_id_fkey"
+            columns: ["egreso_id"]
+            isOneToOne: false
+            referencedRelation: "Egresos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagos_sueldos: {
         Row: {
           barbero_id: string
@@ -2795,6 +2875,7 @@ export type Database = {
         Row: {
           activo: boolean
           created_at: string
+          descripcion: string | null
           duracion_min: number
           eliminado: boolean
           eliminado_at: string | null
@@ -2810,6 +2891,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           created_at?: string
+          descripcion?: string | null
           duracion_min?: number
           eliminado?: boolean
           eliminado_at?: string | null
@@ -2825,6 +2907,7 @@ export type Database = {
         Update: {
           activo?: boolean
           created_at?: string
+          descripcion?: string | null
           duracion_min?: number
           eliminado?: boolean
           eliminado_at?: string | null
@@ -4491,6 +4574,10 @@ export type Database = {
           _venta_id?: string
         }
         Returns: string
+      }
+      reorder_lineas: {
+        Args: { p_ids: string[]; p_org_id: string }
+        Returns: undefined
       }
       seed_payment_methods_for_org: {
         Args: { _org_id: string }

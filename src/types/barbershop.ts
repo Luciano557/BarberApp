@@ -3,6 +3,8 @@ export interface Line {
   name: string;
   color?: string;
   active: boolean;
+  descripcion?: string;
+  orden?: number;
 }
 
 export interface Service {
@@ -15,6 +17,7 @@ export interface Service {
   lineName?: string; // Cached line name for display
   sucursalId?: string; // Legacy / origen (no decide visibilidad)
   active: boolean; // Operativo: globalActive && branchActive cuando hay sucursal
+  descripcion?: string;
   // Enriquecimiento por sucursal
   globalActive?: boolean; // servicios.activo
   branchActive?: boolean; // servicios_sucursales.activo

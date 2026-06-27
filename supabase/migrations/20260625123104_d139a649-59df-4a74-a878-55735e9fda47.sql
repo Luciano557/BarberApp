@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.reorder_lineas(uuid, uuid[]) FROM PUBLIC, anon;

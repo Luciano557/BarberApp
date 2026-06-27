@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Plus, MoreVertical, Tag } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, MoreVertical, Tag, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -9,6 +10,23 @@ import { DrawerForm } from '@/components/ui/drawer-form';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const LINE_COLORS = [
   { label: 'Azul', value: '#3B82F6' },
@@ -26,6 +44,8 @@ interface LinesConfigProps {
   onAdd: (line: Omit<Line, 'id'>) => Promise<Line | null>;
   onUpdate: (id: string, updates: Partial<Line>) => void;
   onDelete?: (id: string) => void;
+  /** Si se provee, habilita reordenamiento DnD (puntero + teclado) en la tab "Activas". */
+  onReorder?: (ids: string[]) => Promise<void>;
 }
 
 interface ToggleConfirm {
@@ -40,29 +60,106 @@ function validateName(name: string): string | null {
   return null;
 }
 
-export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigProps) {
+interface SortableLineItemProps {
+  line: Line;
+  onEdit: (line: Line) => void;
+  isReorderable: boolean;
+}
+
+function SortableLineItem({ line, onEdit, isReorderable }: SortableLineItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: line.id, disabled: !isReorderable });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : 'auto',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {isReorderable && (
+          <button
+            type="button"
+            aria-label={`Reordenar ${line.name}`}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted touch-none cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-ring"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
+        <EntityColorBar color={line.color} />
+        <div className="flex flex-1 items-center gap-3">
+          <span className="flex-1 font-medium text-foreground">{line.name}</span>
+          <button
+            onClick={() => onEdit(line)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
+          >
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: LinesConfigProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>('');
+  const [descripcion, setDescripcion] = useState<string>('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Line | null>(null);
 
-  const active = lines.filter(l => l.active);
+  const active = useMemo(() => {
+    return [...lines.filter(l => l.active)].sort((a, b) => {
+      const oa = a.orden ?? Number.MAX_SAFE_INTEGER;
+      const ob = b.orden ?? Number.MAX_SAFE_INTEGER;
+      if (oa !== ob) return oa - ob;
+      return a.name.localeCompare(b.name, 'es');
+    });
+  }, [lines]);
   const inactive = lines.filter(l => !l.active);
   const editingLine = editingId ? (lines.find(l => l.id === editingId) ?? null) : null;
   const editingIsActive = editingLine?.active ?? false;
 
-  const resetForm = () => { setName(''); setColor(''); };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const isReorderable = !!onReorder && active.length > 1;
+
+  const resetForm = () => { setName(''); setColor(''); setDescripcion(''); };
 
   const handleAdd = async () => {
     const err = validateName(name);
     if (err) { toast.error(err); return; }
     setIsSaving(true);
     try {
-      await onAdd({ name: name.trim(), active: true, color: color || undefined });
+      await onAdd({
+        name: name.trim(),
+        active: true,
+        color: color || undefined,
+        descripcion: descripcion.trim() || undefined,
+      });
       resetForm();
       setIsAdding(false);
     } finally {
@@ -73,7 +170,11 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
   const handleUpdate = (id: string) => {
     const err = validateName(name);
     if (err) { toast.error(err); return; }
-    onUpdate(id, { name: name.trim(), color: color || undefined });
+    onUpdate(id, {
+      name: name.trim(),
+      color: color || undefined,
+      descripcion: descripcion.trim() || undefined,
+    });
     setEditingId(null);
     resetForm();
   };
@@ -82,6 +183,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
     setEditingId(line.id);
     setName(line.name);
     setColor(line.color || '');
+    setDescripcion(line.descripcion ?? '');
   };
 
   const handleConfirmToggle = () => {
@@ -94,6 +196,16 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
     if (!deleteConfirm || !onDelete) return;
     onDelete(deleteConfirm.id);
     setDeleteConfirm(null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active: act, over } = event;
+    if (!over || act.id === over.id || !onReorder) return;
+    const oldIndex = active.findIndex(l => l.id === act.id);
+    const newIndex = active.findIndex(l => l.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const newOrder = arrayMove(active, oldIndex, newIndex);
+    await onReorder(newOrder.map(l => l.id));
   };
 
   const ColorPicker = (
@@ -111,32 +223,32 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
     </div>
   );
 
-  const renderLine = (line: Line) => {
-    return (
-      <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <EntityColorBar color={line.color} />
-          <div className="flex flex-1 items-center gap-3">
-            <span className="flex-1 font-medium text-foreground">{line.name}</span>
-            <button
-              onClick={() => startEdit(line)}
-              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
-              title="Opciones"
-            >
-              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </div>
+  const renderInactiveLine = (line: Line) => (
+    <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <EntityColorBar color={line.color} />
+        <div className="flex flex-1 items-center gap-3">
+          <span className="flex-1 font-medium text-foreground">{line.name}</span>
+          <button
+            onClick={() => startEdit(line)}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+            title="Opciones"
+          >
+            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
     <>
       <CatalogSectionCard
         icon={Tag}
         title="Agrupación de servicios"
-        description="Organizan el menú de cobro y facilitan la búsqueda de servicios."
+        description={isReorderable
+          ? 'Organizan el menú de cobro y el orden con el que verá el cliente en tu portal de reservas. Arrastrá para reordenar.'
+          : 'Organizan el menú de cobro y facilitan la búsqueda de servicios.'}
         actions={
           !isAdding && !editingId && activeSubTab === 'active' ? (
             <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => { resetForm(); setIsAdding(true); }}>
@@ -157,7 +269,22 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
       >
         {activeSubTab === 'active' && (
           <div className="space-y-2" role="tabpanel">
-            {active.map(renderLine)}
+            {active.length > 0 && (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={active.map(l => l.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {active.map(line => (
+                      <SortableLineItem
+                        key={line.id}
+                        line={line}
+                        onEdit={startEdit}
+                        isReorderable={isReorderable}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
             {active.length === 0 && !isAdding && (
               <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
                 <Tag className="h-8 w-8 text-muted-foreground/50" />
@@ -176,7 +303,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
         )}
         {activeSubTab === 'inactive' && (
           <div className="space-y-2" role="tabpanel">
-            {inactive.map(renderLine)}
+            {inactive.map(renderInactiveLine)}
             {inactive.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No hay líneas inactivas</p>
             )}
@@ -263,6 +390,17 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete }: LinesConfigPro
           <div className="space-y-2">
             <label className="text-sm font-medium">Color (opcional)</label>
             {ColorPicker}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Descripción (opcional)</label>
+            <Textarea
+              maxLength={240}
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Ej: Servicios premium con detalles de terminación."
+            />
+            <p className="text-xs text-muted-foreground text-right">{descripcion.length}/240</p>
+            <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
           </div>
         </div>
       </DrawerForm>

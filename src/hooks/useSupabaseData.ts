@@ -54,6 +54,8 @@ function dbToLine(row: any): Line {
     name: row.nombre,
     color: row.color || undefined,
     active: row.activo,
+    descripcion: row.descripcion ?? undefined,
+    orden: typeof row.orden === 'number' ? row.orden : undefined,
   };
 }
 
@@ -74,6 +76,7 @@ function dbToService(row: any, lines: Line[], branchRow?: ServicioSucursalRow): 
     lineName: line?.name,
     sucursalId: row.sucursal_id || undefined,
     active: operativeActive,
+    descripcion: row.descripcion ?? undefined,
     globalActive,
     branchActive,
     sucursalConfigId: branchRow?.id,
@@ -190,7 +193,7 @@ export function useSupabaseData() {
     try {
       const linesData = await runQuery<any[]>(
         'lineas',
-        supabase.from('lineas').select('*').eq('eliminado', false).order('nombre') as any
+        supabase.from('lineas').select('*').eq('eliminado', false).order('orden', { ascending: true }).order('nombre', { ascending: true }) as any
       );
       const fetchedLines = linesData.map(dbToLine);
       setLines(fetchedLines);
@@ -361,17 +364,22 @@ export function useSupabaseData() {
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
 
       // 1. Insert global SIN propagar precio. precio=0 placeholder, sucursal_id=null.
+      const insertPayload: any = {
+        nombre: normalizedName,
+        precio: 0,
+        duracion_min: service.durationMin || 30,
+        activo: true,
+        linea_id: service.lineId || null,
+        organization_id: organization.id,
+        sucursal_id: null,
+      };
+      if (service.descripcion !== undefined) {
+        const trimmed = (service.descripcion ?? '').trim();
+        insertPayload.descripcion = trimmed ? trimmed : null;
+      }
       const { data, error } = await supabase
         .from('servicios')
-        .insert({
-          nombre: normalizedName,
-          precio: 0,
-          duracion_min: service.durationMin || 30,
-          activo: true,
-          linea_id: service.lineId || null,
-          organization_id: organization.id,
-          sucursal_id: null,
-        })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;
@@ -434,11 +442,15 @@ export function useSupabaseData() {
 
   const updateService = useCallback(async (id: string, updates: Partial<Service>) => {
     try {
-      // 1. Globales: nombre / duracion_min / linea_id (NUNCA precio ni activo si hay sucursal)
+      // 1. Globales: nombre / duracion_min / linea_id / descripcion (NUNCA precio ni activo si hay sucursal)
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.nombre = updates.name.replace(/\s+/g, ' ').trim();
       if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
+      if (updates.descripcion !== undefined) {
+        const trimmed = (updates.descripcion ?? '').trim();
+        dbUpdates.descripcion = trimmed ? trimmed : null;
+      }
       // Sin sucursal: active toggle global directo
       if (!sucursalId && updates.active !== undefined) dbUpdates.activo = updates.active;
 
@@ -495,6 +507,7 @@ export function useSupabaseData() {
           merged.lineId = updates.lineId || undefined;
           merged.lineName = updatedLine?.name;
         }
+        if (updates.descripcion !== undefined) merged.descripcion = (updates.descripcion ?? '').trim() || undefined;
         if (!sucursalId && updates.active !== undefined) {
           merged.active = updates.active;
           merged.globalActive = updates.active;
@@ -964,21 +977,42 @@ export function useSupabaseData() {
     }
   }, [softDelete]);
 
-  // ============= Lines CRUD (sin cambios) =============
+  // ============= Lines CRUD =============
   const addLine = useCallback(async (line: Omit<Line, 'id'>) => {
     if (!organization) {
       toast.error('No se pudo determinar la organización');
       return null;
     }
     try {
+      // Calcular el próximo orden (MAX+10) para que la línea nueva quede al final.
+      // Race condition documentada: si dos crean a la vez podrían empatar; el orden
+      // queda ambiguo pero no roto, y el siguiente reorden por DnD lo deja determinista.
+      const { data: maxRow, error: maxErr } = await supabase
+        .from('lineas')
+        .select('orden')
+        .eq('organization_id', organization.id)
+        .eq('eliminado', false)
+        .order('orden', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (maxErr) throw maxErr;
+      const nextOrden = ((maxRow?.orden ?? 0) as number) + 10;
+
+      const insertPayload: any = {
+        nombre: line.name,
+        activo: line.active,
+        color: line.color || null,
+        organization_id: organization.id,
+        orden: nextOrden,
+      };
+      if (line.descripcion !== undefined) {
+        const trimmed = (line.descripcion ?? '').trim();
+        insertPayload.descripcion = trimmed ? trimmed : null;
+      }
+
       const { data, error } = await supabase
         .from('lineas')
-        .insert({
-          nombre: line.name,
-          activo: line.active,
-          color: line.color || null,
-          organization_id: organization.id,
-        })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;
@@ -999,6 +1033,12 @@ export function useSupabaseData() {
       if (updates.name !== undefined) dbUpdates.nombre = updates.name;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
       if (updates.color !== undefined) dbUpdates.color = updates.color || null;
+      if (updates.descripcion !== undefined) {
+        const trimmed = (updates.descripcion ?? '').trim();
+        dbUpdates.descripcion = trimmed ? trimmed : null;
+      }
+
+      if (Object.keys(dbUpdates).length === 0) return;
 
       const { error } = await supabase.from('lineas').update(dbUpdates).eq('id', id);
       if (error) throw error;
@@ -1013,6 +1053,30 @@ export function useSupabaseData() {
     }
   }, []);
 
+  const reorderLines = useCallback(async (ids: string[]) => {
+    if (!organization) {
+      toast.error('No se pudo determinar la organización');
+      return;
+    }
+    if (!ids.length) return;
+    // Snapshot para rollback
+    const prevLines = lines;
+    // Optimista: aplicar nuevo orden en múltiplos de 10
+    const orderMap = new Map(ids.map((id, idx) => [id, (idx + 1) * 10]));
+    setLines(prev => prev.map(l => orderMap.has(l.id) ? { ...l, orden: orderMap.get(l.id)! } : l));
+    try {
+      const { error } = await supabase.rpc('reorder_lineas', {
+        p_org_id: organization.id,
+        p_ids: ids,
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error reordering lines:', error);
+      setLines(prevLines);
+      toast.error('No se pudo guardar el nuevo orden');
+    }
+  }, [organization, lines]);
+
   // ============= GLOBAL handlers (tab "General" en Mi Negocio) =============
   // Estos handlers NO miran currentSucursal y NUNCA tocan tablas *_sucursales ni RPCs de sucursal.
   // Escriben siempre sobre las tablas globales (servicios / extras / descuentos).
@@ -1024,17 +1088,22 @@ export function useSupabaseData() {
     }
     try {
       const normalizedName = service.name.replace(/\s+/g, ' ').trim();
+      const insertPayload: any = {
+        nombre: normalizedName,
+        precio: 0,
+        duracion_min: service.durationMin || 30,
+        activo: service.active !== false,
+        linea_id: service.lineId || null,
+        organization_id: organization.id,
+        sucursal_id: null,
+      };
+      if (service.descripcion !== undefined) {
+        const trimmed = (service.descripcion ?? '').trim();
+        insertPayload.descripcion = trimmed ? trimmed : null;
+      }
       const { data, error } = await supabase
         .from('servicios')
-        .insert({
-          nombre: normalizedName,
-          precio: 0,
-          duracion_min: service.durationMin || 30,
-          activo: service.active !== false,
-          linea_id: service.lineId || null,
-          organization_id: organization.id,
-          sucursal_id: null,
-        })
+        .insert(insertPayload)
         .select()
         .single();
       if (error) throw error;
@@ -1056,6 +1125,10 @@ export function useSupabaseData() {
       if (updates.durationMin !== undefined) dbUpdates.duracion_min = updates.durationMin;
       if (updates.lineId !== undefined) dbUpdates.linea_id = updates.lineId || null;
       if (updates.active !== undefined) dbUpdates.activo = updates.active;
+      if (updates.descripcion !== undefined) {
+        const trimmed = (updates.descripcion ?? '').trim();
+        dbUpdates.descripcion = trimmed ? trimmed : null;
+      }
 
       if (Object.keys(dbUpdates).length === 0) return;
 
@@ -1072,6 +1145,7 @@ export function useSupabaseData() {
           merged.lineId = updates.lineId || undefined;
           merged.lineName = updatedLine?.name;
         }
+        if (updates.descripcion !== undefined) merged.descripcion = (updates.descripcion ?? '').trim() || undefined;
         if (updates.active !== undefined) {
           merged.globalActive = updates.active;
           const branchActive = merged.branchActive;
@@ -1275,6 +1349,7 @@ export function useSupabaseData() {
     setDiscountActive,
     addLine,
     updateLine,
+    reorderLines,
     deleteService,
     deleteExtra,
     deleteLine,
