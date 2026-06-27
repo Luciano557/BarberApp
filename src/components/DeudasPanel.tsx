@@ -35,7 +35,7 @@ function formatARS(n: number): string {
 }
 
 export function DeudasPanel() {
-  const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda } = useDeudas();
+  const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda, fetchPagosDeuda } = useDeudas();
   const { inversiones } = useInversiones();
 
   const [acreedor, setAcreedor] = useState('');
