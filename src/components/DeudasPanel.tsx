@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Landmark, Trash2, Plus, CreditCard, CheckCircle2 } from 'lucide-react';
-import { useDeudas, type Deuda } from '@/hooks/useDeudas';
+import { useEffect, useState, useMemo } from 'react';
+import { Landmark, Trash2, Plus, CreditCard, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useDeudas, type Deuda, type PagoDeuda } from '@/hooks/useDeudas';
 import { useInversiones } from '@/hooks/useInversiones';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
