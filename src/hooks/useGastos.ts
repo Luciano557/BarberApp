@@ -18,6 +18,7 @@ export interface Gasto {
   inversion_id: string | null;
   gasto_recurrente_id?: string | null;
   pago_deuda_id?: string | null;
+  pago_sueldo_id?: string | null;
 }
 
 export function useGastos() {
