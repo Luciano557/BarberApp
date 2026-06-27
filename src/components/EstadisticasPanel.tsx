@@ -336,6 +336,7 @@ export function EstadisticasPanel() {
         .from('Egresos')
         .select('Monto, tipo_costo, Fecha')
         .eq('organization_id', organization.id)
+        .eq('estado', 'activo')
         .gte('Fecha', startDate.toISOString())
         .lte('Fecha', endDate.toISOString());
 
