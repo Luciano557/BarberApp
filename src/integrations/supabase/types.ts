@@ -2358,6 +2358,53 @@ export type Database = {
         }
         Relationships: []
       }
+      pagos_deudas: {
+        Row: {
+          created_at: string
+          deuda_id: string
+          egreso_id: string | null
+          fecha_pago: string
+          id: string
+          monto: number
+          numero_cuota: number | null
+          observacion: string | null
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deuda_id: string
+          egreso_id?: string | null
+          fecha_pago: string
+          id?: string
+          monto: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deuda_id?: string
+          egreso_id?: string | null
+          fecha_pago?: string
+          id?: string
+          monto?: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_deudas_deuda_id_fkey"
+            columns: ["deuda_id"]
+            isOneToOne: false
+            referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pagos_sueldos: {
         Row: {
           barbero_id: string
