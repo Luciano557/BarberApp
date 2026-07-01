@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 export type TipoCosto = 'fijo' | 'variable' | 'semivariable';
 
@@ -16,6 +16,9 @@ export interface Gasto {
   organization_id: string | null;
   tipo_costo: TipoCosto | null;
   inversion_id: string | null;
+  gasto_recurrente_id?: string | null;
+  pago_deuda_id?: string | null;
+  pago_sueldo_id?: string | null;
 }
 
 export function useGastos() {
@@ -57,74 +60,6 @@ export function useGastos() {
     }
   }, [organization?.id, selectedMonth, currentSucursal]);
 
-  const syncAmortizaciones = useCallback(async () => {
-    if (!organization?.id) return;
-    try {
-      // 1. Fetch active investments
-      let invQuery = supabase
-        .from('inversiones')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .eq('activa', true);
-
-      if (currentSucursal) {
-        invQuery = invQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      const { data: inversiones, error: invError } = await invQuery;
-      if (invError || !inversiones?.length) return;
-
-      const monthStart = startOfMonth(selectedMonth);
-      const start = format(monthStart, 'yyyy-MM-dd');
-      const end = format(endOfMonth(selectedMonth), 'yyyy-MM-dd');
-
-      // 2. Check which amortization egresos already exist for this month
-      let existQuery = supabase
-        .from('Egresos')
-        .select('inversion_id')
-        .eq('organization_id', organization.id)
-        .not('inversion_id', 'is', null)
-        .gte('Fecha', `${start}T00:00:00`)
-        .lte('Fecha', `${end}T23:59:59`);
-
-      if (currentSucursal) {
-        existQuery = existQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      const { data: existing } = await existQuery;
-      const existingIds = new Set((existing || []).map(e => e.inversion_id));
-
-      // 3. Determine which investments need an amortization entry this month
-      const toInsert = inversiones.filter(inv => {
-        if (existingIds.has(inv.id)) return false;
-        const compra = new Date(inv.fecha_compra);
-        const compraMonth = startOfMonth(compra);
-        const lastMonth = startOfMonth(addMonths(compra, inv.meses_amortizacion - 1));
-        return monthStart >= compraMonth && monthStart <= lastMonth;
-      });
-
-      if (toInsert.length === 0) return;
-
-      // 4. Insert missing amortization egresos
-      const rows = toInsert.map(inv => ({
-        Categoria: 'Amortización de equipamiento',
-        tipo_costo: 'fijo',
-        Monto: Math.round((inv.monto_total / inv.meses_amortizacion) * 100) / 100,
-        Descripcion: inv.nombre,
-        Fecha: new Date(monthStart.getFullYear(), monthStart.getMonth(), 1).toISOString(),
-        organization_id: organization.id,
-        sucursal_id: currentSucursal?.id || null,
-        inversion_id: inv.id,
-      }));
-
-      await supabase.from('Egresos').insert(rows);
-      // Return true to signal a re-fetch is needed
-      return true;
-    } catch (error) {
-      console.error('Error syncing amortizaciones:', error);
-    }
-    return false;
-  }, [organization?.id, selectedMonth, currentSucursal]);
 
   const hasSynced = useRef<string>('');
   const syncRecurrentesRef = useRef<(() => Promise<boolean>) | null>(null);
@@ -144,14 +79,10 @@ export function useGastos() {
         await syncRecurrentesRef.current();
       }
       await fetchGastos();
-      const inserted = await syncAmortizaciones();
-      if (inserted) {
-        await fetchGastos();
-      }
       hasSynced.current = key;
     };
     run();
-  }, [fetchGastos, syncAmortizaciones]);
+  }, [fetchGastos]);
 
   const addGasto = async (data: {
     categoria: string;

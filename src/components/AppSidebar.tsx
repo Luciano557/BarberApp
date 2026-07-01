@@ -63,9 +63,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     ...(canOperarCajaYGastos ? [{ id: 'registro', label: 'Cobrar', icon: CreditCard }] : []),
     ...(canViewResumen ? [{ id: 'resumen', label: 'Caja', icon: BarChart3 }] : []),
     ...(canViewFinanzas ? [{ id: 'finanzas', label: 'Finanzas', icon: Wallet }] : []),
-    ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList, feature: 'tasks' }] : []),
-    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock, feature: 'appointments' }] : []),
-    ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users, feature: 'clients' }] : []),
+    ...(canViewTareas ? [{ id: 'tareas', label: 'Tareas', icon: ClipboardList, feature: 'tasks' as const }] : []),
+    ...(canViewTurnosAgenda ? [{ id: 'turnos-agenda', label: 'Turnos', icon: CalendarClock, feature: 'appointments' as const }] : []),
+    ...(canViewClientes ? [{ id: 'clientes', label: 'Clientes', icon: Users, feature: 'clients' as const }] : []),
     ...(canViewMiNegocio ? [{ id: 'mi-negocio', label: 'Mi Negocio', icon: Store }] : []),
     ...(canViewConfig ? [{ id: 'config', label: 'Configuración', icon: Settings }] : []),
   ];

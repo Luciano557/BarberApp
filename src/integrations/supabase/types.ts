@@ -1036,6 +1036,8 @@ export type Database = {
           inversion_id: string | null
           Monto: number | null
           organization_id: string | null
+          pago_deuda_id: string | null
+          pago_sueldo_id: string | null
           sucursal_id: string | null
           tipo_costo: string | null
         }
@@ -1053,6 +1055,8 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
+          pago_sueldo_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1070,6 +1074,8 @@ export type Database = {
           inversion_id?: string | null
           Monto?: number | null
           organization_id?: string | null
+          pago_deuda_id?: string | null
+          pago_sueldo_id?: string | null
           sucursal_id?: string | null
           tipo_costo?: string | null
         }
@@ -1079,6 +1085,20 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_pago_deuda_id_fkey"
+            columns: ["pago_deuda_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_deudas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "Egresos_pago_sueldo_id_fkey"
+            columns: ["pago_sueldo_id"]
+            isOneToOne: false
+            referencedRelation: "pagos_sueldos"
             referencedColumns: ["id"]
           },
           {
@@ -2357,6 +2377,60 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      pagos_deudas: {
+        Row: {
+          created_at: string
+          deuda_id: string
+          egreso_id: number | null
+          fecha_pago: string
+          id: string
+          monto: number
+          numero_cuota: number | null
+          observacion: string | null
+          organization_id: string
+          sucursal_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deuda_id: string
+          egreso_id?: number | null
+          fecha_pago: string
+          id?: string
+          monto: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id: string
+          sucursal_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deuda_id?: string
+          egreso_id?: number | null
+          fecha_pago?: string
+          id?: string
+          monto?: number
+          numero_cuota?: number | null
+          observacion?: string | null
+          organization_id?: string
+          sucursal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_deudas_deuda_id_fkey"
+            columns: ["deuda_id"]
+            isOneToOne: false
+            referencedRelation: "deudas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_deudas_egreso_id_fkey"
+            columns: ["egreso_id"]
+            isOneToOne: false
+            referencedRelation: "Egresos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pagos_sueldos: {
         Row: {
