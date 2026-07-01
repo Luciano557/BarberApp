@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -28,6 +28,7 @@ import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoP
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
+import { SelectableCard } from '@/components/ui/SelectableCard';
 import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
@@ -860,7 +861,10 @@ export function PaymentRegistration({
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
-        <p className="text-muted-foreground text-sm mt-1">Ctrl+1-9 para selección rápida</p>
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Keyboard className="h-3.5 w-3.5" />
+          Ctrl+1-9 para selección rápida
+        </p>
       </div>
 
       {/* Progress Steps */}
@@ -875,9 +879,9 @@ export function PaymentRegistration({
               }}
               className={`h-1.5 w-full rounded-full transition-colors ${
                 index < currentStepIndex
-                  ? 'bg-secondary cursor-pointer'
+                  ? 'bg-ring/40 cursor-pointer'
                   : index === currentStepIndex
-                  ? 'bg-foreground'
+                  ? 'bg-ring'
                   : 'bg-border'
               }`}
             />
@@ -926,46 +930,34 @@ export function PaymentRegistration({
                     selectedBarber === barber.uid ||
                     (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
                   return (
-                    <button
+                    <SelectableCard
                       key={barber.uid}
+                      number={index + 1}
+                      selected={isSelected}
                       onClick={() => handleSelectBarber(barber.uid)}
-                      className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
-                        isSelected
-                          ? 'border-secondary bg-secondary/5'
-                          : 'border-border bg-card hover:bg-muted/50'
-                      }`}
                     >
-                      <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                        {index + 1}
-                      </span>
                       <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
                         <User className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
-                    </button>
+                    </SelectableCard>
                   );
                 })}
 
                 {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
                 {cart.length > 0 && (
-                  <button
-                    type="button"
+                  <SelectableCard
+                    number={barbers.length + 1}
+                    selected={productSaleAssignment === 'no_barber'}
                     onClick={handleSelectNoBarber}
-                    className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
-                      productSaleAssignment === 'no_barber'
-                        ? 'border-secondary bg-secondary/5'
-                        : 'border-dashed border-border bg-card hover:bg-muted/50'
-                    }`}
+                    className={productSaleAssignment === 'no_barber' ? '' : 'border-dashed'}
                   >
-                    <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                      {barbers.length + 1}
-                    </span>
                     <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
                       <Package className="h-6 w-6 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-center text-foreground">Sin barbero</p>
                     <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
-                  </button>
+                  </SelectableCard>
                 )}
               </div>
             )}
@@ -1113,18 +1105,13 @@ export function PaymentRegistration({
                       const idx = globalIndex;
                       const blocked = isPriceMissing(service.price);
                       return (
-                        <button
+                        <SelectableCard
                           key={service.id}
+                          number={idx}
+                          selected={selectedService === service.id}
                           onClick={() => handleSelectService(service.id)}
-                          className={`relative p-5 rounded-lg border transition-colors text-left hover:border-secondary ${
-                            selectedService === service.id
-                              ? 'border-secondary bg-secondary/5'
-                              : 'border-border bg-card hover:bg-muted/50'
-                          } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                          <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                            {idx}
-                          </span>
+                          className={`text-left${blocked ? ' opacity-50 cursor-not-allowed' : ''}`}
+                        >
                           <div className="flex flex-col items-start gap-1.5 pl-6 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                             <span className="font-medium text-foreground">{service.name}</span>
                             {blocked ? (
@@ -1133,7 +1120,7 @@ export function PaymentRegistration({
                               <span className="text-lg font-semibold text-foreground">${service.price.toLocaleString()}</span>
                             )}
                           </div>
-                        </button>
+                        </SelectableCard>
                       );
                     })}
                   </div>
@@ -1167,18 +1154,13 @@ export function PaymentRegistration({
               {extras.map((extra, index) => {
                 const blocked = isPriceMissing(extra.price);
                 return (
-                  <button
+                  <SelectableCard
                     key={extra.id}
+                    number={index + 1}
+                    selected={selectedExtras.includes(extra.id)}
                     onClick={() => handleToggleExtra(extra.id)}
-                    className={`relative p-4 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
-                      selectedExtras.includes(extra.id)
-                        ? 'border-secondary bg-secondary/5'
-                        : 'border-border bg-card hover:bg-muted/50'
-                    } ${blocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={blocked ? 'opacity-50 cursor-not-allowed' : ''}
                   >
-                    <span className="absolute top-2 left-2 text-xs font-medium text-muted-foreground">
-                      {index + 1}
-                    </span>
                     {selectedExtras.includes(extra.id) && (
                       <div className="animate-pop-in absolute top-2 right-2 w-5 h-5 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center">
                         <Check className="h-3 w-3" />
@@ -1194,12 +1176,12 @@ export function PaymentRegistration({
                         <p className="text-sm font-semibold text-foreground text-center mt-1">+${extra.price.toLocaleString()}</p>
                       )}
                     </div>
-                  </button>
+                  </SelectableCard>
                 );
               })}
             </div>
 
-            <Button onClick={goToNextStep} className="w-full h-12 bg-foreground hover:bg-foreground/90">
+            <Button onClick={goToNextStep} className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90">
               Continuar <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -1224,20 +1206,17 @@ export function PaymentRegistration({
         {currentStep === 'discount' && (
           <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
-            <button
+            <SelectableCard
               key="none"
+              selected={selectedDiscount === 'none'}
               onClick={() => handleSelectDiscount('none')}
-              className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
-                selectedDiscount === 'none'
-                  ? 'border-secondary bg-secondary/5'
-                  : 'border-dashed border-border bg-card hover:bg-muted/50'
-              }`}
+              className={selectedDiscount === 'none' ? '' : 'border-dashed'}
             >
               <div className="w-10 h-10 rounded-lg bg-muted mx-auto mb-3 flex items-center justify-center">
                 <Check className="h-5 w-5 text-muted-foreground" />
               </div>
               <p className="font-medium text-center text-foreground">Sin descuento</p>
-            </button>
+            </SelectableCard>
             {discounts.map((discount, index) => {
               const rounding = discount.rounding || 'cliente';
               const rawCalc = discount.type === 'fixed' 
@@ -1251,18 +1230,12 @@ export function PaymentRegistration({
               const paymentLabel = paymentRestriction ? getMethodLabel(discount.paymentMethod as PaymentMethod) : '';
               
               return (
-                <button
+                <SelectableCard
                   key={discount.id}
+                  number={index + 1}
+                  selected={selectedDiscount === discount.id}
                   onClick={() => handleSelectDiscount(discount.id)}
-                  className={`relative p-6 rounded-lg border transition-[transform,border-color,background-color,color] hover:border-secondary active:scale-[0.98] ${
-                    selectedDiscount === discount.id
-                      ? 'border-secondary bg-secondary/5'
-                      : 'border-border bg-card hover:bg-muted/50'
-                  }`}
                 >
-                  <span className="absolute top-3 left-3 text-xs font-medium text-muted-foreground">
-                    {index + 1}
-                  </span>
                   {paymentRestriction && (
                     <span className="absolute top-3 right-3 text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent text-accent-foreground">
                       Solo {paymentLabel}
@@ -1283,7 +1256,7 @@ export function PaymentRegistration({
                       -${calcAmount.toLocaleString()}
                     </p>
                   )}
-                </button>
+                </SelectableCard>
               );
             })}
           </div>
@@ -1296,7 +1269,7 @@ export function PaymentRegistration({
                 }
                 goToNextStep();
               }}
-              className="w-full h-12 bg-foreground hover:bg-foreground/90"
+              className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Continuar <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -1325,12 +1298,12 @@ export function PaymentRegistration({
                     const isSelected = paymentMethod === m.method;
                     const Icon = isEfectivo ? Banknote : CreditCard;
                     const selectedClass = isEfectivo
-                      ? 'border-success bg-success/5'
-                      : 'border-secondary bg-secondary/5';
+                      ? 'border-success bg-success/5 ring-1 ring-success/20'
+                      : 'border-primary bg-primary/5 ring-1 ring-primary/20';
                     const hoverClass = isEfectivo ? 'hover:border-success' : 'hover:border-secondary';
                     const iconColor = isSelected
-                      ? (isEfectivo ? 'text-success' : 'text-secondary')
-                      : 'text-muted-foreground';
+                      ? 'text-primary'
+                      : 'text-foreground';
                     return (
                       <button
                         key={m.method}
@@ -1645,28 +1618,27 @@ export function PaymentRegistration({
 
       {overlayPhase !== 'idle' && createPortal(
         <div
-          className={`fixed inset-0 z-50 flex items-center justify-center ${
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm ${
             overlayPhase === 'exiting' ? 'animate-overlay-hide' : 'animate-overlay-show'
           }`}
-          style={{ background: 'rgba(10, 16, 36, 0.72)' }}
           aria-live="polite"
           aria-label="Cobro registrado exitosamente"
         >
           <div
-            className={`flex flex-col items-center gap-5 rounded-2xl px-8 py-8 sm:px-12 sm:py-10 text-center ${
+            className={`flex flex-col items-center gap-5 rounded-2xl bg-primary px-8 py-8 sm:px-12 sm:py-10 text-center ${
               overlayPhase === 'exiting' ? 'animate-confirm-card-out' : 'animate-confirm-card-in'
             }`}
-            style={{ background: '#1E2A4A', maxWidth: '300px', width: '90%' }}
+            style={{ maxWidth: '300px', width: '90%' }}
           >
             <div
-              className={overlayPhase !== 'exiting' ? 'animate-confirm-icon-pop flex items-center justify-center rounded-full' : 'flex items-center justify-center rounded-full'}
-              style={{ width: 64, height: 64, background: 'rgba(255,255,255,0.1)' }}
+              className={`${overlayPhase !== 'exiting' ? 'animate-confirm-icon-pop ' : ''}flex items-center justify-center rounded-full bg-primary-foreground/10`}
+              style={{ width: 64, height: 64 }}
             >
-              <Check className="h-8 w-8 text-white" strokeWidth={2.5} />
+              <Check className="h-8 w-8 text-primary-foreground" strokeWidth={2.5} />
             </div>
             <div className={overlayPhase !== 'exiting' ? 'animate-confirm-text-in flex flex-col gap-1' : 'flex flex-col gap-1'}>
-              <p className="text-xl font-medium text-white">Cobro registrado</p>
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>
+              <p className="text-xl font-medium text-primary-foreground">Cobro registrado</p>
+              <p className="text-sm text-primary-foreground/60">
                 El cobro fue registrado con éxito
               </p>
             </div>
