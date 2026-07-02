@@ -131,7 +131,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
       return;
     }
 
-    const fail = res;
+    const fail = res as Extract<typeof res, { ok: false }>;
     if (fail.status === 409 && fail.error === 'choque_de_horario') {
       setMoveConflict({ kind: 'choque_de_horario', conflicts: fail.conflicts });
       return;
