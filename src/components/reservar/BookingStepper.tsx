@@ -215,7 +215,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         </div>
 
         <div className="mb-5 lg:hidden">
-          <BookingSummary booking={booking} stepLabel={stepLabel} />
+          <BookingSummary booking={booking} stepLabel={stepLabel} variant={step <= 3 ? "chip" : "full"} />
         </div>
 
         {step === 0 && (

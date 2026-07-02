@@ -16,10 +16,12 @@ import { UnavailableSlotDialog } from './UnavailableSlotDialog';
 import { DayOffDialog } from './DayOffDialog';
 import { AppointmentDetailDialog } from './AppointmentDetailDialog';
 import { MoveConfirmDialog } from './MoveConfirmDialog';
+import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
+import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+
 
 type ViewMode = 'day' | '3days' | 'week';
 
@@ -31,7 +33,7 @@ interface AgendaPanelProps {
 }
 
 export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barbers }: AgendaPanelProps) {
-  const { isOwner, isGeneralManager, isManager, isBarber } = useAuth();
+  const { isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount } = useAuth();
   const [date, setDate] = useState(new Date());
   const [view, setView] = useState<ViewMode>('day');
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -47,9 +49,19 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   } | null>(null);
   const [movingLoading, setMovingLoading] = useState(false);
 
-  const canManageAgenda = isOwner || isGeneralManager || isManager;
+  const [moveConflict, setMoveConflict] = useState<{
+    kind: TurnoConflictKind;
+    conflicts?: ConflictTurno[];
+  } | null>(null);
+
+  // Cualquier miembro del equipo con acceso a la agenda puede crear/editar/mover
+  // turnos y bloquear horarios. La función update-turno-internal aplica los
+  // controles finos por sucursal en el servidor.
+  const canManageAgenda =
+    isOwner || isGeneralManager || isManager || isBarber || isSucursalAccount;
   const canCreateDayOff = canManageAgenda;
   const canDrag = canManageAgenda;
+
 
   const { fromDate, toDate } = useMemo(() => {
     if (view === 'day') return { fromDate: date, toDate: date };
@@ -97,26 +109,68 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
     setMoveDialog({ turno, newBarberoId, newHoraInicio, newHoraFin, newFecha });
   };
 
-  const confirmMove = async () => {
-    if (!canManageAgenda) return;
-    if (!moveDialog) return;
+  const performMove = async (opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {}) => {
+    if (!canManageAgenda || !moveDialog) return;
+    const { turno, newBarberoId, newHoraInicio, newFecha } = moveDialog;
     setMovingLoading(true);
-    const { turno, newBarberoId, newHoraInicio, newHoraFin, newFecha } = moveDialog;
-    const { error } = await supabase.from('turnos').update({
+    const res = await callUpdateTurnoInternal({
+      turno_id: turno.id,
       barbero_id: newBarberoId,
-      hora_inicio: newHoraInicio,
-      hora_fin: newHoraFin,
       fecha: newFecha,
-    }).eq('id', turno.id);
+      hora_inicio: newHoraInicio,
+      confirm_overlap: opts.confirmOverlap,
+      confirm_fuera_horario: opts.confirmFueraHorario,
+    });
     setMovingLoading(false);
-    if (error) {
-      toast.error('No se pudo mover el turno');
+
+    if (res.ok) {
+      toast.success('Turno actualizado');
+      setMoveDialog(null);
+      setMoveConflict(null);
+      refetch();
       return;
     }
-    toast.success('Turno actualizado');
-    setMoveDialog(null);
-    refetch();
+
+    const fail = res as Extract<typeof res, { ok: false }>;
+    if (fail.status === 409 && fail.error === 'choque_de_horario') {
+      setMoveConflict({ kind: 'choque_de_horario', conflicts: fail.conflicts });
+      return;
+    }
+    if (fail.status === 409 && fail.error === 'fuera_de_horario') {
+      setMoveConflict({ kind: 'fuera_de_horario' });
+      return;
+    }
+    if (fail.error === 'slot_en_pasado') {
+      toast.error('No podés mover el turno a un horario en el pasado');
+      return;
+    }
+    if (fail.error === 'turno_cerrado') {
+      toast.error('Este turno ya no se puede modificar');
+      return;
+    }
+    if (fail.error === 'slot_bloqueado') {
+      toast.error('Ese horario está bloqueado en la agenda');
+      return;
+    }
+    if (fail.error === 'forbidden') {
+      toast.error('No tenés permiso para mover este turno');
+      return;
+    }
+    toast.error(fail.message || 'No se pudo mover el turno');
   };
+
+
+  const confirmMove = () => performMove();
+
+  const confirmMoveConflictRetry = () => {
+    if (!moveConflict) return;
+    if (moveConflict.kind === 'choque_de_horario') {
+      performMove({ confirmOverlap: true });
+    } else if (moveConflict.kind === 'fuera_de_horario') {
+      performMove({ confirmFueraHorario: true });
+    }
+  };
+
 
   const titleLabel = useMemo(() => {
     if (view === 'day') return format(date, "EEEE dd 'de' MMMM yyyy", { locale: es });
@@ -276,8 +330,8 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         readOnly={!canManageAgenda}
       />
       <MoveConfirmDialog
-        open={!!moveDialog}
-        onOpenChange={(v) => { if (!v) setMoveDialog(null); }}
+        open={!!moveDialog && !moveConflict}
+        onOpenChange={(v) => { if (!v) { setMoveDialog(null); setMoveConflict(null); } }}
         turno={moveDialog?.turno || null}
         newBarberId={moveDialog?.newBarberoId || ''}
         newHoraInicio={moveDialog?.newHoraInicio || ''}
@@ -287,6 +341,15 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         onConfirm={confirmMove}
         loading={movingLoading}
       />
+      <TurnoConflictDialog
+        open={!!moveConflict}
+        onOpenChange={(v) => { if (!v) setMoveConflict(null); }}
+        kind={moveConflict?.kind || null}
+        conflicts={moveConflict?.conflicts}
+        onConfirm={confirmMoveConflictRetry}
+        loading={movingLoading}
+      />
+
     </div>
   );
 }

@@ -6,15 +6,22 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Phone, Calendar, User, Scissors, X, Search, Check, UserPlus, ArrowLeft } from 'lucide-react';
+import { Phone, Calendar, User, Scissors, X, Search, Check, UserPlus, ArrowLeft, Pencil, Clock, CalendarIcon } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
 import { Turno, Servicio } from './hooks/useAgendaData';
 import { formatHHMM } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
+
 
 interface AppointmentDetailDialogProps {
   open: boolean;
@@ -75,6 +82,19 @@ export function AppointmentDetailDialog({
   const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
 
+  // --- Edición del turno (servicio / profesional / fecha / hora) ---
+  const [editingTurno, setEditingTurno] = useState(false);
+  const [savingTurno, setSavingTurno] = useState(false);
+  const [editServicioId, setEditServicioId] = useState('');
+  const [editBarberoId, setEditBarberoId] = useState('');
+  const [editFecha, setEditFecha] = useState<Date | null>(null);
+  const [editHora, setEditHora] = useState('');
+  const [fechaOpen, setFechaOpen] = useState(false);
+  const [turnoConflict, setTurnoConflict] = useState<{
+    kind: TurnoConflictKind;
+    conflicts?: ConflictTurno[];
+  } | null>(null);
+
   const tokenRef = useRef(0);
 
   useEffect(() => {
@@ -92,8 +112,11 @@ export function AppointmentDetailDialog({
       setEmail('');
       setConfirmingCancel(false);
       setMotivo('');
+      setEditingTurno(false);
+      setTurnoConflict(null);
     }
   }, [open]);
+
 
   useEffect(() => {
     if (!editingCliente || !searchOpen) return;
@@ -141,6 +164,87 @@ export function AppointmentDetailDialog({
   const servicio = servicios.find((s) => s.id === turno.servicio_id);
   const canCancel = !readOnly && ['pendiente', 'confirmado'].includes(turno.estado);
   const canEditCliente = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
+  const canEditTurno = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
+
+  const startEditTurno = () => {
+    setEditServicioId(turno.servicio_id);
+    setEditBarberoId(turno.barbero_id);
+    try {
+      setEditFecha(parseISO(turno.fecha));
+    } catch {
+      setEditFecha(new Date());
+    }
+    setEditHora(turno.hora_inicio.slice(0, 5));
+    setEditingTurno(true);
+  };
+
+  const runUpdateTurno = async (opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {}) => {
+    if (!editFecha) {
+      toast.error('Elegí una fecha');
+      return;
+    }
+    if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(editHora)) {
+      toast.error('Ingresá una hora válida (HH:MM)');
+      return;
+    }
+    setSavingTurno(true);
+    const res = await callUpdateTurnoInternal({
+      turno_id: turno.id,
+      servicio_id: editServicioId || undefined,
+      barbero_id: editBarberoId || undefined,
+      fecha: format(editFecha, 'yyyy-MM-dd'),
+      hora_inicio: editHora,
+      confirm_overlap: opts.confirmOverlap,
+      confirm_fuera_horario: opts.confirmFueraHorario,
+    });
+    setSavingTurno(false);
+
+    if (res.ok) {
+      toast.success('Turno actualizado');
+      setEditingTurno(false);
+      setTurnoConflict(null);
+      onChanged();
+      return;
+    }
+    const fail = res as Extract<typeof res, { ok: false }>;
+    if (fail.status === 409 && fail.error === 'choque_de_horario') {
+      setTurnoConflict({ kind: 'choque_de_horario', conflicts: fail.conflicts });
+      return;
+    }
+    if (fail.status === 409 && fail.error === 'fuera_de_horario') {
+      setTurnoConflict({ kind: 'fuera_de_horario' });
+      return;
+    }
+    if (fail.error === 'slot_en_pasado') {
+      toast.error('No podés guardar el turno en un horario en el pasado');
+      return;
+    }
+    if (fail.error === 'turno_cerrado') {
+      toast.error('Este turno ya no se puede modificar');
+      return;
+    }
+    if (fail.error === 'slot_bloqueado') {
+      toast.error('Ese horario está bloqueado en la agenda');
+      return;
+    }
+    if (fail.error === 'forbidden') {
+      toast.error('No tenés permiso para editar este turno');
+      return;
+    }
+    if (fail.error === 'barbero_no_disponible_en_sucursal') {
+      toast.error('El barbero elegido no está disponible en esta sucursal');
+      return;
+    }
+    toast.error(fail.message || 'No se pudo guardar el turno');
+  };
+
+  const handleSaveTurno = () => runUpdateTurno();
+  const handleConfirmConflict = () => {
+    if (!turnoConflict) return;
+    if (turnoConflict.kind === 'choque_de_horario') runUpdateTurno({ confirmOverlap: true });
+    else runUpdateTurno({ confirmFueraHorario: true });
+  };
+
 
   const ensureRelacion = async (clienteId: string) => {
     const { data: existing, error: selErr } = await supabase
@@ -406,27 +510,97 @@ export function AppointmentDetailDialog({
           </div>
         </DialogHeader>
         <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Scissors className="h-4 w-4" />
-            <span>{servicio?.nombre || 'Servicio'}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <User className="h-4 w-4" />
-            <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
-          </div>
-          {turno.cliente_telefono && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="h-4 w-4" />
-              <span>{turno.cliente_telefono}</span>
+          {editingTurno && canEditTurno ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Servicio</Label>
+                <Select value={editServicioId} onValueChange={setEditServicioId}>
+                  <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
+                  <SelectContent>
+                    {servicios.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nombre} · {s.duracion_min} min
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Profesional</Label>
+                <Select value={editBarberoId} onValueChange={setEditBarberoId}>
+                  <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
+                  <SelectContent>
+                    {barbers.filter((b) => b.active).map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.firstName} {b.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha</Label>
+                  <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                        <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
+                        {editFecha ? format(editFecha, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarUI
+                        mode="single"
+                        selected={editFecha ?? undefined}
+                        onSelect={(d) => { if (d) { setEditFecha(d); setFechaOpen(false); } }}
+                        locale={es}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Hora</Label>
+                  <div className="relative">
+                    <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
+                    <Input
+                      type="time"
+                      value={editHora}
+                      onChange={(e) => setEditHora(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                La duración se recalcula automáticamente según el servicio.
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Scissors className="h-4 w-4" />
+                <span>{servicio?.nombre || 'Servicio'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
+              </div>
+              {turno.cliente_telefono && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="h-4 w-4" />
+                  <span>{turno.cliente_telefono}</span>
+                </div>
+              )}
+              {turno.notas && (
+                <div className="text-xs text-muted-foreground border-l-2 border-border pl-3">{turno.notas}</div>
+              )}
+            </>
           )}
-          {turno.notas && (
-            <div className="text-xs text-muted-foreground border-l-2 border-border pl-3">{turno.notas}</div>
-          )}
+
 
           {editingCliente && canEditCliente && (
             <div className="space-y-3 pt-3 border-t">
@@ -474,7 +648,20 @@ export function AppointmentDetailDialog({
           )}
         </div>
         <DialogFooter className="gap-2">
-          {!confirmingCancel ? (
+          {editingTurno ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => { setEditingTurno(false); setTurnoConflict(null); }}
+                disabled={savingTurno}
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" /> Cancelar
+              </Button>
+              <Button onClick={handleSaveTurno} disabled={savingTurno}>
+                {savingTurno ? 'Guardando…' : 'Guardar turno'}
+              </Button>
+            </>
+          ) : !confirmingCancel ? (
             <>
               {editingCliente ? (
                 <>
@@ -492,6 +679,11 @@ export function AppointmentDetailDialog({
               ) : (
                 <>
                   <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                  {canEditTurno && (
+                    <Button variant="outline" onClick={startEditTurno}>
+                      <Pencil className="h-4 w-4 mr-1" /> Editar turno
+                    </Button>
+                  )}
                   {canEditCliente && (
                     <Button variant="outline" onClick={() => setEditingCliente(true)}>
                       Editar cliente
@@ -515,7 +707,16 @@ export function AppointmentDetailDialog({
           )}
         </DialogFooter>
       </DialogContent>
+      <TurnoConflictDialog
+        open={!!turnoConflict}
+        onOpenChange={(v) => { if (!v) setTurnoConflict(null); }}
+        kind={turnoConflict?.kind || null}
+        conflicts={turnoConflict?.conflicts}
+        onConfirm={handleConfirmConflict}
+        loading={savingTurno}
+      />
     </Dialog>
   );
 }
+
 
