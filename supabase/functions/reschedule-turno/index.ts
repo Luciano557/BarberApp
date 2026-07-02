@@ -1,6 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { formatMinutesToText } from "../_shared/formatMinutes.ts";
 import { canonicalPhoneOrNull } from "../_shared/phone.ts";
+import {
+  findConflictingTurnos,
+  isBlockedByBloqueo,
+  isWithinWorkingHours,
+} from "../_shared/availability.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -144,32 +150,17 @@ Deno.serve(async (req) => {
     }
 
     const nueva_hora_fin = minutesToTime(timeToMinutes(nueva_hora_inicio) + duracion);
-
-    // Validar horario de apertura del barbero/sucursal para ese día
-    const [Y, M, D] = nueva_fecha.split("-").map(Number);
-    const jsDow = new Date(Date.UTC(Y, M - 1, D)).getUTCDay();
-    const dbDow = jsDow === 0 ? 7 : jsDow;
-
-    const { data: horariosData } = await supabase
-      .from("horarios_trabajo")
-      .select("barbero_id, hora_inicio, hora_fin")
-      .eq("organization_id", turno.organization_id)
-      .eq("sucursal_id", turno.sucursal_id)
-      .eq("dia_semana", dbDow)
-      .eq("activo", true)
-      .or(`barbero_id.eq.${turno.barbero_id},barbero_id.is.null`);
-
-    const horariosAll = horariosData || [];
-    const horariosOverride = horariosAll.filter((h: any) => h.barbero_id === turno.barbero_id);
-    const horariosResolved = horariosOverride.length > 0
-      ? horariosOverride
-      : horariosAll.filter((h: any) => h.barbero_id === null);
-
     const slotStartMin = timeToMinutes(nueva_hora_inicio);
     const slotEndMin = timeToMinutes(nueva_hora_fin);
-    const inWorkingHours = horariosResolved.some((h: any) =>
-      timeToMinutes(h.hora_inicio) <= slotStartMin && timeToMinutes(h.hora_fin) >= slotEndMin
-    );
+
+    const inWorkingHours = await isWithinWorkingHours(supabase, {
+      orgId: turno.organization_id,
+      sucursalId: turno.sucursal_id,
+      barberoId: turno.barbero_id,
+      fecha: nueva_fecha,
+      slotStartMin,
+      slotEndMin,
+    });
 
     if (!inWorkingHours) {
       return new Response(JSON.stringify({
@@ -178,24 +169,13 @@ Deno.serve(async (req) => {
       }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Validar bloqueos de agenda
-    const { data: bloqueosData } = await supabase
-      .from("bloqueos_agenda")
-      .select("barbero_id, hora_inicio, hora_fin, todo_el_dia")
-      .eq("organization_id", turno.organization_id)
-      .eq("sucursal_id", turno.sucursal_id)
-      .lte("fecha_inicio", nueva_fecha)
-      .gte("fecha_fin", nueva_fecha);
-
-    const bloqueosRelevant = (bloqueosData || []).filter(
-      (b: any) => b.barbero_id === turno.barbero_id || b.barbero_id === null
-    );
-    const isBlocked = bloqueosRelevant.some((b: any) => {
-      if (b.todo_el_dia) return true;
-      if (!b.hora_inicio || !b.hora_fin) return false;
-      const bStart = timeToMinutes(b.hora_inicio);
-      const bEnd = timeToMinutes(b.hora_fin);
-      return bStart < slotEndMin && bEnd > slotStartMin;
+    const isBlocked = await isBlockedByBloqueo(supabase, {
+      orgId: turno.organization_id,
+      sucursalId: turno.sucursal_id,
+      barberoId: turno.barbero_id,
+      fecha: nueva_fecha,
+      slotStartMin,
+      slotEndMin,
     });
 
     if (isBlocked) {
@@ -207,19 +187,18 @@ Deno.serve(async (req) => {
 
     const bufferBefore = configRes.data?.buffer_antes_min || 0;
     const bufferAfter = configRes.data?.buffer_despues_min || 0;
-    const checkStart = minutesToTime(timeToMinutes(nueva_hora_inicio) - bufferBefore);
-    const checkEnd = minutesToTime(timeToMinutes(nueva_hora_fin) + bufferAfter);
 
-    const { data: conflicts } = await supabase
-      .from("turnos")
-      .select("id")
-      .eq("barbero_id", turno.barbero_id)
-      .eq("fecha", nueva_fecha)
-      .neq("id", turno_id)
-      .in("estado", ["pendiente", "confirmado", "en_curso"])
-      .or(`and(hora_inicio.lt.${checkEnd},hora_fin.gt.${checkStart})`);
+    const conflicts = await findConflictingTurnos(supabase, {
+      barberoId: turno.barbero_id,
+      fecha: nueva_fecha,
+      hora_inicio: nueva_hora_inicio,
+      hora_fin: nueva_hora_fin,
+      bufferBefore,
+      bufferAfter,
+      excludeTurnoId: turno_id,
+    });
 
-    if (conflicts && conflicts.length > 0) {
+    if (conflicts.length > 0) {
       return new Response(JSON.stringify({
         error: "slot_taken",
         message: "Este horario ya fue reservado. Por favor elegí otro.",
@@ -228,6 +207,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
 
     const { error: updateError } = await supabase
