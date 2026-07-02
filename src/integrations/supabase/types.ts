@@ -3713,6 +3713,7 @@ export type Database = {
           id: string
           notas: string | null
           organization_id: string
+          overlap_autorizado: boolean
           rango_horario: unknown
           servicio_id: string
           sucursal_id: string
@@ -3737,6 +3738,7 @@ export type Database = {
           id?: string
           notas?: string | null
           organization_id: string
+          overlap_autorizado?: boolean
           rango_horario?: unknown
           servicio_id: string
           sucursal_id: string
@@ -3761,6 +3763,7 @@ export type Database = {
           id?: string
           notas?: string | null
           organization_id?: string
+          overlap_autorizado?: boolean
           rango_horario?: unknown
           servicio_id?: string
           sucursal_id?: string
