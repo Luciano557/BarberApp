@@ -6,15 +6,22 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Phone, Calendar, User, Scissors, X, Search, Check, UserPlus, ArrowLeft } from 'lucide-react';
+import { Phone, Calendar, User, Scissors, X, Search, Check, UserPlus, ArrowLeft, Pencil, Clock, CalendarIcon } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
 import { Turno, Servicio } from './hooks/useAgendaData';
 import { formatHHMM } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
+
 
 interface AppointmentDetailDialogProps {
   open: boolean;
