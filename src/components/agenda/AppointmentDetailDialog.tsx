@@ -82,6 +82,19 @@ export function AppointmentDetailDialog({
   const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
   const [email, setEmail] = useState('');
 
+  // --- Edición del turno (servicio / profesional / fecha / hora) ---
+  const [editingTurno, setEditingTurno] = useState(false);
+  const [savingTurno, setSavingTurno] = useState(false);
+  const [editServicioId, setEditServicioId] = useState('');
+  const [editBarberoId, setEditBarberoId] = useState('');
+  const [editFecha, setEditFecha] = useState<Date | null>(null);
+  const [editHora, setEditHora] = useState('');
+  const [fechaOpen, setFechaOpen] = useState(false);
+  const [turnoConflict, setTurnoConflict] = useState<{
+    kind: TurnoConflictKind;
+    conflicts?: ConflictTurno[];
+  } | null>(null);
+
   const tokenRef = useRef(0);
 
   useEffect(() => {
@@ -99,8 +112,11 @@ export function AppointmentDetailDialog({
       setEmail('');
       setConfirmingCancel(false);
       setMotivo('');
+      setEditingTurno(false);
+      setTurnoConflict(null);
     }
   }, [open]);
+
 
   useEffect(() => {
     if (!editingCliente || !searchOpen) return;
