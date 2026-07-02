@@ -105,24 +105,34 @@ Deno.serve(async (req) => {
     }
 
     // ------------------------- Authorization -------------------------
-    // 1) Rol permitido + misma org
+    // 1) Misma organización que el turno (por profiles).
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profileErr) {
+      console.error("update-turno-internal profile error:", profileErr);
+      return json(500, { error: "internal_error" });
+    }
+    if (!profile || profile.organization_id !== turno.organization_id) {
+      return json(403, { error: "forbidden" });
+    }
+
+    // 2) Rol permitido.
     const { data: rolesRows, error: rolesErr } = await supabase
       .from("user_roles")
-      .select("role, organization_id")
+      .select("role")
       .eq("user_id", userId);
     if (rolesErr) {
       console.error("update-turno-internal roles error:", rolesErr);
       return json(500, { error: "internal_error" });
     }
-    const orgRoles = (rolesRows || []).filter(
-      (r: any) => r.organization_id === turno.organization_id,
-    );
-    if (orgRoles.length === 0) return json(403, { error: "forbidden" });
-
     const allowedRoles = new Set(["owner", "general_manager", "manager", "barber", "sucursal_account"]);
-    const heldRoles = new Set(orgRoles.map((r: any) => r.role));
+    const heldRoles = new Set((rolesRows || []).map((r: any) => r.role));
     const hasAllowedRole = [...heldRoles].some((r) => allowedRoles.has(r as string));
     if (!hasAllowedRole) return json(403, { error: "forbidden" });
+
 
     // 2) Alcance de sucursal: owner/general_manager acceden a cualquier sucursal
     //    de la org; manager/barber/sucursal_account deben tener la sucursal en
