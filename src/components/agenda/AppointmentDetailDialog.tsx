@@ -510,27 +510,97 @@ export function AppointmentDetailDialog({
           </div>
         </DialogHeader>
         <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Scissors className="h-4 w-4" />
-            <span>{servicio?.nombre || 'Servicio'}</span>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <User className="h-4 w-4" />
-            <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
-          </div>
-          {turno.cliente_telefono && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="h-4 w-4" />
-              <span>{turno.cliente_telefono}</span>
+          {editingTurno && canEditTurno ? (
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Servicio</Label>
+                <Select value={editServicioId} onValueChange={setEditServicioId}>
+                  <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
+                  <SelectContent>
+                    {servicios.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nombre} · {s.duracion_min} min
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Profesional</Label>
+                <Select value={editBarberoId} onValueChange={setEditBarberoId}>
+                  <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
+                  <SelectContent>
+                    {barbers.filter((b) => b.active).map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.firstName} {b.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Fecha</Label>
+                  <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                        <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
+                        {editFecha ? format(editFecha, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarUI
+                        mode="single"
+                        selected={editFecha ?? undefined}
+                        onSelect={(d) => { if (d) { setEditFecha(d); setFechaOpen(false); } }}
+                        locale={es}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Hora</Label>
+                  <div className="relative">
+                    <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
+                    <Input
+                      type="time"
+                      value={editHora}
+                      onChange={(e) => setEditHora(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                La duración se recalcula automáticamente según el servicio.
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Scissors className="h-4 w-4" />
+                <span>{servicio?.nombre || 'Servicio'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
+              </div>
+              {turno.cliente_telefono && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="h-4 w-4" />
+                  <span>{turno.cliente_telefono}</span>
+                </div>
+              )}
+              {turno.notas && (
+                <div className="text-xs text-muted-foreground border-l-2 border-border pl-3">{turno.notas}</div>
+              )}
+            </>
           )}
-          {turno.notas && (
-            <div className="text-xs text-muted-foreground border-l-2 border-border pl-3">{turno.notas}</div>
-          )}
+
 
           {editingCliente && canEditCliente && (
             <div className="space-y-3 pt-3 border-t">
