@@ -16,10 +16,12 @@ import { UnavailableSlotDialog } from './UnavailableSlotDialog';
 import { DayOffDialog } from './DayOffDialog';
 import { AppointmentDetailDialog } from './AppointmentDetailDialog';
 import { MoveConfirmDialog } from './MoveConfirmDialog';
+import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
+import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+
 
 type ViewMode = 'day' | '3days' | 'week';
 
@@ -31,7 +33,7 @@ interface AgendaPanelProps {
 }
 
 export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barbers }: AgendaPanelProps) {
-  const { isOwner, isGeneralManager, isManager, isBarber } = useAuth();
+  const { isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount } = useAuth();
   const [date, setDate] = useState(new Date());
   const [view, setView] = useState<ViewMode>('day');
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -47,9 +49,19 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   } | null>(null);
   const [movingLoading, setMovingLoading] = useState(false);
 
-  const canManageAgenda = isOwner || isGeneralManager || isManager;
+  const [moveConflict, setMoveConflict] = useState<{
+    kind: TurnoConflictKind;
+    conflicts?: ConflictTurno[];
+  } | null>(null);
+
+  // Cualquier miembro del equipo con acceso a la agenda puede crear/editar/mover
+  // turnos y bloquear horarios. La función update-turno-internal aplica los
+  // controles finos por sucursal en el servidor.
+  const canManageAgenda =
+    isOwner || isGeneralManager || isManager || isBarber || isSucursalAccount;
   const canCreateDayOff = canManageAgenda;
   const canDrag = canManageAgenda;
+
 
   const { fromDate, toDate } = useMemo(() => {
     if (view === 'day') return { fromDate: date, toDate: date };
