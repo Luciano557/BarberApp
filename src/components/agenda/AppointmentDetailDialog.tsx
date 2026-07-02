@@ -648,7 +648,20 @@ export function AppointmentDetailDialog({
           )}
         </div>
         <DialogFooter className="gap-2">
-          {!confirmingCancel ? (
+          {editingTurno ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => { setEditingTurno(false); setTurnoConflict(null); }}
+                disabled={savingTurno}
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" /> Cancelar
+              </Button>
+              <Button onClick={handleSaveTurno} disabled={savingTurno}>
+                {savingTurno ? 'Guardando…' : 'Guardar turno'}
+              </Button>
+            </>
+          ) : !confirmingCancel ? (
             <>
               {editingCliente ? (
                 <>
@@ -666,6 +679,11 @@ export function AppointmentDetailDialog({
               ) : (
                 <>
                   <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+                  {canEditTurno && (
+                    <Button variant="outline" onClick={startEditTurno}>
+                      <Pencil className="h-4 w-4 mr-1" /> Editar turno
+                    </Button>
+                  )}
                   {canEditCliente && (
                     <Button variant="outline" onClick={() => setEditingCliente(true)}>
                       Editar cliente
@@ -689,7 +707,16 @@ export function AppointmentDetailDialog({
           )}
         </DialogFooter>
       </DialogContent>
+      <TurnoConflictDialog
+        open={!!turnoConflict}
+        onOpenChange={(v) => { if (!v) setTurnoConflict(null); }}
+        kind={turnoConflict?.kind || null}
+        conflicts={turnoConflict?.conflicts}
+        onConfirm={handleConfirmConflict}
+        loading={savingTurno}
+      />
     </Dialog>
   );
 }
+
 
