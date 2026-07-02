@@ -330,8 +330,8 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         readOnly={!canManageAgenda}
       />
       <MoveConfirmDialog
-        open={!!moveDialog}
-        onOpenChange={(v) => { if (!v) setMoveDialog(null); }}
+        open={!!moveDialog && !moveConflict}
+        onOpenChange={(v) => { if (!v) { setMoveDialog(null); setMoveConflict(null); } }}
         turno={moveDialog?.turno || null}
         newBarberId={moveDialog?.newBarberoId || ''}
         newHoraInicio={moveDialog?.newHoraInicio || ''}
@@ -341,6 +341,15 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         onConfirm={confirmMove}
         loading={movingLoading}
       />
+      <TurnoConflictDialog
+        open={!!moveConflict}
+        onOpenChange={(v) => { if (!v) setMoveConflict(null); }}
+        kind={moveConflict?.kind || null}
+        conflicts={moveConflict?.conflicts}
+        onConfirm={confirmMoveConflictRetry}
+        loading={movingLoading}
+      />
+
     </div>
   );
 }
