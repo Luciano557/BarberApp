@@ -164,6 +164,87 @@ export function AppointmentDetailDialog({
   const servicio = servicios.find((s) => s.id === turno.servicio_id);
   const canCancel = !readOnly && ['pendiente', 'confirmado'].includes(turno.estado);
   const canEditCliente = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
+  const canEditTurno = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
+
+  const startEditTurno = () => {
+    setEditServicioId(turno.servicio_id);
+    setEditBarberoId(turno.barbero_id);
+    try {
+      setEditFecha(parseISO(turno.fecha));
+    } catch {
+      setEditFecha(new Date());
+    }
+    setEditHora(turno.hora_inicio.slice(0, 5));
+    setEditingTurno(true);
+  };
+
+  const runUpdateTurno = async (opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {}) => {
+    if (!editFecha) {
+      toast.error('Elegí una fecha');
+      return;
+    }
+    if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(editHora)) {
+      toast.error('Ingresá una hora válida (HH:MM)');
+      return;
+    }
+    setSavingTurno(true);
+    const res = await callUpdateTurnoInternal({
+      turno_id: turno.id,
+      servicio_id: editServicioId || undefined,
+      barbero_id: editBarberoId || undefined,
+      fecha: format(editFecha, 'yyyy-MM-dd'),
+      hora_inicio: editHora,
+      confirm_overlap: opts.confirmOverlap,
+      confirm_fuera_horario: opts.confirmFueraHorario,
+    });
+    setSavingTurno(false);
+
+    if (res.ok) {
+      toast.success('Turno actualizado');
+      setEditingTurno(false);
+      setTurnoConflict(null);
+      onChanged();
+      return;
+    }
+    const fail = res as Extract<typeof res, { ok: false }>;
+    if (fail.status === 409 && fail.error === 'choque_de_horario') {
+      setTurnoConflict({ kind: 'choque_de_horario', conflicts: fail.conflicts });
+      return;
+    }
+    if (fail.status === 409 && fail.error === 'fuera_de_horario') {
+      setTurnoConflict({ kind: 'fuera_de_horario' });
+      return;
+    }
+    if (fail.error === 'slot_en_pasado') {
+      toast.error('No podés guardar el turno en un horario en el pasado');
+      return;
+    }
+    if (fail.error === 'turno_cerrado') {
+      toast.error('Este turno ya no se puede modificar');
+      return;
+    }
+    if (fail.error === 'slot_bloqueado') {
+      toast.error('Ese horario está bloqueado en la agenda');
+      return;
+    }
+    if (fail.error === 'forbidden') {
+      toast.error('No tenés permiso para editar este turno');
+      return;
+    }
+    if (fail.error === 'barbero_no_disponible_en_sucursal') {
+      toast.error('El barbero elegido no está disponible en esta sucursal');
+      return;
+    }
+    toast.error(fail.message || 'No se pudo guardar el turno');
+  };
+
+  const handleSaveTurno = () => runUpdateTurno();
+  const handleConfirmConflict = () => {
+    if (!turnoConflict) return;
+    if (turnoConflict.kind === 'choque_de_horario') runUpdateTurno({ confirmOverlap: true });
+    else runUpdateTurno({ confirmFueraHorario: true });
+  };
+
 
   const ensureRelacion = async (clienteId: string) => {
     const { data: existing, error: selErr } = await supabase
