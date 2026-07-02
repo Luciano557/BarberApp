@@ -29,6 +29,10 @@ verify_jwt = false
 [functions.reschedule-turno]
 verify_jwt = false
 
+[functions.update-turno-internal]
+verify_jwt = true
+
+
 [functions.lookup-cliente-by-phone]
 verify_jwt = false
 
