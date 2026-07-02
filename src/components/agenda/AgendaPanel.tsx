@@ -109,26 +109,66 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
     setMoveDialog({ turno, newBarberoId, newHoraInicio, newHoraFin, newFecha });
   };
 
-  const confirmMove = async () => {
-    if (!canManageAgenda) return;
-    if (!moveDialog) return;
+  const performMove = async (opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {}) => {
+    if (!canManageAgenda || !moveDialog) return;
+    const { turno, newBarberoId, newHoraInicio, newFecha } = moveDialog;
     setMovingLoading(true);
-    const { turno, newBarberoId, newHoraInicio, newHoraFin, newFecha } = moveDialog;
-    const { error } = await supabase.from('turnos').update({
+    const res = await callUpdateTurnoInternal({
+      turno_id: turno.id,
       barbero_id: newBarberoId,
-      hora_inicio: newHoraInicio,
-      hora_fin: newHoraFin,
       fecha: newFecha,
-    }).eq('id', turno.id);
+      hora_inicio: newHoraInicio,
+      confirm_overlap: opts.confirmOverlap,
+      confirm_fuera_horario: opts.confirmFueraHorario,
+    });
     setMovingLoading(false);
-    if (error) {
-      toast.error('No se pudo mover el turno');
+
+    if (res.ok) {
+      toast.success('Turno actualizado');
+      setMoveDialog(null);
+      setMoveConflict(null);
+      refetch();
       return;
     }
-    toast.success('Turno actualizado');
-    setMoveDialog(null);
-    refetch();
+
+    if (res.status === 409 && res.error === 'choque_de_horario') {
+      setMoveConflict({ kind: 'choque_de_horario', conflicts: res.conflicts });
+      return;
+    }
+    if (res.status === 409 && res.error === 'fuera_de_horario') {
+      setMoveConflict({ kind: 'fuera_de_horario' });
+      return;
+    }
+    if (res.error === 'slot_en_pasado') {
+      toast.error('No podés mover el turno a un horario en el pasado');
+      return;
+    }
+    if (res.error === 'turno_cerrado') {
+      toast.error('Este turno ya no se puede modificar');
+      return;
+    }
+    if (res.error === 'slot_bloqueado') {
+      toast.error('Ese horario está bloqueado en la agenda');
+      return;
+    }
+    if (res.error === 'forbidden') {
+      toast.error('No tenés permiso para mover este turno');
+      return;
+    }
+    toast.error(res.message || 'No se pudo mover el turno');
   };
+
+  const confirmMove = () => performMove();
+
+  const confirmMoveConflictRetry = () => {
+    if (!moveConflict) return;
+    if (moveConflict.kind === 'choque_de_horario') {
+      performMove({ confirmOverlap: true });
+    } else if (moveConflict.kind === 'fuera_de_horario') {
+      performMove({ confirmFueraHorario: true });
+    }
+  };
+
 
   const titleLabel = useMemo(() => {
     if (view === 'day') return format(date, "EEEE dd 'de' MMMM yyyy", { locale: es });
