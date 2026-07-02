@@ -131,32 +131,34 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
       return;
     }
 
-    if (res.status === 409 && res.error === 'choque_de_horario') {
-      setMoveConflict({ kind: 'choque_de_horario', conflicts: res.conflicts });
+    const fail = res;
+    if (fail.status === 409 && fail.error === 'choque_de_horario') {
+      setMoveConflict({ kind: 'choque_de_horario', conflicts: fail.conflicts });
       return;
     }
-    if (res.status === 409 && res.error === 'fuera_de_horario') {
+    if (fail.status === 409 && fail.error === 'fuera_de_horario') {
       setMoveConflict({ kind: 'fuera_de_horario' });
       return;
     }
-    if (res.error === 'slot_en_pasado') {
+    if (fail.error === 'slot_en_pasado') {
       toast.error('No podés mover el turno a un horario en el pasado');
       return;
     }
-    if (res.error === 'turno_cerrado') {
+    if (fail.error === 'turno_cerrado') {
       toast.error('Este turno ya no se puede modificar');
       return;
     }
-    if (res.error === 'slot_bloqueado') {
+    if (fail.error === 'slot_bloqueado') {
       toast.error('Ese horario está bloqueado en la agenda');
       return;
     }
-    if (res.error === 'forbidden') {
+    if (fail.error === 'forbidden') {
       toast.error('No tenés permiso para mover este turno');
       return;
     }
-    toast.error(res.message || 'No se pudo mover el turno');
+    toast.error(fail.message || 'No se pudo mover el turno');
   };
+
 
   const confirmMove = () => performMove();
 
