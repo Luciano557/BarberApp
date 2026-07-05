@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
+import { Separator } from '@/components/ui/separator';
+import { InitialsAvatar } from '@/components/ui/InitialsAvatar';
+import { EditableSectionHeader } from '@/components/ui/EditableSectionHeader';
+import { StatusPill } from '@/components/ui/StatusPill';
+import { TURNO_ESTADO_PILL } from '@/lib/turnoEstadoPill';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Phone, Calendar, User, Scissors, X, Search, Check, UserPlus, ArrowLeft, Pencil, Clock, CalendarIcon } from 'lucide-react';
+import { Phone, Mail, Calendar, User, Scissors, X, Search, Check, UserPlus, Clock, CalendarIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
@@ -162,6 +166,7 @@ export function AppointmentDetailDialog({
   if (!turno) return null;
   const barber = barbers.find((b) => b.id === turno.barbero_id);
   const servicio = servicios.find((s) => s.id === turno.servicio_id);
+  const estadoPill = TURNO_ESTADO_PILL[turno.estado] ?? { label: turno.estado, status: 'neutral' as const };
   const canCancel = !readOnly && ['pendiente', 'confirmado'].includes(turno.estado);
   const canEditCliente = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
   const canEditTurno = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
@@ -504,141 +509,182 @@ export function AppointmentDetailDialog({
     <Dialog open={open} onOpenChange={(v) => { if (!v) { setConfirmingCancel(false); setMotivo(''); } onOpenChange(v); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>{turno.cliente_nombre || 'Sin nombre'}</DialogTitle>
-            <Badge variant="outline" className="text-[10px] h-5 capitalize">{turno.estado}</Badge>
+          <div className="flex items-center gap-3 pr-6 text-left">
+            <InitialsAvatar name={turno.cliente_nombre || 'Sin nombre'} />
+            <DialogTitle className="flex-1 min-w-0 truncate">
+              {turno.cliente_nombre || 'Sin nombre'}
+            </DialogTitle>
+            <StatusPill status={estadoPill.status} label={estadoPill.label} size="sm" />
           </div>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          {editingTurno && canEditTurno ? (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Servicio</Label>
-                <Select value={editServicioId} onValueChange={setEditServicioId}>
-                  <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
-                  <SelectContent>
-                    {servicios.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.nombre} · {s.duracion_min} min
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <div className="space-y-4 text-sm">
+          <section>
+            {canEditCliente ? (
+              <EditableSectionHeader
+                title="Datos de contacto"
+                isEditing={editingCliente}
+                saving={savingCliente}
+                disabled={editingTurno || confirmingCancel}
+                onEdit={() => setEditingCliente(true)}
+                onCancel={() => { setEditingCliente(false); resetClienteEditor(); }}
+                onSave={handleSaveCliente}
+              />
+            ) : (
+              <h3 className="text-sm font-medium mb-3">Datos de contacto</h3>
+            )}
+
+            {editingCliente && canEditCliente ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={clienteMode === 'existing' ? 'default' : 'outline'}
+                    className="h-8 px-2 text-xs"
+                    onClick={() => {
+                      setClienteMode('existing');
+                      setNombre('');
+                      setApellido('');
+                      setPhoneOut(null);
+                      setEmail('');
+                    }}
+                  >
+                    Cliente existente
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={clienteMode === 'new' ? 'default' : 'outline'}
+                    className="h-8 px-2 text-xs"
+                    onClick={() => {
+                      setClienteMode('new');
+                      setSelectedCliente(null);
+                      setSearchOpen(false);
+                      setQuery('');
+                      setResults([]);
+                    }}
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Crear cliente
+                  </Button>
+                </div>
+                {clienteMode === 'existing' ? renderExistingClientePicker() : renderNewClienteForm()}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Profesional</Label>
-                <Select value={editBarberoId} onValueChange={setEditBarberoId}>
-                  <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
-                  <SelectContent>
-                    {barbers.filter((b) => b.active).map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.firstName} {b.lastName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            ) : (
+              <div className="space-y-2 text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  <span>{turno.cliente_telefono || 'Sin teléfono'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  <span>{turno.cliente_email || 'Sin email'}</span>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+            )}
+          </section>
+
+          <Separator />
+
+          <section>
+            {canEditTurno ? (
+              <EditableSectionHeader
+                title="Detalle del turno"
+                isEditing={editingTurno}
+                saving={savingTurno}
+                disabled={editingCliente || confirmingCancel}
+                onEdit={startEditTurno}
+                onCancel={() => { setEditingTurno(false); setTurnoConflict(null); }}
+                onSave={handleSaveTurno}
+              />
+            ) : (
+              <h3 className="text-sm font-medium mb-3">Detalle del turno</h3>
+            )}
+
+            {editingTurno && canEditTurno ? (
+              <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Fecha</Label>
-                  <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-start font-normal">
-                        <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
-                        {editFecha ? format(editFecha, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarUI
-                        mode="single"
-                        selected={editFecha ?? undefined}
-                        onSelect={(d) => { if (d) { setEditFecha(d); setFechaOpen(false); } }}
-                        locale={es}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <Label className="text-xs">Servicio</Label>
+                  <Select value={editServicioId} onValueChange={setEditServicioId}>
+                    <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
+                    <SelectContent>
+                      {servicios.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.nombre} · {s.duracion_min} min
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Hora</Label>
-                  <div className="relative">
-                    <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
-                    <Input
-                      type="time"
-                      value={editHora}
-                      onChange={(e) => setEditHora(e.target.value)}
-                      className="pl-9"
-                    />
+                  <Label className="text-xs">Profesional</Label>
+                  <Select value={editBarberoId} onValueChange={setEditBarberoId}>
+                    <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
+                    <SelectContent>
+                      {barbers.filter((b) => b.active).map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.firstName} {b.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Fecha</Label>
+                    <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
+                      <PopoverTrigger asChild>
+                        <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                          <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
+                          {editFecha ? format(editFecha, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarUI
+                          mode="single"
+                          selected={editFecha ?? undefined}
+                          onSelect={(d) => { if (d) { setEditFecha(d); setFechaOpen(false); } }}
+                          locale={es}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Hora</Label>
+                    <div className="relative">
+                      <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
+                      <Input
+                        type="time"
+                        value={editHora}
+                        onChange={(e) => setEditHora(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
                   </div>
                 </div>
+                <p className="text-[11px] text-muted-foreground">
+                  La duración se recalcula automáticamente según el servicio.
+                </p>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                La duración se recalcula automáticamente según el servicio.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Scissors className="h-4 w-4" />
-                <span>{servicio?.nombre || 'Servicio'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
-              </div>
-              {turno.cliente_telefono && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span>{turno.cliente_telefono}</span>
+            ) : (
+              <div className="space-y-2 text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
                 </div>
-              )}
-              {turno.notas && (
-                <div className="text-xs text-muted-foreground border-l-2 border-border pl-3">{turno.notas}</div>
-              )}
-            </>
-          )}
-
-
-          {editingCliente && canEditCliente && (
-            <div className="space-y-3 pt-3 border-t">
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={clienteMode === 'existing' ? 'default' : 'outline'}
-                  className="h-8 px-2 text-xs"
-                  onClick={() => {
-                    setClienteMode('existing');
-                    setNombre('');
-                    setApellido('');
-                    setPhoneOut(null);
-                    setEmail('');
-                  }}
-                >
-                  Cliente existente
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={clienteMode === 'new' ? 'default' : 'outline'}
-                  className="h-8 px-2 text-xs"
-                  onClick={() => {
-                    setClienteMode('new');
-                    setSelectedCliente(null);
-                    setSearchOpen(false);
-                    setQuery('');
-                    setResults([]);
-                  }}
-                >
-                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Crear cliente
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Scissors className="h-4 w-4" />
+                  <span>{servicio?.nombre || 'Servicio'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
+                </div>
+                {turno.notas && (
+                  <div className="text-xs border-l-2 border-border pl-3">{turno.notas}</div>
+                )}
               </div>
-              {clienteMode === 'existing' ? renderExistingClientePicker() : renderNewClienteForm()}
-            </div>
-          )}
+            )}
+          </section>
 
           {confirmingCancel && (
             <div className="space-y-2 pt-2 border-t">
@@ -648,62 +694,19 @@ export function AppointmentDetailDialog({
           )}
         </div>
         <DialogFooter className="gap-2">
-          {editingTurno ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => { setEditingTurno(false); setTurnoConflict(null); }}
-                disabled={savingTurno}
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" /> Cancelar
-              </Button>
-              <Button onClick={handleSaveTurno} disabled={savingTurno}>
-                {savingTurno ? 'Guardando…' : 'Guardar turno'}
-              </Button>
-            </>
-          ) : !confirmingCancel ? (
-            <>
-              {editingCliente ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => { setEditingCliente(false); resetClienteEditor(); }}
-                    disabled={savingCliente}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-1" /> Cancelar
-                  </Button>
-                  <Button onClick={handleSaveCliente} disabled={savingCliente}>
-                    {savingCliente ? 'Guardando...' : 'Guardar cliente'}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
-                  {canEditTurno && (
-                    <Button variant="outline" onClick={startEditTurno}>
-                      <Pencil className="h-4 w-4 mr-1" /> Editar turno
-                    </Button>
-                  )}
-                  {canEditCliente && (
-                    <Button variant="outline" onClick={() => setEditingCliente(true)}>
-                      Editar cliente
-                    </Button>
-                  )}
-                  {canCancel && (
-                    <Button variant="destructive" onClick={() => setConfirmingCancel(true)}>
-                      <X className="h-4 w-4" /> Cancelar turno
-                    </Button>
-                  )}
-                </>
-              )}
-            </>
-          ) : (
+          {confirmingCancel ? (
             <>
               <Button variant="outline" onClick={() => setConfirmingCancel(false)} disabled={cancelling}>Volver</Button>
               <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
                 {cancelling ? 'Cancelando...' : 'Si, cancelar'}
               </Button>
             </>
+          ) : (
+            canCancel && !editingTurno && !editingCliente && (
+              <Button variant="destructive" onClick={() => setConfirmingCancel(true)}>
+                <X className="h-4 w-4" /> Cancelar turno
+              </Button>
+            )
           )}
         </DialogFooter>
       </DialogContent>

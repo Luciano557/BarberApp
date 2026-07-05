@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { EditableSectionHeader } from '@/components/ui/EditableSectionHeader';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
@@ -282,42 +283,10 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
 
   const datosIncompletos = cliente && (!cliente.telefono || !cliente.email);
 
-  const SectionHeader = ({ title, section }: { title: string; section: EditingSection }) => (
-    <div className="flex items-center justify-between mb-3">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {editing === section ? (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" onClick={cancelEdit} className="h-7 text-xs" disabled={saving}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs"
-            disabled={saving}
-            onClick={() => {
-              if (section === 'contacto') handleSaveContacto();
-              else if (section === 'redes') handleSaveRedes();
-              else if (section === 'personal') handleSavePersonal();
-            }}
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Guardar
-          </Button>
-        </div>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => { if (cliente) hydrateFromCliente(cliente); setEditing(section); }}
-          className="h-7 text-xs"
-          disabled={editing !== null}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Editar
-        </Button>
-      )}
-    </div>
-  );
+  const startEditingSection = (section: EditingSection) => {
+    if (cliente) hydrateFromCliente(cliente);
+    setEditing(section);
+  };
 
   return (
     <>
@@ -364,7 +333,15 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
 
               {/* Datos de contacto */}
               <section>
-                <SectionHeader title="Datos de contacto" section="contacto" />
+                <EditableSectionHeader
+                  title="Datos de contacto"
+                  isEditing={editing === 'contacto'}
+                  saving={saving}
+                  disabled={editing !== null}
+                  onEdit={() => startEditingSection('contacto')}
+                  onCancel={cancelEdit}
+                  onSave={handleSaveContacto}
+                />
                 {editing === 'contacto' ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -423,7 +400,15 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
 
               {/* Redes sociales */}
               <section>
-                <SectionHeader title="Redes sociales" section="redes" />
+                <EditableSectionHeader
+                  title="Redes sociales"
+                  isEditing={editing === 'redes'}
+                  saving={saving}
+                  disabled={editing !== null}
+                  onEdit={() => startEditingSection('redes')}
+                  onCancel={cancelEdit}
+                  onSave={handleSaveRedes}
+                />
                 {editing === 'redes' ? (
                   <div className="space-y-3">
                     <div className="space-y-1.5">
@@ -467,7 +452,15 @@ export function ClienteDetailDialog({ clienteId, open, onOpenChange }: ClienteDe
 
               {/* Información personal */}
               <section>
-                <SectionHeader title="Información personal" section="personal" />
+                <EditableSectionHeader
+                  title="Información personal"
+                  isEditing={editing === 'personal'}
+                  saving={saving}
+                  disabled={editing !== null}
+                  onEdit={() => startEditingSection('personal')}
+                  onCancel={cancelEdit}
+                  onSave={handleSavePersonal}
+                />
                 {editing === 'personal' ? (
                   <div className="space-y-3">
                     <div className="space-y-1.5">

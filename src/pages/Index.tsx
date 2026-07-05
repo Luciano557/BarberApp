@@ -17,6 +17,7 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -29,8 +30,9 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { user, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const { organization } = useOrganization();
+  usePushNotifications(user?.id, organization?.id);
   const { access: subscriptionAccess } = useSubscriptionAccess();
   const onboarding = useOnboarding();
   const effectivePlan = resolveEffectivePlan(subscriptionAccess, organization?.plan);

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "107482706156",
+    "project_id": "vittro-b780d",
+    "storage_bucket": "vittro-b780d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:107482706156:android:410e0f08f6bc3f9e43b5c9",
+        "android_client_info": {
+          "package_name": "com.vittro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3E5e5KxYojSyvq9AlloRV5Txwm7ppZyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
