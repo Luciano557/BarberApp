@@ -214,7 +214,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         className={cn(
           'flex flex-col border-r border-[#EEEFF2] bg-background',
           isMobile
-            ? 'fixed inset-y-0 left-0 z-50 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
+            ? 'fixed inset-y-0 left-0 z-40 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
             : 'z-10 h-full transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]',
           !isMobile && (collapsed ? 'w-16' : 'w-56'),
         )}

@@ -72,7 +72,7 @@ const Reservar = () => {
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         {mode === "landing" ? (
           <div className="mx-auto max-w-md">
-            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)] sm:p-8">
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
               <BookingLanding
                 orgName={orgData.organization.name}
                 fallbackLogo={orgData.organization.logo_url}

@@ -1,6 +1,7 @@
 import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, MoreVertical, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -470,54 +471,57 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
   return (
     <div className="space-y-6 animate-fade-in sm:space-y-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Cierre de Caja</h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1 capitalize">
+      <PageHeader
+        title="Cierre de Caja"
+        subtitle={(
+          <span className="font-medium capitalize">
             {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Button variant="outline" size="icon" onClick={handlePreviousDay}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="flex-1 sm:min-w-[140px] sm:flex-none">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {format(validDate, 'dd/MM/yyyy')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  mode="single"
-                  selected={validDate}
-                  onSelect={(date) => date && navigateToDate(date)}
-                  locale={es}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(validDate)}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            {!isToday(validDate) && (
-              <Button variant="secondary" size="sm" className="sm:w-auto" onClick={handleToday}>
-                Hoy
+          </span>
+        )}
+        actions={(
+          <>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <Button variant="outline" size="icon" onClick={handlePreviousDay}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <AnulacionesCierreHistory barbers={barbers} />
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleHistoryClick}>
-              <Clock className="h-4 w-4 mr-2" />
-              Historial
-            </Button>
-            <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
-          </div>
-        </div>
-      </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="flex-1 sm:min-w-[140px] sm:flex-none">
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(validDate, 'dd/MM/yyyy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    mode="single"
+                    selected={validDate}
+                    onSelect={(date) => date && navigateToDate(date)}
+                    locale={es}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" size="icon" onClick={handleNextDay} disabled={isToday(validDate)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              {!isToday(validDate) && (
+                <Button variant="secondary" size="sm" className="sm:w-auto" onClick={handleToday}>
+                  Hoy
+                </Button>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <AnulacionesCierreHistory barbers={barbers} />
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleHistoryClick}>
+                <Clock className="h-4 w-4 mr-2" />
+                Historial
+              </Button>
+              <CashClosingHistory barbers={barbers} externalOpen={historyOpen} onExternalOpenChange={setHistoryOpen} />
+            </div>
+          </>
+        )}
+        actionsLayout="row"
+      />
 
       {/* Banner Consultar Período */}
       <div className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -530,7 +534,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
 
       {/* General Summary Cards */}
       <div className="grid gap-3 grid-cols-3 md:grid-cols-4">
-        <Card className="col-span-3 md:col-span-1 bg-primary border-primary shadow-md rounded-2xl">
+        <Card className="col-span-3 md:col-span-1 bg-primary border-primary shadow-sm rounded-2xl">
           <CardContent className="p-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div>

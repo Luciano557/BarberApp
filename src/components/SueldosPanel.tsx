@@ -13,7 +13,7 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Wallet, Plus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -923,14 +923,8 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Wallet className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-bold">Sueldos</h2>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-wrap items-center gap-2 justify-end">
           {/* Period Presets */}
           <div className="flex items-center gap-1">
             <Button
@@ -1047,7 +1041,6 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
               </div>
             </DialogContent>
           </Dialog>
-        </div>
       </div>
 
       {shouldGateSueldosView ? (

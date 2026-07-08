@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Plus, Search, Users, MessageCircle, Upload, Loader2 } from 'lucide-react';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useClientes } from '@/hooks/useClientes';
@@ -59,24 +60,25 @@ export function ClientesPanel() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Clientes</h1>
-          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleImportClick}>
-            <Upload className="h-4 w-4" />
-            Importar clientes
-          </Button>
-          <Button onClick={() => setShowNuevo(true)}>
-            <Plus className="h-4 w-4" />
-            Nuevo cliente
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Clientes"
+        subtitle={subtitle}
+        actions={(
+          <>
+            <Button variant="outline" onClick={handleImportClick}>
+              <Upload className="h-4 w-4" />
+              Importar clientes
+            </Button>
+            <Button onClick={() => setShowNuevo(true)}>
+              <Plus className="h-4 w-4" />
+              Nuevo cliente
+            </Button>
+          </>
+        )}
+        actionsLayout="inline"
+      />
 
       {/* Search */}
       <div className="relative">

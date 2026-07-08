@@ -1,5 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/*
+ * Stack de z-index — bandas globales de la app (fuera de src/components/agenda,
+ * que tiene su propio sub-stack interno documentado en ese módulo).
+ *
+ *   0-20   Capas locales (hero de portal, sticky menores dentro de un panel)
+ *   40     Chrome fijo: header/nav sticky, botón hamburguesa y scrim del
+ *          sidebar mobile — nunca debe competir con overlays de Radix
+ *   50     Overlays de Radix (dialog, sheet/drawer-form, popover, dropdown,
+ *          select, tooltip, alert-dialog, menubar, context-menu, hover-card,
+ *          navigation-menu) y el overlay de éxito de cobro
+ *   60-70  Onboarding (overlay 60-61, tooltip 70) — por encima de los
+ *          overlays normales, por debajo de toasts
+ *   80     Ghost de drag de turnos en Agenda
+ *   100    Toast viewport — siempre la capa más alta
+ */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -99,13 +115,18 @@
     --chart-4: 232 74% 32%;
     --chart-5: 232 75% 59%;
 
-    /* Shadow scale */
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
-    --shadow-md: 0 2px 8px 0 hsl(0 0% 0% / 0.06);
-    --shadow-lg: 0 4px 16px 0 hsl(0 0% 0% / 0.08);
+    /* Chart tokens — Estadísticas (reusan valores de --status-*) */
+    --chart-cash: 142 76% 36%;
+    --chart-mp: 217 91% 60%;
+    --chart-cost: 0 72% 50%;
+    --chart-purple: 270 70% 55%;
+    --chart-indigo: 243 75% 59%;
+    --chart-orange: 25 85% 55%; /* PROVISIONAL: pendiente definición de paleta con socio */
+    --chart-amber: 38 90% 50%; /* PROVISIONAL: pendiente definición de paleta con socio */
 
     --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-quint: cubic-bezier(0.4, 0, 1, 1);
   }
 
   .dark {
@@ -181,12 +202,14 @@
     --chart-4: 234 30% 40%;
     --chart-5: 234 20% 30%;
 
-    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 2px 8px 0 hsl(0 0% 0% / 0.15);
-    --shadow-lg: 0 4px 16px 0 hsl(0 0% 0% / 0.2);
-
-    /* Motion: ease-out custom (las curvas nativas son débiles) */
-   
+    /* Chart tokens — Estadísticas (reusan valores de --status-*) */
+    --chart-cash: 142 76% 42%;
+    --chart-mp: 217 91% 65%;
+    --chart-cost: 0 84% 60%;
+    --chart-purple: 270 70% 62%;
+    --chart-indigo: 243 75% 65%;
+    --chart-orange: 25 85% 60%; /* PROVISIONAL: pendiente definición de paleta con socio */
+    --chart-amber: 38 90% 58%; /* PROVISIONAL: pendiente definición de paleta con socio */
   }
 }
 
@@ -207,7 +230,7 @@
 
 @layer utilities {
   .animate-fade-in {
-    animation: fade-in 0.2s ease-out;
+    animation: fade-in 0.2s var(--ease-out-quint);
   }
 
   @keyframes fade-in {
@@ -351,10 +374,10 @@
   }
 
   .animate-overlay-hide {
-    animation: overlay-hide 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: overlay-hide 220ms var(--ease-in-quint) forwards;
   }
   .animate-confirm-card-out {
-    animation: confirm-card-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: confirm-card-out 220ms var(--ease-in-quint) forwards;
   }
 }
 

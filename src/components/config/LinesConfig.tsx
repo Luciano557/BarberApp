@@ -224,18 +224,20 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
   );
 
   const renderInactiveLine = (line: Line) => (
-    <div key={line.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <EntityColorBar color={line.color} />
-        <div className="flex flex-1 items-center gap-3">
-          <span className="flex-1 font-medium text-foreground">{line.name}</span>
-          <button
-            onClick={() => startEdit(line)}
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
-            title="Opciones"
-          >
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+    <div key={line.id} className="animate-item-in">
+      <div className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <EntityColorBar color={line.color} />
+          <div className="flex flex-1 items-center gap-3">
+            <span className="flex-1 font-medium text-foreground">{line.name}</span>
+            <button
+              onClick={() => startEdit(line)}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+              title="Opciones"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -274,12 +276,13 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
                 <SortableContext items={active.map(l => l.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
                     {active.map(line => (
-                      <SortableLineItem
-                        key={line.id}
-                        line={line}
-                        onEdit={startEdit}
-                        isReorderable={isReorderable}
-                      />
+                      <div key={line.id} className="animate-item-in">
+                        <SortableLineItem
+                          line={line}
+                          onEdit={startEdit}
+                          isReorderable={isReorderable}
+                        />
+                      </div>
                     ))}
                   </div>
                 </SortableContext>

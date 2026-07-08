@@ -33,7 +33,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
 
     return (
       <div className="flex items-center gap-2 h-9 px-3 rounded-lg bg-white/10 text-white text-xs ring-1 ring-inset ring-white/10">
-        <span className="h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--status-success))] shadow-[0_0_0_3px_hsl(var(--status-success)/0.25)]" />
+        <span className="h-2 w-2 shrink-0 rounded-full bg-[hsl(var(--status-success))] ring-2 ring-status-success/25" />
         <span className="font-medium truncate">{currentSucursal.nombre}</span>
       </div>
     );
@@ -66,7 +66,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
               'h-2 w-2 shrink-0 rounded-full',
               isAllMode
                 ? 'bg-white/50'
-                : 'bg-[hsl(var(--status-success))] shadow-[0_0_0_3px_hsl(var(--status-success)/0.25)]',
+                : 'bg-[hsl(var(--status-success))] ring-2 ring-status-success/25',
             )}
           />
           <span className="truncate">{triggerLabel}</span>

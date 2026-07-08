@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Plus, Building2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
@@ -384,63 +384,44 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Mi Negocio</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Configuración general y gestión de sucursales.</p>
-        </div>
-        {canCreateSucursal && (
+      <PageHeader
+        title="Mi Negocio"
+        subtitle="Configuración general y gestión de sucursales."
+        actions={canCreateSucursal && (
           <Button size="sm" onClick={handleOpenCreate}>
             <Plus className="h-4 w-4 mr-1" /> Nueva sucursal
           </Button>
         )}
-      </div>
+        actionsLayout="inline"
+      />
 
       {/* Tabs */}
       {(showGeneralTab || visibleSucursalesActivas.length > 0) && activeTab && (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <div className="flex items-center gap-3 mb-6 flex-wrap">
+          <TabsList variant="underline" className="mb-6 flex-wrap">
             {showGeneralTab && (
-              <button
-                data-onboarding-id="general-tab"
-                onClick={() => handleTabChange(GENERAL_TAB)}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg",
-                  "text-sm font-medium transition-all duration-200",
-                  "border",
-                  activeTab === GENERAL_TAB
-                    ? "bg-foreground text-background border-foreground"
-                    : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
-                )}
-              >
+              <TabsTrigger value={GENERAL_TAB} variant="underline" data-onboarding-id="general-tab">
                 <Settings className="h-4 w-4" />
                 General
-              </button>
+              </TabsTrigger>
             )}
             {visibleSucursalesActivas.length > 0 && showGeneralTab && (
               <div className="h-5 w-px bg-border shrink-0" aria-hidden="true" />
             )}
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-0.5 max-w-full">
+            <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide max-w-full">
               {visibleSucursalesActivas.map((s, idx) => (
-                <button
+                <TabsTrigger
                   key={s.id}
+                  value={s.id}
+                  variant="underline"
                   data-onboarding-id={idx === 0 ? 'sucursal-tab' : undefined}
-                  onClick={() => handleTabChange(s.id)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg",
-                    "text-sm font-medium transition-all duration-200",
-                    "border",
-                    activeTab === s.id
-                      ? "bg-background text-foreground border-foreground/40 shadow-sm"
-                      : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
-                  )}
                 >
                   <Building2 className="h-4 w-4" />
                   {s.nombre}
-                </button>
+                </TabsTrigger>
               ))}
             </div>
-          </div>
+          </TabsList>
 
           {showGeneralTab && (
             <TabsContent value={GENERAL_TAB}>

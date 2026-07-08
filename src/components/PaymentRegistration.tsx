@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -859,13 +860,16 @@ export function PaymentRegistration({
       </AlertDialog>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Keyboard className="h-3.5 w-3.5" />
-          Ctrl+1-9 para selección rápida
-        </p>
-      </div>
+      <PageHeader
+        title="Nuevo Cobro"
+        subtitle={(
+          <span className="flex items-center gap-1.5 text-xs">
+            <Keyboard className="h-3.5 w-3.5" />
+            Ctrl+1-9 para selección rápida
+          </span>
+        )}
+        actionsLayout="inline"
+      />
 
       {/* Progress Steps */}
       <div className="flex gap-1">

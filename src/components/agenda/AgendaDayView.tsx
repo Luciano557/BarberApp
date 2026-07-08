@@ -601,7 +601,7 @@ export function AgendaDayView({
       {/* Drag ghost */}
       {ghost && (
         <div
-          className="fixed z-[100] pointer-events-none"
+          className="fixed z-[80] pointer-events-none"
           style={{
             left: 0,
             top: 0,

@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { TabBadge } from '@/components/ui/TabBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil, ListChecks,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -427,17 +429,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const estadoOptions = isTareasTab ? ESTADO_OPTIONS_TAREA : ESTADO_OPTIONS_PETICION;
 
   return (
-    <div className="w-full max-w-4xl lg:max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-4xl lg:max-w-6xl mx-auto space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Tareas</h1>
-          <p className="text-sm text-muted-foreground max-w-2xl">
+      <PageHeader
+        title="Tareas"
+        subtitle={(
+          <span className="block max-w-2xl">
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.
-          </p>
-        </div>
-        {isTareasTab ? (
-          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          </span>
+        )}
+        actions={isTareasTab ? (
+          <>
             {canManageTareas && !showCompletedHistory && !showRecurrencias && (
               <Button onClick={handleNuevaTarea}>
                 <Plus className="h-4 w-4 mr-2" />Nueva tarea
@@ -452,15 +454,16 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 <ChartSpline className="h-4 w-4 mr-2" />Historial ({tareasCompletadas.length})
               </Button>
             ))}
-          </div>
+          </>
         ) : (
           !isBarber && (
-            <Button onClick={handleNuevaPeticion} className="self-start sm:self-auto">
+            <Button onClick={handleNuevaPeticion}>
               <Plus className="h-4 w-4 mr-2" />Nueva petición
             </Button>
           )
         )}
-      </div>
+        actionsLayout="inline"
+      />
 
 
       <TareaFormDialog
@@ -480,9 +483,17 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setFiltroEstado('todos'); setShowCompletedHistory(false); setShowRecurrencias(false); }}>
-        <TabsList>
-          <TabsTrigger value="tareas">Tareas ({tareasAdmin.length})</TabsTrigger>
-          <TabsTrigger value="peticiones">Peticiones ({peticiones.length})</TabsTrigger>
+        <TabsList variant="underline">
+          <TabsTrigger value="tareas" variant="underline" className="group">
+            <ListChecks className="h-4 w-4" />
+            Tareas
+            <TabBadge count={tareasAdmin.length} />
+          </TabsTrigger>
+          <TabsTrigger value="peticiones" variant="underline" className="group">
+            <Inbox className="h-4 w-4" />
+            Peticiones
+            <TabBadge count={peticiones.length} />
+          </TabsTrigger>
         </TabsList>
 
         {/* Filters bar */}

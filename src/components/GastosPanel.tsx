@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, Trash2, ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react';
 import { useGastos, TipoCosto } from '@/hooks/useGastos';
 import { supabase } from '@/integrations/supabase/client';
 import { useGastosRecurrentes } from '@/hooks/useGastosRecurrentes';
@@ -188,12 +188,7 @@ export function GastosPanel() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Receipt className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-bold text-foreground">Gastos</h2>
-      </div>
-
+    <div className="space-y-6 animate-fade-in">
       {/* Formulario */}
       <Card>
         <CardHeader>
