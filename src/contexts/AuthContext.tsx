@@ -167,11 +167,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // blocking the auth callback and prevent deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       console.info('[Auth] phase=onAuthStateChange event=', event);
+      console.info('[Auth][DIAG]', {
+        timestamp: new Date().toISOString(),
+        event,
+        nextSessionIsNull: !nextSession,
+        hadPreviousSession: !!session,
+      });
 
       // Clear localStorage hint when verified.
       if (nextSession?.user?.email_confirmed_at) {
         localStorage.removeItem('pending_verification_email');
       }
+
 
       setTimeout(() => {
         hydrateSession(nextSession);
