@@ -705,6 +705,294 @@ escritorio **quedan fuera de este build** — tienen sesión propia pendiente.
 
 ---
 
+## Fase 3 — Formularios (auditoría 2026-07-08)
+
+> Inventario y diagnóstico puro, sin implementación. Fuera de alcance: Auth,
+> Homepage, portal público de reservas (su stepper se audita en Fase 4), las
+> animaciones de Cobrar (cerradas en Fase 2) y el sidebar de escritorio.
+
+### F3.0 Hallazgo estructural — la premisa del stack es falsa
+
+El contexto del proyecto describe "formularios con react-hook-form + zod".
+**El código dice otra cosa**: hay **0 usos de `useForm`** en todo `src/`.
+`react-hook-form` solo aparece dentro de `ui/form.tsx` (el wrapper shadcn
+Form/FormField/FormMessage, completo y correcto, con `aria-invalid` y estados
+de error — `form.tsx:81,92-94,121`), que **ningún componente importa: es
+código muerto**. `zod` se usa en exactamente **un** archivo
+(`InviteUserDialog.tsx:2`, schema + `.safeParse()` manual en `:86-95`, sin
+`zodResolver` — `@hookform/resolvers` tampoco se importa nunca). El 100% de
+los formularios reales es `useState` + validación imperativa. Esto no es un
+hallazgo cosmético: **cualquier plan de normalización tiene que decidir
+primero el stack** (adoptar el wrapper que ya existe, o borrarlo y formalizar
+el patrón manual).
+
+Además, ningún componente base (`Input`, `Textarea`, `Select`, `Checkbox`,
+`RadioGroup`, `Switch`) tiene estado de error nativo (ni borde rojo ni
+`aria-invalid`); cada formulario lo resuelve con `className` condicional
+(ej. `ChangePasswordForm.tsx:114`, `EquipoUnificado.tsx:1632`,
+`phone-input.tsx:244`). `aria-invalid` a mano existe solo en 2 archivos
+(`TareaFormDialog.tsx:266,286` y `TareaRecurrenteFormDialog`). `Button` no
+tiene prop `loading`; cada form compone su spinner a mano.
+
+### F3.1 Inventario de formularios — 38 relevados
+
+Conteo por cluster (alta/edición con campos; excluye confirmaciones puras
+como `MoveConfirmDialog`/`TurnoConflictDialog`, y listas de toggles como
+`PinActionsToggleList`):
+
+| Cluster | Total | DrawerForm | Dialog centrado | Sheet crudo/manual | Popover | Inline en página |
+|---|---|---|---|---|---|---|
+| Configuración (catálogo, pagos, horarios, comisiones, PINs, productos) | 18 | 6 | 4 | 1 | 1 | 6 |
+| Finanzas | 6 | 0 | 3 | 0 | 0 | 3 (Card siempre visible) |
+| Turnos/Agenda | 4 | 0 | 4 | 0 | 0 | 0 |
+| Tareas | 2 | 0 | 0 | 2 (markup de DrawerForm duplicado a mano) | 0 | 0 |
+| Mi Negocio + Clientes | 7 | 2 (EquipoUnificado:1264, InviteUserDialog:194) | 3 (Nueva sucursal `MiNegocioPanel:522`, `NuevoClienteDialog:120`, `ClienteDetailDialog:268/294`) | 0 | 0 | 2 (StaffConfig, SucursalTabContent) |
+| Cobrar | 1 | — | — | — | — | Stepper full-page propio |
+| **Total** | **38** | **8** | **14** | **3** | **1** | **11+1** |
+
+**El canon "entidad → DrawerForm" se cumple en 8 de ~25 casos aplicables.**
+Desvíos más significativos (mismo tipo de operación que los 8 canónicos,
+contenedor distinto):
+
+1. **`ProductoDialog.tsx:239` vs `ProductosGlobalConfig.tsx:252`** — la misma
+   entidad Producto tiene DOS formularios independientes: Dialog centrado con
+   tabs en sucursal, DrawerForm en catálogo global. Campos, validación y
+   marcado de opcionales también difieren entre ambos.
+2. **`NuevoClienteDialog.tsx:120`** — alta de Cliente (entidad principal) en
+   Dialog centrado.
+3. **`NewAppointmentDialog.tsx:427`** — alta de turno, el formulario más
+   complejo del cluster de agenda, en Dialog `max-w-md`.
+4. **`SueldosPanel.tsx:992`** y **`DeudasPanel.tsx:286`** — pagos (sueldo,
+   deuda) en Dialog.
+5. **`ServicesConfig.tsx:542`** — quick-create de línea en Dialog, cuando la
+   creación completa de líneas usa DrawerForm en el mismo archivo.
+6. **`TareaFormDialog.tsx:236` / `TareaRecurrenteFormDialog.tsx:201`** —
+   replican a mano el markup header/body/footer de DrawerForm sobre un Sheet
+   crudo en vez de importar el componente.
+7. **`HorariosTrabajoSection` DayEditSheet (:289)** — Sheet crudo, con la
+   particularidad de que **cada onChange persiste a Supabase al instante**
+   (sin botón Guardar) — único formulario "sin borrador" de la app.
+
+Nota: `SucursalesConfig.tsx` quedó relevado solo en su manejo de teléfono
+(consistente); su contenedor no se verificó en esta pasada.
+
+### F3.2 Validación y manejo de errores
+
+Tres patrones conviven:
+
+- **Solo toast al submit** (mayoría): toda Agenda (`NewAppointmentDialog`,
+  `AppointmentDetailDialog`, `DayOffDialog`, `UnavailableSlotDialog`),
+  Gastos, Sueldos, Inversiones/Deudas (alta), todo el catálogo de
+  Configuración (Services/Lines/Extras/Discounts vía `validate*` + `toast.error`).
+  El campo culpable nunca se marca — el usuario lee el toast y tiene que
+  deducir qué corregir.
+- **Error inline bajo el campo** (minoría): `TareaFormDialog`/`TareaRecurrente`
+  (el patrón más completo: error tras primer submit + contador de caracteres +
+  `aria-invalid`), `RegistrarPagoDialog` de Deudas (`DeudasPanel:309-315`),
+  `CustomRepeatSheet:160`, `PinConfigSection:269-271`,
+  `PaymentMethodsConfig:378-383`, `InviteUserDialog:309-360` (zod) y
+  `PhoneInput` (que trae su propio error inline).
+- **Cobrar** (`PaymentRegistration`): toasts al submit (`:531-596`) + un único
+  feedback inline vivo (el split: "Debe coincidir exacto", `:1417-1422`) +
+  auto-sanación silenciosa de estado por useEffect (`:230-237,486-513`).
+
+Convención de facto sana pero no escrita: **error de campo → inline; error de
+servidor/red → toast**. Solo ~8 de 38 formularios la cumplen.
+
+### F3.3 Campo obligatorio — 4 variantes
+
+1. Asterisco con estilo (`<span className="text-destructive">*</span>`):
+   `BackfillWizard:334`, `VoidClosureDialog:51`.
+2. Asterisco plano en el label: `NewAppointmentDialog:397-401`, Gastos,
+   Inversiones, Deudas, Sueldos.
+3. Solo "(opcional)" en los NO obligatorios (los obligatorios sin marca):
+   el patrón más extendido (~35 usos) — todo el catálogo de Configuración,
+   Tareas, DayOff/UnavailableSlot.
+4. Nada (la obligatoriedad se descubre al fallar el submit): Servicios
+   (Nombre/Duración), Descuentos, PINs, y hasta bloques enteros de
+   formularios que en otra sección del MISMO form sí marcan
+   (`NewAppointmentDialog`: sub-form cliente con asteriscos, bloque
+   barbero/servicio/fecha sin marca siendo igual de obligatorio).
+
+No existe `<Label required>` ni componente unificado.
+
+### F3.4 Estados de envío y doble submit
+
+- `disabled={saving}` durante envío es el patrón dominante (~40 usos) y el
+  texto "Guardando..." es frecuente, pero el spinner `Loader2` aparece solo a
+  veces (`InviteUserDialog:212`, `NuevoClienteDialog:286`,
+  `PaymentRegistration:1525`…) y otras solo cambia el texto
+  (`NewAppointmentDialog:507`, `DayOffDialog:72`, Gastos) — sin componente
+  `Button loading` común.
+- **Formularios SIN guard contra doble submit** (async sin `disabled` ni
+  estado de loading): `LineQuickEditPopover:210-212`, `ServicesConfig`
+  (Guardar/Guardar cambios `:340,344` y quick-create de línea `:565`),
+  `ExtrasConfig:215,219`, `DiscountsConfig:423,427`, `LinesConfig` (solo el
+  editar, `:338` — el agregar sí tiene guard: inconsistente dentro del mismo
+  archivo), alta de Inversiones (`InversionesPanel:161`) y de Deudas
+  (`DeudasPanel:152`), `ComisionEquipoConfig:400-404`.
+- 🔴 **Cobrar**: el atajo de teclado Enter (`PaymentRegistration:691-695`)
+  llama `handleSubmit()` directamente **sin chequear `isSubmitting`** — el
+  guard vive solo en el `disabled` del botón. Vector real de doble cobro por
+  teclado si el segundo Enter entra antes del re-render.
+
+### F3.5 maxLength — estado real
+
+**78 ocurrencias en 33 archivos** (el pendiente del informe funcional está
+mayormente saldado). Límites de facto: 80 nombres/títulos, 120 email y
+dirección, 240 descripciones/motivos/observaciones, 1500 notas de turno,
+6 PIN/porcentajes. Contador de caracteres visible solo en Tareas y parte del
+catálogo (`{n}/240`).
+
+**Huecos concretos (texto libre que persiste en DB, sin límite):**
+- Descripción de gasto (`GastosPanel:247-252`)
+- Concepto de pago de sueldo (`SueldosPanel:1025-1031`)
+- Motivo de ausencia (`BloqueosSection:201` — textarea sin maxLength)
+- Nueva inversión: Nombre, Descripción y Acreedor, los tres sin límite
+  (`InversionesPanel:104-131`)
+- `CurrencyInput` no acota cantidad de dígitos enteros en ningún uso
+  (verificado en `currency-input.tsx`: solo limita decimales)
+
+### F3.6 Autofocus, cierre y estado residual
+
+- **Autofocus**: 13 usos en 12 archivos, concentrados en dialogs de PIN y en
+  inputs de búsqueda dentro de Popovers (`NewAppointmentDialog:304`,
+  `AppointmentDetailDialog:426`). En formularios de alta/edición comunes, el
+  único primer-campo con `autoFocus` explícito es `MarcasManagerDialog:114`.
+  (Radix enfoca el primer focusable por defecto al abrir, así que el efecto
+  práctico depende del orden del markup — no verificado en runtime.)
+- **Orden de tab**: no se detectó ningún `tabIndex` manual en formularios; el
+  orden sigue el DOM, que coincide con el orden visual en lo relevado.
+- **Cambios sin guardar**: **ningún formulario de los 38 confirma antes de
+  cerrar con datos cargados** — 0 usos de `confirm(`, `beforeunload`,
+  `hasUnsaved`. Pérdida silenciosa universal. Dos excepciones parciales que
+  prueban que el problema es conocido: "Cancelar venta" de Cobrar (AlertDialog
+  con detalle de lo que se borra, `PaymentRegistration:1603-1621`) y
+  `RegenerarPasswordDialog:41-45` (bloquea cierre durante loading + advierte
+  antes de cerrar sin copiar).
+- **Reset inconsistente al cerrar/cancelar**: la mayoría resetea el estado al
+  cerrar; `SueldosPanel` NO (cerrar y reabrir muestra los datos viejos,
+  `:887-889` solo resetea tras éxito), `BloqueosSection:206` y
+  `ComisionProductosConfig:160-162` cancelan sin limpiar el borrador.
+
+### F3.7 Teléfono
+
+Núcleo **consistente**: `src/lib/phone.ts` (formato canónico `+54…` sin el 9,
+post-migración 2026-05) + componente compartido `PhoneInput`
+(`ui/phone-input.tsx`) usados por Staff, EquipoUnificado, Sucursales (alta y
+edición), NuevoCliente, ClienteDetail y NewAppointment. Ningún formulario
+interno trata el teléfono como texto libre. `InviteUserDialog` no pide
+teléfono.
+
+Desvíos menores:
+1. `useSupabaseData.ts:9` y `phone-input.tsx:3` importan `libphonenumber-js`
+   directo, contra la regla escrita en `phone.ts:4-5`.
+2. Comentarios desactualizados que aún dicen `+549…`:
+   `reservar/lib/phone.ts:24-26`, `clientes/import/lib/normalize.ts:16`
+   (comportamiento correcto, doc vieja).
+3. `ClientesPanel:139` muestra el E.164 crudo en la lista, sin
+   `formatPhoneDisplay` (los detalles sí formatean).
+4. Mensaje de error hardcodeado "Ingresa un telefono valido" (¡en tuteo!) en
+   `NuevoClienteDialog` y `NewAppointmentDialog:284-286`, en vez de
+   `phoneErrorMessage()`.
+5. `useClientes.ts:171-180` — si el update recibe un teléfono no
+   canonicalizable, lo guarda como `null` en silencio en vez de rechazar
+   (a confirmar si algún caller puede llegar ahí sin validar antes).
+6. El portal público duplica la UI de selector-país+teléfono en vez de
+   reutilizar `PhoneInput` — se audita en Fase 4.
+
+### F3.8 Selects vacíos
+
+Sin patrón. Tres niveles conviven:
+
+- **Bien resuelto** (mensaje + contexto/CTA): Cobrar sin barberos
+  (`PaymentRegistration:915-928`, mensaje por rol + botón "Añadir miembro"),
+  Cobrar sin métodos de pago (`:1290-1296`),
+  `ComisionEquipoConfig:422-424` ("No hay barberos disponibles para asignar.").
+- **Fallback estructural** (nunca queda vacío): "Asignación" en Tareas (ítem
+  fijo "Todo el equipo"), "Línea" en Servicios ("Sin línea"), "Marca" en
+  Productos ("Sin marca"), "Aplica a" en Bloqueos ("Toda la sucursal").
+- **Mudo** (dropdown en blanco, sin explicación): Barbero y Servicio en
+  `NewAppointmentDialog:469-487`, Servicio/Profesional en
+  `AppointmentDetailDialog:607-629`, Barbero en `UnavailableSlotDialog:68-75`,
+  Empleado en `SueldosPanel:1003-1009`, barbero en
+  `HorariosTrabajoSection:605-623`. En Cobrar: paso Servicios y paso Extras
+  quedan mudos si las listas están vacías (`:1135-1149`), y el split con
+  0 métodos electrónicos solo se explica vía `title` (tooltip nativo,
+  `:1336-1338`).
+
+### F3.9 Inconsistencias (priorizadas)
+
+**P1 — Visible y molesto**
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | Doble submit posible: 8+ formularios async sin guard + el Enter de Cobrar que no chequea `isSubmitting` (riesgo de doble cobro, el flujo más crítico del producto) | F3.4 |
+| 2 | Validación solo-toast sin marcar el campo culpable en la mayoría de la app (toda Agenda, Gastos, Sueldos, catálogo) | F3.2 |
+| 3 | 5+ selects que bloquean el flujo quedan mudos cuando su lista está vacía (crear turno sin barberos/servicios es indescifrable para un usuario nuevo) | F3.8 |
+
+**P2 — Repetido / sistémico**
+
+| # | Qué |
+|---|---|
+| 4 | Contenedor sin canon efectivo: 14 Dialog vs 8 DrawerForm para operaciones equivalentes; Producto con 2 formularios distintos para la misma entidad; Tareas duplica el markup de DrawerForm a mano |
+| 5 | 4 variantes de marcado de obligatorio, inconsistentes incluso dentro del mismo formulario |
+| 6 | Pérdida silenciosa universal al cerrar con cambios (0 confirmaciones en 38 forms) + reset inconsistente (Sueldos retiene datos viejos al reabrir) |
+| 7 | Loading de submit sin patrón: spinner vs solo-texto vs nada; `Button` sin prop `loading` |
+| 8 | maxLength con huecos en campos que persisten (gasto, sueldo, ausencia, inversiones) y `CurrencyInput` sin tope de dígitos |
+| 9 | `form.tsx` (RHF+zod) muerto mientras el 100% de los forms es useState manual — stack sin decidir |
+
+**P3 — Higiene menor**
+
+| # | Qué |
+|---|---|
+| 10 | `aria-invalid` solo en Tareas; inputs base sin estado de error nativo |
+| 11 | Contador de caracteres solo en Tareas y parte del catálogo |
+| 12 | Autofocus casi nunca en el primer campo de formularios de alta |
+| 13 | Teléfono: 2 imports directos de libphonenumber-js contra la regla de `phone.ts`, comentarios `+549` viejos, E.164 crudo en lista de clientes, "Ingresa un telefono valido" hardcodeado en tuteo |
+| 14 | `WeekdayPicker` no se reutiliza en Horarios (chips ad-hoc); sus únicos usos reales son EquipoSucursalPanel y BarberSucursalesGeneralSection |
+| 15 | `PinConfigSection:178` es el único `<form onSubmit>` semántico de la app; el resto son divs con onClick |
+| 16 | DayEditSheet persiste cada cambio al instante sin "Guardar" — único form sin borrador, sin indicación de que ya guardó |
+
+**Totales Fase 3:** 38 formularios · 3 P1 / 6 P2 / 7 P3 · 78 maxLength en 33
+archivos con 8+ huecos concretos · 0 confirmaciones de cierre en toda la app.
+
+### F3.10 Preguntas abiertas (para la fase de plan)
+
+1. **Stack de formularios**: ¿se adopta react-hook-form+zod (el wrapper
+   `ui/form.tsx` ya está listo y sin uso) o se declara canónico el patrón
+   useState+helpers y se borra el wrapper? Todo lo demás (errores inline,
+   obligatorios, disabled) depende de esta decisión.
+2. **Canon de contenedor**: ¿se ratifica "entidad → DrawerForm, confirmación →
+   Dialog, edición in-place → inline"? Y si sí, ¿migran los 14 Dialogs o se
+   acepta Dialog para altas rápidas (cliente, turno, pagos)? ¿Producto se
+   unifica en un solo formulario?
+3. **Marcado de obligatorio**: ¿cuál de las 4 variantes queda? (la más
+   extendida hoy es "(opcional) en los no obligatorios, nada en los
+   obligatorios").
+4. **Errores**: ¿se formaliza "campo → inline, servidor → toast" y se agrega
+   estado de error a los inputs base?
+5. **Doble submit**: ¿guard universal (y fix inmediato del Enter de Cobrar)?
+   Esto es casi un bugfix — puede no esperar al plan general.
+6. **Selects vacíos**: ¿patrón estándar "No hay X disponibles" + CTA de
+   creación, como ya hacen Cobrar y ComisionEquipo?
+7. **Cambios sin guardar**: ¿se define política (ej. confirmar solo en
+   formularios con N+ campos tocados) o se acepta la pérdida silenciosa?
+8. **maxLength**: ¿obligatorio en todo texto libre que persiste, con la tabla
+   de facto 80/120/240/1500 como estándar?
+
+*Método F3: relevamiento distribuido en 5 pasadas (componentes base;
+Configuración; Mi Negocio+Clientes; Finanzas+Turnos+Tareas; Cobrar+teléfono)
+con lectura de archivos y barridos ripgrep (`useForm`, `zod`, `toast.error`,
+`maxLength=`, `autoFocus`, `confirm(`/`isDirty`/`hasUnsaved`,
+`disabled={saving}`, `libphonenumber-js`) al 2026-07-08. La pasada de
+Mi Negocio+Clientes se completó con verificación directa tras un corte de la
+pasada automática. `SucursalesConfig.tsx` quedó relevado solo parcialmente
+(teléfono). El focus-trap de Radix en runtime no se verificó (solo props
+`autoFocus` explícitas en código).*
+
+---
+
 *Método: lectura completa de `src/index.css`, `tailwind.config.ts` y los 16
 componentes compartidos/base relevantes, más barridos con ripgrep sobre `src/` para
 hex, clases de color directas, sombras, z-index, radios y valores arbitrarios. Los

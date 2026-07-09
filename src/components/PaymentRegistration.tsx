@@ -690,6 +690,7 @@ export function PaymentRegistration({
           goToNextStep();
         } else if (currentStep === 'payment' && paymentMethod) {
           e.preventDefault();
+          if (isSubmitting) return;
           handleSubmit();
         }
       }
@@ -712,7 +713,7 @@ export function PaymentRegistration({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length, isSubmitting]);
 
   // ── MP Terminal confirmed callback ──────────────────────────────────────────
   const handleMpTerminalConfirmed = useCallback(async (intentId: string, deviceId: string) => {
