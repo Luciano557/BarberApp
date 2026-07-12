@@ -240,7 +240,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
       <div
         key={barberoId}
         className={cn(
-          "rounded-lg border border-border bg-muted/20 p-4 transition-shadow duration-[250ms]",
+          "rounded-lg border border-border bg-muted/20 p-4 transition-shadow duration-highlight",
           highlightedId === barberoId && "ring-2 ring-primary/40"
         )}
       >

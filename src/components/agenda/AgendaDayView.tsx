@@ -608,7 +608,7 @@ export function AgendaDayView({
             transform: `translate(${ghost.x + 12}px, ${ghost.y + 12}px)`,
           }}
         >
-          <div className="animate-in zoom-in-95 fade-in duration-[120ms] ease-out rounded-md border bg-card px-2 py-1 text-xs shadow-md">
+          <div className="animate-in zoom-in-95 fade-in duration-tooltip ease-out rounded-md border bg-card px-2 py-1 text-xs shadow-md">
             <span className="font-medium text-foreground">{ghost.label}</span>
           </div>
         </div>

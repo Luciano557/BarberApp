@@ -1,4 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -56,6 +59,24 @@ const STEPS = [
 const emptyQty = (): Record<PaymentMethod, number> =>
   Object.fromEntries(PAYMENT_METHODS.map(m => [m, 0])) as Record<PaymentMethod, number>;
 
+/**
+ * Un schema único para los 3 pasos con validación real (Barbero/Motivo/Servicios);
+ * Resumen y Confirmar no tienen campos propios. `hasServiceData` espeja
+ * `totals.totalCobrado > 0 || totals.services > 0` (deriva de items/quickAmounts,
+ * que viven fuera del form). El gate de "no avanzar si el paso es inválido" se
+ * resuelve leyendo `schema.shape.<campo>.safeParse(...)` directo — necesita ser
+ * síncrono en cada render para deshabilitar el botón "Siguiente" en vivo, sin
+ * esperar al ciclo async de validación de RHF.
+ */
+const backfillSchema = z.object({
+  barberId: z.string().min(1, 'Seleccioná un barbero'),
+  reason: z.string().min(1, 'Seleccioná un motivo'),
+  note: z.string().max(240).optional().default(''),
+  hasServiceData: z.boolean().refine((v) => v === true, { message: 'Cargá al menos un servicio o un monto.' }),
+});
+
+type BackfillFormValues = z.infer<typeof backfillSchema>;
+
 export function BackfillWizard({ open, onOpenChange, date, barbers, services, lines: _lines, closedBarberIds, onComplete }: BackfillWizardProps) {
   const [step, setStep] = useState(0);
   const [selectedBarberId, setSelectedBarberId] = useState('');
@@ -70,6 +91,11 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
   const { saveBackfill } = useBackfillClosing();
   const { methods, loading: methodsLoading, getRecargoPct } = usePaymentMethodsConfig();
   const activeMethods = useMemo(() => methods.filter(m => m.activo), [methods]);
+
+  const form = useForm<BackfillFormValues>({
+    resolver: zodResolver(backfillSchema),
+    defaultValues: { barberId: '', reason: '', note: '', hasServiceData: false },
+  });
 
   const availableBarbers = useMemo(() =>
     barbers.filter(b => !closedBarberIds.has(b.id)),
@@ -156,11 +182,15 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
     return { efectivoBase, digitalBase, totalBase, efectivoCobrado, digitalCobrado, totalCobrado, recargosTotal, services: serviceCount, commission };
   }, [loadMode, quickAmounts, quickCantidad, items, selectedBarber, getRecargoPct]);
 
+  useEffect(() => {
+    form.setValue('hasServiceData', totals.totalCobrado > 0 || totals.services > 0);
+  }, [totals, form]);
+
   const canAdvance = () => {
     switch (step) {
-      case 0: return !!selectedBarberId;
-      case 1: return !!reason;
-      case 2: return totals.totalCobrado > 0 || totals.services > 0;
+      case 0: return backfillSchema.shape.barberId.safeParse(selectedBarberId).success;
+      case 1: return backfillSchema.shape.reason.safeParse(reason).success;
+      case 2: return backfillSchema.shape.hasServiceData.safeParse(totals.totalCobrado > 0 || totals.services > 0).success;
       case 3: return true;
       default: return false;
     }
@@ -199,6 +229,8 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
 
   const handleConfirm = async () => {
     if (!selectedBarber) return;
+    const isValid = await form.trigger();
+    if (!isValid) return;
     setIsSaving(true);
     const success = await saveBackfill({
       barberId: selectedBarberId,
@@ -232,6 +264,7 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
     setItems([]);
     setQuickAmounts(emptyQty());
     setQuickCantidad(0);
+    form.reset({ barberId: '', reason: '', note: '', hasServiceData: false });
     onOpenChange(false);
   };
 
@@ -299,7 +332,7 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                   {availableBarbers.map(b => (
                     <button
                       key={b.id}
-                      onClick={() => setSelectedBarberId(b.id)}
+                      onClick={() => { setSelectedBarberId(b.id); form.setValue('barberId', b.id); }}
                       className={cn(
                         "flex items-center gap-3 p-4 rounded-lg border transition-colors text-left",
                         selectedBarberId === b.id
@@ -331,13 +364,13 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">
-                  Motivo del cierre diferido <span className="text-destructive">*</span>
+                  Motivo del cierre diferido
                 </Label>
                 <div className="grid gap-2">
                   {BACKFILL_REASONS.map(r => (
                     <button
                       key={r}
-                      onClick={() => setReason(r)}
+                      onClick={() => { setReason(r); form.setValue('reason', r); }}
                       className={cn(
                         "flex items-center gap-3 w-full p-4 rounded-lg border text-left text-sm transition-colors",
                         reason === r
@@ -358,9 +391,9 @@ export function BackfillWizard({ open, onOpenChange, date, barbers, services, li
                 <Label className="text-sm font-medium">Nota adicional (opcional)</Label>
                 <Textarea
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(e) => { setNote(e.target.value); form.setValue('note', e.target.value); }}
                   placeholder="Detalle adicional sobre el cierre..."
-                  maxLength={500}
+                  maxLength={240}
                   rows={3}
                 />
               </div>

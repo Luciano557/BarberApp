@@ -108,6 +108,14 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      transitionDuration: {
+        "sidebar-text": "120ms",
+        highlight: "250ms",
+        tooltip: "120ms",
+      },
+      transitionDelay: {
+        "sidebar-width": "60ms",
+      },
       keyframes: {
         "accordion-down": {
           from: {

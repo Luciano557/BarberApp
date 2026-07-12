@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, ChevronRight, Lock, Menu, X, Clock } from 'lucide-react';
+import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, Lock, Menu, X, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -42,6 +42,10 @@ const ROLE_LABELS: Record<string, string> = {
 // deciden qué ítems existen no cambian.
 const MGMT_IDS = new Set(['mi-negocio', 'config']);
 
+// Curva compartida para las transiciones de "tamaño" del colapso (ancho del
+// aside, paddings, ícono de nav) — la misma que ya usa el ancho del <aside>.
+const SIZE_EASE = 'var(--ease-out-quint)';
+
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
@@ -58,6 +62,18 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   // En mobile el drawer siempre muestra la versión completa: `collapsed` solo
   // lo desliza fuera de pantalla. El riel compacto es exclusivo de desktop.
   const railMode = !isMobile && collapsed;
+
+  // Transición de texto que persiste en el DOM en ambos estados (logo,
+  // labels de nav, section labels, selector de sucursal): opacity con
+  // timing asimétrico (Opción B) + cualquier propiedad de "tamaño" extra
+  // que acompañe a ese mismo elemento (margin, max-height), siempre a
+  // SIZE_EASE/200ms para que quede sincronizada con el ancho del aside.
+  const textTransition = (extra?: string) => {
+    const opacityPart = railMode
+      ? 'opacity 120ms var(--ease-in-quint)'
+      : `opacity 150ms ${SIZE_EASE} 80ms`;
+    return extra ? `${opacityPart}, ${extra}` : opacityPart;
+  };
 
   const navItems: NavItem[] = [
     ...(canOperarCajaYGastos ? [{ id: 'registro', label: 'Cobrar', icon: CreditCard }] : []),
@@ -119,62 +135,69 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           aria-current={active ? 'page' : undefined}
           title={itemTitle}
           className={cn(
-            'group flex w-full items-center transition-colors duration-150',
-            railMode
-              ? 'justify-center'
-              : cn(
-                  'gap-2.5 rounded-[10px] px-2 py-1.5 text-sm',
-                  active
-                    ? 'bg-primary font-semibold text-primary-foreground'
-                    : 'font-medium text-muted-foreground hover:bg-[#F4F5F7] hover:text-foreground',
-                ),
+            'group flex w-full items-center justify-center rounded-[10px] py-1.5 text-sm transition-colors duration-150',
+            railMode ? 'px-0' : 'px-2',
+            active
+              ? 'bg-primary font-semibold text-primary-foreground'
+              : 'font-medium text-muted-foreground hover:bg-[#F4F5F7] hover:text-foreground',
           )}
+          style={{ transition: `padding-left 200ms ${SIZE_EASE}, padding-right 200ms ${SIZE_EASE}` }}
         >
-          {railMode ? (
+          <span
+            className={cn(
+              'relative grid shrink-0 place-items-center',
+              railMode
+                ? cn(
+                    'h-10 w-10 rounded-[10px]',
+                    active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
+                  )
+                : active
+                  ? 'h-7 w-7 rounded-md bg-primary-foreground/15 text-primary-foreground'
+                  : 'h-5 w-5 rounded-md',
+            )}
+            style={{
+              transition: `width 200ms ${SIZE_EASE}, height 200ms ${SIZE_EASE}, border-radius 200ms ${SIZE_EASE}, background-color 200ms ${SIZE_EASE}, color 200ms ${SIZE_EASE}`,
+            }}
+          >
+            <Icon className="h-5 w-5 shrink-0" />
+            {isPlanLocked && railMode && (
+              <span
+                className={cn(
+                  'absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full border border-background',
+                  active ? 'bg-primary-foreground text-primary' : 'bg-status-warning-bg text-status-warning-foreground',
+                )}
+              >
+                <Lock className="h-2.5 w-2.5" />
+              </span>
+            )}
+          </span>
+          <span
+            className="min-w-0 truncate text-left"
+            style={{
+              opacity: railMode ? 0 : 1,
+              marginLeft: railMode ? '0px' : '0.625rem',
+              // flex-basis (no flex-1/flex-grow) a propósito: flex-grow no es
+              // animable por CSS y, aunque quede invisible, seguiría
+              // reclamando todo el espacio libre y correría el ícono del
+              // centro. Con basis explícito el label transiciona a 0 de
+              // verdad y justify-center puede centrar el ícono.
+              flexBasis: railMode ? '0px' : '200px',
+              transition: textTransition(`margin-left 200ms ${SIZE_EASE}, flex-basis 200ms ${SIZE_EASE}`),
+            }}
+            aria-hidden={railMode}
+          >
+            {item.label}
+          </span>
+          {!railMode && isPlanLocked && requiredPlan && (
             <span
               className={cn(
-                'relative grid h-10 w-10 shrink-0 place-items-center rounded-[10px] transition-colors',
-                active
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
+                'ml-auto inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]',
+                active ? 'bg-primary-foreground/15 text-primary-foreground' : 'bg-status-warning-bg text-status-warning-foreground',
               )}
             >
-              <Icon className="h-5 w-5" />
-              {isPlanLocked && (
-                <span
-                  className={cn(
-                    'absolute -right-0.5 -top-0.5 grid h-4 w-4 place-items-center rounded-full border border-background',
-                    active ? 'bg-primary-foreground text-primary' : 'bg-status-warning-bg text-status-warning-foreground',
-                  )}
-                >
-                  <Lock className="h-2.5 w-2.5" />
-                </span>
-              )}
+              <Lock className="h-3 w-3" />
+              {PLAN_LABELS[requiredPlan]}
             </span>
-          ) : active ? (
-            <>
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-primary-foreground/15 text-primary-foreground">
-                <Icon className="h-4 w-4" />
-              </span>
-              <span className="truncate">{item.label}</span>
-              {isPlanLocked && requiredPlan && (
-                <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[10px] text-primary-foreground">
-                  <Lock className="h-3 w-3" />
-                  {PLAN_LABELS[requiredPlan]}
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="truncate">{item.label}</span>
-              {isPlanLocked && requiredPlan && (
-                <span className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] text-status-warning-foreground">
-                  <Lock className="h-3 w-3" />
-                  {PLAN_LABELS[requiredPlan]}
-                </span>
-              )}
-            </>
           )}
         </button>
       </li>
@@ -182,7 +205,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   };
 
   const sectionLabel = (text: string) => (
-    <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <p
+      className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+      style={{
+        opacity: railMode ? 0 : 1,
+        transition: textTransition(),
+      }}
+      aria-hidden={railMode}
+    >
       {text}
     </p>
   );
@@ -215,7 +245,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           'flex flex-col border-r border-[#EEEFF2] bg-background',
           isMobile
             ? 'fixed inset-y-0 left-0 z-40 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
-            : 'z-10 h-full transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]',
+            : cn(
+                'z-10 h-full transition-[width] duration-200 [transition-timing-function:var(--ease-out-quint)]',
+                collapsed && 'delay-sidebar-width',
+              ),
           !isMobile && (collapsed ? 'w-16' : 'w-56'),
         )}
         style={
@@ -228,65 +261,86 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             : undefined
         }
       >
-        {/* Brand identity — header blanco con logo tile navy */}
-        {railMode ? (
-          <div className="flex items-center justify-center bg-background py-4">
+        {/* Brand identity — header blanco con logo tile navy. Persiste en el
+            DOM en ambos estados: el tile no cambia de tamaño, solo el
+            padding del header y el bloque de texto (nombre + badges)
+            transicionan. */}
+        <div
+          className="bg-background py-4"
+          style={{
+            paddingLeft: railMode ? '0px' : '1rem',
+            paddingRight: railMode ? '0px' : '1rem',
+            transition: `padding-left 200ms ${SIZE_EASE}, padding-right 200ms ${SIZE_EASE}`,
+          }}
+        >
+          <div className="flex items-center justify-center">
             <div
-              className="grid h-10 w-10 place-items-center rounded-[10px] bg-primary"
-              title={organization?.name || 'Barbería'}
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary"
+              title={railMode ? organization?.name || 'Barbería' : undefined}
             >
               <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
             </div>
-          </div>
-        ) : (
-          <div className="bg-background px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary">
-                <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
-                  {organization?.name || 'Barbería'}
-                </p>
-                {planLabel && (
-                  isPremium ? (
-                    <span className="mt-1.5 inline-flex items-center rounded-full bg-[#C39A45] px-2 py-0.5 text-[10px] font-semibold text-white">
-                      PREMIUM
-                    </span>
-                  ) : (
-                    <span className="mt-1.5 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                      {planLabel}
-                    </span>
-                  )
-                )}
-                {showBillingNotice && (
-                  <span className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning-foreground">
-                    <Clock className="h-3 w-3 shrink-0" />
-                    <span className="truncate">
-                      {daysUntilBillingEnds === 1 ? 'Vence en 1 dia' : `Vence en ${daysUntilBillingEnds} dias`}
-                    </span>
+            <div
+              className="min-w-0"
+              style={{
+                opacity: railMode ? 0 : 1,
+                marginLeft: railMode ? '0px' : '0.75rem',
+                // Mismo motivo que en renderNavItem: flex-basis explícito en
+                // vez de flex-1, para que el bloque de texto colapse a 0
+                // real y no corra el tile del logo del centro.
+                flexBasis: railMode ? '0px' : '200px',
+                transition: textTransition(`margin-left 200ms ${SIZE_EASE}, flex-basis 200ms ${SIZE_EASE}`),
+              }}
+              aria-hidden={railMode}
+            >
+              <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
+                {organization?.name || 'Barbería'}
+              </p>
+              {planLabel && (
+                isPremium ? (
+                  <span className="mt-1.5 inline-flex items-center rounded-full bg-[#C39A45] px-2 py-0.5 text-[10px] font-semibold text-white">
+                    PREMIUM
                   </span>
-                )}
-              </div>
-              {isMobile && (
-                <button
-                  type="button"
-                  onClick={() => setCollapsed(true)}
-                  aria-label="Cerrar navegación"
-                  className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-[#F4F5F7] hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                ) : (
+                  <span className="mt-1.5 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
+                    {planLabel}
+                  </span>
+                )
+              )}
+              {showBillingNotice && (
+                <span className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning-foreground">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  <span className="truncate">
+                    {daysUntilBillingEnds === 1 ? 'Vence en 1 dia' : `Vence en ${daysUntilBillingEnds} dias`}
+                  </span>
+                </span>
               )}
             </div>
-            {/* Wrapper-only styling del selector de sucursal (chip navy claro).
-                El componente interno se recolorea vía overrides de descendiente
-                para no tocar SucursalSelector. */}
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setCollapsed(true)}
+                aria-label="Cerrar navegación"
+                className="ml-2 grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-[#F4F5F7] hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {/* Wrapper-only styling del selector de sucursal (chip navy claro).
+              El componente interno se recolorea vía overrides de descendiente
+              para no tocar SucursalSelector.
+              Nota: el selector de sucursal en sí NO se unificó — el glyph
+              colapsado (ícono de ubicación) y el Select expandido son dos
+              renders internos completamente distintos de SucursalSelector
+              (uno es un ícono estático, el otro un dropdown interactivo),
+              no una diferencia de texto. Ver reporte del build. */}
+          {!railMode && (
             <div className="mt-3 w-full rounded-lg border border-primary/15 bg-primary/5 [&_[role=combobox]]:border-0 [&_[role=combobox]]:bg-transparent [&_[role=combobox]]:text-primary [&_[role=combobox]_svg]:text-primary [&>div]:border-0 [&>div]:bg-transparent [&>div]:text-primary [&>div]:ring-0">
               <SucursalSelector collapsed={false} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {railMode && <SucursalSelector collapsed />}
 
@@ -294,7 +348,17 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         <nav className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
           {principalItems.length > 0 && (
             <div>
-              {!railMode && sectionLabel('Principal')}
+              <div
+                className="overflow-hidden"
+                style={{
+                  opacity: railMode ? 0 : 1,
+                  maxHeight: railMode ? '0px' : '28px',
+                  transition: textTransition(`max-height 200ms ${SIZE_EASE}`),
+                }}
+                aria-hidden={railMode}
+              >
+                {sectionLabel('Principal')}
+              </div>
               <ul className="space-y-0.5">
                 {principalItems.map((item, i) => renderNavItem(item, i))}
               </ul>
@@ -303,9 +367,30 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
           {gestionItems.length > 0 && (
             <div className="mt-3">
-              {!railMode
-                ? sectionLabel('Gestión')
-                : principalItems.length > 0 && <div className="mx-2 my-2 h-px bg-[#EEEFF2]" />}
+              <div className="relative h-7">
+                <p
+                  className="absolute inset-x-3 top-0 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  style={{
+                    opacity: railMode ? 0 : 1,
+                    transition: textTransition(),
+                  }}
+                  aria-hidden={railMode}
+                >
+                  Gestión
+                </p>
+                {principalItems.length > 0 && (
+                  <div
+                    className="absolute inset-x-2 top-3 h-px bg-[#EEEFF2]"
+                    style={{
+                      opacity: railMode ? 1 : 0,
+                      transition: railMode
+                        ? `opacity 150ms ${SIZE_EASE} 80ms`
+                        : 'opacity 120ms var(--ease-in-quint)',
+                    }}
+                    aria-hidden={!railMode}
+                  />
+                )}
+              </div>
               <ul className="space-y-0.5">
                 {gestionItems.map((item, i) => renderNavItem(item, principalItems.length + i))}
               </ul>
@@ -313,7 +398,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           )}
         </nav>
 
-        {/* User & session */}
+        {/* User & session.
+            Nota: el bloque avatar+campana+candado NO se unificó — en rail
+            (64px) se apilan verticalmente por necesidad de espacio; en
+            expandido van en fila horizontal. flex-direction no es una
+            propiedad animable por CSS, así que esta parte sigue siendo un
+            swap condicional (igual que hoy). El chevron de colapsar SÍ
+            quedó unificado como un solo botón persistente. Ver reporte. */}
         <div className="border-t border-[#EEEFF2] p-2">
           {railMode ? (
             <div className="flex flex-col items-center gap-1.5 py-2">
@@ -338,63 +429,57 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                   <Lock className="h-4 w-4" />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setCollapsed(false)}
-                title="Expandir"
-                aria-label="Expandir navegación"
-                className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/85"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
             </div>
           ) : (
-            <>
-              <div className="flex items-center gap-2.5 px-2 py-2">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
-                  {primaryRoleLabel && (
-                    <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {primaryRoleLabel}
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {canViewTareas && (
-                    <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
-                      <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
-                    </div>
-                  )}
-                  {requiresPin && isUnlocked && (
-                    <button
-                      type="button"
-                      onClick={lock}
-                      title={`Bloquear (${unlockedBy})`}
-                      aria-label="Bloquear"
-                      className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                    >
-                      <Lock className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+            <div className="flex items-center gap-2.5 px-2 py-2">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+                {primaryRoleLabel && (
+                  <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {primaryRoleLabel}
+                  </p>
+                )}
               </div>
-              {!isMobile && (
-                <button
-                  type="button"
-                  onClick={() => setCollapsed(true)}
-                  title="Colapsar"
-                  aria-label="Colapsar"
-                  className="mt-1 flex w-full items-center justify-center rounded-lg bg-primary py-2 text-primary-foreground transition-colors hover:bg-primary/85"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-              )}
-            </>
+              <div className="flex shrink-0 items-center gap-1">
+                {canViewTareas && (
+                  <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
+                    <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
+                  </div>
+                )}
+                {requiresPin && isUnlocked && (
+                  <button
+                    type="button"
+                    onClick={lock}
+                    title={`Bloquear (${unlockedBy})`}
+                    aria-label="Bloquear"
+                    className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Lock className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? 'Expandir' : 'Colapsar'}
+              aria-label={collapsed ? 'Expandir navegación' : 'Colapsar navegación'}
+              className="mt-1 flex w-full items-center justify-center rounded-lg bg-primary py-2 text-primary-foreground transition-colors hover:bg-primary/85"
+            >
+              <ChevronLeft
+                className={cn(
+                  'h-4 w-4 transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]',
+                  collapsed && 'rotate-180',
+                )}
+              />
+            </button>
           )}
         </div>
       </aside>

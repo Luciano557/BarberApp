@@ -8,7 +8,7 @@ import { Sheet, SheetOverlay, SheetPortal } from "@/components/ui/sheet";
 interface DrawerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title: string;
+  title: React.ReactNode;
   size: "sm" | "md" | "lg";
   children: React.ReactNode;
   footer: React.ReactNode;

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
@@ -11,21 +13,23 @@ import { Separator } from '@/components/ui/separator';
 import { InitialsAvatar } from '@/components/ui/InitialsAvatar';
 import { EditableSectionHeader } from '@/components/ui/EditableSectionHeader';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { TURNO_ESTADO_PILL } from '@/lib/turnoEstadoPill';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Phone, Mail, Calendar, User, Scissors, X, Search, Check, UserPlus, Clock, CalendarIcon } from 'lucide-react';
+import { Phone, Mail, Calendar, User, Scissors, X, UserPlus, Clock, CalendarIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
 import { Turno, Servicio } from './hooks/useAgendaData';
 import { formatHHMM } from './lib/timeUtils';
-import { cn } from '@/lib/utils';
-import { formatPhoneDisplay } from '@/lib/phone';
-import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
 import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
-
+import { useClienteSearch, clienteFullName } from './hooks/useClienteSearch';
+import { ClienteSearchPicker } from './ClienteSearchPicker';
+import { ClienteFormFields } from './ClienteFormFields';
+import { EmptySelectHint } from './EmptySelectHint';
+import { clienteModeFieldsSchema, validateClienteMode } from './clienteModeSchema';
 
 interface AppointmentDetailDialogProps {
   open: boolean;
@@ -39,22 +43,23 @@ interface AppointmentDetailDialogProps {
   readOnly?: boolean;
 }
 
-interface ClienteLite {
-  id: string;
-  nombre: string;
-  apellido: string | null;
-  telefono: string | null;
-  email: string | null;
-  inSucursal?: boolean;
-}
+const clienteEditSchema = z
+  .object({
+    mode: z.enum(['existing', 'new']),
+    ...clienteModeFieldsSchema.shape,
+  })
+  .superRefine((data, ctx) => validateClienteMode(data.mode, data, ctx));
 
-type ClienteEditMode = 'existing' | 'new';
+type ClienteEditFormValues = z.infer<typeof clienteEditSchema>;
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const turnoEditSchema = z.object({
+  servicioId: z.string().min(1, 'Elegí un servicio'),
+  barberoId: z.string().min(1, 'Elegí un profesional'),
+  fecha: z.custom<Date | null>((v) => v instanceof Date, { message: 'Elegí una fecha' }),
+  hora: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, 'Ingresá una hora válida (HH:MM)'),
+});
 
-function fullName(c: { nombre: string; apellido: string | null }) {
-  return `${c.nombre}${c.apellido ? ' ' + c.apellido : ''}`.trim();
-}
+type TurnoEditFormValues = z.infer<typeof turnoEditSchema>;
 
 export function AppointmentDetailDialog({
   open,
@@ -72,96 +77,44 @@ export function AppointmentDetailDialog({
   const [cancelling, setCancelling] = useState(false);
 
   const [editingCliente, setEditingCliente] = useState(false);
-  const [clienteMode, setClienteMode] = useState<ClienteEditMode>('existing');
   const [savingCliente, setSavingCliente] = useState(false);
+  const clienteSearchForCliente = useClienteSearch({ organizationId, sucursalId, enabled: editingCliente });
 
-  const [selectedCliente, setSelectedCliente] = useState<ClienteLite | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ClienteLite[]>([]);
-  const [searching, setSearching] = useState(false);
+  const clienteForm = useForm<ClienteEditFormValues>({
+    resolver: zodResolver(clienteEditSchema),
+    defaultValues: { mode: 'existing', clienteId: '', nombre: '', apellido: '', telefono: null, email: '' },
+  });
+  const clienteMode = clienteForm.watch('mode');
 
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
-  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
-  const [email, setEmail] = useState('');
-
-  // --- Edición del turno (servicio / profesional / fecha / hora) ---
   const [editingTurno, setEditingTurno] = useState(false);
   const [savingTurno, setSavingTurno] = useState(false);
-  const [editServicioId, setEditServicioId] = useState('');
-  const [editBarberoId, setEditBarberoId] = useState('');
-  const [editFecha, setEditFecha] = useState<Date | null>(null);
-  const [editHora, setEditHora] = useState('');
   const [fechaOpen, setFechaOpen] = useState(false);
   const [turnoConflict, setTurnoConflict] = useState<{
     kind: TurnoConflictKind;
     conflicts?: ConflictTurno[];
   } | null>(null);
 
-  const tokenRef = useRef(0);
+  const turnoForm = useForm<TurnoEditFormValues>({
+    resolver: zodResolver(turnoEditSchema),
+    defaultValues: { servicioId: '', barberoId: '', fecha: null, hora: '' },
+  });
+
+  const resetClienteEditor = () => {
+    clienteSearchForCliente.reset();
+    clienteForm.reset({ mode: 'existing', clienteId: '', nombre: '', apellido: '', telefono: null, email: '' });
+  };
 
   useEffect(() => {
     if (!open) {
       setEditingCliente(false);
-      setClienteMode('existing');
-      setSelectedCliente(null);
-      setSearchOpen(false);
-      setQuery('');
-      setResults([]);
-      setSearching(false);
-      setNombre('');
-      setApellido('');
-      setPhoneOut(null);
-      setEmail('');
+      resetClienteEditor();
       setConfirmingCancel(false);
       setMotivo('');
       setEditingTurno(false);
       setTurnoConflict(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-
-  useEffect(() => {
-    if (!editingCliente || !searchOpen) return;
-    const q = query.trim();
-    const myToken = ++tokenRef.current;
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        let req = supabase
-          .from('clientes')
-          .select('id, nombre, apellido, telefono, email')
-          .eq('organization_id', organizationId)
-          .eq('eliminado', false)
-          .order('apellido', { ascending: true })
-          .limit(20);
-        if (q.length > 0) {
-          const safe = q.replace(/[%,]/g, ' ');
-          req = req.or(`nombre.ilike.%${safe}%,apellido.ilike.%${safe}%,telefono.ilike.%${safe}%,email.ilike.%${safe}%`);
-        }
-
-        const [{ data: cliData }, { data: linkData }] = await Promise.all([
-          req,
-          supabase
-            .from('clientes_sucursales')
-            .select('cliente_id')
-            .eq('organization_id', organizationId)
-            .eq('sucursal_id', sucursalId),
-        ]);
-        if (myToken !== tokenRef.current) return;
-        const localIds = new Set((linkData || []).map((l) => l.cliente_id));
-        const list: ClienteLite[] = (cliData || []).map((c) => ({ ...c, inSucursal: localIds.has(c.id) }));
-        list.sort((a, b) => Number(b.inSucursal) - Number(a.inSucursal));
-        setResults(list);
-      } catch {
-        if (myToken === tokenRef.current) setResults([]);
-      } finally {
-        if (myToken === tokenRef.current) setSearching(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [editingCliente, searchOpen, query, organizationId, sucursalId]);
 
   if (!turno) return null;
   const barber = barbers.find((b) => b.id === turno.barbero_id);
@@ -170,35 +123,36 @@ export function AppointmentDetailDialog({
   const canCancel = !readOnly && ['pendiente', 'confirmado'].includes(turno.estado);
   const canEditCliente = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
   const canEditTurno = !readOnly && ['pendiente', 'confirmado', 'en_curso'].includes(turno.estado);
+  const activeBarbersForEdit = barbers.filter((b) => b.active);
 
   const startEditTurno = () => {
-    setEditServicioId(turno.servicio_id);
-    setEditBarberoId(turno.barbero_id);
+    let fecha: Date;
     try {
-      setEditFecha(parseISO(turno.fecha));
+      fecha = parseISO(turno.fecha);
     } catch {
-      setEditFecha(new Date());
+      fecha = new Date();
     }
-    setEditHora(turno.hora_inicio.slice(0, 5));
+    turnoForm.reset({
+      servicioId: turno.servicio_id,
+      barberoId: turno.barbero_id,
+      fecha,
+      hora: turno.hora_inicio.slice(0, 5),
+    });
     setEditingTurno(true);
   };
 
-  const runUpdateTurno = async (opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {}) => {
-    if (!editFecha) {
-      toast.error('Elegí una fecha');
-      return;
-    }
-    if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(editHora)) {
-      toast.error('Ingresá una hora válida (HH:MM)');
-      return;
-    }
+  const runUpdateTurno = async (
+    values: TurnoEditFormValues,
+    opts: { confirmOverlap?: boolean; confirmFueraHorario?: boolean } = {},
+  ) => {
+    if (!values.fecha) return;
     setSavingTurno(true);
     const res = await callUpdateTurnoInternal({
       turno_id: turno.id,
-      servicio_id: editServicioId || undefined,
-      barbero_id: editBarberoId || undefined,
-      fecha: format(editFecha, 'yyyy-MM-dd'),
-      hora_inicio: editHora,
+      servicio_id: values.servicioId || undefined,
+      barbero_id: values.barberoId || undefined,
+      fecha: format(values.fecha, 'yyyy-MM-dd'),
+      hora_inicio: values.hora,
       confirm_overlap: opts.confirmOverlap,
       confirm_fuera_horario: opts.confirmFueraHorario,
     });
@@ -243,66 +197,15 @@ export function AppointmentDetailDialog({
     toast.error(fail.message || 'No se pudo guardar el turno');
   };
 
-  const handleSaveTurno = () => runUpdateTurno();
+  const handleSaveTurno = () => {
+    void turnoForm.handleSubmit((values) => runUpdateTurno(values))();
+  };
+
   const handleConfirmConflict = () => {
     if (!turnoConflict) return;
-    if (turnoConflict.kind === 'choque_de_horario') runUpdateTurno({ confirmOverlap: true });
-    else runUpdateTurno({ confirmFueraHorario: true });
-  };
-
-
-  const ensureRelacion = async (clienteId: string) => {
-    const { data: existing, error: selErr } = await supabase
-      .from('clientes_sucursales')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('cliente_id', clienteId)
-      .eq('sucursal_id', sucursalId)
-      .maybeSingle();
-    if (selErr) throw selErr;
-    if (existing) return;
-    const { error: insErr } = await supabase
-      .from('clientes_sucursales')
-      .insert({
-        organization_id: organizationId,
-        cliente_id: clienteId,
-        sucursal_id: sucursalId,
-        origen_relacion: 'manual',
-      } as any);
-    if (insErr) throw insErr;
-  };
-
-  const validateNewCliente = (): { ok: boolean; phoneCanonical: string | null } => {
-    if (!nombre.trim()) {
-      toast.error('Ingresa el nombre');
-      return { ok: false, phoneCanonical: null };
-    }
-    if (!apellido.trim()) {
-      toast.error('Ingresa el apellido');
-      return { ok: false, phoneCanonical: null };
-    }
-    if (!phoneOut?.e164 || !phoneOut.isValid) {
-      toast.error('Ingresa un telefono valido');
-      return { ok: false, phoneCanonical: null };
-    }
-    if (email.trim() && !EMAIL_RE.test(email.trim())) {
-      toast.error('Email invalido');
-      return { ok: false, phoneCanonical: null };
-    }
-    return { ok: true, phoneCanonical: phoneOut.e164 };
-  };
-
-  const resetClienteEditor = () => {
-    setClienteMode('existing');
-    setSelectedCliente(null);
-    setSearchOpen(false);
-    setQuery('');
-    setResults([]);
-    setSearching(false);
-    setNombre('');
-    setApellido('');
-    setPhoneOut(null);
-    setEmail('');
+    const values = turnoForm.getValues();
+    if (turnoConflict.kind === 'choque_de_horario') runUpdateTurno(values, { confirmOverlap: true });
+    else runUpdateTurno(values, { confirmFueraHorario: true });
   };
 
   const handleCancel = async () => {
@@ -327,7 +230,7 @@ export function AppointmentDetailDialog({
     onChanged();
   };
 
-  const handleSaveCliente = async () => {
+  const onSubmitCliente = async (values: ClienteEditFormValues) => {
     setSavingCliente(true);
     try {
       let clienteId: string | null = null;
@@ -335,31 +238,28 @@ export function AppointmentDetailDialog({
       let clienteTelefono: string | null = null;
       let clienteEmail: string | null = null;
 
-      if (clienteMode === 'existing') {
+      if (values.mode === 'existing') {
+        const selectedCliente = clienteSearchForCliente.selectedCliente;
         if (!selectedCliente) {
           toast.error('Selecciona un cliente');
           setSavingCliente(false);
           return;
         }
         clienteId = selectedCliente.id;
-        clienteNombre = fullName(selectedCliente).slice(0, 80);
+        clienteNombre = clienteFullName(selectedCliente).slice(0, 80);
         clienteTelefono = selectedCliente.telefono ? selectedCliente.telefono.slice(0, 80) : null;
         clienteEmail = selectedCliente.email ? selectedCliente.email.slice(0, 120) : null;
         if (!selectedCliente.inSucursal) {
-          await ensureRelacion(selectedCliente.id);
+          await clienteSearchForCliente.ensureRelacion(selectedCliente.id);
         }
       } else {
-        const v = validateNewCliente();
-        if (!v.ok) {
-          setSavingCliente(false);
-          return;
-        }
+        const telefonoCanonical = values.telefono?.e164 ?? null;
         const { data: rpcData, error: rpcErr } = await supabase.rpc('create_cliente_with_sucursal', {
-          _nombre: nombre.trim(),
-          _apellido: apellido.trim(),
+          _nombre: values.nombre.trim(),
+          _apellido: values.apellido.trim(),
           _sucursal_id: sucursalId,
-          _telefono: v.phoneCanonical,
-          _email: email.trim() || null,
+          _telefono: telefonoCanonical,
+          _email: values.email.trim() || null,
           _instagram: null,
           _tiktok: null,
           _otra_red_social: null,
@@ -369,9 +269,9 @@ export function AppointmentDetailDialog({
         } as any);
         if (rpcErr) throw rpcErr;
         clienteId = (rpcData as string) || null;
-        clienteNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
-        clienteTelefono = v.phoneCanonical ? v.phoneCanonical.slice(0, 80) : null;
-        clienteEmail = email.trim() ? email.trim().slice(0, 120) : null;
+        clienteNombre = `${values.nombre.trim()} ${values.apellido.trim()}`.slice(0, 80);
+        clienteTelefono = telefonoCanonical ? telefonoCanonical.slice(0, 80) : null;
+        clienteEmail = values.email.trim() ? values.email.trim().slice(0, 120) : null;
       }
 
       const { error } = await supabase.from('turnos').update({
@@ -395,128 +295,44 @@ export function AppointmentDetailDialog({
     }
   };
 
-  const renderExistingClientePicker = () => {
-    return (
-      <div className="space-y-2">
-        <Label className="text-xs">Cliente existente</Label>
-        <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="w-full justify-between font-normal">
-              {selectedCliente ? (
-                <span className="flex items-center gap-2 truncate">
-                  <span className="truncate">{fullName(selectedCliente)}</span>
-                  {selectedCliente.telefono && (
-                    <span className="text-xs text-muted-foreground truncate">· {formatPhoneDisplay(selectedCliente.telefono)}</span>
-                  )}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">Buscar por nombre, apellido, telefono o email</span>
-              )}
-              {selectedCliente ? (
-                <X className="h-4 w-4 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); setSelectedCliente(null); }} />
-              ) : (
-                <Search className="h-4 w-4 opacity-60" />
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-            <div className="flex items-center border-b px-3">
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por nombre, apellido, telefono o email"
-                className="flex h-10 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
-                maxLength={80}
-              />
-            </div>
-            <div className="max-h-64 overflow-y-auto py-1">
-              {searching && (
-                <div className="px-3 py-3 text-xs text-muted-foreground">Buscando...</div>
-              )}
-              {!searching && results.length === 0 && (
-                <div className="px-3 py-3 text-xs text-muted-foreground">
-                  Sin resultados.
-                </div>
-              )}
-              {!searching && results.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => { setSelectedCliente(c); setSearchOpen(false); }}
-                  className={cn(
-                    'w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2',
-                    selectedCliente?.id === c.id && 'bg-accent',
-                  )}
-                >
-                  <Check className={cn('h-4 w-4 mt-0.5 shrink-0', selectedCliente?.id === c.id ? 'opacity-100' : 'opacity-0')} />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">{fullName(c)}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '-'}
-                    </div>
-                  </div>
-                  {!c.inSucursal && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
-                      Otra sucursal
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    );
+  const handleSaveCliente = () => {
+    void clienteForm.handleSubmit(onSubmitCliente)();
   };
 
-  const renderNewClienteForm = () => {
-    return (
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Nombre *</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Apellido *</Label>
-            <Input value={apellido} onChange={(e) => setApellido(e.target.value)} maxLength={80} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Telefono *</Label>
-            <PhoneInput
-              value={phoneOut?.e164 ?? null}
-              onChange={(o) => setPhoneOut(o)}
-              defaultCountry="AR"
-              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-              mode="mobile"
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Email (opcional)</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const titleContent = (
+    <div className="flex items-center gap-3 min-w-0">
+      <InitialsAvatar name={turno.cliente_nombre || 'Sin nombre'} />
+      <span className="flex-1 min-w-0 truncate">{turno.cliente_nombre || 'Sin nombre'}</span>
+      <StatusPill status={estadoPill.status} label={estadoPill.label} size="sm" />
+    </div>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { setConfirmingCancel(false); setMotivo(''); } onOpenChange(v); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-3 pr-6 text-left">
-            <InitialsAvatar name={turno.cliente_nombre || 'Sin nombre'} />
-            <DialogTitle className="flex-1 min-w-0 truncate">
-              {turno.cliente_nombre || 'Sin nombre'}
-            </DialogTitle>
-            <StatusPill status={estadoPill.status} label={estadoPill.label} size="sm" />
-          </div>
-        </DialogHeader>
+    <>
+      <DrawerForm
+        open={open}
+        onOpenChange={onOpenChange}
+        title={titleContent}
+        size="md"
+        footer={
+          confirmingCancel ? (
+            <div className="flex w-full justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmingCancel(false)} disabled={cancelling}>Volver</Button>
+              <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
+                {cancelling ? 'Cancelando...' : 'Si, cancelar'}
+              </Button>
+            </div>
+          ) : (
+            canCancel && !editingTurno && !editingCliente && (
+              <div className="flex w-full justify-end">
+                <Button variant="destructive" onClick={() => setConfirmingCancel(true)}>
+                  <X className="h-4 w-4" /> Cancelar turno
+                </Button>
+              </div>
+            )
+          )
+        }
+      >
         <div className="space-y-4 text-sm">
           <section>
             {canEditCliente ? (
@@ -534,41 +350,66 @@ export function AppointmentDetailDialog({
             )}
 
             {editingCliente && canEditCliente ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={clienteMode === 'existing' ? 'default' : 'outline'}
-                    className="h-8 px-2 text-xs"
-                    onClick={() => {
-                      setClienteMode('existing');
-                      setNombre('');
-                      setApellido('');
-                      setPhoneOut(null);
-                      setEmail('');
-                    }}
-                  >
-                    Cliente existente
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={clienteMode === 'new' ? 'default' : 'outline'}
-                    className="h-8 px-2 text-xs"
-                    onClick={() => {
-                      setClienteMode('new');
-                      setSelectedCliente(null);
-                      setSearchOpen(false);
-                      setQuery('');
-                      setResults([]);
-                    }}
-                  >
-                    <UserPlus className="h-3.5 w-3.5 mr-1" /> Crear cliente
-                  </Button>
+              <Form {...clienteForm}>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={clienteMode === 'existing' ? 'default' : 'outline'}
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        clienteForm.setValue('mode', 'existing');
+                        clienteForm.setValue('nombre', '');
+                        clienteForm.setValue('apellido', '');
+                        clienteForm.setValue('telefono', null);
+                        clienteForm.setValue('email', '');
+                      }}
+                    >
+                      Cliente existente
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={clienteMode === 'new' ? 'default' : 'outline'}
+                      className="h-8 px-2 text-xs"
+                      onClick={() => {
+                        clienteForm.setValue('mode', 'new');
+                        clienteSearchForCliente.setSelectedCliente(null);
+                        clienteSearchForCliente.setSearchOpen(false);
+                        clienteSearchForCliente.setQuery('');
+                        clienteForm.setValue('clienteId', '');
+                      }}
+                    >
+                      <UserPlus className="h-3.5 w-3.5 mr-1" /> Crear cliente
+                    </Button>
+                  </div>
+                  {clienteMode === 'existing' ? (
+                    <ClienteSearchPicker
+                      label="Cliente existente"
+                      selectedCliente={clienteSearchForCliente.selectedCliente}
+                      onSelect={(c) => {
+                        clienteSearchForCliente.setSelectedCliente(c);
+                        clienteForm.setValue('clienteId', c?.id ?? '', { shouldValidate: true });
+                      }}
+                      searchOpen={clienteSearchForCliente.searchOpen}
+                      onSearchOpenChange={clienteSearchForCliente.setSearchOpen}
+                      query={clienteSearchForCliente.query}
+                      onQueryChange={clienteSearchForCliente.setQuery}
+                      results={clienteSearchForCliente.results}
+                      searching={clienteSearchForCliente.searching}
+                    />
+                  ) : (
+                    <ClienteFormFields
+                      control={clienteForm.control}
+                      nombreName="nombre"
+                      apellidoName="apellido"
+                      telefonoName="telefono"
+                      emailName="email"
+                    />
+                  )}
                 </div>
-                {clienteMode === 'existing' ? renderExistingClientePicker() : renderNewClienteForm()}
-              </div>
+              </Form>
             ) : (
               <div className="space-y-2 text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -601,70 +442,119 @@ export function AppointmentDetailDialog({
             )}
 
             {editingTurno && canEditTurno ? (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Servicio</Label>
-                  <Select value={editServicioId} onValueChange={setEditServicioId}>
-                    <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
-                    <SelectContent>
-                      {servicios.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.nombre} · {s.duracion_min} min
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Profesional</Label>
-                  <Select value={editBarberoId} onValueChange={setEditBarberoId}>
-                    <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
-                    <SelectContent>
-                      {barbers.filter((b) => b.active).map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.firstName} {b.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Fecha</Label>
-                    <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
-                      <PopoverTrigger asChild>
-                        <Button type="button" variant="outline" className="w-full justify-start font-normal">
-                          <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
-                          {editFecha ? format(editFecha, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={editFecha ?? undefined}
-                          onSelect={(d) => { if (d) { setEditFecha(d); setFechaOpen(false); } }}
-                          locale={es}
-                        />
-                      </PopoverContent>
-                    </Popover>
+              <Form {...turnoForm}>
+                <div className="space-y-3">
+                  {servicios.length === 0 ? (
+                    <EmptySelectHint
+                      message="No hay servicios cargados."
+                      ctaLabel="Configurar servicios"
+                      onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
+                    />
+                  ) : (
+                    <FormField
+                      control={turnoForm.control}
+                      name="servicioId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-xs">Servicio</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Elegir servicio" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {servicios.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.nombre} · {s.duracion_min} min
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  {activeBarbersForEdit.length === 0 ? (
+                    <EmptySelectHint
+                      message="No hay profesionales activos."
+                      ctaLabel="Añadir miembro del equipo"
+                      onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar profesionales.')}
+                    />
+                  ) : (
+                    <FormField
+                      control={turnoForm.control}
+                      name="barberoId"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-xs">Profesional</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger><SelectValue placeholder="Elegir profesional" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {activeBarbersForEdit.map((b) => (
+                                <SelectItem key={b.id} value={b.id}>
+                                  {b.firstName} {b.lastName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={turnoForm.control}
+                      name="fecha"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-xs">Fecha</FormLabel>
+                          <Popover open={fechaOpen} onOpenChange={setFechaOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                                  <CalendarIcon className="h-4 w-4 mr-2 opacity-60" />
+                                  {field.value ? format(field.value, "dd 'de' MMM yyyy", { locale: es }) : 'Elegir'}
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarUI
+                                mode="single"
+                                selected={field.value ?? undefined}
+                                onSelect={(d) => { if (d) { field.onChange(d); setFechaOpen(false); } }}
+                                locale={es}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={turnoForm.control}
+                      name="hora"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel className="text-xs">Hora</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
+                              <Input type="time" {...field} className="pl-9" />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Hora</Label>
-                    <div className="relative">
-                      <Clock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60 pointer-events-none" />
-                      <Input
-                        type="time"
-                        value={editHora}
-                        onChange={(e) => setEditHora(e.target.value)}
-                        className="pl-9"
-                      />
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    La duración se recalcula automáticamente según el servicio.
+                  </p>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
-                  La duración se recalcula automáticamente según el servicio.
-                </p>
-              </div>
+              </Form>
             ) : (
               <div className="space-y-2 text-muted-foreground">
                 <div className="flex items-center gap-2">
@@ -693,23 +583,7 @@ export function AppointmentDetailDialog({
             </div>
           )}
         </div>
-        <DialogFooter className="gap-2">
-          {confirmingCancel ? (
-            <>
-              <Button variant="outline" onClick={() => setConfirmingCancel(false)} disabled={cancelling}>Volver</Button>
-              <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
-                {cancelling ? 'Cancelando...' : 'Si, cancelar'}
-              </Button>
-            </>
-          ) : (
-            canCancel && !editingTurno && !editingCliente && (
-              <Button variant="destructive" onClick={() => setConfirmingCancel(true)}>
-                <X className="h-4 w-4" /> Cancelar turno
-              </Button>
-            )
-          )}
-        </DialogFooter>
-      </DialogContent>
+      </DrawerForm>
       <TurnoConflictDialog
         open={!!turnoConflict}
         onOpenChange={(v) => { if (!v) setTurnoConflict(null); }}
@@ -718,8 +592,6 @@ export function AppointmentDetailDialog({
         onConfirm={handleConfirmConflict}
         loading={savingTurno}
       />
-    </Dialog>
+    </>
   );
 }
-
-

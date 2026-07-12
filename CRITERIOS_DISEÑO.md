@@ -670,6 +670,19 @@ escritorio **quedan fuera de este build** — tienen sesión propia pendiente.
   (`sheet.tsx`, igualado a `DrawerForm`); el highlight de asignación de
   `EquipoSucursalPanel.tsx` bajó de 700ms a 250ms. `ProductoPickerDialog`
   (180ms) no se tocó, según lo indicado.
+- **Nombres canónicos en `tailwind.config.ts`** (2026-07-10, sin cambio de
+  valor — solo nomenclatura, resolviendo warnings de "clase ambigua" de
+  Tailwind): `duration-sidebar-text` (120ms, texto del sidebar al
+  colapsar/expandir — hoy sin uso en clases porque esa transición vive en
+  un `style={{transition:...}}` inline; token dejado a propósito para
+  cuando se necesite como clase), `delay-sidebar-width` (60ms, delay del
+  ancho del `<aside>` al colapsar), `duration-highlight` (250ms, highlight
+  de asignación de `EquipoSucursalPanel`) y `duration-tooltip` (120ms,
+  tooltip de hover en `AgendaDayView.tsx`, sin relación con el sidebar
+  pese a compartir valor). Si aparece un cuarto uso de cualquiera de estos
+  4 valores, reusar el nombre en vez de escribir el número suelto de
+  nuevo. Los 3 warnings de "clase ambigua" de Tailwind detectados en esta
+  tanda quedaron resueltos (0/3).
 - **Collapsible animado**: `CollapsibleContent` (`ui/collapsible.tsx`) ya no
   re-exporta el primitivo de Radix desnudo — ahora es un `forwardRef` que
   anima `height` vía `data-[state=open|closed]`, igual que `Accordion`. No
@@ -981,6 +994,112 @@ archivos con 8+ huecos concretos · 0 confirmaciones de cierre en toda la app.
 8. **maxLength**: ¿obligatorio en todo texto libre que persiste, con la tabla
    de facto 80/120/240/1500 como estándar?
 
+### F3.11 Los dos formularios de Producto — comparación campo por campo
+
+Profundización del hallazgo de F3.1 (#1: "la misma entidad Producto tiene DOS
+formularios independientes"). Solo relevamiento — sin propuesta de unificación.
+
+**`ProductoDialog.tsx`** — Dialog con tabs, invocado desde `ProductosConfig.tsx`
+(vista de una sucursal específica; requiere `sucursalId`). Escribe en
+`productos` (datos globales) y hace upsert en `productos_sucursal` (fila por
+producto+sucursal).
+
+**`ProductosGlobalConfig.tsx`** — DrawerForm, catálogo global de la
+organización (no requiere sucursal). Escribe **solo** en `productos`. Ambos
+archivos declaran esta división explícitamente en su propio código
+(`ProductoDialog.tsx:244`: *"Los datos generales se aplican a toda la
+organización. Los precios y stock son por sucursal."*;
+`ProductosGlobalConfig.tsx:26`: *"Edita SOLO datos globales... No toca
+productos_sucursal, stock ni precios por sucursal."*) — la separación de
+responsabilidad es intencional y documentada, no un descuido.
+
+| Campo | ProductoDialog (sucursal) | ProductosGlobalConfig (global) | Tabla.columna |
+|---|---|---|---|
+| Nombre | ✅ tab "Datos", `maxLength=80` | ✅ único form, `maxLength=80` | `productos.nombre` |
+| Marca | ✅ tab "Datos", Select + botón "Gestionar" | ✅ mismo patrón, Select + botón "Gestionar" | `productos.marca_id` |
+| Descripción | ✅ tab "Datos", opcional, `maxLength=240`, contador | ✅ opcional, `maxLength=240`, contador | `productos.descripcion` |
+| Activo (global) | ❌ no editable acá (se activa/desactiva desde `ProductosConfig` o queda `true` al crear) | ✅ vía footer "Activar"/"Desactivar" + `AlertDialog` de confirmación | `productos.activo` |
+| **Activo en esta sucursal** | ✅ `Switch` en el header del Dialog | ❌ no existe (no hay concepto de sucursal) | `productos_sucursal.activo` |
+| **Precio costo** | ✅ tab "Precio y stock" | ❌ | `productos_sucursal.precio_costo` |
+| **Precio venta** | ✅ tab "Precio y stock", obligatorio (`canSave` lo exige) | ❌ | `productos_sucursal.precio_venta` |
+| **Margen estimado** | ✅ campo de solo lectura, calculado (`(venta-costo)/costo`) | ❌ | `productos_sucursal.margen_pct` (derivado, no persistido como input) |
+| **Stock mínimo** | ✅ tab "Precio y stock" | ❌ | `productos_sucursal.stock_minimo` |
+| **Stock inicial** | ✅ solo si es alta o la sucursal aún no tiene vínculo (`isNew \|\| !producto?.sucursal`) — genera un `registrar_movimiento_stock` | ❌ | vía RPC, no es columna directa |
+| **Comisión (modo + %)** | ✅ tab "Comisión" completa (barbero/ninguna/personalizada) | ❌ | `productos_sucursal.comision_modo`, `.comision_porcentaje` |
+
+**Respuesta al punto 2 (qué representan los campos exclusivos):** todos los
+campos exclusivos de `ProductoDialog` son datos que **varían por sucursal**
+dentro del mismo negocio — el mismo producto puede costar distinto, tener
+stock distinto y generar comisión distinta en cada local. Están modelados
+correctamente como una tabla aparte (`productos_sucursal`, fila por
+`producto_id`+`sucursal_id`), no como columnas de `productos`.
+
+**Respuesta al punto 3 (¿aplican al catálogo global?):** no — son
+estructuralmente inaplicables ahí. El catálogo global (`ProductosGlobalConfig`)
+no tiene ni conoce un `sucursal_id`; no hay "el" precio o "el" stock de un
+producto a nivel organización, solo a nivel sucursal. Confirmado por el propio
+código: no existe ningún estado ni columna para precio/stock a nivel
+`productos` (la tabla global) en todo el archivo. Es una diferencia de
+**alcance del dato**, no una omisión.
+
+**Punto 4 — diferencias de validación y marcado de obligatorio en los 3 campos
+COMPARTIDOS** (Nombre/Marca/Descripción):
+
+| Aspecto | ProductoDialog | ProductosGlobalConfig |
+|---|---|---|
+| Validación de Nombre | `tabErrors.datos` reactivo + bloquea el submit (`canSave`) + marca la pestaña con un punto rojo tras `submitAttempted` | `if (!nombre) toast.error(...)`, sin marca visual, solo al hacer click |
+| Mensaje de error | `toast.error('Completá el nombre del producto.')` | `toast.error('Ingresá un nombre')` — copy distinto para el mismo caso |
+| Precio venta | Obligatorio, valida `>= 0` y bloquea `canSave` (no existe en el otro form) | N/A (el campo no existe acá) |
+| Etiqueta "(opcional)" | Solo en Descripción y Stock inicial (`<span className="text-muted-foreground font-normal">`) | Solo en el placeholder del Textarea ("Detalles internos (opcional)"), no en el `<label>` — inconsistente incluso dentro del propio patrón ya documentado en F3.3 |
+| Nombre del label | `<Label>` (componente shadcn) | `<label className="text-sm font-medium">` (HTML crudo, no el componente `Label`) — mismo campo, dos formas de declarar el label |
+| maxLength Nombre/Descripción | 80 / 240, con contador solo en Descripción | 80 / 240, con contador en Descripción — **coinciden** en los límites numéricos |
+| Estado de envío | `saving` + texto "Guardando..." (sin spinner) | `saving` + texto "Guardando…" (con "…" tipográfico distinto: `…` vs `...`) |
+
+*Método F3.11: lectura completa de `ProductoDialog.tsx`, `ProductosGlobalConfig.tsx`
+y `productos/types.ts` (`Producto`, `ProductoSucursal`, `ProductoConSucursal`),
+más confirmación del punto de invocación de `ProductoDialog` en
+`ProductosConfig.tsx:218` (requiere `sucursalId`) al 2026-07-09.*
+
+---
+
+## Decisiones tomadas — Canon de contenedor (2026-07-09)
+
+Cierra la pregunta abierta F3.10 #2 ("¿se ratifica DrawerForm como canon?").
+Queda fijo para la Fase 4 (Módulos) — no se re-discute ahí, se aplica.
+
+1. **DrawerForm es el único canon para alta/edición de entidades.** Migran
+   los 14 `Dialog` centrados relevados en F3.1 (incluye `NuevoClienteDialog`,
+   `NewAppointmentDialog`, `AppointmentDetailDialog`, `SueldosPanel`,
+   `DeudasPanel` → `RegistrarPagoDialog`, `ProductoDialog`, ambos
+   `MarcasManagerDialog`/`ServicesConfig` quick-create de línea, etc.) y los
+   3 formularios armados a mano sobre `Sheet` crudo replicando el markup de
+   DrawerForm en vez de importarlo (`TareaFormDialog`,
+   `TareaRecurrenteFormDialog`, `HorariosTrabajoSection` → `DayEditSheet`).
+   **Sin excepción por tipo de operación**: alta rápida y edición completa
+   comparten el mismo contenedor — no hay un canon separado para "modales
+   chicos".
+2. **`HorariosTrabajoSection` pierde el autosave instantáneo.** Hoy cada
+   cambio de horario escribe a Supabase al toque (`DayEditSheet`, sin
+   borrador ni botón Guardar — el único formulario de todo el relevamiento
+   sin ese patrón, F3.1). Pasa a comportarse como el resto: cambios en
+   estado local + botón "Guardar" explícito + los mismos estados de
+   envío/loading (disabled + texto/spinner) que el resto de los formularios
+   migrados.
+3. **Producto NO se fusiona.** `ProductoDialog.tsx` (datos por sucursal, en
+   `productos_sucursal`) y `ProductosGlobalConfig.tsx` (datos globales, en
+   `productos`) son formularios legítimamente distintos por alcance de dato
+   (F3.11) — se mantienen **separados**, ambos migrados a DrawerForm. Lo que
+   sí se unifica es la **implementación** de los 3 campos que comparten
+   (Nombre, Marca, Descripción): misma validación, mismo copy de error,
+   mismo componente `Label` — eliminando la duplicación de código real
+   detectada en F3.11, sin tocar los campos exclusivos de cada uno.
+4. **Micro-ediciones de 1-2 campos también migran, sin excepción.**
+   `LineQuickEditPopover` (hoy `Popover`) y cualquier editor rápido
+   equivalente pasan a DrawerForm — no queda un canon aparte para ediciones
+   chicas.
+
+---
+
 *Método F3: relevamiento distribuido en 5 pasadas (componentes base;
 Configuración; Mi Negocio+Clientes; Finanzas+Turnos+Tareas; Cobrar+teléfono)
 con lectura de archivos y barridos ripgrep (`useForm`, `zod`, `toast.error`,
@@ -993,6 +1112,107 @@ pasada automática. `SucursalesConfig.tsx` quedó relevado solo parcialmente
 
 ---
 
+## Sesión dedicada — Sidebar de escritorio (build 2026-07-08)
+
+Cierra los 3 puntos de decisión que habían quedado pausados sobre
+`AppSidebar.tsx` (logo, info de usuario, chevron durante el colapso — ver
+Fase 2, F2.3.a). No toca la identidad visual "Filled·Bold" (colores, radios,
+tipografía) definida en su propia sesión — solo el *cómo transiciona* entre
+estado expandido y colapsado.
+
+- **Chevron unificado**: los dos botones distintos (cuadrado 8×8 con
+  `ChevronRight` en rail, navy full-width con `ChevronLeft` expandido) se
+  reemplazaron por **un solo botón persistente**, siempre navy sólido
+  full-width, misma altura en ambos estados. El ícono `ChevronLeft` rota
+  180° vía `transform` (200ms, `var(--ease-out-quint)`) en vez de cambiar de
+  componente. El handler pasó de dos `setCollapsed(true)`/`setCollapsed(false)`
+  asimétricos a un único `setCollapsed(!collapsed)` que alterna. `ChevronRight`
+  quedó sin uso y se sacó del import de `lucide-react`.
+- **Logo + nombre + badges**: el tile navy (40px, sin cambio de tamaño entre
+  estados) persiste siempre; el bloque de texto (nombre de la organización,
+  badge PREMIUM/plan, aviso de vencimiento) ahora persiste en el DOM en
+  ambos estados y se anima por opacity (Opción B) en vez de aparecer/
+  desaparecer con el condicional `railMode ? ... : ...`. El padding
+  horizontal del header (`px-4` ↔ `0`) y el margen del bloque de texto
+  transicionan a 200ms `var(--ease-out-quint)`, sincronizados con el ancho
+  del `<aside>`.
+- **Section labels**: "Principal" persiste con opacity + colapso de altura
+  (`max-height`). "Gestión" persiste igual, y el divisor decorativo que
+  reemplazaba el label en rail (`<div className="h-px .../>`) ahora
+  **coexiste** con el label en un contenedor de altura fija, cruzando
+  opacity en fase inversa (aparece el divisor cuando se va el texto y
+  viceversa) — antes eran mutuamente excluyentes.
+- **Labels de nav**: el `<span>` del label de cada ítem ahora persiste
+  siempre en el DOM (antes no existía en absoluto en rail); se anima por
+  opacity + `margin-left`. El wrapper del ícono (antes dos elementos JSX
+  distintos: tile 40px en rail vs. tile 28px/ícono desnudo en expandido) se
+  unificó en un solo `<span>` persistente cuyo `width`/`height`/
+  `border-radius`/`background-color` transicionan a 200ms
+  `var(--ease-out-quint)` — los tres estados de reposo (rail, expandido
+  activo, expandido inactivo) quedan pixel-idénticos a los de hoy; solo se
+  suavizó la interpolación entre ellos. El botón pasó de `justify-center`
+  condicional a `justify-center` fijo + `flex-1` en el label (el centrado
+  del ícono en rail y el layout en fila del expandido son ambos casos
+  particulares de la misma regla, sin necesidad de alternar `justify-*`).
+  El badge de función bloqueada (candado) **no se tocó**: sigue siendo un
+  overlay circular en rail y una pastilla con texto en expandido — no era
+  uno de los 5 elementos de texto nombrados y es un estado secundario poco
+  frecuente.
+- **Timing — Opción B aplicado exactamente como se pidió**:
+  - Colapsar: texto `opacity 1→0`, 120ms, `var(--ease-in-quint)`, sin delay.
+    Ancho del `<aside>`: 200ms, `var(--ease-out-quint)`, **delay 60ms**
+    (agregado en esta sesión — antes el ancho no tenía delay en ninguna
+    dirección).
+  - Expandir: ancho del `<aside>`: 200ms, `var(--ease-out-quint)`, sin
+    delay. Texto `opacity 0→1`: 150ms, `var(--ease-out-quint)`, **delay
+    80ms**.
+  - Todas las propiedades de "tamaño" que acompañan al texto (padding,
+    margin, max-height, el resize del ícono de nav) comparten el mismo
+    200ms `var(--ease-out-quint)` del ancho del aside, para que se sientan
+    parte del mismo movimiento físico.
+- **Técnica**: se mantiene animando `width` directamente en el `<aside>`
+  (sin migrar a compositor), tal como estaba decidido. Los nuevos paddings/
+  márgenes/tamaños de ícono agregados en esta sesión son, por la misma
+  razón, transiciones de propiedades de layout (no solo transform/opacity)
+  — es una extensión directa de la misma decisión ya tomada, no una nueva.
+
+### Excepciones — no se resolvieron con CSS (reportado, no improvisado)
+
+1. **Footer de usuario (avatar + campana + candado)**: el arreglo de estos
+   tres elementos sigue siendo un swap condicional (columna vertical en
+   rail vs. fila horizontal en expandido), sin cambios respecto a hoy. Rail
+   tiene 48px de ancho útil, insuficiente para alojar avatar+campana+candado
+   en fila (necesitarían ~120px); el layout vertical es un requisito duro
+   del espacio disponible, no una preferencia. `flex-direction` no es una
+   propiedad animable por CSS, así que no hay forma de interpolar entre
+   columna y fila sin una técnica de cross-fade con posicionamiento
+   absoluto — evaluada y descartada por el riesgo/complejidad que agrega
+   frente al beneficio (el "salto" es instantáneo, no un elemento de texto
+   apareciendo de la nada). El nombre+rol del usuario, al vivir dentro de
+   esa fila, se mantiene también condicional por la misma razón. La
+   campana y el botón de candado ya eran persistentes antes de esta sesión
+   (mismas clases en ambas ramas) — no requerían cambio.
+2. **Selector de sucursal**: no se unificó. `SucursalSelector.tsx` renderiza
+   internamente dos cosas completamente distintas según su prop `collapsed`:
+   un glyph estático (ícono de ubicación en un tile, sin texto ni
+   interactividad) en rail, y un `<Select>` de Radix completo (dropdown,
+   lista de sucursales) en expandido. No es una diferencia de "texto que
+   aparece/desaparece" sino dos UIs distintas para dos necesidades
+   distintas; unificarlas requeriría rediseñar el componente compartido
+   `SucursalSelector.tsx` (fuera de archivo y de alcance de esta sesión) o
+   renderizar el dropdown interactivo también en rail (cambiaría la
+   identidad visual del rail, prohibido). Se mantienen las dos invocaciones
+   exactamente como estaban (`<SucursalSelector collapsed />` en rail,
+   `<SucursalSelector collapsed={false} />` dentro del header en expandido).
+
+*Método: lectura completa de `AppSidebar.tsx` antes de asumir los números de
+línea del prompt (coincidían, con corrimiento menor). Validación matemática
+manual del centrado del ícono en rail (48px de fila, ícono 40px, márgenes
+4px) antes de decidir la técnica de `justify-center` fijo + `flex-1`, para
+no introducir un corrimiento visual en el estado de reposo colapsado.*
+
+---
+
 *Método: lectura completa de `src/index.css`, `tailwind.config.ts` y los 16
 componentes compartidos/base relevantes, más barridos con ripgrep sobre `src/` para
 hex, clases de color directas, sombras, z-index, radios y valores arbitrarios. Los
@@ -1001,3 +1221,480 @@ conteos son de ocurrencias en código al 2026-07-07 (incluye cambios sin commite
 estáticamente: la fuente efectiva en runtime (#2), marcado como "confirmar en
 navegador". No se detectaron componentes usados solo dinámicamente que impidieran
 rastrear instancias.*
+
+---
+
+## Fase 4 — Tanda 1: Operación diaria (auditoría 2026-07-09)
+
+Relevamiento de Cobrar, Resumen/Cierre de caja y Turnos/Agenda contra los
+criterios cerrados en Fases 1-3 + Canon de contenedor. Solo diagnóstico y
+alcance por archivo — sin implementación.
+
+### F4.1 Resumen / Cierre de caja — estado
+
+Esta área no estaba en el inventario de 38 formularios de Fase 3. Relevada
+desde cero:
+
+**La vista principal (`DailySummary.tsx`) es una vista de resumen, no un
+formulario.** Sus flujos de confirmación quedan fuera del canon de
+contenedor (no son alta/edición de entidades):
+
+- **Diálogo "Cierre de caja: {barbero}"** (Dialog inline en
+  `DailySummary.tsx:959`): confirmación con resumen de transacciones, sin
+  campos editables. Guard `disabled={isSaving}` + spinner ✅.
+- **`VoidTransactionDialog.tsx`**: confirmación de anulación de venta con
+  un Select de motivo (obligatorio vía botón deshabilitado). Guard interno
+  `if (submitting) return` ✅. Conforme como confirmación.
+- **`VoidClosureDialog.tsx`**: ídem para anular cierre. Guard
+  `disabled={isLoading}` ✅. Desvío menor: marca el motivo con asterisco
+  (`Motivo de la anulación *`) — el canon dice nada en obligatorios.
+- **AlertDialog "Regularizar cierre"** (inline): confirmación pura, sin
+  campos. Conforme.
+
+**Los visores ya usan DrawerForm**: `CashClosingHistory`,
+`AnulacionesCierreHistory`, `TransactionDetailDrawer` y
+`MultiDayClosingSummary` (consulta por rango de fechas — no es alta/edición,
+su "formulario" es un filtro de consulta). Nada que migrar.
+
+**Excepción encontrada — `BackfillWizard.tsx` SÍ es un formulario de alta**
+(crea un cierre diferido en `ingresos` vía `saveBackfill`), y es un **cuarto
+Sheet armado a mano** que no está en los 3 contados por el Canon de
+contenedor (Tareas x2 + HorariosTrabajoSection), porque esta área no se
+relevó en Fase 3:
+
+- Contenedor: `Sheet` crudo con header/stepper/footer artesanales, wizard de
+  5 pasos (Barbero → Motivo → Servicios → Resumen → Confirmar).
+- Campos: barbero (cards seleccionables), motivo (radio-cards, obligatorio,
+  **marcado con asterisco** — desvío), nota (`Textarea`
+  **`maxLength={500}` — fuera de la escala 80/120/240/1500**, marcada
+  "(opcional)" ✅), montos por método (`CurrencyInput`), cantidad de
+  servicios (`Input number`), grilla detallada con steppers +/-.
+- Validación: imperativa por paso (`canAdvance()`), sin RHF+Zod.
+- Guard doble submit: `disabled={isSaving}` en Confirmar ✅ (sin atajo Enter).
+
+Ver decisión pendiente en F4.4 #1 — no se resuelve en esta auditoría.
+
+`DailySummary` ya tiene `animate-fade-in` en la raíz ✅.
+
+### F4.2 Cobrar (`PaymentRegistration.tsx`) — plan de migración (solo validación)
+
+**Verificado, no es hallazgo**: el guard de doble submit del Enter corregido
+en Fase 3 sigue intacto (`if (isSubmitting) return` antes de
+`handleSubmit()` en el keydown handler, con `isSubmitting` en las deps del
+`useEffect`). El botón "Registrar Cobro" y "Cobrar con Terminal" también
+deshabilitan con `isSubmitting` ✅.
+
+**Campos/estado actual** (todo `useState` + validación imperativa):
+
+| Campo | Estado hoy | Regla |
+|---|---|---|
+| Barbero | `selectedBarber` (cards) | obligatorio si hay servicio |
+| Servicio | `selectedService` (cards) | obligatorio salvo venta solo-productos |
+| Extras | `selectedExtras[]` (cards toggle) | opcional |
+| Descuento | `selectedDiscount` (cards, default 'none') | opcional; se anula solo si no aplica al método |
+| Método de pago | `paymentMethod` (cards) | obligatorio |
+| Split: montos | `efectivoAmount`/`mpAmount` (CurrencyInput) | ambos > 0, suma == total (±0.01), cada uno ≤ total |
+| Split: método electrónico | `selectedDigitalMethod` (chips) | obligatorio en split |
+| Carrito productos | `cart[]` + `productSaleAssignment` | venta no vacía (servicio o productos); sin ítems con precio faltante |
+
+**Validaciones imperativas hoy** — 6 reglas en `handleSubmit` + 3
+preventivas en los handlers de selección (servicio sin barbero, precio
+pendiente en servicio/extra), **todas reportadas con toast destructivo**.
+Desvío del canon: los errores de campo deben ser inline; el toast queda solo
+para servidor/red (los dos toasts de error de red/imprevisto ya cumplen).
+
+**Schema Zod correspondiente** (para el build): objeto único con
+`barberId`, `serviceId`, `extraIds[]`, `discountId`, `paymentMethod`
+(enum de `PAYMENT_METHODS` activos), `split { enabled, efectivo, digital,
+digitalMethod }`, `cart[]`, con `superRefine` para las 5 reglas cruzadas
+(venta no vacía; barbero requerido con servicio; método requerido; suma del
+split == total; método electrónico requerido en split). La regla de "ítems
+sin precio" depende de datos externos (config de precios) — entra como
+refinement con contexto o se mantiene como guard previo. RHF registra como
+campos reales solo los 2 `CurrencyInput` del split (los únicos inputs de
+texto); las selecciones por cards escriben al form vía `setValue`. El estado
+"Suma / Debe coincidir exacto" del split ya es feedback inline — se conserva
+y se conecta al error del schema.
+
+**maxLength**: N/A — Cobrar no tiene ningún campo de texto libre
+persistente (solo montos y selecciones). ✅
+
+**Obligatorios**: los labels del split ("Efectivo"/"Electrónico") no llevan
+marca y son obligatorios — ya conforme.
+
+Contenedor (stepper full-page propio) y animaciones: **sin cambios**, según
+lo decidido.
+
+### F4.3 Turnos/Agenda — plan por formulario
+
+Estado actual de los 4 (todos **Dialog centrado → migran a DrawerForm**,
+todos **useState + validación imperativa por toast → migran a RHF+Zod**):
+
+| | NewAppointment | DayOff | UnavailableSlot | AppointmentDetail |
+|---|---|---|---|---|
+| Contenedor | Dialog | Dialog | Dialog | Dialog |
+| Validación | imperativa, toasts | imperativa, 1 regla | imperativa, 2 reglas | imperativa + 409 del servidor |
+| maxLength | ✅ completo (80/80/120 + notas 1500, query 80) | ✅ motivo 240 | ✅ motivo 240 | ✅ completo (80/80/120, motivo 240) |
+| Guard doble submit | `disabled={saving}` | `disabled={saving}` | `disabled={saving}` | `disabled={saving}` en EditableSectionHeader y footer ✅ |
+| Obligatorios | ❌ asteriscos en Nombre/Apellido/Teléfono; "(opcional)" ✅ en Email/Notas | ✅ ya conforme | ✅ ya conforme | ❌ asteriscos en form de cliente nuevo |
+| Teléfono | ✅ PhoneInput canónico (e164) | — | — | ✅ PhoneInput canónico |
+| Reset/defaults | ✅ resync al abrir + reset al cerrar | ❌ defaults congelados + motivo persiste | ❌ ídem | ✅ reset al cerrar |
+
+- La cobertura de `maxLength` en Agenda es **completa y en escala** —
+  ningún faltante. Los `.slice()` defensivos en submit se conservan.
+- Ningún guard interno `if (saving) return` dentro de los `handleSubmit`,
+  pero todos los caminos de invocación están cubiertos por `disabled`; la
+  migración a RHF lo resuelve de fábrica (`formState.isSubmitting`).
+- **Selects vacíos sin mensaje+CTA** (desvío del canon): barbero y servicio
+  en NewAppointment/UnavailableSlot/AppointmentDetail renderizan un Select
+  sin ítems si no hay barberos activos o servicios — falta el patrón
+  mensaje + CTA ya usado en Cobrar.
+- **Bug de estado en DayOff y UnavailableSlot**: los 4 diálogos viven
+  montados permanentemente en `AgendaPanel.tsx:291-331` (controlados por
+  `open`), pero estos dos inicializan fecha/hora con `useState(initializer)`
+  — corre una sola vez al montar. Si el usuario navega la agenda a otra
+  fecha y abre "Día off", el formulario muestra la fecha del primer render,
+  no la seleccionada. Además `motivo` no se resetea al cerrar (reabre con el
+  texto anterior). `NewAppointmentDialog` lo hace bien (resync en `useEffect`
+  sobre `open` + `reset()` al cerrar) — es la referencia para el build.
+- **Schemas Zod**: DayOff (rango de fechas con refine fin ≥ inicio + motivo
+  opcional) y UnavailableSlot (barbero requerido + refine hora fin > inicio)
+  son triviales. NewAppointment necesita **unión discriminada por `mode`**
+  (`existing` → cliente seleccionado requerido; `new` → nombre/apellido/
+  teléfono válidos + email opcional con regex; `quick` → sin cliente) +
+  campos comunes (barbero, servicio, fecha, hora).
+
+**AppointmentDetailDialog — qué preservar al migrar (Stage 1 verificado
+intacto al 2026-07-09):**
+
+1. **Header**: `InitialsAvatar` + nombre + `StatusPill` (vía
+   `TURNO_ESTADO_PILL`). DrawerForm debe aceptar/replicar esta composición
+   de título.
+2. **Edición por secciones con `EditableSectionHeader`** y exclusión mutua
+   (editar cliente ↔ editar turno ↔ cancelar se bloquean entre sí vía
+   `disabled`). NO aplanar a un formulario único: la migración a RHF es
+   **por sección** (un `useForm` por editor, montado al entrar en modo
+   edición), manteniendo la semántica de guardar cada sección por separado.
+3. **Flujo de cancelación inline** (motivo opcional + confirmación en el
+   footer) — es una confirmación, no cambia de contenedor.
+4. **`TurnoConflictDialog` + semántica 409 del servidor**
+   (`choque_de_horario`/`fuera_de_horario` con re-submit confirmado, más los
+   6 códigos de error de negocio con toast). Es un canal de error de
+   servidor ya decidido — la migración a RHF no lo toca; solo los errores
+   de campo locales (fecha vacía, hora inválida, cliente incompleto) pasan
+   a inline.
+5. **`readOnly`** y los permisos por estado del turno (`canCancel`/
+   `canEditCliente`/`canEditTurno`).
+6. **Búsqueda de cliente** con debounce + token anti-race y el `PhoneInput`
+   canónico (compartidos textualmente con NewAppointmentDialog — candidato a
+   extraer a componente común en el build, análogo a la unificación de
+   campos compartidos de Producto).
+
+**Fade de entrada (Fase 2)**: la página Turnos ya lo tiene
+(`TurnosAgendaPanel.tsx:112` con `animate-fade-in` en la raíz) — no falta
+aplicarlo. Hallazgo menor aparte en F4.4 #5.
+
+### F4.4 Hallazgos nuevos (no encajan en criterios ya cerrados)
+
+1. **Contenedor de `BackfillWizard` — decisión pendiente.** Es un formulario
+   real de alta con wizard de 5 pasos. El canon dice "DrawerForm sin
+   excepciones", pero la única analogía existente es Cobrar (stepper con
+   excepción explícita de contenedor). Opciones: (a) migrar a DrawerForm con
+   el stepper adentro del body, o (b) extender la excepción de Cobrar a los
+   wizards multi-paso. No se resuelve acá — requiere decisión.
+2. **`BackfillWizard` nota con `maxLength={500}`**: fuera de la escala
+   80/120/240/1500. Corresponde decidir si baja a 240 o sube a 1500 (por
+   contenido es una nota breve → 240 parece el tier natural, pero acorta un
+   límite existente: puede truncar hábitos de usuarios actuales).
+3. **Defaults congelados + motivo persistente en DayOff/UnavailableSlot**
+   (detalle en F4.3). Bug funcional de UX, no solo de canon — entra al
+   build de Agenda de esta tanda.
+4. **Asteriscos residuales** en VoidClosureDialog (confirmación, fuera de
+   canon de contenedor pero el criterio de marcado es transversal) y
+   BackfillWizard. Cambio trivial de copy.
+5. **Cambio de vista Día/3días/Semana en `AgendaPanel.tsx:247-289`** usa
+   `animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out`
+   (tailwindcss-animate con easing nativo) en vez del timing canónico
+   200ms `--ease-out-quint`. P3 — retimar en el build de Agenda o dejar
+   explícitamente como está.
+
+---
+
+*Método F4-T1: lectura completa de `DailySummary.tsx`,
+`VoidTransactionDialog.tsx`, `VoidClosureDialog.tsx`,
+`MultiDayClosingSummary.tsx`, `BackfillWizard.tsx`,
+`PaymentRegistration.tsx` (1658 líneas), los 4 diálogos de agenda,
+`EditableSectionHeader.tsx` y `AgendaPanel.tsx` (zona de montaje de
+diálogos), más barridos ripgrep (`animate-fade-in`, `maxLength`,
+`DrawerForm|SheetContent|DialogContent`) sobre Caja y Agenda al 2026-07-09.
+`CashClosingHistory`/`AnulacionesCierreHistory`/`TransactionDetailDrawer` se
+verificaron por grep de contenedor y campos (visores DrawerForm sin
+formularios). No se modificó código.*
+
+---
+
+## Fase 4 - Tanda 1 - Build Parte 1 (Agenda) — 2026-07-09
+
+Ejecuta el plan de F4.3 sobre los 4 formularios de Agenda. Cobrar,
+Caja/Resumen y `BackfillWizard` quedan intactos para la Parte 2.
+
+### Archivos modificados
+
+- `src/components/agenda/DayOffDialog.tsx` — reescrito.
+- `src/components/agenda/UnavailableSlotDialog.tsx` — reescrito.
+- `src/components/agenda/NewAppointmentDialog.tsx` — reescrito.
+- `src/components/agenda/AppointmentDetailDialog.tsx` — reescrito.
+- `src/components/agenda/AgendaPanel.tsx` — solo el retimado del cambio de
+  vista (líneas ~247-289).
+- `src/components/ui/drawer-form.tsx` — `title` amplía de `string` a
+  `React.ReactNode` (extensión aditiva, sin romper los ~19 consumidores
+  existentes; todos pasan strings literales, que siguen siendo válidos).
+
+**Archivos nuevos** (extracción del punto 7 + utilidades compartidas):
+
+- `src/components/agenda/hooks/useClienteSearch.ts` — hook con la búsqueda
+  de cliente (debounce 250ms + token anti-race) y `ensureRelacion`,
+  extraído de la lógica duplicada en NewAppointmentDialog y
+  AppointmentDetailDialog.
+- `src/components/agenda/ClienteSearchPicker.tsx` — Popover de búsqueda de
+  cliente existente, compartido por ambos diálogos.
+- `src/components/agenda/ClienteFormFields.tsx` — sub-formulario de
+  "cliente nuevo" (Nombre/Apellido/Teléfono/Email) sobre RHF, compartido
+  por ambos diálogos; sin asteriscos, "(opcional)" solo en Email.
+- `src/components/agenda/clienteModeSchema.ts` — schema Zod + validación
+  cruzada por modo (`existing`/`new`) compartida por NewAppointmentDialog y
+  AppointmentDetailDialog.
+- `src/components/agenda/EmptySelectHint.tsx` — mensaje + CTA para Selects
+  sin ítems (mismo patrón que Cobrar).
+
+### Resumen por archivo
+
+**DayOffDialog / UnavailableSlotDialog**: contenedor Dialog → DrawerForm
+(`size="sm"`); validación imperativa → RHF + `zodResolver` (schemas
+triviales: rango de fechas con `refine` fin ≥ inicio; barbero requerido +
+`refine` hora fin > inicio). Bug de fecha congelada corregido: un único
+`useEffect` sobre `open` llama `form.reset(...)` con los defaults actuales
+de la agenda en cada apertura — reemplaza el `useState(initializer)` que
+solo corría una vez. El motivo ahora se resetea junto con todo lo demás en
+cada apertura (antes persistía). UnavailableSlotDialog suma
+`EmptySelectHint` cuando no hay barberos activos (deshabilita también el
+submit). Guard de doble submit: `form.formState.isSubmitting` (RHF), sin
+guard manual.
+
+**NewAppointmentDialog**: contenedor Dialog → DrawerForm (`size="md"`).
+Validación: en vez de un `z.discriminatedUnion` literal (que generaba
+fricción de tipos con `useForm` por tener shapes distintas por rama), se
+implementó como **un schema plano con `superRefine` que discrimina por el
+campo `mode`** (`existing`/`new`/`quick`) — mismo comportamiento de
+validación que una unión discriminada, mejor ergonomía con RHF. La
+validación cruzada de modo cliente se comparte con AppointmentDetailDialog
+vía `clienteModeSchema.ts`. Se agregó `EmptySelectHint` en barbero y
+servicio. Se quitaron los asteriscos de Nombre/Apellido/Teléfono (ya sin
+marca, consistente con barbero/servicio/fecha/hora que tampoco llevaban
+marca); Email/Notas mantienen "(opcional)". El bug-fix-pattern (reset
+completo en `useEffect` sobre `open`) que este diálogo ya aplicaba
+correctamente se preservó tal cual, ahora expresado como un único
+`form.reset(defaultValues())` que reemplaza el `reset()` parcial + el
+`useEffect` de sync que antes vivían separados.
+
+**AppointmentDetailDialog**: contenedor Dialog → DrawerForm (`size="md"`)
+con **título compuesto** (`InitialsAvatar` + nombre + `StatusPill`) pasado
+como `ReactNode` a la prop `title` extendida. Migración **por sección**,
+tal como exigía el candado de alcance: un `useForm` independiente para el
+editor de cliente (`clienteEditSchema`, reutiliza `clienteModeSchema.ts`) y
+otro para el editor de turno (`turnoEditSchema`: servicio/barbero
+requeridos, fecha vía `z.custom<Date | null>`, hora vía regex HH:MM). La
+exclusión mutua existente (`disabled` cruzado entre ambos
+`EditableSectionHeader` y `confirmingCancel`) **no se tocó** — sigue
+funcionando igual porque ambos forms son independientes y los `disabled`
+siguen leyendo los mismos tres booleanos de estado (`editingCliente`,
+`editingTurno`, `confirmingCancel`). El flujo de cancelación (motivo +
+confirmación) se dejó **exactamente como estaba**, sin RHF, según lo
+pedido. Los errores locales de turno (fecha vacía, hora inválida) ahora son
+inline vía `FormMessage`; el canal 409 (`TurnoConflictDialog`,
+`choque_de_horario`/`fuera_de_horario`, los 6 códigos de error de negocio
+con toast) **no se modificó**: `runUpdateTurno` recibe los valores ya
+validados por RHF pero conserva la misma lógica de respuesta del servidor,
+y el reintento tras conflicto (`handleConfirmConflict`) lee los valores
+vigentes vía `turnoForm.getValues()` en vez de estado plano, sin cambiar el
+comportamiento. Se agregó `EmptySelectHint` en servicio y profesional del
+editor de turno. Asteriscos quitados del sub-formulario de cliente nuevo
+(mismo criterio que NewAppointmentDialog).
+
+**AgendaPanel.tsx**: el cambio de vista Día/3días/Semana pasa de
+`duration-150 ease-out` a `duration-200
+[animation-timing-function:var(--ease-out-quint)]` — mismo efecto visual
+(fade + slide sutil desde abajo), timing canónico.
+
+### TurnoConflictDialog — confirmación explícita
+
+No se tocó. Sigue siendo un `Dialog` propio, sin cambios en su archivo, su
+API (`open`/`kind`/`conflicts`/`onConfirm`/`loading`) ni su lógica de
+render. `AppointmentDetailDialog` lo sigue montando fuera del `DrawerForm`
+(como hermano, dentro de un fragment `<>...</>` ya que ahora hay dos
+elementos de nivel superior).
+
+### Punto 7 — extracción de búsqueda de cliente
+
+**Se hizo.** La duplicación textual (debounce + token anti-race +
+`ensureRelacion` + el Popover de búsqueda + el sub-form de cliente nuevo)
+era mayor a la estimada en la auditoría — no solo la búsqueda, también el
+formulario de cliente nuevo completo. Se extrajeron 4 piezas reutilizables
+(`useClienteSearch`, `ClienteSearchPicker`, `ClienteFormFields`,
+`clienteModeSchema`) en vez de una sola, porque cada una tiene un punto de
+variación distinto entre los dos diálogos (contexto de habilitación,
+nombres de campo del form padre) y forzar una única abstracción hubiera
+sido más rígida que útil. El costo fue contenido: 4 archivos nuevos, ambos
+diálogos consumidores quedaron más cortos que sus versiones pre-migración
+pese a ganar RHF+Zod.
+
+---
+
+*Método: build directo sobre los 4 archivos listados en el candado de
+alcance, verificando estado actual de cada uno con `Read` antes de asumir
+los números de línea de la auditoría F4.3 (coincidían). Validación:
+`npx tsc --noEmit` limpio tras el build completo. Lint (`eslint`) marca 5
+usos de `any` preexistentes (cast de payload RPC/insert y `catch (e: any)`)
+idénticos línea por línea a los del código original antes de esta
+migración — no se tocaron por ser deuda preexistente ajena al alcance de
+este build (fuera del criterio de validación pedido, que era `tsc`).*
+
+---
+
+## Regresión post-build Parte 1 — NewAppointmentDialog (2026-07-09)
+
+QA reportó que al crear un turno que choca de horario, en vez de
+`TurnoConflictDialog` aparecía el error crudo de Postgres ("conflicting
+key value violates exclusion constraint 'no_overlap_turnos'"). Diagnóstico
+(comparación contra `HEAD`, antes de tocar el archivo): **no fue una
+regresión de la migración** — el `catch` de `NewAppointmentDialog` siempre
+fue genérico, byte por byte igual antes/después. La detección específica
+de este error **nunca existió** para el flujo de creación; solo existe
+para editar/mover turnos (`update-turno-internal`, que hace un
+pre-chequeo de conflictos antes de tocar la base). El botón "Guardar igual
+(superponer)" de `TurnoConflictDialog` tampoco es viable para creación: ese
+bypass depende de que el servidor setee `overlap_autorizado`, algo que solo
+`update-turno-internal` puede hacer — un insert directo del cliente no
+tiene forma de pasarlo.
+
+**Fix aplicado (alcance mínimo, elegido por el usuario frente a la
+alternativa de construir una edge function de creación con paridad
+completa)**: en `NewAppointmentDialog.tsx`, el catch del insert ahora
+detecta el código `23P01` (o el texto `no_overlap_turnos` como respaldo) y
+muestra `"Ese horario ya está ocupado. Elegí otro horario o
+profesional."` en vez del mensaje crudo. Sin botón de "guardar igual" — no
+existe forma de cumplirlo para este flujo.
+
+`AppointmentDetailDialog` (editar) se verificó sin regresión: cadena de
+manejo de errores idéntica a `HEAD`.
+
+---
+
+## Fase 4 - Tanda 1 - Build Parte 2 (Cobrar + Caja) — 2026-07-09
+
+Cierra la Tanda 1 completa. Cobrar migra solo su capa de validación
+(contenedor y animaciones intactos, según lo decidido). `BackfillWizard`
+mantiene su Sheet propio con wizard de 5 pasos — segunda excepción
+explícita al canon de contenedor, junto con Cobrar.
+
+### Archivos modificados
+
+- `src/components/PaymentRegistration.tsx` — validación migrada a
+  React Hook Form + Zod. Contenedor (stepper full-page) y animaciones
+  (`step-in-*`, overlay/confirm, `payment-card-in`) sin cambios.
+- `src/components/VoidClosureDialog.tsx` — se sacó el asterisco de
+  "Motivo de la anulación".
+- `src/components/BackfillWizard.tsx` — validación por paso migrada a
+  React Hook Form + Zod. Contenedor (Sheet + wizard de 5 pasos) sin
+  cambios. Nota: `maxLength` 500 → 240. Motivo: se sacó el asterisco.
+
+### Cobrar — resumen de la migración
+
+**Schema único** (`barberId`, `serviceId`, `extraIds[]`, `discountId`,
+`paymentMethod`, `cart[]`, `split { enabled, efectivo, digital,
+digitalMethod }`) con `superRefine` para las 5 reglas cruzadas (venta no
+vacía → error en `root`; barbero requerido si hay servicio → `barberId`;
+método de pago requerido → `paymentMethod`; suma del split == total → error
+en `split.efectivo`, ya cubierto en vivo por el indicador "Suma / Debe
+coincidir exacto" existente; método electrónico requerido en split →
+`split.digitalMethod`). El total (necesario dentro del `superRefine` para
+validar el split) se resuelve vía una ref actualizada en cada render — el
+schema se construye una sola vez por instancia del componente y siempre lee
+el total vigente al validar, sin necesidad de reconstruir el schema ni el
+resolver en cada render.
+
+**"Ítems sin precio pendiente"** se implementó como guard previo dentro del
+propio submit ya validado (no en el schema, tal como se pidió — depende de
+config externa de precios, no es forma del formulario), preservando el
+mismo orden que tenía el handler imperativo original (venta vacía primero,
+ítems sin precio segundo). Usa `form.setError('root', ...)`, compartiendo
+el mismo slot visual que la regla de venta vacía.
+
+**RHF registra como campos reales solo los 2 `CurrencyInput` del split**
+(`split.efectivo`/`split.digital`, ahora vía `form.watch`/`form.setValue`
+en vez de `useState` — la lógica de autocompletado cruzado entre ambos se
+preservó intacta). Barbero, servicio, extras, descuento, método de pago y
+carrito siguen su mecanismo de cards/estado local de siempre; cada handler
+de selección ahora también hace `form.setValue(...)` + `form.trigger()`
+para mantener el schema sincronizado y limpiar errores en vivo apenas el
+usuario corrige el campo.
+
+**Errores — alineados al canon**: los 6 tests de `handleSubmit` + la
+validación de método electrónico en split, que eran 100% toast, ahora son
+inline en la sección correspondiente (barbero, método de pago, split) o en
+el bloque de resumen del paso de pago (venta vacía / ítems sin precio,
+compartiendo el slot `root`). Los mensajes solo se muestran después de un
+intento de submit (`form.formState.submitCount > 0`) para no mostrar ruido
+antes de que el usuario intente cobrar. Los 2 toasts de error de
+red/imprevisto ("No se pudo guardar el cobro" / "Error inesperado") se
+dejaron exactamente como estaban.
+
+**Guard de doble submit del Enter**: verificado intacto
+(`if (isSubmitting) return;` antes de `handleSubmit()`, con el mismo
+`isSubmitting` manual de siempre — no se reemplazó por
+`formState.isSubmitting` de RHF porque ese mismo estado también gobierna el
+flujo separado de "Cobrar con Terminal", que no pasa por
+`form.handleSubmit`; ambos coexisten, tal como se pidió).
+
+**`maxLength`**: confirmado N/A — Cobrar no tiene texto libre persistente.
+
+### BackfillWizard — resumen de la migración
+
+Un solo schema (`barberId`, `reason`, `note`, `hasServiceData`) para los 3
+pasos con campos propios (Barbero/Motivo/Servicios); Resumen y Confirmar no
+tienen validación de forma. `hasServiceData` espeja
+`totals.totalCobrado > 0 || totals.services > 0` (que depende de
+`items`/`quickAmounts`, fuera del form) vía un `useEffect`.
+
+El gate "no avanzar si el paso es inválido" (antes `canAdvance()` ad hoc)
+ahora lee `backfillSchema.shape.<campo>.safeParse(...)` directo en vez de
+reimplementar las reglas a mano — mismo comportamiento visual (botón
+"Siguiente" deshabilitado), pero la regla vive en el schema. Se mantuvo
+como chequeo síncrono directo sobre el schema (no vía `formState.isValid`
+de RHF) porque el botón necesita reaccionar en el mismo render en que
+cambia la selección, sin esperar el ciclo async de validación de RHF.
+
+`handleConfirm` suma `await form.trigger()` como red de seguridad antes de
+guardar (los gates por paso ya deberían garantizar formulario válido al
+llegar a "Confirmar"). El guard de doble submit del botón Confirmar
+(`disabled={isSaving}`) no se tocó, tal como se pidió — es un wizard con
+submit final, no un formulario RHF de un solo submit.
+
+Ajustes puntuales aplicados: nota `maxLength` 500 → 240; asterisco sacado
+de "Motivo del cierre diferido".
+
+### Visores y diálogos ya conformes — sin cambios
+
+`VoidTransactionDialog`, el diálogo "Cierre de caja: {barbero}", el
+`AlertDialog` "Regularizar cierre", `CashClosingHistory`,
+`AnulacionesCierreHistory`, `TransactionDetailDrawer` y
+`MultiDayClosingSummary` — confirmados conformes en F4.1, no se tocaron.
+
+---
+
+*Método: lectura completa de `PaymentRegistration.tsx` (1658 líneas) y
+`BackfillWizard.tsx` antes de editar, verificando que los números de línea
+de la auditoría F4.2 coincidieran con el estado actual. Validación:
+`npx tsc --noEmit` limpio tras el build completo (Cobrar + VoidClosureDialog
++ BackfillWizard). No se tocó ningún archivo fuera del candado de alcance
+(Agenda, Sidebar, Portal, Auth, Homepage quedaron intactos).*

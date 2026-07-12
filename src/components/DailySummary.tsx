@@ -188,7 +188,8 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     const summaryMap = new Map<string, BarberSummary>();
 
     // Initialize all active barbers with their commission percentage
-    barbers.forEach(barber => {
+    // (solo quienes tienen rol 'barber' — 'barbers' incluye a todo el personal activo de la sucursal)
+    barbers.filter(b => (b.rolesEquipo ?? []).includes('barber')).forEach(barber => {
       summaryMap.set(barber.id, {
         barberId: barber.id,
         barberName: `${barber.firstName} ${barber.lastName}`,
@@ -368,8 +369,9 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
   const isPastDate = useMemo(() => isBefore(startOfDay(validDate), startOfDay(new Date())), [validDate]);
 
   // Check which barbers are missing closings (for backfill)
+  // Solo personal con rol 'barber' — 'barbers' incluye a todo el personal activo (dueño, encargados, otros)
   const barbersWithoutClosing = useMemo(() =>
-    barbers.filter(b => !closedBarbers.has(b.id)),
+    barbers.filter(b => (b.rolesEquipo ?? []).includes('barber') && !closedBarbers.has(b.id)),
     [barbers, closedBarbers]
   );
 

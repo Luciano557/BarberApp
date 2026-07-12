@@ -1,21 +1,26 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Barber } from '@/types/barbershop';
 import { Servicio } from './hooks/useAgendaData';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
-import { Search, UserPlus, Zap, ArrowLeft, Check, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { formatPhoneDisplay } from '@/lib/phone';
-import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { UserPlus, Zap, ArrowLeft } from 'lucide-react';
+import { useClienteSearch, clienteFullName } from './hooks/useClienteSearch';
+import { ClienteSearchPicker } from './ClienteSearchPicker';
+import { ClienteFormFields } from './ClienteFormFields';
+import { EmptySelectHint } from './EmptySelectHint';
+import { clienteModeFieldsSchema, validateClienteMode } from './clienteModeSchema';
 
 interface NewAppointmentDialogProps {
   open: boolean;
@@ -31,196 +36,117 @@ interface NewAppointmentDialogProps {
   onCreated: () => void;
 }
 
-type Mode = 'existing' | 'new' | 'quick';
+const newAppointmentSchema = z
+  .object({
+    mode: z.enum(['existing', 'new', 'quick']),
+    ...clienteModeFieldsSchema.shape,
+    barberoId: z.string().min(1, 'Selecciona un barbero'),
+    servicioId: z.string().min(1, 'Selecciona un servicio'),
+    fecha: z.string().min(1, 'Selecciona una fecha'),
+    horaInicio: z.string().min(1, 'Selecciona una hora'),
+    notas: z.string().max(1500).optional().default(''),
+  })
+  .superRefine((data, ctx) => {
+    if (data.mode === 'existing' || data.mode === 'new') {
+      validateClienteMode(data.mode, data, ctx);
+    }
+  });
 
-interface ClienteLite {
-  id: string;
-  nombre: string;
-  apellido: string | null;
-  telefono: string | null;
-  email: string | null;
-  inSucursal?: boolean;
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function fullName(c: { nombre: string; apellido: string | null }) {
-  return `${c.nombre}${c.apellido ? ' ' + c.apellido : ''}`.trim();
-}
+type NewAppointmentFormValues = z.infer<typeof newAppointmentSchema>;
 
 export function NewAppointmentDialog({
   open, onOpenChange, organizationId, sucursalId, sucursalTimezone, barbers, servicios,
   defaultDate, defaultBarberId, defaultHoraInicio, onCreated,
 }: NewAppointmentDialogProps) {
-  const [mode, setMode] = useState<Mode>('existing');
+  const activeBarbers = barbers.filter((b) => b.active);
+  const clienteSearch = useClienteSearch({ organizationId, sucursalId, enabled: open });
 
-  // existing
-  const [selectedCliente, setSelectedCliente] = useState<ClienteLite | null>(null);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ClienteLite[]>([]);
-  const [searching, setSearching] = useState(false);
+  const defaultValues = (): NewAppointmentFormValues => ({
+    mode: 'existing',
+    clienteId: '',
+    nombre: '',
+    apellido: '',
+    telefono: null,
+    email: '',
+    barberoId: defaultBarberId || '',
+    servicioId: '',
+    fecha: format(defaultDate, 'yyyy-MM-dd'),
+    horaInicio: defaultHoraInicio || '10:00',
+    notas: '',
+  });
 
-  // new client
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
-  const [email, setEmail] = useState('');
+  const form = useForm<NewAppointmentFormValues>({
+    resolver: zodResolver(newAppointmentSchema),
+    defaultValues: defaultValues(),
+  });
 
-  // common
-  const [barberoId, setBarberoId] = useState(defaultBarberId || '');
-  const [servicioId, setServicioId] = useState('');
-  const [fecha, setFecha] = useState(format(defaultDate, 'yyyy-MM-dd'));
-  const [horaInicio, setHoraInicio] = useState(defaultHoraInicio || '10:00');
-  const [notas, setNotas] = useState('');
-  const [saving, setSaving] = useState(false);
+  const mode = form.watch('mode');
 
-  const activeBarbers = useMemo(() => barbers.filter(b => b.active), [barbers]);
-
+  // Resync con los defaults actuales de la agenda en cada apertura (mismo patrón que
+  // corrigió el bug de fecha congelada en DayOffDialog/UnavailableSlotDialog).
   useEffect(() => {
     if (open) {
-      setBarberoId(defaultBarberId || '');
-      setFecha(format(defaultDate, 'yyyy-MM-dd'));
-      setHoraInicio(defaultHoraInicio || '10:00');
+      clienteSearch.reset();
+      form.reset(defaultValues());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultBarberId, defaultHoraInicio, defaultDate]);
 
-  const reset = () => {
-    setMode('existing');
-    setSelectedCliente(null);
-    setQuery('');
-    setResults([]);
-    setSearchOpen(false);
-    setNombre('');
-    setApellido('');
-    setTelefono('');
-    setPhoneOut(null);
-    setEmail('');
-    setServicioId('');
-    setNotas('');
+  const handleSwitchToNew = () => {
+    form.setValue('mode', 'new');
+    clienteSearch.setSelectedCliente(null);
+    form.setValue('clienteId', '');
   };
 
-  const tokenRef = useRef(0);
-  useEffect(() => {
-    if (!searchOpen) return;
-    const q = query.trim();
-    const myToken = ++tokenRef.current;
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        let req = supabase
-          .from('clientes')
-          .select('id, nombre, apellido, telefono, email')
-          .eq('organization_id', organizationId)
-          .eq('eliminado', false)
-          .order('apellido', { ascending: true })
-          .limit(20);
-        if (q.length > 0) {
-          const safe = q.replace(/[%,]/g, ' ');
-          req = req.or(`nombre.ilike.%${safe}%,apellido.ilike.%${safe}%,telefono.ilike.%${safe}%,email.ilike.%${safe}%`);
-        }
-        const [{ data: cliData }, { data: linkData }] = await Promise.all([
-          req,
-          supabase
-            .from('clientes_sucursales')
-            .select('cliente_id')
-            .eq('organization_id', organizationId)
-            .eq('sucursal_id', sucursalId),
-        ]);
-        if (myToken !== tokenRef.current) return;
-        const localIds = new Set((linkData || []).map((l) => l.cliente_id));
-        const list: ClienteLite[] = (cliData || []).map((c) => ({ ...c, inSucursal: localIds.has(c.id) }));
-        list.sort((a, b) => Number(b.inSucursal) - Number(a.inSucursal));
-        setResults(list);
-      } catch {
-        if (myToken === tokenRef.current) setResults([]);
-      } finally {
-        if (myToken === tokenRef.current) setSearching(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [query, searchOpen, organizationId, sucursalId]);
-
-  const validateCommon = () => {
-    if (!barberoId) { toast.error('Selecciona un barbero'); return false; }
-    if (!servicioId) { toast.error('Selecciona un servicio'); return false; }
-    if (!fecha) { toast.error('Selecciona una fecha'); return false; }
-    if (!horaInicio) { toast.error('Selecciona una hora'); return false; }
-    return true;
+  const handleSwitchToQuick = () => {
+    form.setValue('mode', 'quick');
+    clienteSearch.setSelectedCliente(null);
+    form.setValue('clienteId', '');
+    form.setValue('nombre', '');
+    form.setValue('apellido', '');
+    form.setValue('telefono', null);
+    form.setValue('email', '');
   };
 
-  const validateNewClienteFields = (): { ok: boolean; phoneCanonical: string | null } => {
-    if (!nombre.trim()) { toast.error('Ingresa el nombre'); return { ok: false, phoneCanonical: null }; }
-    if (!apellido.trim()) { toast.error('Ingresa el apellido'); return { ok: false, phoneCanonical: null }; }
-    if (!phoneOut?.e164 || !phoneOut.isValid) {
-      toast.error('Ingresa un telefono valido');
-      return { ok: false, phoneCanonical: null };
-    }
-    if (email.trim() && !EMAIL_RE.test(email.trim())) {
-      toast.error('Email invalido');
-      return { ok: false, phoneCanonical: null };
-    }
-    return { ok: true, phoneCanonical: phoneOut.e164 };
+  const handleBackFromQuick = () => form.setValue('mode', 'existing');
+
+  const handleBackFromNew = () => {
+    form.setValue('mode', 'existing');
+    form.setValue('nombre', '');
+    form.setValue('apellido', '');
+    form.setValue('telefono', null);
+    form.setValue('email', '');
   };
 
-  const ensureRelacion = async (clienteId: string) => {
-    const { data: existing, error: selErr } = await supabase
-      .from('clientes_sucursales')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('cliente_id', clienteId)
-      .eq('sucursal_id', sucursalId)
-      .maybeSingle();
-    if (selErr) throw selErr;
-    if (existing) return;
-    const { error: insErr } = await supabase.from('clientes_sucursales').insert({
-      organization_id: organizationId,
-      cliente_id: clienteId,
-      sucursal_id: sucursalId,
-      origen_relacion: 'manual',
-    } as any);
-    if (insErr) throw insErr;
-  };
+  const ensureRelacion = clienteSearch.ensureRelacion;
 
-  const handleSubmit = async () => {
-    const servicio = servicios.find((s) => s.id === servicioId);
+  const onSubmit = async (values: NewAppointmentFormValues) => {
+    const servicio = servicios.find((s) => s.id === values.servicioId);
+    if (!servicio) return;
 
-    let telefonoCanonical: string | null = null;
-    if (mode === 'existing') {
-      if (!selectedCliente) { toast.error('Selecciona un cliente'); return; }
-      if (!validateCommon() || !servicio) return;
-    } else if (mode === 'new') {
-      const v = validateNewClienteFields();
-      if (!v.ok) return;
-      telefonoCanonical = v.phoneCanonical;
-      if (!validateCommon() || !servicio) return;
-    } else {
-      if (!validateCommon() || !servicio) return;
-    }
-
-    setSaving(true);
     try {
       let clienteId: string | null = null;
       let snapNombre = '';
       let snapTelefono: string | null = null;
       let snapEmail: string | null = null;
 
-      if (mode === 'existing' && selectedCliente) {
+      if (values.mode === 'existing' && clienteSearch.selectedCliente) {
+        const selectedCliente = clienteSearch.selectedCliente;
         clienteId = selectedCliente.id;
-        snapNombre = fullName(selectedCliente).slice(0, 80);
+        snapNombre = clienteFullName(selectedCliente).slice(0, 80);
         snapTelefono = selectedCliente.telefono || null;
         snapEmail = selectedCliente.email || null;
         if (!selectedCliente.inSucursal) {
           await ensureRelacion(selectedCliente.id);
         }
-      } else if (mode === 'new') {
+      } else if (values.mode === 'new') {
+        const telefonoCanonical = values.telefono?.e164 ?? null;
         const { data: rpcData, error: rpcErr } = await supabase.rpc('create_cliente_with_sucursal', {
-          _nombre: nombre.trim(),
-          _apellido: apellido.trim(),
+          _nombre: values.nombre.trim(),
+          _apellido: values.apellido.trim(),
           _sucursal_id: sucursalId,
           _telefono: telefonoCanonical,
-          _email: email.trim() || null,
+          _email: values.email.trim() || null,
           _instagram: null,
           _tiktok: null,
           _otra_red_social: null,
@@ -230,9 +156,9 @@ export function NewAppointmentDialog({
         } as any);
         if (rpcErr) throw rpcErr;
         clienteId = (rpcData as string) || null;
-        snapNombre = `${nombre.trim()} ${apellido.trim()}`.slice(0, 80);
+        snapNombre = `${values.nombre.trim()} ${values.apellido.trim()}`.slice(0, 80);
         snapTelefono = telefonoCanonical;
-        snapEmail = email.trim() || null;
+        snapEmail = values.email.trim() || null;
       } else {
         clienteId = null;
         snapNombre = 'Cita rápida';
@@ -240,112 +166,62 @@ export function NewAppointmentDialog({
         snapEmail = null;
       }
 
-      const horaFin = minutesToTime(timeToMinutes(horaInicio) + servicio.duracion_min);
+      const horaFin = minutesToTime(timeToMinutes(values.horaInicio) + servicio.duracion_min);
       const { error: turnoErr } = await supabase.from('turnos').insert({
         organization_id: organizationId,
         sucursal_id: sucursalId,
-        barbero_id: barberoId,
-        servicio_id: servicioId,
+        barbero_id: values.barberoId,
+        servicio_id: values.servicioId,
         cliente_id: clienteId,
         cliente_nombre: snapNombre,
         cliente_telefono: snapTelefono ? snapTelefono.slice(0, 80) : null,
         cliente_email: snapEmail ? snapEmail.slice(0, 120) : null,
-        fecha,
-        hora_inicio: horaInicio,
+        fecha: values.fecha,
+        hora_inicio: values.horaInicio,
         hora_fin: horaFin,
         timezone: sucursalTimezone || 'America/Argentina/Buenos_Aires',
         estado: 'pendiente',
-        notas: notas.trim().slice(0, 1500) || null,
+        notas: values.notas?.trim().slice(0, 1500) || null,
         eligio_barbero: true,
       });
       if (turnoErr) throw turnoErr;
 
       toast.success('Turno creado');
-      reset();
+      clienteSearch.reset();
+      form.reset(defaultValues());
       onOpenChange(false);
       onCreated();
     } catch (e: any) {
       console.error('Crear turno error:', e);
-      toast.error(e?.message || 'Error al crear el turno');
-    } finally {
-      setSaving(false);
+      // El insert directo no tiene pre-chequeo de choque de horario (a diferencia de
+      // update-turno-internal, que sí lo hace); el exclusion constraint de Postgres
+      // es la única red de seguridad. Se traduce a un mensaje claro antes de que el
+      // texto crudo del constraint llegue al usuario.
+      const isOverlapConstraint = e?.code === '23P01' || (typeof e?.message === 'string' && e.message.includes('no_overlap_turnos'));
+      if (isOverlapConstraint) {
+        toast.error('Ese horario ya está ocupado. Elegí otro horario o profesional.');
+      } else {
+        toast.error(e?.message || 'Error al crear el turno');
+      }
     }
   };
 
   const renderClienteBlock = () => {
     if (mode === 'existing') {
       return (
-        <div className="space-y-2">
-          <Label className="text-xs">Cliente</Label>
-          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline" className="w-full justify-between font-normal">
-                {selectedCliente ? (
-                  <span className="flex items-center gap-2 truncate">
-                    <span className="truncate">{fullName(selectedCliente)}</span>
-                    {selectedCliente.telefono && (
-                      <span className="text-xs text-muted-foreground truncate">· {formatPhoneDisplay(selectedCliente.telefono)}</span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Buscar por nombre, apellido, telefono o email</span>
-                )}
-                {selectedCliente ? (
-                  <X className="h-4 w-4 opacity-60 hover:opacity-100" onClick={(e) => { e.stopPropagation(); setSelectedCliente(null); }} />
-                ) : (
-                  <Search className="h-4 w-4 opacity-60" />
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="p-0 w-[--radix-popover-trigger-width]" align="start">
-              <div className="flex items-center border-b px-3">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Buscar por nombre, apellido, telefono o email"
-                  className="flex h-10 w-full bg-transparent py-2 text-sm outline-none placeholder:text-muted-foreground"
-                  maxLength={80}
-                />
-              </div>
-              <div className="max-h-64 overflow-y-auto py-1">
-                {searching && (
-                  <div className="px-3 py-3 text-xs text-muted-foreground">Buscando...</div>
-                )}
-                {!searching && results.length === 0 && (
-                  <div className="px-3 py-3 text-xs text-muted-foreground">
-                    Sin resultados. Proba con otro termino o crea un cliente nuevo.
-                  </div>
-                )}
-                {!searching && results.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => { setSelectedCliente(c); setSearchOpen(false); }}
-                    className={cn(
-                      'w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-start gap-2',
-                      selectedCliente?.id === c.id && 'bg-accent',
-                    )}
-                  >
-                    <Check className={cn('h-4 w-4 mt-0.5 shrink-0', selectedCliente?.id === c.id ? 'opacity-100' : 'opacity-0')} />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium truncate">{fullName(c)}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {[c.telefono ? formatPhoneDisplay(c.telefono) : null, c.email].filter(Boolean).join(' · ') || '-'}
-                      </div>
-                    </div>
-                    {!c.inSucursal && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
-                        Otra sucursal
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <ClienteSearchPicker
+          selectedCliente={clienteSearch.selectedCliente}
+          onSelect={(c) => {
+            clienteSearch.setSelectedCliente(c);
+            form.setValue('clienteId', c?.id ?? '', { shouldValidate: true });
+          }}
+          searchOpen={clienteSearch.searchOpen}
+          onSearchOpenChange={clienteSearch.setSearchOpen}
+          query={clienteSearch.query}
+          onQueryChange={clienteSearch.setQuery}
+          results={clienteSearch.results}
+          searching={clienteSearch.searching}
+        />
       );
     }
 
@@ -354,13 +230,7 @@ export function NewAppointmentDialog({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-xs">Cita rápida sin cliente</Label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              onClick={() => setMode('existing')}
-            >
+            <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromQuick}>
               <ArrowLeft className="h-3 w-3 mr-1" /> Volver
             </Button>
           </div>
@@ -375,138 +245,154 @@ export function NewAppointmentDialog({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-xs">Datos del nuevo cliente</Label>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => {
-              setMode('existing');
-              setNombre('');
-              setApellido('');
-              setTelefono('');
-              setPhoneOut(null);
-              setEmail('');
-            }}
-          >
+          <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromNew}>
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Nombre *</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Apellido *</Label>
-            <Input value={apellido} onChange={(e) => setApellido(e.target.value)} maxLength={80} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Telefono *</Label>
-            <PhoneInput
-              value={phoneOut?.e164 ?? null}
-              onChange={(o) => { setPhoneOut(o); setTelefono(o.e164 ?? ''); }}
-              defaultCountry="AR"
-              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-              mode="mobile"
-              required
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Email (opcional)</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
-          </div>
-        </div>
+        <ClienteFormFields
+          control={form.control}
+          nombreName="nombre"
+          apellidoName="apellido"
+          telefonoName="telefono"
+          emailName="email"
+        />
       </div>
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Nueva cita</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Nueva cita"
+      size="md"
+      footer={
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="new-appointment-form" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Guardando...' : 'Crear cita'}
+          </Button>
+        </div>
+      }
+    >
+      <Form {...form}>
+        <form id="new-appointment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {renderClienteBlock()}
 
           {mode === 'existing' && (
             <div className="flex flex-wrap gap-2 -mt-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => { setMode('new'); setSelectedCliente(null); }}
-              >
+              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToNew}>
                 <UserPlus className="h-3.5 w-3.5 mr-1" /> Nuevo cliente
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => {
-                  setMode('quick');
-                  setSelectedCliente(null);
-                  setNombre('');
-                  setApellido('');
-                  setTelefono('');
-                  setPhoneOut(null);
-                  setEmail('');
-                }}
-              >
+              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToQuick}>
                 <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
               </Button>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Barbero</Label>
-              <Select value={barberoId} onValueChange={setBarberoId}>
-                <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                <SelectContent>
-                  {activeBarbers.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Servicio</Label>
-              <Select value={servicioId} onValueChange={setServicioId}>
-                <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                <SelectContent>
-                  {servicios.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {activeBarbers.length === 0 ? (
+              <EmptySelectHint
+                message="No hay barberos activos."
+                ctaLabel="Añadir miembro del equipo"
+                onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="barberoId"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Barbero</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeBarbers.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {servicios.length === 0 ? (
+              <EmptySelectHint
+                message="No hay servicios cargados."
+                ctaLabel="Configurar servicios"
+                onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="servicioId"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Servicio</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {servicios.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Hora inicio</Label>
-              <Input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} />
-            </div>
+            <FormField
+              control={form.control}
+              name="fecha"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Fecha</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="horaInicio"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Hora inicio</FormLabel>
+                  <FormControl>
+                    <Input type="time" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Notas (opcional)</Label>
-            <Textarea value={notas} onChange={(e) => setNotas(e.target.value)} maxLength={1500} rows={2} />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={saving}>{saving ? 'Guardando...' : 'Crear cita'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <FormField
+            control={form.control}
+            name="notas"
+            render={({ field }) => (
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">Notas (opcional)</FormLabel>
+                <FormControl>
+                  <Textarea {...field} maxLength={1500} rows={2} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </form>
+      </Form>
+    </DrawerForm>
   );
 }
