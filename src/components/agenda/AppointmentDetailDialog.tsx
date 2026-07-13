@@ -314,6 +314,11 @@ export function AppointmentDetailDialog({
         onOpenChange={onOpenChange}
         title={titleContent}
         size="md"
+        isDirty={
+          (editingCliente && clienteForm.formState.isDirty) ||
+          (editingTurno && turnoForm.formState.isDirty) ||
+          (confirmingCancel && motivo.trim().length > 0)
+        }
         footer={
           confirmingCancel ? (
             <div className="flex w-full justify-end gap-2">

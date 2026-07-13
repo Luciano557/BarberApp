@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
@@ -35,41 +39,41 @@ interface LineQuickEditPopoverProps {
   disabled?: boolean;
 }
 
+const lineQuickEditSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  color: z.string(),
+  active: z.boolean(),
+});
+
+type LineQuickEditValues = z.infer<typeof lineQuickEditSchema>;
+
 export function LineQuickEditPopover({ line, onUpdate, onDelete, disabled }: LineQuickEditPopoverProps) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState<string>('');
-  const [active, setActive] = useState<boolean>(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const form = useForm<LineQuickEditValues>({
+    resolver: zodResolver(lineQuickEditSchema),
+    defaultValues: { name: '', color: '', active: true },
+  });
 
   const isDisabled = disabled || !line;
 
-  // Inicializar al abrir el popover con los valores actuales de la línea
+  // Inicializar al abrir con los valores actuales de la línea
   useEffect(() => {
     if (open && line) {
-      setName(line.name);
-      setColor(line.color || '');
-      setActive(line.active);
+      form.reset({ name: line.name, color: line.color || '', active: line.active });
     }
   }, [open, line]);
 
-  const handleSave = async () => {
+  const onSubmit = async (values: LineQuickEditValues) => {
     if (!line) return;
-    const trimmed = name.trim();
-    if (!trimmed) {
-      toast.error('El nombre no puede estar vacío.');
-      return;
-    }
-    if (trimmed.length > 80) {
-      toast.error('El nombre no puede superar los 80 caracteres.');
-      return;
-    }
+    const trimmed = values.name.trim();
 
     const updates: Partial<Line> = {};
     if (trimmed !== line.name) updates.name = trimmed;
-    const normalizedColor = color || undefined;
+    const normalizedColor = values.color || undefined;
     if (normalizedColor !== (line.color || undefined)) updates.color = normalizedColor;
-    if (active !== line.active) updates.active = active;
+    if (values.active !== line.active) updates.active = values.active;
 
     if (Object.keys(updates).length === 0) {
       setOpen(false);
@@ -97,90 +101,119 @@ export function LineQuickEditPopover({ line, onUpdate, onDelete, disabled }: Lin
 
   // La eliminación solo se habilita si la línea YA está guardada como inactiva
   const canDelete = !!line && line.active === false;
+  const colorValue = form.watch('color');
+  const activeValue = form.watch('active');
 
   return (
     <>
-      <Popover open={open} onOpenChange={(v) => !isDisabled && setOpen(v)}>
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    disabled={isDisabled}
-                    className="h-9 w-9"
-                    aria-label="Editar línea seleccionada"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isDisabled ? 'Selecciona una línea para editarla.' : 'Editar línea seleccionada'}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                disabled={isDisabled}
+                className="h-9 w-9"
+                aria-label="Editar línea seleccionada"
+                onClick={() => setOpen(true)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            {isDisabled ? 'Selecciona una línea para editarla.' : 'Editar línea seleccionada'}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
-        <PopoverContent align="start" className="w-80 p-4">
+      <DrawerForm
+        open={open}
+        onOpenChange={setOpen}
+        title="Editar línea"
+        size="sm"
+        isDirty={form.formState.isDirty}
+        footer={
+          <div className="flex justify-end gap-2 w-full">
+            <Button type="button" variant="outline" size="sm" disabled={form.formState.isSubmitting} onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" size="sm" disabled={form.formState.isSubmitting} onClick={form.handleSubmit(onSubmit)}>
+              {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...form}>
           <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-semibold text-foreground">Editar línea</h4>
-            </div>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-medium text-muted-foreground">Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} maxLength={80} placeholder="Nombre de la línea" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nombre</label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={80}
-                placeholder="Nombre de la línea"
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-medium text-muted-foreground">Color</FormLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {LINE_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => field.onChange(colorValue === c.value ? '' : c.value)}
+                        className={`w-7 h-7 rounded-full border-2 transition-colors ${
+                          colorValue === c.value ? 'border-foreground scale-110' : 'border-transparent'
+                        }`}
+                        style={{ backgroundColor: c.value }}
+                        title={c.label}
+                        aria-label={c.label}
+                      />
+                    ))}
+                  </div>
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Color</label>
-              <div className="flex flex-wrap gap-2">
-                {LINE_COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setColor(color === c.value ? '' : c.value)}
-                    className={`w-7 h-7 rounded-full border-2 transition-colors ${
-                      color === c.value ? 'border-foreground scale-110' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: c.value }}
-                    title={c.label}
-                    aria-label={c.label}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Estado</label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={active ? 'default' : 'outline'}
-                  onClick={() => setActive(true)}
-                >
-                  Activa
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={!active ? 'default' : 'outline'}
-                  onClick={() => setActive(false)}
-                >
-                  Inactiva
-                </Button>
-              </div>
-            </div>
+            <FormField
+              control={form.control}
+              name="active"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-medium text-muted-foreground">Estado</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={activeValue ? 'default' : 'outline'}
+                      onClick={() => field.onChange(true)}
+                    >
+                      Activa
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={!activeValue ? 'default' : 'outline'}
+                      onClick={() => field.onChange(false)}
+                    >
+                      Inactiva
+                    </Button>
+                  </div>
+                </FormItem>
+              )}
+            />
 
             {onDelete && (
               <div className="pt-2 border-t border-border space-y-2">
@@ -202,18 +235,9 @@ export function LineQuickEditPopover({ line, onUpdate, onDelete, disabled }: Lin
                 )}
               </div>
             )}
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
-              <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="button" size="sm" onClick={handleSave}>
-                Guardar cambios
-              </Button>
-            </div>
           </div>
-        </PopoverContent>
-      </Popover>
+        </Form>
+      </DrawerForm>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>

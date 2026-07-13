@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, MoreVertical, Clock, Scissors } from 'lucide-react';
 import { useShowMore } from '@/hooks/useShowMore';
 import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
@@ -6,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Service, Line } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -46,62 +49,65 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-function validateName(name: string): string | null {
-  const trimmed = name.trim();
-  if (!trimmed) return 'El nombre no puede estar vacío.';
-  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
-  return null;
-}
+const LINE_COLORS = [
+  { label: 'Azul', value: '#3B82F6' },
+  { label: 'Verde', value: '#22C55E' },
+  { label: 'Dorado', value: '#EAB308' },
+  { label: 'Rojo', value: '#EF4444' },
+  { label: 'Violeta', value: '#8B5CF6' },
+  { label: 'Naranja', value: '#F97316' },
+  { label: 'Rosa', value: '#EC4899' },
+  { label: 'Gris', value: '#6B7280' },
+];
 
-function validatePrice(raw: string): { ok: true; value: number } | { ok: false; error: string } {
-  const cleaned = (raw || '').toString().trim();
-  if (!cleaned) return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
-  const value = parseFloat(cleaned);
-  if (Number.isNaN(value) || value < 0) {
-    return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
-  }
-  return { ok: true, value };
-}
+const serviceSchema = (isGlobal: boolean) => z.object({
+  name: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  price: isGlobal
+    ? z.string().optional()
+    : z.string().refine((v) => {
+        const cleaned = (v || '').trim();
+        if (!cleaned) return false;
+        const n = parseFloat(cleaned);
+        return !Number.isNaN(n) && n >= 0;
+      }, 'El precio debe ser un número igual o mayor a 0.'),
+  duration: z.string().refine((v) => {
+    const n = parseInt(v, 10);
+    return !Number.isNaN(n) && n >= 5;
+  }, 'La duración debe ser de al menos 5 minutos.'),
+  lineId: z.string(),
+  descripcion: z.string().max(240, 'La descripción no puede superar los 240 caracteres.').optional(),
+});
 
-function validateDuration(raw: string): { ok: true; value: number } | { ok: false; error: string } {
-  const value = parseInt(raw, 10);
-  if (Number.isNaN(value) || value < 5) {
-    return { ok: false, error: 'La duración debe ser de al menos 5 minutos.' };
-  }
-  return { ok: true, value };
-}
+type ServiceFormValues = z.infer<ReturnType<typeof serviceSchema>>;
+
+const emptyServiceValues: ServiceFormValues = { name: '', price: '', duration: '30', lineId: 'none', descripcion: '' };
+
+const quickLineSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  color: z.string().optional(),
+});
+
+type QuickLineFormValues = z.infer<typeof quickLineSchema>;
 
 export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, onUpdateLine, onDeleteLine, onDelete, mode = 'sucursal', canCreate = true, canEditStructure = true }: ServicesConfigProps) {
   const isGlobal = mode === 'global';
   const structureLocked = !canEditStructure;
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newPrice, setNewPrice] = useState('');
-  const [newDuration, setNewDuration] = useState('30');
-  const [newLineId, setNewLineId] = useState<string>('');
-  const [editLineId, setEditLineId] = useState<string>('');
-  const [editDuration, setEditDuration] = useState('30');
-  const [newDescripcion, setNewDescripcion] = useState('');
-  const [editDescripcion, setEditDescripcion] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [showAddLineDialog, setShowAddLineDialog] = useState(false);
-  const [newLineName, setNewLineName] = useState('');
-  const [newLineColor, setNewLineColor] = useState('');
-  const [addLineContext, setAddLineContext] = useState<'add' | 'edit'>('add');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Service | null>(null);
 
-  const LINE_COLORS = [
-    { label: 'Azul', value: '#3B82F6' },
-    { label: 'Verde', value: '#22C55E' },
-    { label: 'Dorado', value: '#EAB308' },
-    { label: 'Rojo', value: '#EF4444' },
-    { label: 'Violeta', value: '#8B5CF6' },
-    { label: 'Naranja', value: '#F97316' },
-    { label: 'Rosa', value: '#EC4899' },
-    { label: 'Gris', value: '#6B7280' },
-  ];
+  const form = useForm<ServiceFormValues>({
+    resolver: zodResolver(serviceSchema(isGlobal)),
+    defaultValues: emptyServiceValues,
+  });
+
+  const quickLineForm = useForm<QuickLineFormValues>({
+    resolver: zodResolver(quickLineSchema),
+    defaultValues: { name: '', color: '' },
+  });
 
   const flagFor = (s: Service) => isGlobal ? (s.globalActive ?? s.active) : s.active;
   const activeLines = lines.filter(l => l.active);
@@ -124,74 +130,72 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
   const { visible, expanded, toggle, showDivider, hiddenCount, threshold } =
     useShowMore(activeServices, { isDefaultView: activeSubTab === 'active' });
 
-  const handleAdd = () => {
-    const nameErr = validateName(newName);
-    if (nameErr) { toast.error(nameErr); return; }
-    const dur = validateDuration(newDuration);
-    if (dur.ok === false) { toast.error(dur.error); return; }
-    let price = 0;
-    if (!isGlobal) {
-      const v = validatePrice(newPrice);
-      if (v.ok === false) { toast.error(v.error); return; }
-      price = v.value;
-    }
-    onAdd({
-      name: newName.trim(),
-      price,
-      durationMin: dur.value,
-      active: true,
-      lineId: newLineId && newLineId !== 'none' ? newLineId : undefined,
-      lineName: activeLines.find(l => l.id === newLineId)?.name,
-      descripcion: newDescripcion.trim() || undefined,
-    });
-    setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setNewDescripcion(''); setIsAdding(false);
+  const startAdd = () => {
+    form.reset(emptyServiceValues);
+    setIsAdding(true);
   };
 
-  const handleUpdate = (id: string) => {
-    const updates: Partial<Service> = {};
-    if (!structureLocked) {
-      const nameErr = validateName(newName);
-      if (nameErr) { toast.error(nameErr); return; }
-      const dur = validateDuration(editDuration);
-      if (dur.ok === false) { toast.error(dur.error); return; }
-      updates.name = newName.trim();
-      updates.durationMin = dur.value;
-      updates.lineId = editLineId && editLineId !== 'none' ? editLineId : undefined;
-      updates.lineName = activeLines.find(l => l.id === editLineId)?.name;
-      updates.descripcion = editDescripcion.trim() || undefined;
+  const closeDrawer = () => {
+    setIsAdding(false);
+    setEditingId(null);
+    form.reset(emptyServiceValues);
+  };
+
+  const onSubmit = async (values: ServiceFormValues) => {
+    const lineId = values.lineId && values.lineId !== 'none' ? values.lineId : undefined;
+    const lineName = activeLines.find(l => l.id === lineId)?.name;
+    const duration = parseInt(values.duration, 10);
+
+    if (isAdding) {
+      const price = isGlobal ? 0 : parseFloat(values.price!);
+      await onAdd({
+        name: values.name.trim(),
+        price,
+        durationMin: duration,
+        active: true,
+        lineId,
+        lineName,
+        descripcion: values.descripcion?.trim() || undefined,
+      });
+    } else if (editingService) {
+      const updates: Partial<Service> = {};
+      if (!structureLocked) {
+        updates.name = values.name.trim();
+        updates.durationMin = duration;
+        updates.lineId = lineId;
+        updates.lineName = lineName;
+        updates.descripcion = values.descripcion?.trim() || undefined;
+      }
+      if (!isGlobal) {
+        updates.price = parseFloat(values.price!);
+      }
+      await onUpdate(editingService.id, updates);
     }
-    if (!isGlobal) {
-      const v = validatePrice(newPrice);
-      if (v.ok === false) { toast.error(v.error); return; }
-      updates.price = v.value;
-    }
-    onUpdate(id, updates);
-    setEditingId(null); setNewName(''); setNewPrice(''); setEditLineId(''); setEditDuration('30'); setEditDescripcion('');
+    closeDrawer();
   };
 
   const startEdit = (service: Service) => {
     setEditingId(service.id);
-    setNewName(service.name);
-    setNewPrice(service.price ? String(service.price) : '');
-    setEditDuration((service.durationMin || 30).toString());
-    setEditLineId(service.lineId || '');
-    setEditDescripcion(service.descripcion ?? '');
+    form.reset({
+      name: service.name,
+      price: service.price ? String(service.price) : '',
+      duration: (service.durationMin || 30).toString(),
+      lineId: service.lineId || 'none',
+      descripcion: service.descripcion ?? '',
+    });
   };
 
-  const handleAddNewLine = async () => {
-    const nameErr = validateName(newLineName);
-    if (nameErr) { toast.error(nameErr); return; }
-    const newLine = await onAddLine({ name: newLineName.trim(), active: true, color: newLineColor || undefined });
+  const closeAddLineDialog = () => {
+    setShowAddLineDialog(false);
+    quickLineForm.reset({ name: '', color: '' });
+  };
+
+  const onSubmitQuickLine = async (values: QuickLineFormValues) => {
+    const newLine = await onAddLine({ name: values.name.trim(), active: true, color: values.color || undefined });
     if (newLine) {
-      if (addLineContext === 'add') setNewLineId(newLine.id);
-      else setEditLineId(newLine.id);
+      form.setValue('lineId', newLine.id);
     }
-    setNewLineName(''); setNewLineColor(''); setShowAddLineDialog(false);
-  };
-
-  const openAddLineDialog = (context: 'add' | 'edit') => {
-    setAddLineContext(context);
-    setShowAddLineDialog(true);
+    closeAddLineDialog();
   };
 
   const handleConfirmToggle = () => {
@@ -208,6 +212,8 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
 
   const isItemActive = (service: Service) =>
     isGlobal ? (service.globalActive ?? service.active) : service.active;
+
+  const currentLineId = form.watch('lineId');
 
   const renderServiceItem = (service: Service) => {
     const itemActive = isItemActive(service);
@@ -254,7 +260,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           : 'Activá los servicios disponibles y configurá el precio.'}
         actions={
           !isAdding && !editingId && activeSubTab === 'active' && canCreate ? (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           ) : undefined
@@ -297,7 +303,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                   </p>
                 </div>
                 {canCreate && (
-                  <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                  <Button variant="outline" size="sm" onClick={startAdd}>
                     Agregar servicio
                   </Button>
                 )}
@@ -317,32 +323,22 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
 
       <DrawerForm
         open={isAdding || editingId !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setIsAdding(false);
-            setEditingId(null);
-            setNewName('');
-            setNewPrice('');
-            setNewDuration('30');
-            setNewLineId('');
-            setNewDescripcion('');
-            setEditDuration('30');
-            setEditLineId('');
-            setEditDescripcion('');
-          }
-        }}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={isAdding ? 'Agregar servicio' : 'Editar servicio'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           isAdding ? (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" onClick={() => { setIsAdding(false); setNewName(''); setNewPrice(''); setNewDuration('30'); setNewLineId(''); setNewDescripcion(''); }}>Cancelar</Button>
-              <Button onClick={handleAdd}>Guardar</Button>
+              <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>Cancelar</Button>
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+              </Button>
             </div>
           ) : editingService ? (
             <div className="flex w-full flex-wrap items-center gap-2">
-              <Button onClick={() => handleUpdate(editingService.id)}>
-                Guardar cambios
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
               </Button>
               <div className="w-px h-5 bg-border" />
               {editingIsActive ? (
@@ -350,7 +346,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                   variant="ghost"
                   onClick={() => {
                     setToggleConfirm({ service: editingService, action: 'deactivate' });
-                    setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
+                    closeDrawer();
                   }}
                   className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
@@ -363,7 +359,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                     onClick={() => {
                       onUpdate(editingService.id, { active: true });
                       toast.success('Servicio activado');
-                      setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
+                      closeDrawer();
                     }}
                     className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   >
@@ -374,7 +370,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                       variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingService);
-                        setEditingId(null); setNewName(''); setNewPrice(''); setEditDuration('30'); setEditLineId(''); setEditDescripcion('');
+                        closeDrawer();
                       }}
                     >
                       Eliminar
@@ -386,114 +382,106 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
           ) : null
         }
       >
-        {isAdding ? (
+        <Form {...form}>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre</label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Corte clásico" />
-            </div>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} maxLength={80} placeholder="Ej: Corte clásico" disabled={!isAdding && structureLocked} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             {!isGlobal && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Precio</label>
-                <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
-              </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Duración</label>
-              <div className="flex items-center gap-2">
-                <Input type="number" inputMode="numeric" min={5} value={newDuration} onChange={(e) => setNewDuration(e.target.value)} />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción (opcional)</label>
-              <Textarea
-                maxLength={240}
-                value={newDescripcion}
-                onChange={(e) => setNewDescripcion(e.target.value)}
-                placeholder="Ej: Corte con detalles de terminación, shaver y experiencia completa."
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Precio</FormLabel>
+                    <FormControl>
+                      <CurrencyInput value={field.value ?? ''} onChange={field.onChange} placeholder="0" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <p className="text-xs text-muted-foreground text-right">{newDescripcion.length}/240</p>
-              <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Línea</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Select value={newLineId || 'none'} onValueChange={setNewLineId}>
-                  <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin línea</SelectItem>
-                    {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-                {onUpdateLine && (
-                  <LineQuickEditPopover
-                    line={lines.find(l => l.id === newLineId) || null}
-                    onUpdate={onUpdateLine}
-                    onDelete={onDeleteLine}
-                    disabled={!newLineId || newLineId === 'none' || !lines.find(l => l.id === newLineId)}
-                  />
-                )}
-                <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('add')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nombre</label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} disabled={structureLocked} />
-            </div>
-            {!isGlobal && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Precio</label>
-                <CurrencyInput value={newPrice} onChange={setNewPrice} />
-              </div>
             )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Duración</label>
-              <div className="flex items-center gap-2">
-                <Input type="number" inputMode="numeric" min={5} value={editDuration} onChange={(e) => setEditDuration(e.target.value)} disabled={structureLocked} />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descripción (opcional)</label>
-              <Textarea
-                maxLength={240}
-                value={editDescripcion}
-                onChange={(e) => setEditDescripcion(e.target.value)}
-                disabled={structureLocked}
-                placeholder="Ej: Corte con detalles de terminación, shaver y experiencia completa."
-              />
-              <p className="text-xs text-muted-foreground text-right">{editDescripcion.length}/240</p>
-              <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Línea</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Select value={editLineId || 'none'} onValueChange={setEditLineId} disabled={structureLocked}>
-                  <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin línea</SelectItem>
-                    {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
-                  </SelectContent>
-                </Select>
-                {onUpdateLine && !structureLocked && (
-                  <LineQuickEditPopover
-                    line={lines.find(l => l.id === editLineId) || null}
-                    onUpdate={onUpdateLine}
-                    onDelete={onDeleteLine}
-                    disabled={!editLineId || editLineId === 'none' || !lines.find(l => l.id === editLineId)}
-                  />
-                )}
-                {!structureLocked && (
-                  <Button size="icon" variant="ghost" onClick={() => openAddLineDialog('edit')} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
-                )}
-              </div>
-            </div>
+            <FormField
+              control={form.control}
+              name="duration"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Duración</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-2">
+                      <Input type="number" inputMode="numeric" min={5} {...field} disabled={!isAdding && structureLocked} />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      maxLength={240}
+                      disabled={!isAdding && structureLocked}
+                      placeholder="Ej: Corte con detalles de terminación, shaver y experiencia completa."
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lineId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Línea</FormLabel>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Select value={field.value} onValueChange={field.onChange} disabled={!isAdding && structureLocked}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Sin línea" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sin línea</SelectItem>
+                        {activeLines.map(line => (<SelectItem key={line.id} value={line.id}>{line.name}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                    {onUpdateLine && (isAdding || !structureLocked) && (
+                      <LineQuickEditPopover
+                        line={lines.find(l => l.id === currentLineId) || null}
+                        onUpdate={onUpdateLine}
+                        onDelete={onDeleteLine}
+                        disabled={!currentLineId || currentLineId === 'none' || !lines.find(l => l.id === currentLineId)}
+                      />
+                    )}
+                    {(isAdding || !structureLocked) && (
+                      <Button size="icon" variant="ghost" onClick={() => setShowAddLineDialog(true)} title="Nueva línea"><Plus className="h-4 w-4" /></Button>
+                    )}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-        )}
+        </Form>
       </DrawerForm>
 
       {/* Toggle confirmation dialog */}
@@ -539,33 +527,68 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showAddLineDialog} onOpenChange={setShowAddLineDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Nueva línea</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <Input placeholder="Nombre de la línea (ej: Essencial, Deluxe)" value={newLineName} onChange={(e) => setNewLineName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddNewLine()} maxLength={80} />
-            <div>
-              <label className="text-sm font-medium mb-2 block">Color (opcional)</label>
-              <div className="flex flex-wrap gap-2">
-                {LINE_COLORS.map(c => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setNewLineColor(newLineColor === c.value ? '' : c.value)}
-                    className={`w-8 h-8 rounded-full border-2 transition-colors ${newLineColor === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
-                    style={{ backgroundColor: c.value }}
-                    title={c.label}
-                  />
-                ))}
-              </div>
-            </div>
+      <DrawerForm
+        open={showAddLineDialog}
+        onOpenChange={(o) => { if (!o) closeAddLineDialog(); }}
+        title="Nueva línea"
+        size="sm"
+        isDirty={quickLineForm.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" onClick={closeAddLineDialog} disabled={quickLineForm.formState.isSubmitting}>Cancelar</Button>
+            <Button onClick={quickLineForm.handleSubmit(onSubmitQuickLine)} disabled={quickLineForm.formState.isSubmitting}>
+              {quickLineForm.formState.isSubmitting ? 'Guardando...' : 'Agregar'}
+            </Button>
           </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowAddLineDialog(false)}>Cancelar</Button>
-            <Button onClick={handleAddNewLine} disabled={!newLineName.trim()}>Agregar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        }
+      >
+        <Form {...quickLineForm}>
+          <div className="space-y-4">
+            <FormField
+              control={quickLineForm.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      placeholder="Nombre de la línea (ej: Essencial, Deluxe)"
+                      maxLength={80}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); quickLineForm.handleSubmit(onSubmitQuickLine)(); } }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={quickLineForm.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color (opcional)</FormLabel>
+                  <FormControl>
+                    <div className="flex flex-wrap gap-2">
+                      {LINE_COLORS.map(c => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => field.onChange(field.value === c.value ? '' : c.value)}
+                          className={`w-8 h-8 rounded-full border-2 transition-colors ${field.value === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                          style={{ backgroundColor: c.value }}
+                          title={c.label}
+                        />
+                      ))}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      </DrawerForm>
     </>
   );
 }

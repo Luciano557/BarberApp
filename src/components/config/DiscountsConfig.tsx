@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { toast } from 'sonner';
 import { Plus, MoreVertical, BadgePercent } from 'lucide-react';
 import { useShowMore } from '@/hooks/useShowMore';
@@ -8,39 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { TagPill } from '@/components/ui/TagPill';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Discount, DiscountAppliesTo } from '@/types/barbershop';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-
-function validateDiscountName(name: string): string | null {
-  const trimmed = name.trim();
-  if (!trimmed) return 'El nombre no puede estar vacío.';
-  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
-  return null;
-}
-
-function validateDiscountValue(raw: string, type: 'percentage' | 'fixed'): { ok: true; value: number } | { ok: false; error: string } {
-  const cleaned = (raw || '').toString().trim();
-  if (!cleaned) {
-    return { ok: false, error: type === 'percentage'
-      ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
-      : 'El monto debe ser mayor a 0.' };
-  }
-  const value = parseFloat(cleaned);
-  if (Number.isNaN(value)) {
-    return { ok: false, error: 'Ingresá un valor numérico válido.' };
-  }
-  if (type === 'percentage') {
-    if (value <= 0 || value > 100) {
-      return { ok: false, error: 'El porcentaje debe ser mayor a 0 y menor o igual a 100.' };
-    }
-  } else if (value <= 0) {
-    return { ok: false, error: 'El monto debe ser mayor a 0.' };
-  }
-  return { ok: true, value };
-}
 
 interface DiscountsConfigProps {
   discounts: Discount[];
@@ -59,6 +35,44 @@ const ROUNDING_UNITS = [1, 10, 50, 100, 500, 1000];
 
 type TypeFilter = 'todos' | DiscountAppliesTo;
 
+const discountSchema = z
+  .object({
+    label: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+    value: z.string(),
+    type: z.enum(['percentage', 'fixed']),
+    rounding: z.enum(['cliente', 'negocio', 'matematico']),
+    roundingUnit: z.number(),
+    paymentMethod: z.enum(['todos', 'efectivo', 'mercado_pago']),
+    appliesTo: z.enum(['servicios', 'productos']),
+  })
+  .superRefine((data, ctx) => {
+    const cleaned = (data.value || '').toString().trim();
+    if (!cleaned) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['value'],
+        message: data.type === 'percentage'
+          ? 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'
+          : 'El monto debe ser mayor a 0.',
+      });
+      return;
+    }
+    const value = parseFloat(cleaned);
+    if (Number.isNaN(value)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['value'], message: 'Ingresá un valor numérico válido.' });
+      return;
+    }
+    if (data.type === 'percentage') {
+      if (value <= 0 || value > 100) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['value'], message: 'El porcentaje debe ser mayor a 0 y menor o igual a 100.' });
+      }
+    } else if (value <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['value'], message: 'El monto debe ser mayor a 0.' });
+    }
+  });
+
+type DiscountFormValues = z.infer<typeof discountSchema>;
+
 export function DiscountsConfig({
   discounts,
   onAdd,
@@ -75,65 +89,50 @@ export function DiscountsConfig({
   const [deleteConfirm, setDeleteConfirm] = useState<Discount | null>(null);
   const [deactivateConfirm, setDeactivateConfirm] = useState<Discount | null>(null);
 
-  // Form state
-  const [newLabel, setNewLabel] = useState('');
-  const [newValue, setNewValue] = useState('');
-  const [newType, setNewType] = useState<'percentage' | 'fixed'>('percentage');
-  const [newRounding, setNewRounding] = useState<'cliente' | 'negocio' | 'matematico'>('cliente');
-  const [newRoundingUnit, setNewRoundingUnit] = useState<number>(100);
-  const [newPaymentMethod, setNewPaymentMethod] = useState<'todos' | 'efectivo' | 'mercado_pago'>('todos');
-  const [newAppliesTo, setNewAppliesTo] = useState<DiscountAppliesTo>('servicios');
+  const defaultValues = (): DiscountFormValues => ({
+    label: '',
+    value: '',
+    type: 'percentage',
+    rounding: 'cliente',
+    roundingUnit: 100,
+    paymentMethod: 'todos',
+    appliesTo: typeFilter === 'productos' ? 'productos' : 'servicios',
+  });
 
-  const resetForm = () => {
-    setNewLabel('');
-    setNewValue('');
-    setNewType('percentage');
-    setNewRounding('cliente');
-    setNewRoundingUnit(100);
-    setNewPaymentMethod('todos');
-    setNewAppliesTo(typeFilter === 'productos' ? 'productos' : 'servicios');
-  };
+  const form = useForm<DiscountFormValues>({
+    resolver: zodResolver(discountSchema),
+    defaultValues: defaultValues(),
+  });
+
+  const newType = form.watch('type');
 
   const startAdd = () => {
-    resetForm();
+    form.reset(defaultValues());
     setIsAdding(true);
   };
 
-  const handleAdd = () => {
-    const nameErr = validateDiscountName(newLabel);
-    if (nameErr) { toast.error(nameErr); return; }
-    const v = validateDiscountValue(newValue, newType);
-    if (v.ok === false) { toast.error(v.error); return; }
-    onAdd({
-      label: newLabel.trim(),
-      value: v.value,
-      type: newType,
-      rounding: newRounding,
-      roundingUnit: newRoundingUnit,
-      paymentMethod: newPaymentMethod,
-      appliesTo: newAppliesTo,
-      active: true,
-    });
-    resetForm();
+  const closeDrawer = () => {
     setIsAdding(false);
+    setEditingId(null);
+    form.reset(defaultValues());
   };
 
-  const handleUpdate = (id: string) => {
-    const nameErr = validateDiscountName(newLabel);
-    if (nameErr) { toast.error(nameErr); return; }
-    const v = validateDiscountValue(newValue, newType);
-    if (v.ok === false) { toast.error(v.error); return; }
-    onUpdate(id, {
-      label: newLabel.trim(),
-      value: v.value,
-      type: newType,
-      rounding: newRounding,
-      roundingUnit: newRoundingUnit,
-      paymentMethod: newPaymentMethod,
-      appliesTo: newAppliesTo,
-    });
-    setEditingId(null);
-    resetForm();
+  const onSubmit = async (values: DiscountFormValues) => {
+    const payload = {
+      label: values.label.trim(),
+      value: parseFloat(values.value),
+      type: values.type,
+      rounding: values.rounding,
+      roundingUnit: values.roundingUnit,
+      paymentMethod: values.paymentMethod,
+      appliesTo: values.appliesTo,
+    };
+    if (isAdding) {
+      await onAdd({ ...payload, active: true });
+    } else if (editingDiscount) {
+      await onUpdate(editingDiscount.id, payload);
+    }
+    closeDrawer();
   };
 
   const handleConfirmDelete = () => {
@@ -152,13 +151,15 @@ export function DiscountsConfig({
   const startEdit = (d: Discount) => {
     setIsAdding(false);
     setEditingId(d.id);
-    setNewLabel(d.label);
-    setNewValue(d.value.toString());
-    setNewType(d.type || 'percentage');
-    setNewRounding(d.rounding || 'cliente');
-    setNewRoundingUnit(d.roundingUnit || 100);
-    setNewPaymentMethod(d.paymentMethod || 'todos');
-    setNewAppliesTo(d.appliesTo || 'servicios');
+    form.reset({
+      label: d.label,
+      value: d.value.toString(),
+      type: d.type || 'percentage',
+      rounding: d.rounding || 'cliente',
+      roundingUnit: d.roundingUnit || 100,
+      paymentMethod: d.paymentMethod || 'todos',
+      appliesTo: d.appliesTo || 'servicios',
+    });
   };
 
   const filtered = useMemo(() => {
@@ -177,89 +178,146 @@ export function DiscountsConfig({
   const editingIsActive = editingDiscount ? flagFor(editingDiscount) : false;
   const canToggle = !!onToggleActive && !(!isGlobal && editingDiscount?.globalActive === false);
 
-  const Form = () => (
+  const FormFields = () => (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Nombre</label>
-          <Input
-            placeholder="Ej: Promo Amigo"
-            value={newLabel}
-            onChange={(e) => setNewLabel(e.target.value)}
-            maxLength={80}
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Aplica a</label>
-          <Select value={newAppliesTo} onValueChange={(v) => setNewAppliesTo(v as DiscountAppliesTo)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="servicios">Servicios</SelectItem>
-              <SelectItem value="productos">Productos</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Tipo</label>
-          <Select value={newType} onValueChange={(v) => setNewType(v as 'percentage' | 'fixed')}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="percentage">Porcentaje (%)</SelectItem>
-              <SelectItem value="fixed">Monto Fijo ($)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">{newType === 'percentage' ? 'Porcentaje' : 'Monto'}</label>
-          <Input
-            type="number"
-            inputMode="decimal"
-            placeholder={newType === 'percentage' ? '% (ej: 15)' : '$ (ej: 1000)'}
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            min="0"
-            max={newType === 'percentage' ? 100 : undefined}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="label"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre</FormLabel>
+              <FormControl>
+                <Input placeholder="Ej: Promo Amigo" {...field} maxLength={80} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="appliesTo"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Aplica a</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="servicios">Servicios</SelectItem>
+                  <SelectItem value="productos">Productos</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="percentage">Porcentaje (%)</SelectItem>
+                  <SelectItem value="fixed">Monto Fijo ($)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="value"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{newType === 'percentage' ? 'Porcentaje' : 'Monto'}</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={newType === 'percentage' ? '% (ej: 15)' : '$ (ej: 1000)'}
+                  min="0"
+                  max={newType === 'percentage' ? 100 : undefined}
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         {newType === 'percentage' && (
           <>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo de Redondeo</label>
-              <Select value={newRounding} onValueChange={(v) => setNewRounding(v as 'cliente' | 'negocio' | 'matematico')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">↓ Favor Cliente (redondea hacia abajo)</SelectItem>
-                  <SelectItem value="negocio">↑ Favor Negocio (redondea hacia arriba)</SelectItem>
-                  <SelectItem value="matematico">≈ Al más cercano (redondeo matemático)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Unidad de Redondeo</label>
-              <Select value={newRoundingUnit.toString()} onValueChange={(v) => setNewRoundingUnit(parseInt(v))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {ROUNDING_UNITS.map(unit => (
-                    <SelectItem key={unit} value={unit.toString()}>
-                      {unit === 1 ? 'Sin redondeo (exacto)' : `A ${unit}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FormField
+              control={form.control}
+              name="rounding"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de Redondeo</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="cliente">↓ Favor Cliente (redondea hacia abajo)</SelectItem>
+                      <SelectItem value="negocio">↑ Favor Negocio (redondea hacia arriba)</SelectItem>
+                      <SelectItem value="matematico">≈ Al más cercano (redondeo matemático)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="roundingUnit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unidad de Redondeo</FormLabel>
+                  <Select value={field.value.toString()} onValueChange={(v) => field.onChange(parseInt(v))}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {ROUNDING_UNITS.map(unit => (
+                        <SelectItem key={unit} value={unit.toString()}>
+                          {unit === 1 ? 'Sin redondeo (exacto)' : `A ${unit}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </>
         )}
-        <div className="space-y-1.5 sm:col-span-2">
-          <label className="text-sm font-medium">Aplica con método de pago</label>
-          <Select value={newPaymentMethod} onValueChange={(v) => setNewPaymentMethod(v as 'todos' | 'efectivo' | 'mercado_pago')}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos los métodos</SelectItem>
-              <SelectItem value="efectivo">Solo Efectivo</SelectItem>
-              <SelectItem value="mercado_pago">Solo QR</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <FormField
+          control={form.control}
+          name="paymentMethod"
+          render={({ field }) => (
+            <FormItem className="sm:col-span-2">
+              <FormLabel>Aplica con método de pago</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="todos">Todos los métodos</SelectItem>
+                  <SelectItem value="efectivo">Solo Efectivo</SelectItem>
+                  <SelectItem value="mercado_pago">Solo QR</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </div>
     </div>
   );
@@ -407,25 +465,22 @@ export function DiscountsConfig({
 
       <DrawerForm
         open={isAdding || editingId !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setIsAdding(false);
-            setEditingId(null);
-            resetForm();
-          }
-        }}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={isAdding ? 'Agregar descuento' : 'Editar descuento'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           isAdding ? (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
-              <Button onClick={handleAdd}>Guardar</Button>
+              <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>Cancelar</Button>
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+              </Button>
             </div>
           ) : editingDiscount ? (
             <div className="flex w-full flex-wrap items-center gap-2">
-              <Button onClick={() => handleUpdate(editingDiscount.id)}>
-                Guardar cambios
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
               </Button>
               <div className="w-px h-5 bg-border" />
               {canToggle && editingIsActive ? (
@@ -433,8 +488,7 @@ export function DiscountsConfig({
                   variant="ghost"
                   onClick={() => {
                     setDeactivateConfirm(editingDiscount);
-                    setEditingId(null);
-                    resetForm();
+                    closeDrawer();
                   }}
                   className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
@@ -447,8 +501,7 @@ export function DiscountsConfig({
                     onClick={() => {
                       onToggleActive!(editingDiscount.id, true);
                       toast.success('Descuento activado');
-                      setEditingId(null);
-                      resetForm();
+                      closeDrawer();
                     }}
                     className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   >
@@ -458,8 +511,7 @@ export function DiscountsConfig({
                     variant="destructive"
                     onClick={() => {
                       setDeleteConfirm(editingDiscount);
-                      setEditingId(null);
-                      resetForm();
+                      closeDrawer();
                     }}
                   >
                     Eliminar
@@ -470,7 +522,9 @@ export function DiscountsConfig({
           ) : null
         }
       >
-        <Form />
+        <Form {...form}>
+          <FormFields />
+        </Form>
       </DrawerForm>
 
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
@@ -509,4 +563,3 @@ export function DiscountsConfig({
     </>
   );
 }
-

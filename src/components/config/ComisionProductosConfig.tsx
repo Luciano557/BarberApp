@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Package, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,13 +34,25 @@ interface CfgRow {
   activa: boolean;
 }
 
+const pctSchema = z.object({
+  porcentaje: z.string().refine((v) => {
+    const n = parseFloat(v.replace(',', '.'));
+    return !Number.isNaN(n) && n > 0 && n <= 100;
+  }, 'Ingresá un porcentaje entre 0,01 y 100.'),
+});
+
+type PctFormValues = z.infer<typeof pctSchema>;
+
 export function ComisionProductosConfig({ barberId, organizationId, sucursalId, forceShow }: Props) {
   const [config, setConfig] = useState<CfgRow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [pct, setPct] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+
+  const form = useForm<PctFormValues>({
+    resolver: zodResolver(pctSchema),
+    defaultValues: { porcentaje: '' },
+  });
 
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
@@ -61,13 +77,13 @@ export function ComisionProductosConfig({ barberId, organizationId, sucursalId, 
   if (isLoading) return null;
   if (!config && !forceShow && !isEditing) return null;
 
-  const handleSave = async () => {
-    const num = parseFloat(pct.replace(',', '.'));
-    if (isNaN(num) || num <= 0 || num > 100) {
-      toast.error('Ingresá un porcentaje entre 0,01 y 100');
-      return;
-    }
-    setIsSaving(true);
+  const openEditor = () => {
+    form.reset({ porcentaje: config ? String(config.porcentaje) : '' });
+    setIsEditing(true);
+  };
+
+  const onSubmit = async (values: PctFormValues) => {
+    const num = parseFloat(values.porcentaje.replace(',', '.'));
     try {
       if (config) {
         const ayer = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
@@ -89,13 +105,10 @@ export function ComisionProductosConfig({ barberId, organizationId, sucursalId, 
       if (error) throw error;
       toast.success('Comisión por productos configurada');
       setIsEditing(false);
-      setPct('');
       fetchConfig();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || 'Error al guardar');
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -115,53 +128,69 @@ export function ComisionProductosConfig({ barberId, organizationId, sucursalId, 
     }
   };
 
-  // Sin configuración: botón para configurar
-  if (!config && !isEditing) {
-    return (
-      <div className="mt-2 p-3 rounded-md border border-dashed border-border bg-muted/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Package className="h-4 w-4" />
-            <span>Comisión por productos vendidos</span>
-          </div>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setPct(''); setIsEditing(true); }}>
-            Configurar
+  const editorDrawer = (
+    <DrawerForm
+      open={isEditing}
+      onOpenChange={(o) => { if (!o) setIsEditing(false); }}
+      title="Comisión por productos vendidos"
+      size="sm"
+      isDirty={form.formState.isDirty}
+      footer={
+        <div className="flex gap-2 w-full">
+          <Button size="sm" className="flex-1" disabled={form.formState.isSubmitting} onClick={form.handleSubmit(onSubmit)}>
+            {form.formState.isSubmitting ? 'Guardando...' : config ? 'Actualizar' : 'Guardar'}
           </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isEditing) {
-    return (
-      <div className="mt-2 p-3 rounded-md border border-border bg-muted/20 space-y-3">
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium">Comisión por productos vendidos</span>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Porcentaje sobre la ganancia (%)</Label>
-          <Input
-            inputMode="decimal"
-            className="h-8 text-sm"
-            placeholder="0"
-            value={pct}
-            onChange={(e) => setPct(e.target.value.replace(/[^\d.,]/g, ''))}
-            maxLength={6}
-          />
-          <p className="text-xs text-muted-foreground">
-            La comisión se calcula sobre la ganancia (precio de venta − precio de costo) de cada producto vendido por este barbero.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" className="h-7 text-xs flex-1" disabled={isSaving} onClick={handleSave}>
-            {isSaving ? 'Guardando...' : config ? 'Actualizar' : 'Guardar'}
-          </Button>
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsEditing(false)}>
+          <Button variant="outline" size="sm" disabled={form.formState.isSubmitting} onClick={() => setIsEditing(false)}>
             Cancelar
           </Button>
         </div>
-      </div>
+      }
+    >
+      <Form {...form}>
+        <FormField
+          control={form.control}
+          name="porcentaje"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs">Porcentaje sobre la ganancia (%)</FormLabel>
+              <FormControl>
+                <Input
+                  inputMode="decimal"
+                  className="h-8 text-sm"
+                  placeholder="0"
+                  maxLength={6}
+                  value={field.value}
+                  onChange={(e) => field.onChange(e.target.value.replace(/[^\d.,]/g, ''))}
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                La comisión se calcula sobre la ganancia (precio de venta − precio de costo) de cada producto vendido por este barbero.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </Form>
+    </DrawerForm>
+  );
+
+  // Sin configuración: botón para configurar
+  if (!config) {
+    return (
+      <>
+        <div className="mt-2 p-3 rounded-md border border-dashed border-border bg-muted/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Package className="h-4 w-4" />
+              <span>Comisión por productos vendidos</span>
+            </div>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openEditor}>
+              Configurar
+            </Button>
+          </div>
+        </div>
+        {editorDrawer}
+      </>
     );
   }
 
@@ -185,9 +214,9 @@ export function ComisionProductosConfig({ barberId, organizationId, sucursalId, 
       </div>
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">Porcentaje sobre la ganancia</span>
-        <span className="font-medium">{config!.porcentaje}%</span>
+        <span className="font-medium">{config.porcentaje}%</span>
       </div>
-      <Button variant="outline" size="sm" className="h-7 text-xs w-full" onClick={() => { setPct(String(config!.porcentaje)); setIsEditing(true); }}>
+      <Button variant="outline" size="sm" className="h-7 text-xs w-full" onClick={openEditor}>
         Editar porcentaje
       </Button>
 
@@ -207,6 +236,8 @@ export function ComisionProductosConfig({ barberId, organizationId, sucursalId, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {editorDrawer}
     </div>
   );
 }

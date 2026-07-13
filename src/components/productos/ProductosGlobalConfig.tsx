@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, MoreVertical, Search, Tag, Package } from 'lucide-react';
 import { useShowMore } from '@/hooks/useShowMore';
 import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
@@ -9,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -18,6 +21,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Marca, Producto } from './types';
+import { productSharedFieldsSchema, type ProductSharedFieldsValues, NO_BRAND } from './productSharedFields';
 import { MarcasManagerDialog } from './MarcasManagerDialog';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 
@@ -27,13 +31,7 @@ import { EntityColorBar } from '@/components/ui/EntityColorBar';
  * No toca productos_sucursal, stock ni precios por sucursal.
  */
 
-interface FormState {
-  nombre: string;
-  marca_id: string; // '' = sin marca
-  descripcion: string;
-}
-
-const emptyForm: FormState = { nombre: '', marca_id: '', descripcion: '' };
+const emptyValues: ProductSharedFieldsValues = { nombre: '', marcaId: NO_BRAND, descripcion: '' };
 
 export function ProductosGlobalConfig() {
   const { organization } = useOrganization();
@@ -47,11 +45,14 @@ export function ProductosGlobalConfig() {
 
   const [showDialog, setShowDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [saving, setSaving] = useState(false);
 
   const [marcasDialogOpen, setMarcasDialogOpen] = useState(false);
   const [toggleConfirm, setToggleConfirm] = useState<{ producto: Producto; next: boolean } | null>(null);
+
+  const form = useForm<ProductSharedFieldsValues>({
+    resolver: zodResolver(productSharedFieldsSchema),
+    defaultValues: emptyValues,
+  });
 
   const editingProducto = editingId ? (productos.find(p => p.id === editingId) ?? null) : null;
   const editingIsActive = editingProducto?.activo ?? false;
@@ -96,33 +97,33 @@ export function ProductosGlobalConfig() {
     useShowMore(filtered, { isDefaultView });
 
   const openCreate = () => {
+    form.reset(emptyValues);
     setEditingId(null);
-    setForm(emptyForm);
     setShowDialog(true);
   };
 
   const openEdit = (p: Producto) => {
     setEditingId(p.id);
-    setForm({
+    form.reset({
       nombre: p.nombre,
-      marca_id: p.marca_id || '',
+      marcaId: p.marca_id || NO_BRAND,
       descripcion: p.descripcion || '',
     });
     setShowDialog(true);
   };
 
-  const handleSave = async () => {
+  const closeDrawer = () => {
+    setShowDialog(false);
+    setEditingId(null);
+    form.reset(emptyValues);
+  };
+
+  const onSubmit = async (values: ProductSharedFieldsValues) => {
     if (!orgId) return;
-    const nombre = form.nombre.replace(/\s+/g, ' ').trim();
-    if (!nombre) {
-      toast.error('Ingresá un nombre');
-      return;
-    }
-    setSaving(true);
     const payload = {
-      nombre,
-      marca_id: form.marca_id || null,
-      descripcion: form.descripcion.trim() || null,
+      nombre: values.nombre.replace(/\s+/g, ' ').trim(),
+      marca_id: values.marcaId === NO_BRAND ? null : values.marcaId,
+      descripcion: values.descripcion?.trim() || null,
     };
     if (editingId) {
       const { error } = await supabase.from('productos').update(payload).eq('id', editingId);
@@ -130,7 +131,7 @@ export function ProductosGlobalConfig() {
         toast.error('Error al actualizar producto');
       } else {
         toast.success('Producto actualizado');
-        setShowDialog(false);
+        closeDrawer();
         await fetchAll();
       }
     } else {
@@ -143,11 +144,10 @@ export function ProductosGlobalConfig() {
         toast.error('Error al crear producto');
       } else {
         toast.success('Producto agregado');
-        setShowDialog(false);
+        closeDrawer();
         await fetchAll();
       }
     }
-    setSaving(false);
   };
 
   const handleConfirmToggle = async () => {
@@ -251,21 +251,22 @@ export function ProductosGlobalConfig() {
 
       <DrawerForm
         open={showDialog}
-        onOpenChange={(o) => { if (!o) { setShowDialog(false); setEditingId(null); setForm(emptyForm); } }}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={editingId ? 'Editar producto' : 'Nuevo producto'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           editingId ? (
             <div className="flex w-full flex-wrap items-center gap-2">
-              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
-                {saving ? 'Guardando…' : 'Guardar cambios'}
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando…' : 'Guardar cambios'}
               </Button>
               <div className="w-px h-5 bg-border" />
               {editingIsActive ? (
                 <Button
                   variant="ghost"
                   className="bg-status-warning text-white hover:bg-status-warning/90"
-                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: false }); }}
+                  onClick={() => { const p = editingProducto!; closeDrawer(); setToggleConfirm({ producto: p, next: false }); }}
                 >
                   Desactivar
                 </Button>
@@ -273,7 +274,7 @@ export function ProductosGlobalConfig() {
                 <Button
                   variant="ghost"
                   className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
-                  onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); setToggleConfirm({ producto: editingProducto!, next: true }); }}
+                  onClick={() => { const p = editingProducto!; closeDrawer(); setToggleConfirm({ producto: p, next: true }); }}
                 >
                   Activar
                 </Button>
@@ -281,61 +282,76 @@ export function ProductosGlobalConfig() {
             </div>
           ) : (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" disabled={saving} onClick={() => { setShowDialog(false); setEditingId(null); setForm(emptyForm); }}>
+              <Button variant="ghost" disabled={form.formState.isSubmitting} onClick={closeDrawer}>
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving || !form.nombre.trim()}>
-                {saving ? 'Guardando…' : 'Guardar'}
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando…' : 'Guardar'}
               </Button>
             </div>
           )
         }
       >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Datos generales del producto. El stock y los precios se configuran por sucursal.
-          </p>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nombre</label>
-            <Input
-              value={form.nombre}
-              onChange={(e) => setForm(p => ({ ...p, nombre: e.target.value }))}
-              placeholder="Ej: Cera mate 100ml"
-              maxLength={80}
+        <Form {...form}>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Datos generales del producto. El stock y los precios se configuran por sucursal.
+            </p>
+            <FormField
+              control={form.control}
+              name="nombre"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ej: Cera mate 100ml" maxLength={80} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="marcaId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Marca</FormLabel>
+                  <div className="flex gap-2">
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_BRAND}>Sin marca</SelectItem>
+                        {activeMarcas.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
+                      <Tag className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} rows={3} maxLength={240} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Marca</label>
-            <div className="flex gap-2">
-              <Select
-                value={form.marca_id || 'none'}
-                onValueChange={(v) => setForm(p => ({ ...p, marca_id: v === 'none' ? '' : v }))}
-              >
-                <SelectTrigger className="flex-1"><SelectValue placeholder="Sin marca" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin marca</SelectItem>
-                  {activeMarcas.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.nombre}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="icon" onClick={() => setMarcasDialogOpen(true)} title="Gestionar marcas">
-                <Tag className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción</label>
-            <Textarea
-              value={form.descripcion}
-              onChange={(e) => setForm(p => ({ ...p, descripcion: e.target.value }))}
-              placeholder="Detalles internos (opcional)"
-              rows={3}
-              maxLength={240}
-            />
-            <p className="text-xs text-muted-foreground text-right">{form.descripcion.length}/240</p>
-          </div>
-        </div>
+        </Form>
       </DrawerForm>
 
       {/* Marcas manager */}

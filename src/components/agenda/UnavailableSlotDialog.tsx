@@ -97,6 +97,7 @@ export function UnavailableSlotDialog({
       onOpenChange={onOpenChange}
       title="Horario no disponible"
       size="sm"
+      isDirty={form.formState.isDirty}
       footer={
         <div className="flex w-full justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>

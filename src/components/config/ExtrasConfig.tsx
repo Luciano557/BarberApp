@@ -1,8 +1,12 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Extra } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -28,32 +32,34 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-function validateName(name: string): string | null {
-  const trimmed = name.trim();
-  if (!trimmed) return 'El nombre no puede estar vacío.';
-  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
-  return null;
-}
+const extraSchema = (isGlobal: boolean) => z.object({
+  name: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  price: isGlobal
+    ? z.string().optional()
+    : z.string().refine((v) => {
+        const cleaned = (v || '').trim();
+        if (!cleaned) return false;
+        const n = parseFloat(cleaned);
+        return !Number.isNaN(n) && n >= 0;
+      }, 'El precio debe ser un número igual o mayor a 0.'),
+});
 
-function validatePrice(raw: string): { ok: true; value: number } | { ok: false; error: string } {
-  const cleaned = (raw || '').toString().trim();
-  if (!cleaned) return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
-  const value = parseFloat(cleaned);
-  if (Number.isNaN(value) || value < 0) {
-    return { ok: false, error: 'El precio debe ser un número igual o mayor a 0.' };
-  }
-  return { ok: true, value };
-}
+type ExtraFormValues = z.infer<ReturnType<typeof extraSchema>>;
+
+const emptyValues: ExtraFormValues = { name: '', price: '' };
 
 export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucursal' }: ExtrasConfigProps) {
   const isGlobal = mode === 'global';
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newName, setNewName] = useState('');
-  const [newPrice, setNewPrice] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Extra | null>(null);
+
+  const form = useForm<ExtraFormValues>({
+    resolver: zodResolver(extraSchema(isGlobal)),
+    defaultValues: emptyValues,
+  });
 
   const flagFor = (e: Extra) => isGlobal ? (e.globalActive ?? e.active) : e.active;
   const activeExtras = extras.filter(e => flagFor(e));
@@ -61,37 +67,32 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
   const editingExtra = editingId ? (extras.find(e => e.id === editingId) ?? null) : null;
   const editingIsActive = editingExtra ? flagFor(editingExtra) : false;
 
-  const handleAdd = () => {
-    const nameErr = validateName(newName);
-    if (nameErr) { toast.error(nameErr); return; }
-    let price = 0;
-    if (!isGlobal) {
-      const v = validatePrice(newPrice);
-      if (v.ok === false) { toast.error(v.error); return; }
-      price = v.value;
-    }
-    onAdd({ name: newName.trim(), price, active: true });
-    setNewName(''); setNewPrice(''); setIsAdding(false);
+  const startAdd = () => {
+    form.reset(emptyValues);
+    setIsAdding(true);
   };
 
-  const handleUpdate = (id: string) => {
-    const nameErr = validateName(newName);
-    if (nameErr) { toast.error(nameErr); return; }
-    const updates: Partial<Extra> = { name: newName.trim() };
-    if (!isGlobal) {
-      const v = validatePrice(newPrice);
-      if (v.ok === false) { toast.error(v.error); return; }
-      updates.price = v.value;
+  const closeDrawer = () => {
+    setIsAdding(false);
+    setEditingId(null);
+    form.reset(emptyValues);
+  };
+
+  const onSubmit = async (values: ExtraFormValues) => {
+    if (isAdding) {
+      await onAdd({ name: values.name.trim(), price: isGlobal ? 0 : parseFloat(values.price!), active: true });
+    } else if (editingExtra) {
+      const updates: Partial<Extra> = { name: values.name.trim() };
+      if (!isGlobal) updates.price = parseFloat(values.price!);
+      await onUpdate(editingExtra.id, updates);
     }
-    onUpdate(id, updates);
-    setEditingId(null); setNewName(''); setNewPrice('');
+    closeDrawer();
   };
 
   const startEdit = (extra: Extra) => {
     setEditingId(extra.id);
-    setNewName(extra.name);
     // CurrencyInput espera string "1234.5" en formato clean (punto decimal).
-    setNewPrice(extra.price ? String(extra.price) : '');
+    form.reset({ name: extra.name, price: extra.price ? String(extra.price) : '' });
   };
 
   const handleConfirmToggle = () => {
@@ -146,7 +147,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
         }
         actions={
           !isAdding && !editingId && activeSubTab === 'active' ? (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setIsAdding(true)}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           ) : undefined
@@ -179,7 +180,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                     Agregá extras para cobrarlos junto a un servicio.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setIsAdding(true)}>
+                <Button variant="outline" size="sm" onClick={startAdd}>
                   Agregar extra
                 </Button>
               </div>
@@ -198,26 +199,22 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
 
       <DrawerForm
         open={isAdding || editingId !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setIsAdding(false);
-            setEditingId(null);
-            setNewName('');
-            setNewPrice('');
-          }
-        }}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={isAdding ? 'Agregar extra' : 'Editar extra'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           isAdding ? (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" onClick={() => { setIsAdding(false); setNewName(''); setNewPrice(''); }}>Cancelar</Button>
-              <Button onClick={handleAdd}>Guardar</Button>
+              <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>Cancelar</Button>
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+              </Button>
             </div>
           ) : editingExtra ? (
             <div className="flex w-full flex-wrap items-center gap-2">
-              <Button onClick={() => handleUpdate(editingExtra.id)}>
-                Guardar cambios
+              <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
               </Button>
               <div className="w-px h-5 bg-border" />
               {editingIsActive ? (
@@ -225,7 +222,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                   variant="ghost"
                   onClick={() => {
                     setToggleConfirm({ extra: editingExtra, action: 'deactivate' });
-                    setEditingId(null); setNewName(''); setNewPrice('');
+                    closeDrawer();
                   }}
                   className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
@@ -238,7 +235,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                     onClick={() => {
                       onUpdate(editingExtra.id, { active: true });
                       toast.success('Extra activado');
-                      setEditingId(null); setNewName(''); setNewPrice('');
+                      closeDrawer();
                     }}
                     className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   >
@@ -249,7 +246,7 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
                       variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingExtra);
-                        setEditingId(null); setNewName(''); setNewPrice('');
+                        closeDrawer();
                       }}
                     >
                       Eliminar
@@ -261,18 +258,38 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
           ) : null
         }
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nombre</label>
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={80} placeholder="Ej: Barba" />
+        <Form {...form}>
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} maxLength={80} placeholder="Ej: Barba" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {!isGlobal && (
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Precio</FormLabel>
+                    <FormControl>
+                      <CurrencyInput value={field.value ?? ''} onChange={field.onChange} placeholder="0" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
-          {!isGlobal && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Precio</label>
-              <CurrencyInput value={newPrice} onChange={setNewPrice} placeholder="0" />
-            </div>
-          )}
-        </div>
+        </Form>
       </DrawerForm>
 
       {/* Toggle confirmation dialog */}

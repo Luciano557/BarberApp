@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { ShieldOff, Plus, Trash2, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -31,20 +35,44 @@ interface Bloqueo {
   barbero_id: string | null;
 }
 
+const bloqueoSchema = z.object({
+  fecha_inicio: z.string().min(1, 'La fecha de inicio es obligatoria.'),
+  fecha_fin: z.string().min(1, 'La fecha de fin es obligatoria.'),
+  todo_el_dia: z.boolean(),
+  hora_inicio: z.string(),
+  hora_fin: z.string(),
+  motivo: z.string().max(240, 'El motivo no puede superar los 240 caracteres.').optional(),
+  barbero_id: z.string(),
+}).superRefine((data, ctx) => {
+  if (data.fecha_inicio && data.fecha_fin && data.fecha_fin < data.fecha_inicio) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fecha_fin'],
+      message: 'La fecha fin debe ser posterior a la fecha inicio.',
+    });
+  }
+});
+
+type BloqueoFormValues = z.infer<typeof bloqueoSchema>;
+
+const emptyValues: BloqueoFormValues = {
+  fecha_inicio: '',
+  fecha_fin: '',
+  todo_el_dia: true,
+  hora_inicio: '09:00',
+  hora_fin: '18:00',
+  motivo: '',
+  barbero_id: '__sucursal__',
+};
+
 export function BloqueosSection({ sucursalId, organizationId, barbers }: BloqueosSectionProps) {
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({
-    fecha_inicio: '',
-    fecha_fin: '',
-    todo_el_dia: true,
-    hora_inicio: '09:00',
-    hora_fin: '18:00',
-    motivo: '',
-    barbero_id: '__sucursal__',
+  const form = useForm<BloqueoFormValues>({
+    resolver: zodResolver(bloqueoSchema),
+    defaultValues: emptyValues,
   });
 
   const fetchBloqueos = useCallback(async () => {
@@ -72,38 +100,34 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
   useEffect(() => { fetchBloqueos(); }, [fetchBloqueos]);
 
-  const handleCreate = async () => {
-    if (!form.fecha_inicio || !form.fecha_fin) {
-      toast.error('Completá las fechas');
-      return;
-    }
-    if (form.fecha_fin < form.fecha_inicio) {
-      toast.error('La fecha fin debe ser posterior a la fecha inicio');
-      return;
-    }
-    setSaving(true);
+  const openCreate = () => {
+    form.reset(emptyValues);
+    setShowForm(true);
+  };
+
+  const closeDrawer = () => setShowForm(false);
+
+  const onSubmit = async (values: BloqueoFormValues) => {
     const insert: any = {
       sucursal_id: sucursalId,
       organization_id: organizationId,
-      fecha_inicio: form.fecha_inicio,
-      fecha_fin: form.fecha_fin,
-      todo_el_dia: form.todo_el_dia,
-      motivo: form.motivo || null,
+      fecha_inicio: values.fecha_inicio,
+      fecha_fin: values.fecha_fin,
+      todo_el_dia: values.todo_el_dia,
+      motivo: values.motivo || null,
     };
-    if (!form.todo_el_dia) {
-      insert.hora_inicio = form.hora_inicio;
-      insert.hora_fin = form.hora_fin;
+    if (!values.todo_el_dia) {
+      insert.hora_inicio = values.hora_inicio;
+      insert.hora_fin = values.hora_fin;
     }
-    if (form.barbero_id !== '__sucursal__') {
-      insert.barbero_id = form.barbero_id;
+    if (values.barbero_id !== '__sucursal__') {
+      insert.barbero_id = values.barbero_id;
     }
 
     const { error } = await supabase.from('bloqueos_agenda').insert(insert);
-    if (error) { toast.error('Error al crear bloqueo'); setSaving(false); return; }
+    if (error) { toast.error('Error al crear bloqueo'); return; }
     toast.success('Ausencia registrada');
-    setShowForm(false);
-    setForm({ fecha_inicio: '', fecha_fin: '', todo_el_dia: true, hora_inicio: '09:00', hora_fin: '18:00', motivo: '', barbero_id: '__sucursal__' });
-    setSaving(false);
+    closeDrawer();
     fetchBloqueos();
   };
 
@@ -125,9 +149,12 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
     catch { return d; }
   };
 
+  const todoElDiaValue = form.watch('todo_el_dia');
+
   if (loading) return <div className="text-sm text-muted-foreground py-4">Cargando bloqueos...</div>;
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -142,77 +169,13 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
               </p>
             </div>
           </div>
-          {!showForm && (
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowForm(true)}>
-              <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
-            </Button>
-          )}
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openCreate}>
+            <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Form */}
-        {showForm && (
-          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Fecha inicio</Label>
-                <Input type="date" value={form.fecha_inicio} onChange={e => setForm(p => ({ ...p, fecha_inicio: e.target.value }))} className="h-8 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Fecha fin</Label>
-                <Input type="date" value={form.fecha_fin} onChange={e => setForm(p => ({ ...p, fecha_fin: e.target.value }))} className="h-8 text-sm" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch checked={form.todo_el_dia} onCheckedChange={v => setForm(p => ({ ...p, todo_el_dia: v }))} className="scale-75" />
-              <Label className="text-xs">Todo el día</Label>
-            </div>
-
-            {!form.todo_el_dia && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Hora inicio</Label>
-                  <Input type="time" value={form.hora_inicio} onChange={e => setForm(p => ({ ...p, hora_inicio: e.target.value }))} className="h-8 text-sm" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Hora fin</Label>
-                  <Input type="time" value={form.hora_fin} onChange={e => setForm(p => ({ ...p, hora_fin: e.target.value }))} className="h-8 text-sm" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <Label className="text-xs">Aplica a</Label>
-              <Select value={form.barbero_id} onValueChange={v => setForm(p => ({ ...p, barbero_id: v }))}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__sucursal__">Toda la sucursal</SelectItem>
-                  {barbers.filter(b => b.active).map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Motivo (opcional)</Label>
-              <Textarea value={form.motivo} onChange={e => setForm(p => ({ ...p, motivo: e.target.value }))} placeholder="Ej: Feriado, vacaciones..." className="min-h-[60px] text-sm" />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={saving}>
-                {saving ? 'Guardando...' : 'Crear ausencia'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* List */}
-        {bloqueos.length === 0 && !showForm && (
+        {bloqueos.length === 0 && (
           <p className="text-xs text-muted-foreground text-center py-4">No hay ausencias o cierres registrados</p>
         )}
 
@@ -243,5 +206,139 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
         ))}
       </CardContent>
     </Card>
+
+      <DrawerForm
+        open={showForm}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
+        title="Nueva ausencia"
+        size="sm"
+        isDirty={form.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>Cancelar</Button>
+            <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Guardando...' : 'Crear ausencia'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...form}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="fecha_inicio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Fecha inicio</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="h-8 text-sm" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fecha_fin"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Fecha fin</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="h-8 text-sm" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="todo_el_dia"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} className="scale-75" />
+                  </FormControl>
+                  <FormLabel className="text-xs">Todo el día</FormLabel>
+                </FormItem>
+              )}
+            />
+
+            {!todoElDiaValue && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="hora_inicio"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Hora inicio</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} className="h-8 text-sm" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hora_fin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Hora fin</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} className="h-8 text-sm" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            <FormField
+              control={form.control}
+              name="barbero_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Aplica a</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__sucursal__">Toda la sucursal</SelectItem>
+                      {barbers.filter(b => b.active).map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="motivo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Motivo (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      placeholder="Ej: Feriado, vacaciones..."
+                      className="min-h-[60px] text-sm"
+                      maxLength={240}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      </DrawerForm>
+    </>
   );
 }

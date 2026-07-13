@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -28,13 +32,6 @@ interface PaymentMethodsConfigProps {
   onGoToGeneral?: () => void;
 }
 
-interface MethodDraft {
-  activo: boolean;
-  aplicaRecargo: boolean;
-  recargoPct: string; // string en UI para edición libre (valor de "Personalizado")
-  recargoPreset: string; // '5' | '10' | '15' | '20' | 'custom'
-}
-
 function formatRecargo(pct: number): string {
   return pct > 0 ? `+${pct}%` : 'Sin recargo';
 }
@@ -55,6 +52,39 @@ const METHOD_META: Record<PaymentMethod, { icon: LucideIcon; description: string
   credito: { icon: CreditCard, description: 'Pago con tarjeta de crédito' },
 };
 
+const methodDraftSchema = (methods: ResolvedMethod[], editingMethod: PaymentMethod | null) =>
+  z.object({
+    activo: z.boolean(),
+    aplicaRecargo: z.boolean(),
+    recargoPreset: z.string(),
+    recargoPct: z.string(),
+  }).superRefine((data, ctx) => {
+    if (editingMethod) {
+      const activosRestantes = methods.filter((m) =>
+        m.method === editingMethod ? data.activo : m.activo,
+      );
+      if (activosRestantes.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['activo'],
+          message: 'Debe quedar al menos un método de pago activo. Activá otro método antes de desactivar este.',
+        });
+      }
+    }
+    if (data.aplicaRecargo && data.recargoPreset === 'custom') {
+      const n = parseFloat(data.recargoPct);
+      if (Number.isNaN(n) || n < 0 || n > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['recargoPct'],
+          message: 'El recargo debe ser un número entre 0 y 100.',
+        });
+      }
+    }
+  });
+
+type MethodDraftValues = z.infer<ReturnType<typeof methodDraftSchema>>;
+
 export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMethodsConfigProps) {
   const { organization } = useOrganization();
   const { methods, usarConfigGeneral, loading, reload } =
@@ -71,8 +101,11 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
   }, [loading, usarConfigGeneral]);
 
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
-  const [draft, setDraft] = useState<MethodDraft>({ activo: true, aplicaRecargo: false, recargoPct: '0', recargoPreset: 'custom' });
-  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const form = useForm<MethodDraftValues>({
+    resolver: zodResolver(methodDraftSchema(methods, editingMethod)),
+    defaultValues: { activo: true, aplicaRecargo: false, recargoPreset: 'custom', recargoPct: '0' },
+  });
 
   const editingGeneral = sucursalId === null;
   const editingOverride = sucursalId !== null && !usarGeneral;
@@ -108,41 +141,27 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
   const startEdit = (m: ResolvedMethod) => {
     if (!canEdit) return;
     setEditingMethod(m.method);
-    setDraft({
+    form.reset({
       activo: m.activo,
       aplicaRecargo: m.recargoPct > 0,
-      recargoPct: String(m.recargoPct),
       recargoPreset: detectPreset(m.recargoPct),
+      recargoPct: String(m.recargoPct),
     });
-    setValidationError(null);
   };
 
   const closeDrawer = () => {
     setEditingMethod(null);
-    setValidationError(null);
   };
 
-  const saveDraft = async () => {
+  const onSubmit = async (values: MethodDraftValues) => {
     if (!organization || !canEdit || !editingMethod) return;
 
-    // Validación: no dejar el negocio/sucursal sin ningún método activo
-    const activosRestantes = methods.filter((m) =>
-      m.method === editingMethod ? draft.activo : m.activo,
-    );
-    if (activosRestantes.length === 0) {
-      setValidationError(
-        'Debe quedar al menos un método de pago activo. Activá otro método antes de desactivar este.',
-      );
-      return;
-    }
-
-    const pct = !draft.aplicaRecargo
+    const pct = !values.aplicaRecargo
       ? 0
-      : draft.recargoPreset === 'custom'
-        ? Math.max(0, Math.min(100, parseFloat(draft.recargoPct) || 0))
-        : parseFloat(draft.recargoPreset);
+      : values.recargoPreset === 'custom'
+        ? Math.max(0, Math.min(100, parseFloat(values.recargoPct) || 0))
+        : parseFloat(values.recargoPreset);
 
-    setSaving(true);
     const targetSucursalId = editingOverride ? sucursalId : null;
 
     let q = supabase
@@ -156,11 +175,10 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
     if (existing) {
       const { error } = await supabase
         .from('payment_methods_config')
-        .update({ activo: draft.activo, recargo_pct: pct })
+        .update({ activo: values.activo, recargo_pct: pct })
         .eq('id', existing.id);
       if (error) {
         toast.error('Error al guardar');
-        setSaving(false);
         return;
       }
     } else {
@@ -170,18 +188,16 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
           organization_id: organization.id,
           sucursal_id: targetSucursalId,
           metodo_pago: editingMethod,
-          activo: draft.activo,
+          activo: values.activo,
           recargo_pct: pct,
         });
       if (error) {
         toast.error('Error al guardar');
-        setSaving(false);
         return;
       }
     }
     toast.success(`${getMethodLabel(editingMethod)} actualizado`);
     await reload();
-    setSaving(false);
     closeDrawer();
   };
 
@@ -192,6 +208,8 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
       : 'Esta sucursal tiene configuración propia';
 
   const editingLabel = editingMethod ? getMethodLabel(editingMethod) : '';
+  const aplicaRecargoValue = form.watch('aplicaRecargo');
+  const recargoPresetValue = form.watch('recargoPreset');
 
   return (
     <>
@@ -330,126 +348,161 @@ export function PaymentMethodsConfig({ sucursalId, onGoToGeneral }: PaymentMetho
         onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={editingLabel ? `Editar ${editingLabel}` : 'Editar método'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           <div className="flex w-full justify-between">
-            <Button variant="ghost" onClick={closeDrawer} disabled={saving}>
+            <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>
               Cancelar
             </Button>
-            <Button onClick={saveDraft} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar
             </Button>
           </div>
         }
       >
-        <div className="space-y-5">
-          {editingMethod && (
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              {(() => {
-                const MetaIcon = METHOD_META[editingMethod].icon;
-                return (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <MetaIcon className="h-5 w-5 text-primary" />
-                  </div>
-                );
-              })()}
-              <div className="min-w-0">
-                <p className="truncate font-medium text-foreground">{editingLabel}</p>
-                <p className="text-sm text-muted-foreground">{METHOD_META[editingMethod].description}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="metodo-activo" className="text-sm font-medium">
-                Método activo
-              </Label>
-              <Switch
-                id="metodo-activo"
-                checked={draft.activo}
-                onCheckedChange={(v) => {
-                  setDraft((d) => ({ ...d, activo: v }));
-                  setValidationError(null);
-                }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">Disponible para usar en Cobrar</p>
-            {validationError && (
-              <div className="flex items-start gap-2 rounded-lg border border-status-warning bg-status-warning-bg p-3">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning-foreground" />
-                <p className="flex-1 text-sm text-status-warning-foreground">{validationError}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 border-t border-border pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="aplica-recargo" className="text-sm font-medium">
-                ¿Aplica recargo?
-              </Label>
-              <Switch
-                id="aplica-recargo"
-                checked={draft.aplicaRecargo}
-                onCheckedChange={(v) => setDraft((d) => ({ ...d, aplicaRecargo: v }))}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Si está activo, se suma un porcentaje al precio cuando el cliente paga con este método
-            </p>
-            {draft.aplicaRecargo && (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-muted-foreground">% de recargo</Label>
-                  <Select
-                    value={draft.recargoPreset}
-                    onValueChange={(v) =>
-                      setDraft((d) => ({
-                        ...d,
-                        recargoPreset: v,
-                        // al elegir un preset, sincronizo el valor numérico
-                        recargoPct: v === 'custom' ? d.recargoPct : v,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {RECARGO_PRESETS.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}%
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {draft.recargoPreset === 'custom' && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="recargo-pct" className="text-xs font-medium text-muted-foreground">
-                      Valor personalizado
-                    </Label>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        id="recargo-pct"
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={100}
-                        step="0.01"
-                        value={draft.recargoPct}
-                        onChange={(e) => setDraft((d) => ({ ...d, recargoPct: e.target.value }))}
-                        className="h-9 w-28 text-right"
-                      />
-                      <span className="text-sm text-muted-foreground">%</span>
+        <Form {...form}>
+          <div className="space-y-5">
+            {editingMethod && (
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                {(() => {
+                  const MetaIcon = METHOD_META[editingMethod].icon;
+                  return (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <MetaIcon className="h-5 w-5 text-primary" />
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{editingLabel}</p>
+                  <p className="text-sm text-muted-foreground">{METHOD_META[editingMethod].description}</p>
+                </div>
               </div>
             )}
+
+            <FormField
+              control={form.control}
+              name="activo"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <FormLabel htmlFor="metodo-activo" className="text-sm font-medium">
+                      Método activo
+                    </FormLabel>
+                    <FormControl>
+                      <Switch
+                        id="metodo-activo"
+                        checked={field.value}
+                        onCheckedChange={(v) => {
+                          field.onChange(v);
+                          form.clearErrors('activo');
+                        }}
+                      />
+                    </FormControl>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Disponible para usar en Cobrar</p>
+                  {form.formState.errors.activo && (
+                    <div className="flex items-start gap-2 rounded-lg border border-status-warning bg-status-warning-bg p-3">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-status-warning-foreground" />
+                      <p className="flex-1 text-sm text-status-warning-foreground">
+                        {form.formState.errors.activo.message}
+                      </p>
+                    </div>
+                  )}
+                </FormItem>
+              )}
+            />
+
+            <div className="space-y-3 border-t border-border pt-4">
+              <FormField
+                control={form.control}
+                name="aplicaRecargo"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <FormLabel htmlFor="aplica-recargo" className="text-sm font-medium">
+                        ¿Aplica recargo?
+                      </FormLabel>
+                      <FormControl>
+                        <Switch
+                          id="aplica-recargo"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Si está activo, se suma un porcentaje al precio cuando el cliente paga con este método
+              </p>
+              {aplicaRecargoValue && (
+                <div className="space-y-3">
+                  <FormField
+                    control={form.control}
+                    name="recargoPreset"
+                    render={({ field }) => (
+                      <FormItem className="space-y-1.5">
+                        <FormLabel className="text-xs font-medium text-muted-foreground">% de recargo</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={(v) => {
+                            field.onChange(v);
+                            if (v !== 'custom') form.setValue('recargoPct', v);
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {RECARGO_PRESETS.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {p}%
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="custom">Personalizado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  {recargoPresetValue === 'custom' && (
+                    <FormField
+                      control={form.control}
+                      name="recargoPct"
+                      render={({ field }) => (
+                        <FormItem className="space-y-1.5">
+                          <FormLabel htmlFor="recargo-pct" className="text-xs font-medium text-muted-foreground">
+                            Valor personalizado
+                          </FormLabel>
+                          <div className="flex items-center gap-1">
+                            <FormControl>
+                              <Input
+                                id="recargo-pct"
+                                type="number"
+                                inputMode="decimal"
+                                min={0}
+                                max={100}
+                                step="0.01"
+                                {...field}
+                                className="h-9 w-28 text-right"
+                              />
+                            </FormControl>
+                            <span className="text-sm text-muted-foreground">%</span>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </Form>
       </DrawerForm>
 
       <AlertDialog open={confirmRevert} onOpenChange={setConfirmRevert}>

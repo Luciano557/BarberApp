@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, MoreVertical, Tag, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Line } from '@/types/barbershop';
 import { toast } from 'sonner';
@@ -53,12 +57,15 @@ interface ToggleConfirm {
   action: 'activate' | 'deactivate';
 }
 
-function validateName(name: string): string | null {
-  const trimmed = name.trim();
-  if (!trimmed) return 'El nombre no puede estar vacío.';
-  if (trimmed.length > 80) return 'El nombre no puede superar los 80 caracteres.';
-  return null;
-}
+const lineSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  color: z.string().optional(),
+  descripcion: z.string().max(240, 'La descripción no puede superar los 240 caracteres.').optional(),
+});
+
+type LineFormValues = z.infer<typeof lineSchema>;
+
+const emptyValues: LineFormValues = { name: '', color: '', descripcion: '' };
 
 interface SortableLineItemProps {
   line: Line;
@@ -120,13 +127,14 @@ function SortableLineItem({ line, onEdit, isReorderable }: SortableLineItemProps
 export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: LinesConfigProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState('');
-  const [color, setColor] = useState<string>('');
-  const [descripcion, setDescripcion] = useState<string>('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [toggleConfirm, setToggleConfirm] = useState<ToggleConfirm | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Line | null>(null);
+
+  const form = useForm<LineFormValues>({
+    resolver: zodResolver(lineSchema),
+    defaultValues: emptyValues,
+  });
 
   const active = useMemo(() => {
     return [...lines.filter(l => l.active)].sort((a, b) => {
@@ -147,43 +155,34 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
 
   const isReorderable = !!onReorder && active.length > 1;
 
-  const resetForm = () => { setName(''); setColor(''); setDescripcion(''); };
-
-  const handleAdd = async () => {
-    const err = validateName(name);
-    if (err) { toast.error(err); return; }
-    setIsSaving(true);
-    try {
-      await onAdd({
-        name: name.trim(),
-        active: true,
-        color: color || undefined,
-        descripcion: descripcion.trim() || undefined,
-      });
-      resetForm();
-      setIsAdding(false);
-    } finally {
-      setIsSaving(false);
-    }
+  const startAdd = () => {
+    form.reset(emptyValues);
+    setIsAdding(true);
   };
 
-  const handleUpdate = (id: string) => {
-    const err = validateName(name);
-    if (err) { toast.error(err); return; }
-    onUpdate(id, {
-      name: name.trim(),
-      color: color || undefined,
-      descripcion: descripcion.trim() || undefined,
-    });
+  const closeDrawer = () => {
+    setIsAdding(false);
     setEditingId(null);
-    resetForm();
+    form.reset(emptyValues);
+  };
+
+  const onSubmit = async (values: LineFormValues) => {
+    const payload = {
+      name: values.name.trim(),
+      color: values.color || undefined,
+      descripcion: values.descripcion?.trim() || undefined,
+    };
+    if (isAdding) {
+      await onAdd({ ...payload, active: true });
+    } else if (editingLine) {
+      await onUpdate(editingLine.id, payload);
+    }
+    closeDrawer();
   };
 
   const startEdit = (line: Line) => {
     setEditingId(line.id);
-    setName(line.name);
-    setColor(line.color || '');
-    setDescripcion(line.descripcion ?? '');
+    form.reset({ name: line.name, color: line.color || '', descripcion: line.descripcion ?? '' });
   };
 
   const handleConfirmToggle = () => {
@@ -207,21 +206,6 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
     const newOrder = arrayMove(active, oldIndex, newIndex);
     await onReorder(newOrder.map(l => l.id));
   };
-
-  const ColorPicker = (
-    <div className="flex flex-wrap gap-2">
-      {LINE_COLORS.map(c => (
-        <button
-          key={c.value}
-          type="button"
-          onClick={() => setColor(color === c.value ? '' : c.value)}
-          className={`w-8 h-8 rounded-full border-2 transition-colors ${color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
-          style={{ backgroundColor: c.value }}
-          title={c.label}
-        />
-      ))}
-    </div>
-  );
 
   const renderInactiveLine = (line: Line) => (
     <div key={line.id} className="animate-item-in">
@@ -253,7 +237,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
           : 'Organizan el menú de cobro y facilitan la búsqueda de servicios.'}
         actions={
           !isAdding && !editingId && activeSubTab === 'active' ? (
-            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => { resetForm(); setIsAdding(true); }}>
+            <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={startAdd}>
               <Plus className="h-4 w-4 mr-1" /> Agregar
             </Button>
           ) : undefined
@@ -297,7 +281,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
                     Las categorías agrupan tus servicios en la pantalla de cobro.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => { resetForm(); setIsAdding(true); }}>
+                <Button variant="outline" size="sm" onClick={startAdd}>
                   Agregar categoría
                 </Button>
               </div>
@@ -316,27 +300,22 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
 
       <DrawerForm
         open={isAdding || editingId !== null}
-        onOpenChange={(o) => {
-          if (!o) {
-            setIsAdding(false);
-            setEditingId(null);
-            resetForm();
-          }
-        }}
+        onOpenChange={(o) => { if (!o) closeDrawer(); }}
         title={isAdding ? 'Agregar categoría' : 'Editar categoría'}
         size="sm"
+        isDirty={form.formState.isDirty}
         footer={
           isAdding ? (
             <div className="flex w-full justify-between">
-              <Button variant="ghost" onClick={() => { setIsAdding(false); resetForm(); }}>Cancelar</Button>
-              <Button disabled={isSaving} onClick={handleAdd}>
-                {isSaving ? 'Guardando...' : 'Guardar'}
+              <Button variant="ghost" onClick={closeDrawer} disabled={form.formState.isSubmitting}>Cancelar</Button>
+              <Button disabled={form.formState.isSubmitting} onClick={form.handleSubmit(onSubmit)}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>
           ) : editingLine ? (
             <div className="flex w-full flex-wrap items-center gap-2">
-              <Button onClick={() => handleUpdate(editingLine.id)}>
-                Guardar cambios
+              <Button disabled={form.formState.isSubmitting} onClick={form.handleSubmit(onSubmit)}>
+                {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
               </Button>
               <div className="w-px h-5 bg-border" />
               {editingIsActive ? (
@@ -344,7 +323,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
                   variant="ghost"
                   onClick={() => {
                     setToggleConfirm({ line: editingLine, action: 'deactivate' });
-                    setEditingId(null); resetForm();
+                    closeDrawer();
                   }}
                   className="bg-status-warning text-white hover:bg-status-warning/90"
                 >
@@ -357,7 +336,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
                     onClick={() => {
                       onUpdate(editingLine.id, { active: true });
                       toast.success('Línea activada');
-                      setEditingId(null); resetForm();
+                      closeDrawer();
                     }}
                     className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
                   >
@@ -368,7 +347,7 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
                       variant="destructive"
                       onClick={() => {
                         setDeleteConfirm(editingLine);
-                        setEditingId(null); resetForm();
+                        closeDrawer();
                       }}
                     >
                       Eliminar
@@ -380,32 +359,66 @@ export function LinesConfig({ lines, onAdd, onUpdate, onDelete, onReorder }: Lin
           ) : null
         }
       >
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Nombre</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Essencial, Deluxe"
-              maxLength={80}
+        <Form {...form}>
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ej: Essencial, Deluxe" maxLength={80} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color (opcional)</FormLabel>
+                  <FormControl>
+                    <div className="flex flex-wrap gap-2">
+                      {LINE_COLORS.map(c => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          onClick={() => field.onChange(field.value === c.value ? '' : c.value)}
+                          className={`w-8 h-8 rounded-full border-2 transition-colors ${field.value === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                          style={{ backgroundColor: c.value }}
+                          title={c.label}
+                        />
+                      ))}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      maxLength={240}
+                      placeholder="Ej: Servicios premium con detalles de terminación."
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Color (opcional)</label>
-            {ColorPicker}
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción (opcional)</label>
-            <Textarea
-              maxLength={240}
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Ej: Servicios premium con detalles de terminación."
-            />
-            <p className="text-xs text-muted-foreground text-right">{descripcion.length}/240</p>
-            <p className="text-xs text-muted-foreground">Este texto se mostrará en tu portal de reservas.</p>
-          </div>
-        </div>
+        </Form>
       </DrawerForm>
 
       <AlertDialog open={!!toggleConfirm} onOpenChange={(open) => !open && setToggleConfirm(null)}>
