@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, CalendarClock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -110,7 +110,7 @@ export function TurnosAgendaPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Turnos" subtitle="Configurá horarios, disponibilidad y bloqueos" />
+      <PageHeader title="Turnos" icon={CalendarClock} subtitle="Configurá horarios, disponibilidad y bloqueos" />
 
       {visibleSucursales.length > 0 && (
         <Tabs defaultValue={defaultTabId} className="w-full">

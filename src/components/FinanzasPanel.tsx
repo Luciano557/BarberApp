@@ -80,7 +80,7 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: Fin
   if (isSucursalAccount) {
     return (
       <div className="animate-fade-in">
-        <PageHeader title="Finanzas" subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
+        <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
         <Tabs defaultValue={defaultTab}>
           <TabsList variant="underline" className="mb-6 flex-wrap">
             <TabsTrigger value="sueldos" variant="underline">
@@ -128,7 +128,7 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: Fin
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Finanzas" subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
+      <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
       <Tabs defaultValue={defaultTab}>
         <TabsList variant="underline" className="mb-6 flex-wrap">
           <TabsTrigger value="estadisticas" variant="underline">

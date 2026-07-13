@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTareas } from '@/hooks/useTareas';
 import {
   Plus, Trash2, CheckCircle, Clock, XCircle, RefreshCw, AlertTriangle,
-  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil, ListChecks,
+  Users, User, MapPin, CalendarDays, Repeat, Inbox, ChartSpline, ArrowLeft, Pencil, ListChecks, ClipboardList,
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -433,6 +433,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       {/* Header */}
       <PageHeader
         title="Tareas"
+        icon={ClipboardList}
         subtitle={(
           <span className="block max-w-2xl">
             Gestioná las tareas internas del equipo, asigná responsables y revisá el estado de cada pendiente operativo.

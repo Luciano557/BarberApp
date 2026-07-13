@@ -205,6 +205,10 @@ adentro de sus tabs cada sub-panel repite su propio título de página con otro 
 Resultado: **doble título en la misma vista** (h1 "Finanzas" + h1/h2 del tab),
 mezcla `semibold`/`bold` y mezcla h1/h2. Es el desvío de componentes más visible hoy.
 
+> **Nota (sesión ícono contextual, 2026-07-13)**: `PageHeader` ahora requiere
+> `icon` (prop obligatoria) — cualquier nuevo call site futuro debe
+> especificar un ícono contextual, no hay default.
+
 ---
 
 ## 3. Uso de profundidad (sombras + z-index) por sección
@@ -1112,104 +1116,122 @@ pasada automática. `SucursalesConfig.tsx` quedó relevado solo parcialmente
 
 ---
 
-## Sesión dedicada — Sidebar de escritorio (build 2026-07-08)
+## Sesión dedicada — Sidebar de escritorio (build 2026-07-12)
 
-Cierra los 3 puntos de decisión que habían quedado pausados sobre
+Cierra los puntos de decisión que habían quedado pausados sobre
 `AppSidebar.tsx` (logo, info de usuario, chevron durante el colapso — ver
-Fase 2, F2.3.a). No toca la identidad visual "Filled·Bold" (colores, radios,
-tipografía) definida en su propia sesión — solo el *cómo transiciona* entre
-estado expandido y colapsado.
+Fase 2, F2.3.a), con la decisión validada por mockup: **"Opción B — el texto
+se va primero, el espacio se cierra después"**.
 
-- **Chevron unificado**: los dos botones distintos (cuadrado 8×8 con
-  `ChevronRight` en rail, navy full-width con `ChevronLeft` expandido) se
-  reemplazaron por **un solo botón persistente**, siempre navy sólido
-  full-width, misma altura en ambos estados. El ícono `ChevronLeft` rota
-  180° vía `transform` (200ms, `var(--ease-out-quint)`) en vez de cambiar de
-  componente. El handler pasó de dos `setCollapsed(true)`/`setCollapsed(false)`
-  asimétricos a un único `setCollapsed(!collapsed)` que alterna. `ChevronRight`
-  quedó sin uso y se sacó del import de `lucide-react`.
-- **Logo + nombre + badges**: el tile navy (40px, sin cambio de tamaño entre
-  estados) persiste siempre; el bloque de texto (nombre de la organización,
-  badge PREMIUM/plan, aviso de vencimiento) ahora persiste en el DOM en
-  ambos estados y se anima por opacity (Opción B) en vez de aparecer/
-  desaparecer con el condicional `railMode ? ... : ...`. El padding
-  horizontal del header (`px-4` ↔ `0`) y el margen del bloque de texto
-  transicionan a 200ms `var(--ease-out-quint)`, sincronizados con el ancho
-  del `<aside>`.
-- **Section labels**: "Principal" persiste con opacity + colapso de altura
-  (`max-height`). "Gestión" persiste igual, y el divisor decorativo que
-  reemplazaba el label en rail (`<div className="h-px .../>`) ahora
-  **coexiste** con el label en un contenedor de altura fija, cruzando
-  opacity en fase inversa (aparece el divisor cuando se va el texto y
-  viceversa) — antes eran mutuamente excluyentes.
-- **Labels de nav**: el `<span>` del label de cada ítem ahora persiste
-  siempre en el DOM (antes no existía en absoluto en rail); se anima por
-  opacity + `margin-left`. El wrapper del ícono (antes dos elementos JSX
-  distintos: tile 40px en rail vs. tile 28px/ícono desnudo en expandido) se
-  unificó en un solo `<span>` persistente cuyo `width`/`height`/
-  `border-radius`/`background-color` transicionan a 200ms
-  `var(--ease-out-quint)` — los tres estados de reposo (rail, expandido
-  activo, expandido inactivo) quedan pixel-idénticos a los de hoy; solo se
-  suavizó la interpolación entre ellos. El botón pasó de `justify-center`
-  condicional a `justify-center` fijo + `flex-1` en el label (el centrado
-  del ícono en rail y el layout en fila del expandido son ambos casos
-  particulares de la misma regla, sin necesidad de alternar `justify-*`).
-  El badge de función bloqueada (candado) **no se tocó**: sigue siendo un
-  overlay circular en rail y una pastilla con texto en expandido — no era
-  uno de los 5 elementos de texto nombrados y es un estado secundario poco
-  frecuente.
-- **Timing — Opción B aplicado exactamente como se pidió**:
-  - Colapsar: texto `opacity 1→0`, 120ms, `var(--ease-in-quint)`, sin delay.
-    Ancho del `<aside>`: 200ms, `var(--ease-out-quint)`, **delay 60ms**
-    (agregado en esta sesión — antes el ancho no tenía delay en ninguna
-    dirección).
-  - Expandir: ancho del `<aside>`: 200ms, `var(--ease-out-quint)`, sin
-    delay. Texto `opacity 0→1`: 150ms, `var(--ease-out-quint)`, **delay
-    80ms**.
-  - Todas las propiedades de "tamaño" que acompañan al texto (padding,
-    margin, max-height, el resize del ícono de nav) comparten el mismo
-    200ms `var(--ease-out-quint)` del ancho del aside, para que se sientan
-    parte del mismo movimiento físico.
-- **Técnica**: se mantiene animando `width` directamente en el `<aside>`
-  (sin migrar a compositor), tal como estaba decidido. Los nuevos paddings/
-  márgenes/tamaños de ícono agregados en esta sesión son, por la misma
-  razón, transiciones de propiedades de layout (no solo transform/opacity)
-  — es una extensión directa de la misma decisión ya tomada, no una nueva.
+> ⚠️ **Nota de historial (corregida)**: una primera versión de esta sección
+> (fechada 2026-07-08) documentaba una implementación que nunca llegó al
+> código. Una segunda versión (la que estuvo publicada hasta ahora, también
+> fechada 2026-07-12) la reemplazó pero **tampoco describía el código real**
+> en tres puntos: un chevron circular de 24px anclado al borde que no existe,
+> y un footer + selector de sucursal descritos como "resueltos sin swap
+> condicional" cuando el código real los mantiene como swap condicional
+> (con un comentario del propio archivo diciéndolo explícitamente). Esta
+> versión fue releída línea por línea contra `AppSidebar.tsx` tal como está
+> hoy y corrige los tres puntos.
 
-### Excepciones — no se resolvieron con CSS (reportado, no improvisado)
+- **Chevron**: es **un solo botón** (ya no hay `ChevronRight` en el import,
+  un único handler `setCollapsed(!collapsed)`), pero **no es circular ni
+  está anclado al borde**: es el mismo botón navy `w-full` de siempre, al
+  pie del sidebar, dentro del bloque de usuario/sesión (`:470-485`). Lo
+  único nuevo es que el ícono `ChevronLeft` rota 180° in-place
+  (`transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]`,
+  clase `rotate-180` condicionada a `collapsed`) en vez de intercambiarse por
+  `ChevronRight`.
+- **3 de las 5 zonas quedaron persistentes en el DOM + opacity** (logo,
+  labels de nav, section labels); **2 no** (footer, selector de sucursal):
+  1. *Logo* (`:267-325`): tile navy 40px fijo; el padding del header
+     (`paddingLeft/Right`) y el bloque de texto (nombre + punto/badge)
+     transicionan vía estilos inline con la curva compartida `SIZE_EASE`.
+  2. *Labels de nav* (`renderNavItem`, `:117-204`): un solo `<span>` de
+     ícono persiste y transiciona `width/height/border-radius/
+     background-color/color` entre sus 3 tamaños de reposo (40px en rail,
+     28px activo expandido, 20px inactivo expandido); el label de texto
+     persiste con `opacity`+`margin-left`+`flex-basis` inline. El badge de
+     candado (plan bloqueado) **sigue siendo condicional, no crossfade**:
+     `isPlanLocked && railMode` renderiza el punto circular sobre el ícono,
+     `!railMode && isPlanLocked` renderiza la pastilla con texto — nunca
+     coexisten en el DOM.
+  3. *Section labels* (`:350-400`): "Principal" y "Gestión" sí persisten con
+     altura estable (sin salto vertical); el divisor del riel coexiste con
+     "Gestión" en un contenedor `relative`, cruzando opacity en fase
+     inversa — esta parte del reporte anterior era correcta.
+  4. *Footer de usuario* (`:410-469`): **sigue siendo swap condicional**
+     (`railMode ? <columna> : <fila>`), tal como lo dice el comentario en el
+     propio código (`:403-409`): "el bloque avatar+campana+candado NO se
+     unificó... flex-direction no es una propiedad animable por CSS". No se
+     tocó en esta sesión ni en ninguna posterior.
+  5. *Selector de sucursal* (`:337-347`): **sigue siendo swap condicional**
+     en dos ubicaciones del DOM distintas — `{!railMode && (...)}` dentro
+     del header y `{railMode && <SucursalSelector collapsed />}` como
+     hermano fuera del header — no un crossfade en una sola celda de grid.
+     (La variante expandida sí cambió de aspecto en una sesión posterior:
+     ver "Sesión dedicada — Header + selector de sucursal".)
+- **Timing — Opción B**, implementado con una curva compartida
+  `SIZE_EASE = 'var(--ease-out-quint)'` (`:47`) y un helper `textTransition()`
+  (`:71-76`) que arma el string de `transition` inline según `railMode`:
+  - Colapsar: texto `opacity 1→0` 120ms `var(--ease-in-quint)` sin delay;
+    ancho del `<aside>` 200ms `var(--ease-out-quint)` con delay — token
+    Tailwind custom `delay-sidebar-width` (`tailwind.config.ts:117`,
+    `transitionDelay: { "sidebar-width": "60ms" }`).
+  - Expandir: ancho sin delay; texto `opacity 0→1` 150ms
+    `var(--ease-out-quint)` con delay 80ms.
+  - El resto de propiedades de "tamaño" (padding, margin, max-height, el
+    resize del ícono de nav) comparten `SIZE_EASE`/200ms para sentirse parte
+    del mismo movimiento.
+- **Técnica**: se mantiene la animación de `width` en el `<aside>` (decisión
+  ya tomada, no se migró a compositor).
 
-1. **Footer de usuario (avatar + campana + candado)**: el arreglo de estos
-   tres elementos sigue siendo un swap condicional (columna vertical en
-   rail vs. fila horizontal en expandido), sin cambios respecto a hoy. Rail
-   tiene 48px de ancho útil, insuficiente para alojar avatar+campana+candado
-   en fila (necesitarían ~120px); el layout vertical es un requisito duro
-   del espacio disponible, no una preferencia. `flex-direction` no es una
-   propiedad animable por CSS, así que no hay forma de interpolar entre
-   columna y fila sin una técnica de cross-fade con posicionamiento
-   absoluto — evaluada y descartada por el riesgo/complejidad que agrega
-   frente al beneficio (el "salto" es instantáneo, no un elemento de texto
-   apareciendo de la nada). El nombre+rol del usuario, al vivir dentro de
-   esa fila, se mantiene también condicional por la misma razón. La
-   campana y el botón de candado ya eran persistentes antes de esta sesión
-   (mismas clases en ambas ramas) — no requerían cambio.
-2. **Selector de sucursal**: no se unificó. `SucursalSelector.tsx` renderiza
-   internamente dos cosas completamente distintas según su prop `collapsed`:
-   un glyph estático (ícono de ubicación en un tile, sin texto ni
-   interactividad) en rail, y un `<Select>` de Radix completo (dropdown,
-   lista de sucursales) en expandido. No es una diferencia de "texto que
-   aparece/desaparece" sino dos UIs distintas para dos necesidades
-   distintas; unificarlas requeriría rediseñar el componente compartido
-   `SucursalSelector.tsx` (fuera de archivo y de alcance de esta sesión) o
-   renderizar el dropdown interactivo también en rail (cambiaría la
-   identidad visual del rail, prohibido). Se mantienen las dos invocaciones
-   exactamente como estaban (`<SucursalSelector collapsed />` en rail,
-   `<SucursalSelector collapsed={false} />` dentro del header en expandido).
+*Método de esta corrección: lectura completa y línea por línea de
+`AppSidebar.tsx` tal como está en el repo hoy, sin asumir que el reporte
+previamente publicado en este documento fuera exacto — fue precisamente al
+compararlo contra el archivo que se encontraron las tres discrepancias de
+arriba.*
 
-*Método: lectura completa de `AppSidebar.tsx` antes de asumir los números de
-línea del prompt (coincidían, con corrimiento menor). Validación matemática
-manual del centrado del ícono en rail (48px de fila, ícono 40px, márgenes
-4px) antes de decidir la técnica de `justify-center` fijo + `flex-1`, para
-no introducir un corrimiento visual en el estado de reposo colapsado.*
+---
+
+## Sesión dedicada — Header + selector de sucursal (build, dirección "Variante J")
+
+Rediseño acotado del header del sidebar expandido (`AppSidebar.tsx`,
+`SucursalSelector.tsx`). No tocó la mecánica de colapso/expansión (sección
+anterior) ni el rail — verificado igual en ambos casos.
+
+- **Punto indicador reemplaza el badge de plan/facturación**: el nombre de
+  la organización se mantiene igual; PREMIUM, el badge de plan genérico y el
+  aviso de vencimiento con texto se reemplazaron por un punto de 5px junto
+  al nombre — ámbar (`--status-warning`) con tooltip de días si hay aviso de
+  facturación, dorado (`#C39A45`) con tooltip "Plan Premium" si no hay aviso
+  pero el plan es premium, nada si ninguna aplica. `title` + `aria-label`
+  espejados para no perder legibilidad por lector de pantalla.
+- **Selector de sucursal sin caja**: se sacó el fondo/borde tinte
+  (`bg-primary/5 border-primary/15`) del wrapper; ahora es texto plano sobre
+  el header, separado del nombre por un hairline `#EEEFF2` de 1px. Los
+  overrides de color por descendiente sobre `SucursalSelector` se
+  mantuvieron (el componente sigue diseñado para verse "navy claro" sobre
+  fondo blanco).
+- **Chevron del selector rotativo**: vía `className` en `SucursalSelector.tsx`
+  (`[&[data-state=open]>svg]:rotate-180` + transición 200ms
+  `var(--ease-out-quint)`), sin tocar `ui/select.tsx` compartido.
+- **Menú refinado**, todo scoped a esta instancia (nunca al `Select` base):
+  sombra ya era la canónica "flotante" (`shadow-md`, sin cambios); entrada
+  fade+slide ya la traía Radix por defecto, solo se ató el timing a 200ms
+  `var(--ease-out-quint)`; label "SUCURSALES" agregado (10px/uppercase/
+  muted, mismo estilo que los section labels del nav); check en la sucursal
+  activa ya venía nativo de `SelectItem`; hover por `data-[highlighted]:bg-[#F4F5F7]`.
+- Verificado antes de tocar nada: `SucursalSelector` solo se usa en
+  `AppSidebar.tsx` (2 invocaciones) — sin riesgo de efecto lateral en otras
+  pantallas.
+
+`npx tsc --noEmit` limpio. Archivos: `AppSidebar.tsx`, `SucursalSelector.tsx`.
+
+> **Nota (sesión Variante K, 2026-07-13)**: el indicador de plan/facturación
+> se sacó del header (el punto de 5px descripto arriba) y no tiene lugar
+> visible en la app por ahora — pendiente de decidir dónde mostrarlo, si
+> hace falta.
 
 ---
 
@@ -1698,3 +1720,109 @@ de la auditoría F4.2 coincidieran con el estado actual. Validación:
 `npx tsc --noEmit` limpio tras el build completo (Cobrar + VoidClosureDialog
 + BackfillWizard). No se tocó ningún archivo fuera del candado de alcance
 (Agenda, Sidebar, Portal, Auth, Homepage quedaron intactos).*
+
+---
+
+## Fase 4 - Tanda 2 - Parte 1: Configuración (auditoría 2026-07-13)
+
+> Relevamiento puro contra los criterios ya cerrados (sombras/z-index/Inter/
+> timing, RHF+Zod, errores campo→inline/servidor→toast, "(opcional)" en no
+> obligatorios, selects vacíos con mensaje+CTA, maxLength 80/120/240/1500,
+> DrawerForm único canon salvo Cobrar y BackfillWizard, HorariosTrabajoSection
+> pierde el autosave, Producto no se fusiona). Sin implementación. Método:
+> lectura completa de los 14 archivos listados abajo (no de resúmenes de
+> Fase 3) al 2026-07-13.
+
+### 1. Tabla por formulario
+
+| Formulario | Contenedor actual → destino | Validación actual | maxLength | Obligatorio | Guard doble submit | Selects vacíos |
+|---|---|---|---|---|---|---|
+| Servicios (`ServicesConfig.tsx`) | DrawerForm ✅ → sin cambio | toast-only | Nombre 80 ✅, Descripción 240 ✅ (con contador) | Nombre/Precio/Duración sin marca (variante 4); Descripción "(opcional)" ✅ | ❌ Guardar/Guardar cambios (`:340,344`) sin `disabled` | Línea: fallback "Sin línea" ✅ resuelto |
+| ↳ quick-create "Nueva línea" (`ServicesConfig.tsx:542`, Dialog) | Dialog centrado → DrawerForm | toast-only | Nombre 80 ✅ | sin marca | ❌ `handleAddNewLine` es async, botón "Agregar" (`:565`) solo bloquea por `!newLineName.trim()`, no por loading | N/A |
+| Líneas (`LinesConfig.tsx`) | DrawerForm ✅ → sin cambio | toast-only | Nombre 80 ✅, Descripción 240 ✅ | Nombre sin marca; Color/Descripción "(opcional)" ✅ | ⚠️ Agregar SÍ tiene guard (`isSaving`); Editar (`:338`) NO — inconsistente en el mismo archivo | N/A |
+| Extras (`ExtrasConfig.tsx`) | DrawerForm ✅ → sin cambio | toast-only | Nombre 80 ✅ (sin campo Descripción) | Nombre/Precio sin marca | ❌ Guardar/Guardar cambios (`:215,219`) sin `disabled` | N/A |
+| Descuentos (`DiscountsConfig.tsx`) | DrawerForm ✅ → sin cambio | toast-only | Nombre 80 ✅ (sin campo Descripción) | Nombre/Valor sin marca | ❌ Guardar (`:423`) sin `disabled` | Selects con opciones fijas (Aplica a/Tipo/Redondeo/Método) — nunca vacíos, no aplica |
+| Producto — sucursal (`ProductoDialog.tsx`) | Dialog centrado → DrawerForm (decisión ya tomada) | mixto: `tabErrors` reactivo + `canSave` bloquea submit + toast | Nombre 80, Descripción 240 (coincide con el global) | Precio venta obligatorio vía `canSave`; "(opcional)" solo en Descripción/Stock inicial | ✅ `disabled={saving}` | No aplica (sin selects de lista dinámica relevados) |
+| Producto — global (`ProductosGlobalConfig.tsx`) | **Ya es DrawerForm** ✅ | toast-only | Nombre 80, Descripción 240 | "(opcional)" solo en placeholder, no en el `<label>` (F3.11) | ✅ `disabled={saving \|\| !form.nombre.trim()}` | N/A |
+| Marcas (`MarcasManagerDialog.tsx:177`) | Dialog centrado → DrawerForm | toast-only | Nombre 80 ✅ | sin marca | ✅ `disabled={saving \|\| !draftNombre.trim()}` | N/A — **uno de los 2 Dialog sin nombrar, ver §2** |
+| Métodos de pago (`PaymentMethodsConfig.tsx`) | DrawerForm ✅ → sin cambio | **inline** (banner de error propio, no toast) — el mejor patrón de error de todo el cluster | sin texto libre persistente | N/A (todo `Switch`/`Select`) | ✅ `disabled={saving}` | Presets fijos (5/10/15/20/Personalizado) — nunca vacíos |
+| Horarios de trabajo — sucursal (`HorariosTrabajoSection.tsx`, `QuickApplyCard`) | Card inline (no es un "formulario" de alta/edición clásico) | toast-only | N/A | N/A | ✅ `disabled={applying \|\| ...}` | N/A |
+| Horarios de trabajo — por día (`DayEditSheet`, mismo archivo) | **Sheet crudo, autosave instantáneo** → DrawerForm + botón "Guardar" explícito (decisión ya tomada) | toast-only | N/A | N/A | N/A hoy (no hay submit, cada `onChange` persiste solo) — **el botón nuevo debe nacer con guard** | Select de barbero (tab "Por barbero", `:605-623`) queda **mudo** si no hay barberos activos — sin resolver |
+| Ausencias/Bloqueos (`BloqueosSection.tsx`) | **Inline en página** (`<div>` togglead por `showForm`, ni Dialog ni Sheet ni DrawerForm) → DrawerForm | toast-only | ❌ Motivo (`:202`) **sin maxLength** — hueco de F3.5, confirmado sigue | "Motivo (opcional)" ✅; fechas/"Aplica a" sin marca | ✅ `disabled={saving}` | "Aplica a" con fallback "Toda la sucursal" ✅ resuelto |
+| Comisión por equipo (`ComisionEquipoConfig.tsx`) | Card inline → DrawerForm | toast-only | N/A (`Input` numérico) | sin marca | ❌ "Agregar" regla individual (`:400-404`) sin loading — hueco de F3.4, confirmado sigue; "Agregar todos" SÍ tiene guard (`bulkLoading`) | "No hay barberos disponibles para asignar" ✅ ya resuelto |
+| Comisión por productos (`ComisionProductosConfig.tsx`) | Card inline → DrawerForm | toast-only | `maxLength=6` (numérico) | sin marca | ✅ `disabled={isSaving}` | N/A — **no estaba en la lista del pedido, mismo cluster que Comisión equipo, la sumo para no dejar hueco** |
+| PINs (`PinConfigSection.tsx`) | Card inline con `<form onSubmit>` semántico (único de la app, F3.9 #15) → ¿DrawerForm? Ver §3 | **inline** ("Los PINs no coinciden") + toast para error de servidor — buen patrón | PIN/Confirmar/Actual: `maxLength=6` ✅ (numéricos) | sin marca en labels (PIN/Confirmar PIN son obviamente obligatorios por contexto, pero no están marcados) | ✅ guard robusto (`isSaving` + longitud + coincidencia) | N/A |
+| Editor rápido de línea (`LineQuickEditPopover.tsx`) | Popover → DrawerForm (decisión ya tomada) | toast-only | Nombre 80 ✅ | sin marca | ❌ `handleSave` es async, "Guardar cambios" (`:210-212`) sin loading — hueco de F3.4, confirmado sigue | N/A |
+
+**14 archivos tocarían el contenedor y/o la validación** (contando `ServicesConfig.tsx` y `HorariosTrabajoSection.tsx` una sola vez pese a tener 2 filas cada uno).
+
+### 2. Los 2 Dialog de Configuración que Fase 3 no nombró específicamente
+
+Fase 3 (F3.1) dejó el cluster Configuración en "4 Dialog centrado" pero solo
+nombró explícitamente 2 en su prosa (`ProductoDialog.tsx` y el quick-create
+de línea de `ServicesConfig.tsx`). Un tercero (`MarcasManagerDialog`) aparece
+mencionado de pasada en dos lugares (F3.6, autofocus; y la lista de la
+decisión de canon, "ambos MarcasManagerDialog/ServicesConfig quick-create de
+línea") pero nunca tuvo su propia línea de auditoría. Identifico los 2 que
+faltaban con nombre y línea:
+
+1. **`src/components/productos/MarcasManagerDialog.tsx:177`** — Dialog
+   centrado para alta/edición/activación de marcas de producto. Se reusa
+   desde **ambos** formularios de Producto: lo importa `ProductosConfig.tsx`
+   (contexto `ProductoDialog`, por sucursal) y también `ProductosGlobalConfig.tsx`
+   (catálogo global) — un componente, dos puntos de entrada. Tiene guard de
+   doble submit y maxLength correctos; solo le falta el contenedor.
+2. **`src/components/productos/ProductoPickerDialog.tsx:169`** — Dialog de
+   búsqueda + carrito para agregar productos a una venta (`cart`,
+   `precio_unitario`, `cantidad`). **No estaba en ningún lado de Fase 3.**
+   Ojo: no es exclusivo de Configuración — lo importa también
+   `PaymentRegistration.tsx` (Cobrar, cerrado en Tanda 1). Cualquier
+   migración de este archivo tocaría el flujo de Cobrar que la CONTEXTO de
+   esta parte pidió explícitamente no re-auditar — lo marco como bloqueado
+   hasta que se decida si se toca.
+
+No puedo reconstruir con certeza absoluta cuáles 4 Dialog exactos sumó la
+pasada original de F3.1 (las notas crudas de esa pasada no quedaron en el
+documento, solo el total por cluster) — esto es mi mejor reconstrucción con
+evidencia directa del código actual, no una cita textual de Fase 3.
+
+Nota aparte, no un Dialog pendiente: `StockMovementDialog.tsx` (carga/ajuste
+de stock) tiene nombre de archivo engañoso — **ya usa `DrawerForm`
+internamente** (import en la línea 2). Es higiene de naming, no un desvío de
+contenedor.
+
+### 3. Hallazgos nuevos que no encajan en los criterios ya cerrados
+
+1. **Un cuarto tipo de contenedor no contemplado en la decisión de canon.**
+   La decisión de Fase 3 habla de migrar "Dialog" y "Sheet crudo" a
+   DrawerForm, pero no menciona el patrón que usan `BloqueosSection`,
+   `ComisionEquipoConfig`, `ComisionProductosConfig` y `PinConfigSection`:
+   un `<div>`/`<Card>` que se despliega **inline, dentro de la misma
+   página**, togglead por estado local (`showForm`, `isEditing`) — ni
+   modal, ni drawer, ni Sheet. Aplicar "DrawerForm sin excepción" ahí es
+   técnicamente posible, pero en PINs y Comisiones el "formulario" ES el
+   contenido completo de esa sección de Configuración (no una fila de una
+   lista) — abrir un drawer sobre una página que va a quedar vacía detrás
+   es una UX distinta a la de Servicios/Líneas/Extras. No lo resuelvo yo:
+   ¿el canon aplica también a este cuarto patrón, o "entidad en una lista →
+   DrawerForm" no describe estos 4 casos y quedan como excepción legítima
+   (como Cobrar y BackfillWizard)?
+2. **`ComisionProductosConfig.tsx` no estaba en la lista del pedido** pero
+   es el mismo cluster y patrón que `ComisionEquipoConfig.tsx` (mismo
+   contenedor inline, mismo `barberId`/`organizationId`/`sucursalId`,
+   invocado desde el mismo lugar). Lo sumé a la tabla para no dejarlo
+   afuera del build sin que quede documentado.
+3. **`ProductoPickerDialog.tsx` es compartido con Cobrar** (ver §2, punto 2)
+   — el único caso de esta tanda donde tocar Configuración obligaría a
+   tocar (o al menos revisar) un archivo del área cerrada en Tanda 1.
+
+### 4. Estimación de archivos
+
+**14 archivos** para contenedor+validación de la tabla del §1, más
+**2 archivos** de los Dialog identificados en §2 (`MarcasManagerDialog.tsx`
+es 1 de los 14 ya contados; `ProductoPickerDialog.tsx` sumaría 1 más si se
+decide tocarlo pese a ser compartido con Cobrar) → **14-15 archivos**,
+sin contar un eventual archivo nuevo compartido si se decide estandarizar
+el guard de doble submit en un hook/util común en vez de repetirlo 6 veces
+(`ServicesConfig` ×2, `ExtrasConfig`, `DiscountsConfig`, `LinesConfig` edit,
+`ComisionEquipoConfig`, `LineQuickEditPopover`).

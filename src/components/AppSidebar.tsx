@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, Lock, Menu, X, Clock } from 'lucide-react';
+import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, Lock, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -46,6 +46,14 @@ const MGMT_IDS = new Set(['mi-negocio', 'config']);
 // aside, paddings, ícono de nav) — la misma que ya usa el ancho del <aside>.
 const SIZE_EASE = 'var(--ease-out-quint)';
 
+// Tamaño del ícono de nav en modo rail (railMode): fijo en pantallas altas
+// (100vh ≈ 900px+ → 40px, el tamaño de siempre), se achica con la altura de
+// viewport en pantallas más bajas hasta un piso de 36px (cómodo para tocar)
+// a ~768px de alto (laptop chica, caso de 8 ítems de nav) — así el rail
+// nunca necesita scroll interno en el rango de alturas propio de desktop,
+// sin JS ni mediciones en runtime. Solo aplica en rail; expandido no cambia.
+const RAIL_ICON_SIZE = 'clamp(36px, 3vh + 13px, 40px)';
+
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(isMobile);
@@ -88,15 +96,6 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   const principalItems = navItems.filter((i) => !MGMT_IDS.has(i.id));
   const gestionItems = navItems.filter((i) => MGMT_IDS.has(i.id));
-
-  const isPremium = effectivePlan === 'premium';
-  const planLabel = organization ? PLAN_LABELS[effectivePlan] : null;
-  const daysUntilBillingEnds = subscriptionAccess?.days_until_access_ends ?? null;
-  const showBillingNotice =
-    subscriptionAccess?.has_access === true &&
-    daysUntilBillingEnds !== null &&
-    daysUntilBillingEnds > 0 &&
-    daysUntilBillingEnds <= 3;
 
   const displayName = profile?.full_name || profile?.email || 'Usuario';
   const initials =
@@ -148,7 +147,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               'relative grid shrink-0 place-items-center',
               railMode
                 ? cn(
-                    'h-10 w-10 rounded-[10px]',
+                    'rounded-[10px]',
                     active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
                   )
                 : active
@@ -156,6 +155,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                   : 'h-5 w-5 rounded-md',
             )}
             style={{
+              ...(railMode ? { width: RAIL_ICON_SIZE, height: RAIL_ICON_SIZE } : {}),
               transition: `width 200ms ${SIZE_EASE}, height 200ms ${SIZE_EASE}, border-radius 200ms ${SIZE_EASE}, background-color 200ms ${SIZE_EASE}, color 200ms ${SIZE_EASE}`,
             }}
           >
@@ -261,12 +261,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             : undefined
         }
       >
-        {/* Brand identity — header blanco con logo tile navy. Persiste en el
-            DOM en ambos estados: el tile no cambia de tamaño, solo el
-            padding del header y el bloque de texto (nombre + badges)
-            transicionan. */}
+        {/* Brand identity — header con fondo navy sólido (bg-primary, el
+            mismo tono que el ítem de nav activo y el botón de colapsar).
+            Persiste en el DOM en ambos estados: solo el padding del header
+            y el bloque de texto (nombre) transicionan. */}
         <div
-          className="bg-background py-4"
+          className="bg-primary py-4"
           style={{
             paddingLeft: railMode ? '0px' : '1rem',
             paddingRight: railMode ? '0px' : '1rem',
@@ -274,12 +274,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           }}
         >
           <div className="flex items-center justify-center">
-            <div
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary"
+            <img
+              src="/favicon.png"
+              alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
-            >
-              <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
-            </div>
+              className="h-5 w-5 shrink-0 object-contain"
+            />
             <div
               className="min-w-0"
               style={{
@@ -287,65 +287,52 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 marginLeft: railMode ? '0px' : '0.75rem',
                 // Mismo motivo que en renderNavItem: flex-basis explícito en
                 // vez de flex-1, para que el bloque de texto colapse a 0
-                // real y no corra el tile del logo del centro.
+                // real y no corra el ícono del logo del centro.
                 flexBasis: railMode ? '0px' : '200px',
                 transition: textTransition(`margin-left 200ms ${SIZE_EASE}, flex-basis 200ms ${SIZE_EASE}`),
               }}
               aria-hidden={railMode}
             >
-              <p className="truncate text-[15px] font-semibold leading-tight text-foreground">
+              <p className="min-w-0 truncate text-[15px] font-semibold leading-tight text-primary-foreground">
                 {organization?.name || 'Barbería'}
               </p>
-              {planLabel && (
-                isPremium ? (
-                  <span className="mt-1.5 inline-flex items-center rounded-full bg-[#C39A45] px-2 py-0.5 text-[10px] font-semibold text-white">
-                    PREMIUM
-                  </span>
-                ) : (
-                  <span className="mt-1.5 inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] text-muted-foreground">
-                    {planLabel}
-                  </span>
-                )
-              )}
-              {showBillingNotice && (
-                <span className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-[10px] font-medium text-status-warning-foreground">
-                  <Clock className="h-3 w-3 shrink-0" />
-                  <span className="truncate">
-                    {daysUntilBillingEnds === 1 ? 'Vence en 1 dia' : `Vence en ${daysUntilBillingEnds} dias`}
-                  </span>
-                </span>
-              )}
             </div>
             {isMobile && (
               <button
                 type="button"
                 onClick={() => setCollapsed(true)}
                 aria-label="Cerrar navegación"
-                className="ml-2 grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-muted-foreground transition-colors hover:bg-[#F4F5F7] hover:text-foreground"
+                className="ml-2 grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
-          {/* Wrapper-only styling del selector de sucursal (chip navy claro).
-              El componente interno se recolorea vía overrides de descendiente
-              para no tocar SucursalSelector.
+          {/* Selector de sucursal — sin caja (Variante J): un hairline lo
+              separa del nombre de la organización y el trigger se ve como
+              texto plano. El componente interno se recolorea vía overrides
+              de descendiente para no tocar SucursalSelector: sobre el fondo
+              navy sólido del header usa text-primary-foreground/70, el
+              mismo patrón de opacidad que ya usa el archivo para texto
+              secundario sobre bg-primary.
               Nota: el selector de sucursal en sí NO se unificó — el glyph
               colapsado (ícono de ubicación) y el Select expandido son dos
               renders internos completamente distintos de SucursalSelector
               (uno es un ícono estático, el otro un dropdown interactivo),
               no una diferencia de texto. Ver reporte del build. */}
           {!railMode && (
-            <div className="mt-3 w-full rounded-lg border border-primary/15 bg-primary/5 [&_[role=combobox]]:border-0 [&_[role=combobox]]:bg-transparent [&_[role=combobox]]:text-primary [&_[role=combobox]_svg]:text-primary [&>div]:border-0 [&>div]:bg-transparent [&>div]:text-primary [&>div]:ring-0">
-              <SucursalSelector collapsed={false} />
-            </div>
+            <>
+              <div className="mt-3 h-px w-full bg-primary-foreground/15" />
+              <div className="mt-3 w-full [&_[role=combobox]]:border-0 [&_[role=combobox]]:bg-transparent [&_[role=combobox]]:text-primary-foreground/70 [&_[role=combobox]_svg]:text-primary-foreground/70 [&>div]:border-0 [&>div]:bg-transparent [&>div]:text-primary-foreground/70 [&>div]:ring-0">
+                <SucursalSelector collapsed={false} />
+              </div>
+            </>
           )}
+          {railMode && <SucursalSelector collapsed />}
         </div>
 
-        {railMode && <SucursalSelector collapsed />}
-
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
+        <nav className="mt-2 flex-1 overflow-y-auto px-2 py-2 scrollbar-hide">
           {principalItems.length > 0 && (
             <div>
               <div

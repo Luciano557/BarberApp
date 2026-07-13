@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Plus, Building2, Settings } from 'lucide-react';
+import { Plus, Building2, Settings, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -386,6 +386,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       {/* Header */}
       <PageHeader
         title="Mi Negocio"
+        icon={Store}
         subtitle="Configuración general y gestión de sucursales."
         actions={canCreateSucursal && (
           <Button size="sm" onClick={handleOpenCreate}>

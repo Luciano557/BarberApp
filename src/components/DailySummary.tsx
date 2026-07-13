@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, MoreVertical, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Banknote, CreditCard, Receipt, TrendingUp, Clock, User, ChevronLeft, ChevronRight, CalendarIcon, Percent, CheckCircle, Loader2, MoreVertical, Ban, XCircle, CalendarClock, AlertTriangle, RefreshCw, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -475,6 +475,7 @@ export function DailySummary({ summary, barbers, services, lines, selectedDate, 
     <div className="space-y-6 animate-fade-in sm:space-y-8">
       <PageHeader
         title="Cierre de Caja"
+        icon={BarChart3}
         subtitle={(
           <span className="font-medium capitalize">
             {format(validDate, "EEEE d 'de' MMMM yyyy", { locale: es })}

@@ -969,6 +969,7 @@ export function PaymentRegistration({
       {/* Header */}
       <PageHeader
         title="Nuevo Cobro"
+        icon={CreditCard}
         subtitle={(
           <span className="flex items-center gap-1.5 text-xs">
             <Keyboard className="h-3.5 w-3.5" />

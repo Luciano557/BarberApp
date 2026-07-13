@@ -64,6 +64,7 @@ export function ClientesPanel() {
       {/* Header */}
       <PageHeader
         title="Clientes"
+        icon={Users}
         subtitle={subtitle}
         actions={(
           <>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, LogOut, Settings, Shield, ClipboardList, Crown, Wallet, MonitorSmartphone, Bell, User, type LucideIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ConfigMenu } from './config/ConfigMenu';
 import { TareasConfig } from './config/TareasConfig';
@@ -26,6 +26,17 @@ const sectionTitles: Record<ConfigSection, string> = {
   mercadopago: 'MercadoPago Point',
   notificaciones: 'Notificaciones',
   'mi-cuenta': 'Mi cuenta',
+};
+
+const sectionIcons: Record<ConfigSection, LucideIcon> = {
+  menu: Settings,
+  pin: Shield,
+  tareas: ClipboardList,
+  plan: Crown,
+  payments: Wallet,
+  mercadopago: MonitorSmartphone,
+  notificaciones: Bell,
+  'mi-cuenta': User,
 };
 
 interface ConfigurationPanelProps {
@@ -76,7 +87,7 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
             Configuración
           </button>
         )}
-        <PageHeader title={sectionTitles[activeSection]} subtitle={sectionSubtitle} />
+        <PageHeader title={sectionTitles[activeSection]} icon={sectionIcons[activeSection]} subtitle={sectionSubtitle} />
       </div>
 
       {canManageConfig && activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}
