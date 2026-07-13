@@ -348,7 +348,7 @@ export default function Homepage() {
             <img 
               src="/MagotipoAzul.png" 
               alt="Logo Vittro" 
-              className="h-10 w-auto object-contain"
+              className="h-9 w-auto object-contain"
               />
           </Link>
 
