@@ -112,20 +112,22 @@ export function ExtrasConfig({ extras, onAdd, onUpdate, onDelete, mode = 'sucurs
   const renderExtraItem = (extra: Extra) => {
     const itemActive = isItemActive(extra);
     return (
-    <div key={extra.id} className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-      <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
-        <span className="min-w-0 flex-1 break-words font-medium text-foreground sm:truncate">{extra.name}</span>
-        {!isGlobal && (
-          <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
-        )}
-        <div className="flex items-center justify-end">
-          <button
-            onClick={() => startEdit(extra)}
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
-            title="Opciones"
-          >
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+    <div key={extra.id} className="animate-item-in">
+      <div className="rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+          <span className="min-w-0 flex-1 break-words font-medium text-foreground sm:truncate">{extra.name}</span>
+          {!isGlobal && (
+            <span className="text-muted-foreground tabular-nums">${extra.price.toLocaleString('es-AR')}</span>
+          )}
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => startEdit(extra)}
+              className="flex h-7 w-7 items-center justify-center rounded-md bg-transparent hover:bg-muted transition-colors border-[0.5px] border-border"
+              title="Opciones"
+            >
+              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowLeft, LogOut, Settings, Shield, ClipboardList, Crown, Wallet, MonitorSmartphone, Bell, User, type LucideIcon } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ConfigMenu } from './config/ConfigMenu';
 import { TareasConfig } from './config/TareasConfig';
 import { PinConfigSection } from './PinConfigSection';
@@ -26,6 +26,17 @@ const sectionTitles: Record<ConfigSection, string> = {
   mercadopago: 'MercadoPago Point',
   notificaciones: 'Notificaciones',
   'mi-cuenta': 'Mi cuenta',
+};
+
+const sectionIcons: Record<ConfigSection, LucideIcon> = {
+  menu: Settings,
+  pin: Shield,
+  tareas: ClipboardList,
+  plan: Crown,
+  payments: Wallet,
+  mercadopago: MonitorSmartphone,
+  notificaciones: Bell,
+  'mi-cuenta': User,
 };
 
 interface ConfigurationPanelProps {
@@ -57,29 +68,26 @@ export function ConfigurationPanel({ initialSection, onSectionChange }: Configur
     onSectionChange?.(section);
   };
 
+  const sectionSubtitle: string | undefined =
+    activeSection === 'menu' ? 'Configuración de servicios y operaciones' :
+    activeSection === 'payments' ? 'Configuración general del negocio' :
+    activeSection === 'notificaciones' ? 'Personalizá los avisos del Centro de Notificaciones' :
+    activeSection === 'mi-cuenta' ? 'Datos de tu cuenta y preferencias personales' :
+    undefined;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-start gap-3">
+      <div>
         {canManageConfig && activeSection !== 'menu' && (
-          <Button variant="ghost" size="icon" onClick={() => handleSelect('menu')} className="shrink-0">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <button
+            onClick={() => handleSelect('menu')}
+            className="mb-2 flex items-center gap-1 pl-14 text-sm text-muted-foreground transition-colors hover:text-foreground sm:pl-0"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Configuración
+          </button>
         )}
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">{sectionTitles[activeSection]}</h1>
-          {activeSection === 'menu' && (
-            <p className="text-muted-foreground text-sm mt-1">Configuración de servicios y operaciones</p>
-          )}
-          {activeSection === 'payments' && (
-            <p className="text-muted-foreground text-sm mt-1">Configuración general del negocio</p>
-          )}
-          {activeSection === 'notificaciones' && (
-            <p className="text-muted-foreground text-sm mt-1">Personalizá los avisos del Centro de Notificaciones</p>
-          )}
-          {activeSection === 'mi-cuenta' && (
-            <p className="text-muted-foreground text-sm mt-1">Datos de tu cuenta y preferencias personales</p>
-          )}
-        </div>
+        <PageHeader title={sectionTitles[activeSection]} icon={sectionIcons[activeSection]} subtitle={sectionSubtitle} />
       </div>
 
       {canManageConfig && activeSection === 'menu' && <ConfigMenu onSelect={handleSelect} />}

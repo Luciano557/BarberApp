@@ -39,7 +39,7 @@ interface Props {
 }
 
 const cardClasses =
-  "rounded-2xl border border-border/60 bg-card p-5 sm:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.08)]";
+  "rounded-2xl border border-border/60 bg-card p-5 sm:p-6 shadow-sm";
 
 export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   const [step, setStep] = useState(0);

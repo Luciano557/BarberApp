@@ -1,10 +1,14 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { EmptySelectHint } from './EmptySelectHint';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Barber } from '@/types/barbershop';
@@ -21,83 +25,176 @@ interface UnavailableSlotDialogProps {
   onCreated: () => void;
 }
 
+const unavailableSlotSchema = z
+  .object({
+    barberoId: z.string().min(1, 'Seleccioná un barbero'),
+    fecha: z.string().min(1, 'Elegí una fecha'),
+    horaInicio: z.string().min(1, 'Elegí una hora'),
+    horaFin: z.string().min(1, 'Elegí una hora'),
+    motivo: z.string().max(240).optional().default(''),
+  })
+  .refine((data) => data.horaFin > data.horaInicio, {
+    message: 'La hora fin debe ser posterior',
+    path: ['horaFin'],
+  });
+
+type UnavailableSlotFormValues = z.infer<typeof unavailableSlotSchema>;
+
 export function UnavailableSlotDialog({
   open, onOpenChange, organizationId, sucursalId, barbers, defaultDate, defaultBarberId, onCreated,
 }: UnavailableSlotDialogProps) {
-  const [barberoId, setBarberoId] = useState(defaultBarberId || '');
-  const [fecha, setFecha] = useState(format(defaultDate, 'yyyy-MM-dd'));
-  const [horaInicio, setHoraInicio] = useState('12:00');
-  const [horaFin, setHoraFin] = useState('13:00');
-  const [motivo, setMotivo] = useState('');
-  const [saving, setSaving] = useState(false);
+  const activeBarbers = barbers.filter((b) => b.active);
 
-  const activeBarbers = barbers.filter(b => b.active);
+  const form = useForm<UnavailableSlotFormValues>({
+    resolver: zodResolver(unavailableSlotSchema),
+    defaultValues: {
+      barberoId: defaultBarberId || '',
+      fecha: format(defaultDate, 'yyyy-MM-dd'),
+      horaInicio: '12:00',
+      horaFin: '13:00',
+      motivo: '',
+    },
+  });
 
-  const handleSubmit = async () => {
-    if (!barberoId) { toast.error('Seleccioná un barbero'); return; }
-    if (horaFin <= horaInicio) { toast.error('La hora fin debe ser posterior'); return; }
-    setSaving(true);
+  // Resync con la fecha/barbero actuales de la agenda en cada apertura (antes se congelaba en el primer render).
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        barberoId: defaultBarberId || '',
+        fecha: format(defaultDate, 'yyyy-MM-dd'),
+        horaInicio: '12:00',
+        horaFin: '13:00',
+        motivo: '',
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultDate, defaultBarberId]);
+
+  const onSubmit = async (values: UnavailableSlotFormValues) => {
     const { error } = await supabase.from('bloqueos_agenda').insert({
       organization_id: organizationId,
       sucursal_id: sucursalId,
-      barbero_id: barberoId,
-      fecha_inicio: fecha,
-      fecha_fin: fecha,
+      barbero_id: values.barberoId,
+      fecha_inicio: values.fecha,
+      fecha_fin: values.fecha,
       todo_el_dia: false,
-      hora_inicio: horaInicio,
-      hora_fin: horaFin,
-      motivo: motivo.trim().slice(0, 240) || null,
+      hora_inicio: values.horaInicio,
+      hora_fin: values.horaFin,
+      motivo: values.motivo?.trim().slice(0, 240) || null,
     });
-    setSaving(false);
-    if (error) { toast.error('Error al crear el bloqueo'); return; }
+    if (error) {
+      toast.error('Error al crear el bloqueo');
+      return;
+    }
     toast.success('Horario no disponible registrado');
     onOpenChange(false);
     onCreated();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Horario no disponible</DialogTitle>
-          <p className="text-xs text-muted-foreground">Bloquea una franja horaria para un barbero específico.</p>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Barbero</Label>
-            <Select value={barberoId} onValueChange={setBarberoId}>
-              <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-              <SelectContent>
-                {activeBarbers.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Fecha</Label>
-              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Desde</Label>
-              <Input type="time" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Hasta</Label>
-              <Input type="time" value={horaFin} onChange={e => setHoraFin(e.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Motivo (opcional)</Label>
-            <Textarea value={motivo} onChange={e => setMotivo(e.target.value)} maxLength={240} rows={2} />
-          </div>
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Horario no disponible"
+      size="sm"
+      footer={
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>
+            Cancelar
+          </Button>
+          <Button type="submit" form="unavailable-slot-form" disabled={form.formState.isSubmitting || activeBarbers.length === 0}>
+            {form.formState.isSubmitting ? 'Guardando…' : 'Registrar'}
+          </Button>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={saving}>{saving ? 'Guardando…' : 'Registrar'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      }
+    >
+      <p className="text-xs text-muted-foreground mb-4">Bloquea una franja horaria para un barbero específico.</p>
+      <Form {...form}>
+        <form id="unavailable-slot-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+          {activeBarbers.length === 0 ? (
+            <EmptySelectHint
+              message="No hay barberos activos en esta sucursal."
+              ctaLabel="Añadir miembro del equipo"
+              onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+            />
+          ) : (
+            <FormField
+              control={form.control}
+              name="barberoId"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Barbero</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activeBarbers.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+          <div className="grid grid-cols-3 gap-3">
+            <FormField
+              control={form.control}
+              name="fecha"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Fecha</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="horaInicio"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Desde</FormLabel>
+                  <FormControl>
+                    <Input type="time" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="horaFin"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <FormLabel className="text-xs">Hasta</FormLabel>
+                  <FormControl>
+                    <Input type="time" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="motivo"
+            render={({ field }) => (
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">Motivo (opcional)</FormLabel>
+                <FormControl>
+                  <Textarea {...field} maxLength={240} rows={2} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </form>
+      </Form>
+    </DrawerForm>
   );
 }

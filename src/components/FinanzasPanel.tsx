@@ -6,6 +6,7 @@ import { EstadisticasPanel } from '@/components/EstadisticasPanel';
 import { SueldosPanel } from '@/components/SueldosPanel';
 import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 import { getRequiredPlan, planAllowsFeature, PLAN_LABELS, type PlanFeatureKey } from '@/lib/planAccess';
@@ -78,16 +79,16 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: Fin
 
   if (isSucursalAccount) {
     return (
-      <div>
-        <h2 className="mb-6 text-xl font-semibold text-foreground">Finanzas</h2>
+      <div className="animate-fade-in">
+        <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
         <Tabs defaultValue={defaultTab}>
-          <TabsList className="mb-6 h-auto flex-wrap gap-1">
-            <TabsTrigger value="sueldos" className="flex items-center gap-2">
+          <TabsList variant="underline" className="mb-6 flex-wrap">
+            <TabsTrigger value="sueldos" variant="underline">
               <Wallet className="h-4 w-4" />
               Sueldos
               {!canUseSalaries && <LockedTabMarker feature="finance.salaries" />}
             </TabsTrigger>
-            <TabsTrigger value="gastos" className="flex items-center gap-2">
+            <TabsTrigger value="gastos" variant="underline">
               <Receipt className="h-4 w-4" />
               Gastos
               {!canUseExpenses && <LockedTabMarker feature="finance.expenses" />}
@@ -126,31 +127,31 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: Fin
   }
 
   return (
-    <div>
-      <h2 className="mb-6 text-xl font-semibold text-foreground">Finanzas</h2>
+    <div className="animate-fade-in">
+      <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
       <Tabs defaultValue={defaultTab}>
-        <TabsList className="mb-6 h-auto flex-wrap gap-1">
-          <TabsTrigger value="estadisticas" className="flex items-center gap-2">
+        <TabsList variant="underline" className="mb-6 flex-wrap">
+          <TabsTrigger value="estadisticas" variant="underline">
             <BarChart3 className="h-4 w-4" />
             Estadisticas
             {!canUseStatistics && <LockedTabMarker feature="finance.statistics" />}
           </TabsTrigger>
-          <TabsTrigger value="sueldos" className="flex items-center gap-2">
+          <TabsTrigger value="sueldos" variant="underline">
             <Wallet className="h-4 w-4" />
             Sueldos
             {!canUseSalaries && <LockedTabMarker feature="finance.salaries" />}
           </TabsTrigger>
-          <TabsTrigger value="gastos" className="flex items-center gap-2">
+          <TabsTrigger value="gastos" variant="underline">
             <Receipt className="h-4 w-4" />
             Gastos
             {!canUseExpenses && <LockedTabMarker feature="finance.expenses" />}
           </TabsTrigger>
-          <TabsTrigger value="inversiones" className="flex items-center gap-2">
+          <TabsTrigger value="inversiones" variant="underline">
             <TrendingUp className="h-4 w-4" />
             Inversiones
             {!canUseInvestments && <LockedTabMarker feature="finance.investments" />}
           </TabsTrigger>
-          <TabsTrigger value="deudas" className="flex items-center gap-2">
+          <TabsTrigger value="deudas" variant="underline">
             <Landmark className="h-4 w-4" />
             Deudas
             {!canUseDebts && <LockedTabMarker feature="finance.debts" />}

@@ -48,7 +48,7 @@ export function VoidClosureDialog({
         <div className="py-4 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="void-reason" className="text-sm font-medium">
-              Motivo de la anulación <span className="text-destructive">*</span>
+              Motivo de la anulación
             </Label>
             <Select value={voidReason} onValueChange={onVoidReasonChange}>
               <SelectTrigger id="void-reason">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { CalendarClock } from 'lucide-react';
+import { Building2, CalendarClock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -109,24 +110,15 @@ export function TurnosAgendaPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-            <CalendarClock className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Turnos</h1>
-            <p className="text-sm text-muted-foreground">Configurá horarios, disponibilidad y bloqueos</p>
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Turnos" icon={CalendarClock} subtitle="Configurá horarios, disponibilidad y bloqueos" />
 
       {visibleSucursales.length > 0 && (
         <Tabs defaultValue={defaultTabId} className="w-full">
           {visibleSucursales.length > 1 && (
-            <TabsList className="grid h-auto w-full gap-1 rounded-lg bg-muted p-1 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
+            <TabsList variant="underline" className="flex-wrap">
               {visibleSucursales.map(s => (
-                <TabsTrigger key={s.id} value={s.id} className="min-h-9 whitespace-normal rounded-md px-2 text-center text-xs data-[state=active]:bg-card sm:text-sm">
+                <TabsTrigger key={s.id} value={s.id} variant="underline">
+                  <Building2 className="h-4 w-4" />
                   {s.nombre}
                 </TabsTrigger>
               ))}

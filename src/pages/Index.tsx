@@ -9,7 +9,6 @@ import { MiNegocioPanel, type MiNegocioPanelHandle } from '@/components/MiNegoci
 import { TurnosAgendaPanel } from '@/components/TurnosAgendaPanel';
 import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
-import { AppPanelHeader } from '@/components/AppPanelHeader';
 import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
 import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
@@ -17,6 +16,7 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -29,8 +29,9 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 
 const Index = () => {
   const isMobile = useIsMobile();
-  const { canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
+  const { user, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const { organization } = useOrganization();
+  usePushNotifications(user?.id, organization?.id);
   const { access: subscriptionAccess } = useSubscriptionAccess();
   const onboarding = useOnboarding();
   const effectivePlan = resolveEffectivePlan(subscriptionAccess, organization?.plan);
@@ -197,12 +198,6 @@ const Index = () => {
 
       <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
         <div className={cn("mx-auto px-4 py-6 sm:px-6 md:px-8", activeTab === 'turnos-agenda' ? "max-w-none px-4 md:px-4" : "max-w-7xl")}>
-          {activeTab !== 'welcome' && activeTab !== 'no-access' && (
-            <div className="pl-14 sm:pl-0">
-              <AppPanelHeader />
-            </div>
-          )}
-
           {activeTab === 'registro' && canOperarCajaYGastos && (
             <PaymentRegistration
               services={services}

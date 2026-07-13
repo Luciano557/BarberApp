@@ -1,8 +1,12 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -32,6 +36,81 @@ import { SelectableCard } from '@/components/ui/SelectableCard';
 import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
+
+/**
+ * `getTotal` se resuelve vía ref (ver `totalRef` en el componente): el total a
+ * cobrar depende de servicio/extras/descuento/productos, que viven fuera del
+ * form. El schema se crea una sola vez por instancia del componente y siempre
+ * lee el total vigente al momento de validar.
+ */
+function buildCobroSchema(getTotal: () => number) {
+  return z
+    .object({
+      barberId: z.string().optional().default(''),
+      serviceId: z.string().optional().default(''),
+      extraIds: z.array(z.string()).optional().default([]),
+      discountId: z.string().optional().default('none'),
+      paymentMethod: z.string().optional().default(''),
+      cart: z.array(z.any()).optional().default([]),
+      split: z
+        .object({
+          enabled: z.boolean().default(false),
+          efectivo: z.string().optional().default(''),
+          digital: z.string().optional().default(''),
+          digitalMethod: z.string().optional().default(''),
+        })
+        .default({ enabled: false, efectivo: '', digital: '', digitalMethod: '' }),
+    })
+    .superRefine((data, ctx) => {
+      const hasService = !!data.serviceId;
+      const hasProducts = data.cart.length > 0;
+
+      if (!hasService && !hasProducts) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Agregá al menos un servicio o un producto.',
+          path: ['root'],
+        });
+      }
+      if (hasService && !data.barberId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Seleccioná el barbero que atendió el servicio.',
+          path: ['barberId'],
+        });
+      }
+      if (!data.paymentMethod) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Seleccioná cómo paga el cliente.',
+          path: ['paymentMethod'],
+        });
+      }
+      if (data.split.enabled) {
+        const total = getTotal();
+        const efectivoNum = parseFloat(data.split.efectivo) || 0;
+        const digitalNum = parseFloat(data.split.digital) || 0;
+        const sum = efectivoNum + digitalNum;
+        const valid = efectivoNum > 0 && digitalNum > 0 && Math.abs(sum - total) < 0.01 && efectivoNum <= total && digitalNum <= total;
+        if (!valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'La suma debe ser igual al total y ambos métodos mayores a cero.',
+            path: ['split', 'efectivo'],
+          });
+        }
+        if (!data.split.digitalMethod) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Seleccioná el método electrónico para el split.',
+            path: ['split', 'digitalMethod'],
+          });
+        }
+      }
+    });
+}
+
+type CobroFormValues = z.infer<ReturnType<typeof buildCobroSchema>>;
 
 interface PaymentRegistrationProps {
   services: Service[];
@@ -101,11 +180,29 @@ export function PaymentRegistration({
   const [selectedDiscount, setSelectedDiscount] = useState('none');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [splitMode, setSplitMode] = useState(false);
-  const [efectivoAmount, setEfectivoAmount] = useState<string>('');
-  const [mpAmount, setMpAmount] = useState<string>('');
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // El total se resuelve vía ref porque el schema (módulo, no re-creado por render)
+  // necesita leer el total vigente al momento de validar el split.
+  const totalRef = useRef(0);
+  const cobroSchemaRef = useRef<ReturnType<typeof buildCobroSchema>>();
+  if (!cobroSchemaRef.current) {
+    cobroSchemaRef.current = buildCobroSchema(() => totalRef.current);
+  }
+  const form = useForm<CobroFormValues>({
+    resolver: zodResolver(cobroSchemaRef.current),
+    defaultValues: {
+      barberId: '',
+      serviceId: '',
+      extraIds: [],
+      discountId: 'none',
+      paymentMethod: '',
+      cart: [],
+      split: { enabled: false, efectivo: '', digital: '', digitalMethod: '' },
+    },
+  });
   type OverlayPhase = 'idle' | 'visible' | 'exiting';
   const [overlayPhase, setOverlayPhase] = useState<OverlayPhase>('idle');
   const overlayTimersRef = useRef<{ hold?: ReturnType<typeof setTimeout>; exit?: ReturnType<typeof setTimeout> }>({});
@@ -273,6 +370,7 @@ export function PaymentRegistration({
   }, [subtotalServicios, selectedDiscountData, isDiscountValidForPayment]);
 
   const total = useMemo(() => Math.max(0, subtotal - discountAmount), [subtotal, discountAmount]);
+  totalRef.current = total;
 
   const goToNextStep = useCallback(() => {
     if (currentStepIndex < STEPS.length - 1) {
@@ -307,8 +405,10 @@ export function PaymentRegistration({
     }
 
     setSelectedBarber(barberId);
+    form.setValue('barberId', barberId);
+    form.trigger();
     setTimeout(() => goToNextStep(), 100);
-  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast]);
+  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast, form]);
 
   const handleSelectNoBarber = useCallback(() => {
     setProductSaleAssignment('no_barber');
@@ -318,9 +418,14 @@ export function PaymentRegistration({
     setSelectedService('');
     setSelectedExtras([]);
     setSelectedDiscount('none');
+    form.setValue('barberId', '');
+    form.setValue('serviceId', '');
+    form.setValue('extraIds', []);
+    form.setValue('discountId', 'none');
+    form.trigger();
     // Helper: hoy va directo a payment. Encapsulado para que en el futuro pueda enrutar a un step de descuento de productos.
     setCurrentStep('payment');
-  }, []);
+  }, [form]);
 
   const handleGoToTeamSetup = useCallback(() => {
     if (isSucursalAccount) {
@@ -373,14 +478,18 @@ export function PaymentRegistration({
       return;
     }
     setSelectedService(serviceId);
+    form.setValue('serviceId', serviceId);
+    form.trigger();
     setTimeout(() => goToNextStep(), 100);
-  }, [selectedBarber, goToNextStep, toast, services]);
+  }, [selectedBarber, goToNextStep, toast, services, form]);
 
 
   const handleToggleExtra = useCallback((extraId: string) => {
     setSelectedExtras(prev => {
       if (prev.includes(extraId)) {
-        return prev.filter(id => id !== extraId);
+        const next = prev.filter(id => id !== extraId);
+        form.setValue('extraIds', next);
+        return next;
       }
       const ex = extras.find(e => e.id === extraId);
       if (!ex || isPriceMissing(ex.price)) {
@@ -391,57 +500,74 @@ export function PaymentRegistration({
         });
         return prev;
       }
-      return [...prev, extraId];
+      const next = [...prev, extraId];
+      form.setValue('extraIds', next);
+      return next;
     });
-  }, [extras, toast]);
+  }, [extras, toast, form]);
 
   const handleSelectDiscount = useCallback((discountId: string) => {
     setSelectedDiscount(discountId);
+    form.setValue('discountId', discountId);
     setTimeout(() => goToNextStep(), 100);
-  }, [goToNextStep]);
+  }, [goToNextStep, form]);
 
   const handleSelectPayment = useCallback((method: PaymentMethod) => {
     setSplitMode(false);
-    setEfectivoAmount('');
-    setMpAmount('');
     setPaymentMethod(method);
-  }, []);
+    form.setValue('paymentMethod', method);
+    form.setValue('split.enabled', false);
+    form.setValue('split.efectivo', '');
+    form.setValue('split.digital', '');
+    form.trigger();
+  }, [form]);
 
   const enableSplitMode = useCallback(() => {
     setSplitMode(true);
     setPaymentMethod('efectivo');
-    setEfectivoAmount('');
-    setMpAmount('');
-  }, []);
+    form.setValue('paymentMethod', 'efectivo');
+    form.setValue('split.enabled', true);
+    form.setValue('split.efectivo', '');
+    form.setValue('split.digital', '');
+    form.trigger();
+  }, [form]);
 
   const cancelSplitMode = useCallback(() => {
     setSplitMode(false);
-    setEfectivoAmount('');
-    setMpAmount('');
     setPaymentMethod('');
-  }, []);
+    form.setValue('paymentMethod', '');
+    form.setValue('split.enabled', false);
+    form.setValue('split.efectivo', '');
+    form.setValue('split.digital', '');
+    form.trigger();
+  }, [form]);
+
+  const efectivoAmount = form.watch('split.efectivo');
+  const mpAmount = form.watch('split.digital');
 
   const handleEfectivoChange = useCallback((val: string) => {
-    setEfectivoAmount(val);
+    form.setValue('split.efectivo', val);
     const num = parseFloat(val);
     if (!isNaN(num) && total > 0) {
       const remainder = Math.max(0, total - num);
-      setMpAmount(remainder > 0 ? remainder.toString() : '');
+      form.setValue('split.digital', remainder > 0 ? remainder.toString() : '');
     } else if (val === '') {
-      setMpAmount('');
+      form.setValue('split.digital', '');
     }
-  }, [total]);
+    form.trigger();
+  }, [total, form]);
 
   const handleMpChange = useCallback((val: string) => {
-    setMpAmount(val);
+    form.setValue('split.digital', val);
     const num = parseFloat(val);
     if (!isNaN(num) && total > 0) {
       const remainder = Math.max(0, total - num);
-      setEfectivoAmount(remainder > 0 ? remainder.toString() : '');
+      form.setValue('split.efectivo', remainder > 0 ? remainder.toString() : '');
     } else if (val === '') {
-      setEfectivoAmount('');
+      form.setValue('split.efectivo', '');
     }
-  }, [total]);
+    form.trigger();
+  }, [total, form]);
 
   const splitEfectivoNum = parseFloat(efectivoAmount) || 0;
   const splitMpNum = parseFloat(mpAmount) || 0;
@@ -485,16 +611,21 @@ export function PaymentRegistration({
   // Inicializar / sincronizar selectedDigitalMethod con la lista activa
   useEffect(() => {
     if (electronicMethods.length === 0) {
-      if (selectedDigitalMethod !== '') setSelectedDigitalMethod('');
+      if (selectedDigitalMethod !== '') {
+        setSelectedDigitalMethod('');
+        form.setValue('split.digitalMethod', '');
+      }
       return;
     }
     const stillActive = selectedDigitalMethod
       && electronicMethods.some(m => m.method === selectedDigitalMethod);
     if (!stillActive) {
       const mp = electronicMethods.find(m => m.method === 'mercado_pago');
-      setSelectedDigitalMethod(mp ? mp.method : electronicMethods[0].method);
+      const next = mp ? mp.method : electronicMethods[0].method;
+      setSelectedDigitalMethod(next);
+      form.setValue('split.digitalMethod', next);
     }
-  }, [electronicMethods, selectedDigitalMethod]);
+  }, [electronicMethods, selectedDigitalMethod, form]);
 
   // Self-healing: si el método elegido se desactivó en otra pestaña
   useEffect(() => {
@@ -502,14 +633,17 @@ export function PaymentRegistration({
     const activeSet = new Set(activeMethods.map(m => m.method));
     if (!splitMode && paymentMethod && !activeSet.has(paymentMethod)) {
       setPaymentMethod('');
+      form.setValue('paymentMethod', '');
     }
     if (splitMode && !activeSet.has('efectivo')) {
       setSplitMode(false);
-      setEfectivoAmount('');
-      setMpAmount('');
+      form.setValue('split.enabled', false);
+      form.setValue('split.efectivo', '');
+      form.setValue('split.digital', '');
       setPaymentMethod('');
+      form.setValue('paymentMethod', '');
     }
-  }, [methodsLoading, activeMethods, paymentMethod, splitMode]);
+  }, [methodsLoading, activeMethods, paymentMethod, splitMode, form]);
 
   const resetForm = useCallback(() => {
     setSelectedBarber('');
@@ -518,61 +652,35 @@ export function PaymentRegistration({
     setSelectedDiscount('none');
     setPaymentMethod('');
     setSplitMode(false);
-    setEfectivoAmount('');
-    setMpAmount('');
     setCart([]);
     setCartBarberId(null);
     setCartBarberName(null);
     setProductSaleAssignment('pending');
     setCurrentStep('barber');
-  }, []);
+    form.reset({
+      barberId: '',
+      serviceId: '',
+      extraIds: [],
+      discountId: 'none',
+      paymentMethod: '',
+      cart: [],
+      split: { enabled: false, efectivo: '', digital: '', digitalMethod: '' },
+    });
+  }, [form]);
 
-  const handleSubmit = useCallback(async () => {
+  const onValidCobro = useCallback(async () => {
+    // Guard previo: ítems sin precio (depende de config externa de precios — no es
+    // parte del schema porque no es validación de forma, es una regla de negocio
+    // sobre datos externos). Se chequea primero, antes del guardado, preservando el
+    // mismo orden que tenía el handler imperativo original.
     const hasService = !!selectedService;
-    const hasProducts = cart.length > 0;
-
-    if (!hasService && !hasProducts) {
-      toast({
-        title: 'Venta vacía',
-        description: 'Agregá al menos un servicio o un producto.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     const invalidService = hasService && isPriceMissing(service?.price);
     const invalidExtras = selectedExtrasData.some(e => isPriceMissing(e.price));
     const invalidProducts = cart.some(it => isPriceMissing(it.precio_unitario));
     if (invalidService || invalidExtras || invalidProducts) {
-      toast({
-        title: 'Ítems sin precio',
-        description: 'Hay ítems sin precio configurado. Definí el precio antes de cobrar.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (hasService && !selectedBarber) {
-      toast({
-        title: 'Falta barbero',
-        description: 'Seleccioná el barbero que atendió el servicio.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    if (!paymentMethod) {
-      toast({
-        title: 'Falta método de pago',
-        description: 'Seleccioná cómo paga el cliente.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (splitMode && !splitValid) {
-      toast({
-        title: "Pagos inválidos",
-        description: "La suma debe ser igual al total y ambos métodos mayores a cero.",
-        variant: "destructive",
+      form.setError('root', {
+        type: 'manual',
+        message: 'Hay ítems sin precio configurado. Definí el precio antes de cobrar.',
       });
       return;
     }
@@ -584,26 +692,21 @@ export function PaymentRegistration({
       let primaryMethod: PaymentMethod;
 
       if (splitMode) {
-        if (!selectedDigitalMethod) {
-          toast({
-            title: 'Falta método electrónico',
-            description: 'Seleccioná el método electrónico para el split.',
-            variant: 'destructive',
-          });
-          setIsSubmitting(false);
-          return;
-        }
+        // selectedDigitalMethod y paymentMethod ya vienen garantizados no-vacíos por
+        // el schema (split.digitalMethod / paymentMethod requeridos) al llegar acá.
+        const digitalMethod = selectedDigitalMethod as PaymentMethod;
         const recE = Math.round((splitEfectivoNum * pctEfectivo) / 100);
         const recD = Math.round((splitMpNum * pctDigital) / 100);
         payments = [
           { method: 'efectivo', basePago: splitEfectivoNum, recargoPct: pctEfectivo, recargoMonto: recE, amount: splitEfectivoNum + recE },
-          { method: selectedDigitalMethod, basePago: splitMpNum, recargoPct: pctDigital, recargoMonto: recD, amount: splitMpNum + recD },
+          { method: digitalMethod, basePago: splitMpNum, recargoPct: pctDigital, recargoMonto: recD, amount: splitMpNum + recD },
         ];
-        primaryMethod = splitEfectivoNum >= splitMpNum ? 'efectivo' : selectedDigitalMethod;
+        primaryMethod = splitEfectivoNum >= splitMpNum ? 'efectivo' : digitalMethod;
       } else {
+        const finalPaymentMethod = paymentMethod as PaymentMethod;
         const recargoMonto = Math.round((total * pctSimple) / 100);
-        payments = [{ method: paymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
-        primaryMethod = paymentMethod;
+        payments = [{ method: finalPaymentMethod, basePago: total, recargoPct: pctSimple, recargoMonto, amount: total + recargoMonto }];
+        primaryMethod = finalPaymentMethod;
       }
 
       const productosPayload: ProductoCartInput[] = cart.map(it => ({
@@ -659,7 +762,11 @@ export function PaymentRegistration({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedBarber, selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitValid, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, recargoTotal, totalACobrar, cart, cartBarberId, cartBarberName, productSaleAssignment]);
+  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form]);
+
+  const handleSubmit = useCallback(async () => {
+    await form.handleSubmit(onValidCobro)();
+  }, [form, onValidCobro]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -689,6 +796,7 @@ export function PaymentRegistration({
           goToNextStep();
         } else if (currentStep === 'payment' && paymentMethod) {
           e.preventDefault();
+          if (isSubmitting) return;
           handleSubmit();
         }
       }
@@ -711,7 +819,7 @@ export function PaymentRegistration({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length]);
+  }, [currentStep, barbers, services, extras, discounts, paymentMethod, selectedBarber, selectedService, activeMethods, handleSelectBarber, handleSelectNoBarber, handleSelectService, handleToggleExtra, handleSelectDiscount, handleSelectPayment, goToNextStep, goToPrevStep, handleSubmit, cart.length, isSubmitting]);
 
   // ── MP Terminal confirmed callback ──────────────────────────────────────────
   const handleMpTerminalConfirmed = useCallback(async (intentId: string, deviceId: string) => {
@@ -859,13 +967,17 @@ export function PaymentRegistration({
       </AlertDialog>
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Nuevo Cobro</h1>
-        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Keyboard className="h-3.5 w-3.5" />
-          Ctrl+1-9 para selección rápida
-        </p>
-      </div>
+      <PageHeader
+        title="Nuevo Cobro"
+        icon={CreditCard}
+        subtitle={(
+          <span className="flex items-center gap-1.5 text-xs">
+            <Keyboard className="h-3.5 w-3.5" />
+            Ctrl+1-9 para selección rápida
+          </span>
+        )}
+        actionsLayout="inline"
+      />
 
       {/* Progress Steps */}
       <div className="flex gap-1">
@@ -962,6 +1074,10 @@ export function PaymentRegistration({
               </div>
             )}
 
+            {form.formState.submitCount > 0 && form.formState.errors.barberId && (
+              <p className="text-sm text-destructive">{form.formState.errors.barberId.message}</p>
+            )}
+
             {/* Bloque productos: solo en paso inicial */}
             <div className="rounded-lg border border-border bg-card overflow-hidden">
               <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
@@ -1035,6 +1151,8 @@ export function PaymentRegistration({
                                 setCartBarberId(null);
                                 setCartBarberName(null);
                               }
+                              form.setValue('cart', next);
+                              form.trigger();
                               return next;
                             });
                           }}
@@ -1336,6 +1454,10 @@ export function PaymentRegistration({
                   <Split className="h-4 w-4" />
                   Combinar métodos de pago
                 </button>
+
+                {form.formState.submitCount > 0 && form.formState.errors.paymentMethod && (
+                  <p className="text-sm text-destructive">{form.formState.errors.paymentMethod.message}</p>
+                )}
               </>
             ) : (
               <div className="space-y-4 rounded-lg border border-border bg-card p-4 sm:p-6">
@@ -1357,7 +1479,11 @@ export function PaymentRegistration({
                         <button
                           key={m.method}
                           type="button"
-                          onClick={() => setSelectedDigitalMethod(m.method)}
+                          onClick={() => {
+                            setSelectedDigitalMethod(m.method);
+                            form.setValue('split.digitalMethod', m.method);
+                            form.trigger();
+                          }}
                           className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                             selectedDigitalMethod === m.method
                               ? 'border-secondary bg-secondary/10 text-foreground'
@@ -1370,6 +1496,10 @@ export function PaymentRegistration({
                       ))}
                     </div>
                   </div>
+                )}
+
+                {form.formState.submitCount > 0 && form.formState.errors.split?.digitalMethod && (
+                  <p className="text-sm text-destructive">{form.formState.errors.split.digitalMethod.message}</p>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1512,6 +1642,10 @@ export function PaymentRegistration({
                 <span key={totalACobrar} className="animate-value-change self-end text-3xl font-bold text-foreground sm:self-auto">${totalACobrar.toLocaleString()}</span>
               </div>
 
+              {form.formState.submitCount > 0 && form.formState.errors.root && (
+                <p className="mt-3 text-sm text-destructive">{form.formState.errors.root.message}</p>
+              )}
+
               <Button
                 onClick={handleSubmit}
                 className="w-full mt-6 h-14 text-base font-medium bg-secondary text-secondary-foreground hover:bg-secondary/90"
@@ -1586,6 +1720,8 @@ export function PaymentRegistration({
           onClose={() => setPickerOpen(false)}
           onConfirm={(items) => {
             setCart(items);
+            form.setValue('cart', items);
+            form.trigger();
             // Si el carrito quedó vacío tras editar, resetear asignación.
             if (items.length === 0) {
               setProductSaleAssignment('pending');

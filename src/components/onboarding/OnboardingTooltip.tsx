@@ -56,7 +56,7 @@ export function OnboardingTooltip() {
   if (isMobile) {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[70] animate-fade-in px-3 pb-3 pt-2">
-        <div className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl p-4">
+        <div className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-md p-4">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Paso {currentIndex + 1} de {totalSteps}
@@ -141,7 +141,7 @@ export function OnboardingTooltip() {
       className="fixed z-[70] animate-fade-in"
       style={{ top, left, transform, width: TOOLTIP_W }}
     >
-      <div className="relative rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl p-4">
+      <div className="relative rounded-xl border border-border bg-popover text-popover-foreground shadow-md p-4">
         {arrow && <Arrow direction={arrow} />}
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">

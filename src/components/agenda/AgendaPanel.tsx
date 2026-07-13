@@ -244,7 +244,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
 
       {/* Vista */}
       {view === 'day' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
           <AgendaDayView
             date={date}
             barbers={barbers}
@@ -260,7 +260,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         </div>
       )}
       {view === '3days' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
           <AgendaMultiDayView
             startDate={fromDate}
             daysCount={3}
@@ -274,7 +274,7 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         </div>
       )}
       {view === 'week' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out">
+        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
           <AgendaMultiDayView
             startDate={fromDate}
             daysCount={7}

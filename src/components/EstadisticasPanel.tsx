@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 
 interface MonthlyData {
   month: string;
@@ -140,6 +141,7 @@ function MetricChart({
   color: string;
   formatValue: (v: number) => string;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const config = { [dataKey]: { label: dataKey, color } };
   const vKey = varKeyMap[dataKey as string];
 
@@ -160,8 +162,8 @@ function MetricChart({
             />
           }
         />
-        <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} opacity={0.7} />
-        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} />
+        <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} opacity={0.7} isAnimationActive={!prefersReducedMotion} />
+        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} isAnimationActive={!prefersReducedMotion} />
       </ComposedChart>
     </ChartContainer>
   );
@@ -178,6 +180,7 @@ function MetricDetailDialog({
   metric: MetricCardDef | null;
   data: DerivedMonthlyMetrics[];
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   if (!metric) return null;
   const config = { [metric.dataKey]: { label: metric.title, color: metric.chartColor } };
   const vKey = varKeyMap[metric.dataKey as string];
@@ -210,8 +213,8 @@ function MetricDetailDialog({
                 />
               }
             />
-            <Bar dataKey={metric.dataKey} fill={metric.chartColor} radius={[4, 4, 0, 0]} opacity={0.6} />
-            <Line type="monotone" dataKey={metric.dataKey} stroke={metric.chartColor} strokeWidth={2.5} dot={{ r: 3, fill: metric.chartColor }} />
+            <Bar dataKey={metric.dataKey} fill={metric.chartColor} radius={[4, 4, 0, 0]} opacity={0.6} isAnimationActive={!prefersReducedMotion} />
+            <Line type="monotone" dataKey={metric.dataKey} stroke={metric.chartColor} strokeWidth={2.5} dot={{ r: 3, fill: metric.chartColor }} isAnimationActive={!prefersReducedMotion} />
           </ComposedChart>
         </ChartContainer>
 
@@ -266,6 +269,7 @@ type MetricCardDef = {
 };
 
 export function EstadisticasPanel() {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
@@ -843,7 +847,7 @@ export function EstadisticasPanel() {
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value, name, item) => `${value} ventas promedio cada ${DAY_NAMES_FULL[([1,2,3,4,5,6,0])[behaviorData.byDay.findIndex(d => d.name === item?.payload?.name)] ?? 0]}`} />} />
-                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} isAnimationActive={!prefersReducedMotion} />
               </ComposedChart>
             </ChartContainer>
           </CardContent>
@@ -865,7 +869,7 @@ export function EstadisticasPanel() {
                 <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
                 <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={35} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => `${value} ventas promedio diarias`} />} />
-                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="ventas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} isAnimationActive={!prefersReducedMotion} />
               </ComposedChart>
             </ChartContainer>
           </CardContent>
@@ -920,10 +924,6 @@ export function EstadisticasPanel() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Estadísticas</h1>
-          <p className="text-muted-foreground">Cargando datos...</p>
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map(i => (
             <Card key={i} className="animate-pulse">
@@ -937,25 +937,19 @@ export function EstadisticasPanel() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Estadísticas</h1>
-          <p className="text-muted-foreground">Análisis y métricas del negocio</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={periodoMeses} onValueChange={setPeriodoMeses}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="3">Últimos 3 meses</SelectItem>
-              <SelectItem value="6">Últimos 6 meses</SelectItem>
-              <SelectItem value="12">Último año</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center gap-2 justify-end">
+        <Calendar className="h-4 w-4 text-muted-foreground" />
+        <Select value={periodoMeses} onValueChange={setPeriodoMeses}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="3">Últimos 3 meses</SelectItem>
+            <SelectItem value="6">Últimos 6 meses</SelectItem>
+            <SelectItem value="12">Último año</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Grupo 1: Ingresos y Ventas */}
@@ -1001,8 +995,8 @@ export function EstadisticasPanel() {
                     />
                   }
                 />
-                <Bar dataKey="servicios" fill={serviciosCard.chartColor} radius={[3, 3, 0, 0]} opacity={0.7} />
-                <Line type="monotone" dataKey="servicios" stroke={serviciosCard.chartColor} strokeWidth={2} dot={false} />
+                <Bar dataKey="servicios" fill={serviciosCard.chartColor} radius={[3, 3, 0, 0]} opacity={0.7} isAnimationActive={!prefersReducedMotion} />
+                <Line type="monotone" dataKey="servicios" stroke={serviciosCard.chartColor} strokeWidth={2} dot={false} isAnimationActive={!prefersReducedMotion} />
               </ComposedChart>
             </ChartContainer>
           </CardContent>
