@@ -8,12 +8,12 @@ interface CobrarConfigProps {
   services: Service[];
   extras: Extra[];
   lines: Line[];
-  onAddService: (service: Omit<Service, 'id' | 'uid'>) => void;
-  onUpdateService: (id: string, updates: Partial<Service>) => void;
-  onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => void;
-  onUpdateExtra: (id: string, updates: Partial<Extra>) => void;
+  onAddService: (service: Omit<Service, 'id' | 'uid'>) => Promise<Service | null>;
+  onUpdateService: (id: string, updates: Partial<Service>) => Promise<void>;
+  onAddExtra: (extra: Omit<Extra, 'id' | 'uid'>) => Promise<Extra | null>;
+  onUpdateExtra: (id: string, updates: Partial<Extra>) => Promise<void>;
   onAddLine: (line: Omit<Line, 'id'>) => Promise<Line | null>;
-  onUpdateLine: (id: string, updates: Partial<Line>) => void;
+  onUpdateLine: (id: string, updates: Partial<Line>) => Promise<void>;
   canCreateServices?: boolean;
   canEditServiceStructure?: boolean;
 }

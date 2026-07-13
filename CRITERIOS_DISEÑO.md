@@ -1826,3 +1826,351 @@ sin contar un eventual archivo nuevo compartido si se decide estandarizar
 el guard de doble submit en un hook/util común en vez de repetirlo 6 veces
 (`ServicesConfig` ×2, `ExtrasConfig`, `DiscountsConfig`, `LinesConfig` edit,
 `ComisionEquipoConfig`, `LineQuickEditPopover`).
+
+---
+
+## Fase 4 - Tanda 2 - Build 1 (Catálogo) — 2026-07-13
+
+Primero de 3 builds de la Parte 1 (Configuración). Migra los 4 formularios
+de catálogo (ya DrawerForm) de `useState` + `toast.error` a
+React Hook Form + Zod, con errores inline vía `ui/form.tsx`
+(`FormField`/`FormItem`/`FormLabel`/`FormControl`/`FormMessage`, el wrapper
+que existía sin uso desde F3.0). El quick-create "Nueva línea" de
+`ServicesConfig.tsx` migra además de contenedor: Dialog centrado → DrawerForm.
+
+### Archivos modificados
+
+- `src/components/config/ServicesConfig.tsx` (formulario principal + quick-create de línea, mismo archivo)
+- `src/components/config/LinesConfig.tsx`
+- `src/components/config/ExtrasConfig.tsx`
+- `src/components/config/DiscountsConfig.tsx`
+
+### maxLength y obligatorio — preservados tal cual
+
+Confirmado campo por campo contra la tabla de la auditoría (Parte 1, §1):
+Nombre 80 en los 4 (y en el quick-create de línea); Descripción 240 con
+contador de caracteres en Servicios y Líneas (Extras y Descuentos nunca
+tuvieron ese campo, no se agregó). Ningún campo obligatorio quedó marcado
+con asterisco ni ningún opcional perdió su "(opcional)" — se preservó la
+variante 4 ya vigente (nada en los obligatorios) tal como pedías, no se
+tocó el criterio. El fallback "Sin línea" del Select de Servicios y los
+selects de opciones fijas de Descuentos (Aplica a/Tipo/Redondeo/Método) no
+se tocaron.
+
+### Guard de doble submit — parejo y completo en los 4
+
+Los 4 usan ahora `form.formState.isSubmitting` para deshabilitar
+Guardar/Guardar cambios (y Cancelar, para no permitir cerrar a mitad de un
+guardado) — nada de estado `saving`/`isSaving` implementado a mano. Esto
+resuelve la inconsistencia de Líneas (Agregar tenía guard, Editar no: ambos
+comparten ahora el mismo `form`) y los guards faltantes de Extras,
+Descuentos y el Guardar/Guardar cambios de Servicios.
+
+**Corrección a esta nota (2026-07-13, misma fecha, tras el diagnóstico y el
+type-fix posteriores):** acá decía que el guard tenía "una sola microtarea"
+de protección real en `ExtrasConfig`/`DiscountsConfig`/`ServicesConfig`/
+`LinesConfig.onUpdate`, porque sus props estaban tipadas `=> void`. Eso era
+incorrecto. Se verificó contra `useSupabaseData.ts` que las 14 funciones
+subyacentes (`addService`/`updateService`/`addExtra`/`updateExtra`/
+`addDiscount`/`updateDiscount`/`addLine`/`updateLine` y sus variantes
+`*Global`) ya son genuinamente `async` y hacen `await` real contra
+Supabase antes de resolver — el tipo `=> void` era solo una anotación de
+TypeScript desactualizada, no el comportamiento en runtime (`await` opera
+sobre el valor real, no sobre el tipo declarado, que se borra en compilación).
+El `await onAdd(...)`/`await onUpdate(...)` de estos 4 archivos ya esperaba
+la operación de red completa desde el primer momento. Las firmas de
+`MiNegocioGeneralTabContent.tsx`, `SucursalTabContent.tsx` y
+`CobrarConfig.tsx` se corrigieron después (mismo día, cambio de solo tipos,
+sin lógica) a `Promise<X | null>` / `Promise<void>` para que la anotación
+coincida con la realidad. El guard de doble submit de este Build 1 es
+completo en los 4 archivos, sin salvedades.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.
+
+---
+
+## Fase 4 - Tanda 2 - Build 2 (Productos + Marcas) — 2026-07-13
+
+Segundo de 3 builds de la Parte 1 (Configuración). Migra los 2 formularios
+de Producto (decisión F3.11 ya cerrada: **no se fusionan**, siguen siendo
+dos formularios separados por alcance de dato) y `MarcasManagerDialog` a
+DrawerForm + RHF/Zod, y unifica la implementación de los 3 campos que
+Producto-sucursal y Producto-global comparten (Nombre/Marca/Descripción).
+
+### Archivos modificados
+
+- `src/components/productos/ProductoDialog.tsx` — Dialog con pestañas → DrawerForm (`size="md"`), RHF+Zod completo
+- `src/components/productos/ProductosGlobalConfig.tsx` — ya era DrawerForm, migró validación a RHF+Zod
+- `src/components/productos/MarcasManagerDialog.tsx` — Dialog → DrawerForm, RHF+Zod
+- `src/components/productos/productSharedFields.ts` **(nuevo)** — schema Zod compartido de los 3 campos, según lo que sugería el punto 3 del pedido
+- `src/components/ui/drawer-form.tsx` — cambio aditivo: `footer` pasó de requerido a opcional (ver nota abajo)
+
+### Los 3 campos compartidos — unificados en `productSharedFields.ts`
+
+Un único `productSharedFieldsSchema` (Nombre requerido, `trim().min(1).max(80)`,
+mensaje `"El nombre no puede estar vacío."` / `"...no puede superar los 80
+caracteres."` — el mismo copy que ya usan Servicios/Líneas/Extras/Descuentos
+del Build 1, no uno nuevo; Marca como Select con sentinel `'none'` unificado
+—`ProductoDialog` usaba `'__none__'`, lo cambié al mismo sentinel que
+`ProductosGlobalConfig` ya usaba; Descripción opcional `max(240)` con
+contador). `ProductosGlobalConfig` usa el schema tal cual; `ProductoDialog`
+lo extiende (`.extend()`) con sus campos exclusivos de sucursal. Ambos usan
+ahora `FormLabel` (el mismo componente, vía `ui/form.tsx`) — antes
+`ProductoDialog` usaba `<Label>` y `ProductosGlobalConfig` un `<label>` HTML
+crudo (F3.11). "(opcional)" quedó en el `<FormLabel>` de Descripción en los
+dos (antes solo estaba en el placeholder de `ProductosGlobalConfig`).
+
+### Campos exclusivos de sucursal en ProductoDialog — preservados
+
+Activo-en-esta-sucursal (Switch), Precio costo (opcional), **Precio venta
+(único obligatorio de este grupo**, `refine` numérico ≥0), Margen estimado
+(solo lectura, derivado en vivo de costo/venta vía `form.watch`), Stock
+mínimo, Stock inicial (solo visible en alta o sin vínculo de sucursal, sin
+cambios en esa condición), Comisión (modo + porcentaje). Las dos
+validaciones cruzadas que antes vivían como `toast.error` dentro de
+`handleSave` — porcentaje de comisión personalizada fuera de 0-100, y "sin
+precio de costo con comisión activa" — pasaron a `superRefine` con el error
+anclado al campo correspondiente (`comisionPct` / `precioCosto`), ahora
+inline en vez de toast.
+
+### Pestañas dentro de DrawerForm
+
+No hizo falta ningún cambio estructural en `DrawerForm.tsx` para esto: los
+`Tabs`/`TabsList`/`TabsContent` de shadcn son contenido normal, se montan
+igual dentro del `children` de `DrawerForm` que dentro de un
+`DialogContent`. El indicador rojo por pestaña con error (`submitAttempted`
+→ ahora `form.formState.isSubmitted`) y el salto automático a la primera
+pestaña con error al fallar el submit (antes manual en `handleSave`, ahora
+vía el segundo argumento `onInvalid` de `form.handleSubmit`) se preservaron.
+
+### Cambio aditivo no anticipado en el pedido: `footer` opcional en `DrawerForm`
+
+Lo que sí requirió tocar `drawer-form.tsx` fue otra cosa, no las pestañas:
+`MarcasManagerDialog` nunca tuvo una barra de acciones fija al pie (Guardar/
+Cancelar viven inline dentro de cada editor, en la lista) — con `footer`
+como prop requerida, forzarlo a pasar algo dejaba una franja vacía con
+borde superior al fondo del panel. Cambié `footer` a opcional y el wrapper
+del pie ahora solo se renderiza si hay contenido. Los demás consumidores
+(Build 1 completo + los otros 2 de este build) siguen pasando un `footer`
+real, así que su render no cambió — confirmado por `tsc` limpio y por
+lectura del diff (el cambio es puramente condicional, aditivo).
+
+### `MarcasManagerDialog` — funciona desde sus 2 puntos de entrada
+
+Se invoca igual desde `ProductosConfig.tsx` (vía el `onManageMarcas` de
+`ProductoDialog`, contexto sucursal) y desde `ProductosGlobalConfig.tsx`
+directamente (contexto global) — su interfaz de props (`open`, `marcas`,
+`onClose`, `onChanged`) no cambió, ninguno de los dos call sites necesitó
+ajuste.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.
+
+---
+
+## Fase 4 - Tanda 2 - Build 3a — 2026-07-13
+
+Tercero de los builds de la Parte 1 (Configuración). Migra Métodos de pago,
+Ausencias/Bloqueos, Comisión por equipo, Comisión por productos y el editor
+rápido de línea a RHF+Zod. Incluye una decisión nueva de esta sesión:
+Bloqueos y las 2 Comisiones —hasta ahora "inline en página"— pasan a
+comportarse como entidad-en-lista (resumen inline + gestión en DrawerForm),
+igual que Servicios. `PinConfigSection.tsx` queda explícitamente fuera,
+sin ningún cambio, ni de contenedor ni de validación.
+
+### Archivos modificados
+
+- `src/components/config/PaymentMethodsConfig.tsx` — ya era DrawerForm, migró validación a RHF+Zod
+- `src/components/config/BloqueosSection.tsx` — inline-en-página (toggle `showForm`) → DrawerForm, RHF+Zod
+- `src/components/config/ComisionEquipoConfig.tsx` — Card inline → resumen inline + DrawerForm, RHF+Zod
+- `src/components/config/ComisionProductosConfig.tsx` — Card inline → resumen inline + DrawerForm, RHF+Zod
+- `src/components/config/LineQuickEditPopover.tsx` — Popover → DrawerForm, RHF+Zod
+
+### 1. Métodos de pago
+
+Ya tenía el mejor patrón de error del cluster: un banner inline propio
+(ícono `AlertTriangle` + texto) para "debe quedar al menos un método
+activo", en vez de toast. Se preservó ese nivel exacto — la regla ahora
+vive en un `superRefine` (esquema construido con `methodDraftSchema(methods,
+editingMethod)`, recalculado en cada render para que capture el `methods`
+vigente) anclado al campo `activo`, pero el render del error sigue siendo
+el mismo banner con `AlertTriangle`, leído desde
+`form.formState.errors.activo`, no el `FormMessage` genérico. El recargo
+personalizado (0-100) también se validó por `superRefine`, con
+`FormMessage` estándar. Los presets fijos (5/10/15/20/Personalizado) siguen
+sin sentinel vacío — no aplica maxLength (no hay texto libre persistente).
+
+### 2. Ausencias/Bloqueos
+
+Contenedor: el botón "Nueva ausencia" ahora abre un `DrawerForm` (antes
+mostraba/ocultaba un formulario inline con `showForm`). Validación:
+`bloqueoSchema` con Zod — fechas obligatorias, `superRefine` para
+"la fecha fin debe ser posterior a la fecha inicio" (antes un `toast.error`
+imperativo en `handleCreate`, ahora inline en el campo `fecha_fin`).
+**Hueco cerrado:** "Motivo" no tenía `maxLength` — se agregó `maxLength={240}`
+más `FormMessage`, mismo límite que el resto de los campos de descripción
+del cluster. "Motivo (opcional)" y el fallback "Toda la sucursal" en
+"Aplica a" se preservaron sin cambios.
+
+### 3. Comisión por equipo
+
+Contenedor: el bloque que antes se expandía siempre inline (lista de
+reglas + mini-formulario de alta + botón de alta masiva) se movió a un
+`DrawerForm` sin `footer` (las acciones viven inline en el cuerpo, como
+`MarcasManagerDialog`), disparado por un botón "Gestionar reglas" que
+aparece junto a un resumen ("N reglas configuradas") en la fila que queda
+inline. El toggle activa/inactiva y el botón de eliminar el extra
+**siguen inline**, sin cambios — son acciones de un solo paso, no
+formularios. El alta de una regla (seleccionar barbero + %) pasó de
+validación imperativa (`parseFloat` + `toast.error`) a `addReglaSchema`
+(Zod), con error inline en el Select vacío y en el porcentaje fuera de
+(0, 100]. El alta masiva ("Agregar todos...") valida el mismo campo de
+porcentaje disparando `form.trigger('porcentaje')` contra el mismo
+esquema, así que ambos caminos de alta comparten una sola fuente de
+validación. El mensaje "No hay barberos disponibles para asignar" se
+preservó tal cual, ahora dentro del drawer. **No toqué** la edición inline
+de porcentaje por fila (input con `onBlur`/Enter): sigue exactamente igual,
+incluido que si el valor no pasa la validación simplemente no guarda sin
+avisar — ese comportamiento ya existía antes de este build y no estaba en
+el alcance pedido; lo señalo por transparencia, no lo até a esta migración.
+
+### 4. Comisión por productos
+
+Mismo tratamiento que el punto 3: resumen inline (ícono, label, % actual o
+botón "Configurar"/"Editar porcentaje", botón eliminar) + `DrawerForm` con
+un único campo (`pctSchema`, Zod) para el porcentaje. `maxLength={6}` y el
+filtro de caracteres (`replace(/[^\d.,]/g, '')`) se preservaron tal cual,
+ahora dentro de un `Controller` (`FormField`) que sigue filtrando en
+`onChange` antes de escribir en el form state.
+
+### 5. Editor rápido de línea
+
+Contenedor: `Popover` anclado al botón de lápiz → `DrawerForm` (mismo
+patrón de anidamiento ya probado en Build 1: se abre encima del
+`DrawerForm` de Servicios que ya está abierto, ambos comparten el mismo
+primitivo Radix Dialog por debajo). Validación: `lineQuickEditSchema`
+(Nombre `maxLength 80`, antes un `toast.error` imperativo en `handleSave`
+para vacío/exceso de largo, ahora `FormMessage` inline). Color y Estado
+(Activa/Inactiva) se preservaron como botones/swatches, ahora bindeados
+por `Controller` en vez de `useState` local.
+
+### `PinConfigSection.tsx` — sin tocar
+
+No se modificó en absoluto, ni contenedor ni validación, tal como estaba
+cerrado como excepción.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.
+
+---
+
+## Fase 4 - Tanda 2 - Confirmación al cerrar (DrawerForm) — 2026-07-13
+
+Implementa la decisión de Fase 3 (canon de contenedor) nunca antes hecha:
+cerrar un `DrawerForm` con cambios sin guardar (X, click afuera, Escape)
+pide confirmación. El botón "Cancelar" del footer de cada consumidor NO
+pasa por esto — sigue cerrando directo, sin preguntar, tal como se decidió.
+
+### Auditoría previa al build (Paso 1)
+
+Se revisó cómo cierra "Cancelar" en los 16 consumidores ya en RHF. **Ninguno
+necesitó normalizarse.** En los 16, "Cancelar" llama directo a una función
+propia (`closeDrawer()`, `setOpen(false)`, `onClose()`, `() =>
+onOpenChange(false)`) — nunca usa `SheetClose`/`DialogClose` ni pasa por el
+mecanismo de dismiss de Radix. Como el nuevo intercept vive adentro de
+`DrawerForm`, envolviendo el `onOpenChange` que se le pasa a `Sheet`, un
+`onClick` que llama la función de cierre directamente nunca lo atraviesa —
+bypasea la confirmación automáticamente, sin necesidad de tocar nada en
+esos 16 archivos para lograrlo.
+
+### Mecanismo (`drawer-form.tsx`)
+
+Prop nueva opcional `isDirty?: boolean` (default `false`, no rompe a nadie
+que no la pase). `DrawerForm` ya no le pasa el `onOpenChange` del consumidor
+directo a `Sheet`: lo envuelve en `handleOpenChange`. Si se intenta cerrar
+(`next === false`) y `isDirty` es `true`, no cierra — abre un `AlertDialog`
+interno ("¿Descartar cambios?", patrón visual estándar de este proyecto
+para acciones destructivas) con "Seguir editando" (no hace nada, cierra
+solo el `AlertDialog`) y "Descartar cambios" (`variant` destructivo — recién
+ahí llama al `onOpenChange(false)` real del consumidor). Si `isDirty` es
+`false` o no se pasa, `handleOpenChange` reenvía directo al `onOpenChange`
+original — cero cambio de comportamiento respecto a antes de este build.
+
+### Los 16 consumidores conectados (Paso 3)
+
+| Archivo | Instancia de form usada |
+|---|---|
+| `PaymentMethodsConfig.tsx` | `form` |
+| `BloqueosSection.tsx` | `form` |
+| `ComisionEquipoConfig.tsx` | `addForm` (el mini-form de alta de regla; el drawer no tiene form propio más allá de este) |
+| `ComisionProductosConfig.tsx` | `form` |
+| `LineQuickEditPopover.tsx` | `form` |
+| `ServicesConfig.tsx` (drawer principal) | `form` |
+| `ServicesConfig.tsx` (quick-create línea) | `quickLineForm` |
+| `LinesConfig.tsx` | `form` |
+| `ExtrasConfig.tsx` | `form` |
+| `DiscountsConfig.tsx` | `form` |
+| `MarcasManagerDialog.tsx` | `form`, condicionado a `isAdding \|\| !!editingId` (ver nota abajo) |
+| `ProductoDialog.tsx` | `form` |
+| `ProductosGlobalConfig.tsx` | `form` |
+| `agenda/NewAppointmentDialog.tsx` | `form` |
+| `agenda/AppointmentDetailDialog.tsx` | `clienteForm`/`turnoForm` combinados (ver nota abajo) |
+| `agenda/UnavailableSlotDialog.tsx` | `form` |
+| `agenda/DayOffDialog.tsx` | `form` |
+
+**Dos casos no triviales, verificados antes de asumir el nombre `form`:**
+
+- `MarcasManagerDialog.tsx` mantiene el drawer abierto mientras solo se
+  navega la lista de marcas (tabs Activas/Inactivas), sin editor visible.
+  `isDirty={(isAdding || !!editingId) && form.formState.isDirty}` —
+  el `&&` evita que un `form` recién reseteado (o el estado entre una
+  edición y la siguiente) dispare el aviso mientras no hay ningún editor
+  abierto.
+- `agenda/AppointmentDetailDialog.tsx` tiene un solo `DrawerForm` pero dos
+  editores inline independientes (`clienteForm` para datos de contacto,
+  `turnoForm` para fecha/hora/servicio/profesional), cada uno activable por
+  separado (`editingCliente`/`editingTurno`). `isDirty` es la unión de
+  ambos, cada uno gateado por si su editor está realmente abierto:
+  `(editingCliente && clienteForm.formState.isDirty) || (editingTurno &&
+  turnoForm.formState.isDirty)`. **Hueco que dejo señalado, no oculto:** el
+  motivo de cancelación (`confirmingCancel`) usa un `useState` de texto
+  plano, no RHF — escribir un motivo y cerrar con la X no dispara el aviso.
+  Está fuera del alcance de este build (no migra nada a RHF que no lo
+  estuviera) y el motivo es opcional y de bajo costo si se pierde, pero
+  quedó sin cubrir.
+
+### Los 13 pendientes (no-RHF, no tocados en este build)
+
+Se conectan cuando cada uno migre a RHF en su build correspondiente — no
+antes, y no con un `isDirty` calculado a mano como parche.
+
+**Formularios reales (8):** `InviteUserDialog.tsx`,
+`config/BarberSucursalesGeneralSection.tsx`, `config/EquipoUnificado.tsx`
+(alta/edición de integrante), `StaffPinDialog.tsx`,
+`productos/StockMovementDialog.tsx`, `SucursalTabContent.tsx` (drawer
+"Editar información"), `config/SucursalesConfig.tsx` (drawer "Nueva/Editar
+sucursal"), `config/EquipoSucursalPanel.tsx` (2 drawers: asignación
+temporal y recurrente).
+
+**Paneles de solo lectura / historial (5), sin campos que editar — el
+concepto de "cambios sin guardar" no aplica:** `CashClosingHistory.tsx`,
+`AnulacionesCierreHistory.tsx`, `MultiDayClosingSummary.tsx`,
+`TransactionDetailDrawer.tsx`, `productos/ProductoListItem.tsx`.
+
+### Guards existentes que no se tocaron
+
+`EquipoUnificado.tsx:1266` y `SucursalesConfig.tsx:595` bloquean el cierre
+mientras hay un guardado en curso (`isSubmitting`) — conviven sin pisarse
+con el nuevo mecanismo: ese guard corta el cierre ANTES de que
+`handleOpenChange` evalúe `isDirty`, para un problema distinto (no cerrar a
+mitad de un guardado). `SucursalTabContent.tsx:205-208` sigue usando su
+`isDirty` local solo para deshabilitar el botón de activar/desactivar
+sucursal — no se conectó a ningún `DrawerForm`, tal como se pidió.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.

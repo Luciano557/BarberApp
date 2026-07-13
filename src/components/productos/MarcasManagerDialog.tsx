@@ -1,9 +1,13 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Edit2, Power, PowerOff, Tag } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -23,6 +27,15 @@ interface Props {
   onChanged: () => void;
 }
 
+const marcaSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre no puede estar vacío.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  color: z.string(),
+});
+
+type MarcaFormValues = z.infer<typeof marcaSchema>;
+
+const emptyValues: MarcaFormValues = { nombre: '', color: MARCA_COLORS[0].value };
+
 export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props) {
   const { organization } = useOrganization();
   const orgId = organization?.id;
@@ -30,11 +43,12 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
   const [tab, setTab] = useState<'active' | 'inactive'>('active');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [draftNombre, setDraftNombre] = useState('');
-  const [draftColor, setDraftColor] = useState(MARCA_COLORS[0].value);
   const [toggleConfirm, setToggleConfirm] = useState<{ marca: Marca; next: boolean } | null>(null);
-  const [saving, setSaving] = useState(false);
+
+  const form = useForm<MarcaFormValues>({
+    resolver: zodResolver(marcaSchema),
+    defaultValues: emptyValues,
+  });
 
   const active = marcas.filter(m => m.activo);
   const inactive = marcas.filter(m => !m.activo);
@@ -42,40 +56,36 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
   const reset = () => {
     setIsAdding(false);
     setEditingId(null);
-    setDraftNombre('');
-    setDraftColor(MARCA_COLORS[0].value);
+    form.reset(emptyValues);
   };
 
   const handleStartAdd = () => {
     setEditingId(null);
-    setDraftNombre('');
-    setDraftColor(MARCA_COLORS[0].value);
+    form.reset(emptyValues);
     setIsAdding(true);
   };
 
   const handleStartEdit = (m: Marca) => {
     setIsAdding(false);
     setEditingId(m.id);
-    setDraftNombre(m.nombre);
-    setDraftColor(m.color);
+    form.reset({ nombre: m.nombre, color: m.color });
   };
 
-  const handleSave = async () => {
-    if (!orgId || !draftNombre.trim()) return;
-    setSaving(true);
+  const onSubmit = async (values: MarcaFormValues) => {
+    if (!orgId) return;
     try {
-      const nombre = draftNombre.replace(/\s+/g, ' ').trim();
+      const nombre = values.nombre.replace(/\s+/g, ' ').trim();
       if (editingId) {
         const { error } = await supabase
           .from('marcas_producto')
-          .update({ nombre, color: draftColor })
+          .update({ nombre, color: values.color })
           .eq('id', editingId);
         if (error) throw error;
         toast.success('Marca actualizada');
       } else {
         const { error } = await supabase
           .from('marcas_producto')
-          .insert({ organization_id: orgId, nombre, color: draftColor, activo: true });
+          .insert({ organization_id: orgId, nombre, color: values.color, activo: true });
         if (error) throw error;
         toast.success('Marca creada');
       }
@@ -84,8 +94,6 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
     } catch (e: any) {
       const msg = e?.message?.includes('duplicate key') ? 'Ya existe una marca con ese nombre' : (e?.message || 'Error al guardar');
       toast.error(msg);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -104,43 +112,53 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
     setToggleConfirm(null);
   };
 
+  const nombreValue = form.watch('nombre');
+  const colorValue = form.watch('color');
+
   const renderEditor = () => (
-    <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-3 animate-scale-in">
-      <Input
-        placeholder="Nombre de la marca"
-        value={draftNombre}
-        onChange={(e) => setDraftNombre(e.target.value)}
-        maxLength={80}
-        autoFocus
-      />
-      <div>
-        <p className="text-xs text-muted-foreground mb-2">Color</p>
-        <div className="flex flex-wrap gap-2">
-          {MARCA_COLORS.map(c => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => setDraftColor(c.value)}
-              title={c.name}
-              className={cn(
-                'w-7 h-7 rounded-full border-2 transition-all',
-                draftColor === c.value ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'
-              )}
-              style={{ backgroundColor: c.value }}
-              aria-label={c.name}
-            />
-          ))}
+    <Form {...form}>
+      <div className="p-3 bg-muted/30 border border-border rounded-lg space-y-3 animate-scale-in">
+        <FormField
+          control={form.control}
+          name="nombre"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Input placeholder="Nombre de la marca" {...field} maxLength={80} autoFocus />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Color</p>
+          <div className="flex flex-wrap gap-2">
+            {MARCA_COLORS.map(c => (
+              <button
+                key={c.value}
+                type="button"
+                onClick={() => form.setValue('color', c.value)}
+                title={c.name}
+                className={cn(
+                  'w-7 h-7 rounded-full border-2 transition-all',
+                  colorValue === c.value ? 'border-foreground scale-110' : 'border-transparent hover:scale-105'
+                )}
+                style={{ backgroundColor: c.value }}
+                aria-label={c.name}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2 justify-between">
+          <Button variant="ghost" size="sm" onClick={reset}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting || !nombreValue?.trim()}>
+            {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+          </Button>
         </div>
       </div>
-      <div className="flex gap-2 justify-between">
-        <Button variant="ghost" size="sm" onClick={reset}>
-          Cancelar
-        </Button>
-        <Button size="sm" onClick={handleSave} disabled={saving || !draftNombre.trim()}>
-          {saving ? 'Guardando...' : 'Guardar'}
-        </Button>
-      </div>
-    </div>
+    </Form>
   );
 
   const renderItem = (m: Marca) => (
@@ -174,57 +192,56 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-4 w-4" /> Marcas
-            </DialogTitle>
-            <DialogDescription>
-              Las marcas son globales para toda la organización. El color ayuda a identificarlas en el catálogo.
-            </DialogDescription>
-          </DialogHeader>
+      <DrawerForm
+        open={open}
+        onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}
+        title="Marcas"
+        size="sm"
+        isDirty={(isAdding || !!editingId) && form.formState.isDirty}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Las marcas son globales para toda la organización. El color ayuda a identificarlas en el catálogo.
+          </p>
 
-          <div className="space-y-3">
-            <div className="flex justify-end">
-              {!isAdding && !editingId && tab === 'active' && (
-                <Button size="sm" variant="outline" onClick={handleStartAdd}>
-                  <Plus className="h-4 w-4 mr-1" /> Nueva marca
-                </Button>
-              )}
-            </div>
-
-            <Tabs value={tab} onValueChange={(v) => setTab(v as 'active' | 'inactive')}>
-              <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-                <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
-                  Activas<TabBadge count={active.length} />
-                </TabsTrigger>
-                <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
-                  Inactivas<TabBadge count={inactive.length} />
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="active" className="mt-3 space-y-2">
-                {isAdding && renderEditor()}
-                {active.map(renderItem)}
-                {active.length === 0 && !isAdding && (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    No hay marcas. Agregá la primera para empezar.
-                  </p>
-                )}
-              </TabsContent>
-              <TabsContent value="inactive" className="mt-3 space-y-2">
-                {inactive.map(renderItem)}
-                {inactive.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    No hay marcas inactivas.
-                  </p>
-                )}
-              </TabsContent>
-            </Tabs>
+          <div className="flex justify-end">
+            {!isAdding && !editingId && tab === 'active' && (
+              <Button size="sm" variant="outline" onClick={handleStartAdd}>
+                <Plus className="h-4 w-4 mr-1" /> Nueva marca
+              </Button>
+            )}
           </div>
-        </DialogContent>
-      </Dialog>
+
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'active' | 'inactive')}>
+            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
+              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Activas<TabBadge count={active.length} />
+              </TabsTrigger>
+              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
+                Inactivas<TabBadge count={inactive.length} />
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="active" className="mt-3 space-y-2">
+              {isAdding && renderEditor()}
+              {active.map(renderItem)}
+              {active.length === 0 && !isAdding && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No hay marcas. Agregá la primera para empezar.
+                </p>
+              )}
+            </TabsContent>
+            <TabsContent value="inactive" className="mt-3 space-y-2">
+              {inactive.map(renderItem)}
+              {inactive.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No hay marcas inactivas.
+                </p>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DrawerForm>
 
       <AlertDialog open={!!toggleConfirm} onOpenChange={(o) => !o && setToggleConfirm(null)}>
         <AlertDialogContent>

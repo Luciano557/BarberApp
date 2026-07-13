@@ -4,6 +4,16 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 import { Sheet, SheetOverlay, SheetPortal } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DrawerFormProps {
   open: boolean;
@@ -11,48 +21,93 @@ interface DrawerFormProps {
   title: React.ReactNode;
   size: "sm" | "md" | "lg";
   children: React.ReactNode;
-  footer: React.ReactNode;
+  /** Omitilo cuando el formulario no necesita acciones fijas al pie (ej. edición inline dentro del body). */
+  footer?: React.ReactNode;
+  /**
+   * Si es true, cerrar vía X, click afuera o Escape pide confirmación
+   * ("¿Descartar cambios?") antes de cerrar. Pasale `form.formState.isDirty`.
+   * El botón Cancelar de cada consumidor no pasa por acá — sigue cerrando
+   * directo, llamando su propia función de cierre en vez de esto.
+   */
+  isDirty?: boolean;
 }
 
-export function DrawerForm({ open, onOpenChange, title, size, children, footer }: DrawerFormProps) {
+export function DrawerForm({ open, onOpenChange, title, size, children, footer, isDirty = false }: DrawerFormProps) {
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = React.useState(false);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next && isDirty) {
+      setConfirmDiscardOpen(true);
+      return;
+    }
+    onOpenChange(next);
+  };
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetPortal>
-        <SheetOverlay />
-        <SheetPrimitive.Content
-          className={cn(
-            "fixed inset-y-0 right-0 z-50 flex flex-col",
-            "bg-card border-l shadow-lg",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
-            "data-[state=closed]:duration-200 data-[state=open]:duration-300",
-            "[animation-timing-function:cubic-bezier(0.23,1,0.32,1)]",
-            "w-[calc(100%-48px)]",
-            size === "sm" ? "sm:w-[380px]" : size === "md" ? "sm:w-[520px]" : "sm:w-[680px]",
-          )}
-        >
-          {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
-            <SheetPrimitive.Title className="text-lg font-semibold text-foreground">
-              {title}
-            </SheetPrimitive.Title>
-            <SheetPrimitive.Close className="rounded-md opacity-70 ring-offset-background transition-opacity duration-150 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 disabled:pointer-events-none">
-              <X className="h-4 w-4" />
-              <span className="sr-only">Cerrar</span>
-            </SheetPrimitive.Close>
-          </div>
+    <>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
+        <SheetPortal>
+          <SheetOverlay />
+          <SheetPrimitive.Content
+            className={cn(
+              "fixed inset-y-0 right-0 z-50 flex flex-col",
+              "bg-card border-l shadow-lg",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out",
+              "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+              "data-[state=closed]:duration-200 data-[state=open]:duration-300",
+              "[animation-timing-function:cubic-bezier(0.23,1,0.32,1)]",
+              "w-[calc(100%-48px)]",
+              size === "sm" ? "sm:w-[380px]" : size === "md" ? "sm:w-[520px]" : "sm:w-[680px]",
+            )}
+          >
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
+              <SheetPrimitive.Title className="text-lg font-semibold text-foreground">
+                {title}
+              </SheetPrimitive.Title>
+              <SheetPrimitive.Close className="rounded-md opacity-70 ring-offset-background transition-opacity duration-150 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 disabled:pointer-events-none">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Cerrar</span>
+              </SheetPrimitive.Close>
+            </div>
 
-          {/* Body — scrolleable */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {children}
-          </div>
+            {/* Body — scrolleable */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {children}
+            </div>
 
-          {/* Footer — siempre fijo en la parte inferior */}
-          <div className="shrink-0 border-t px-6 py-4">
-            {footer}
-          </div>
-        </SheetPrimitive.Content>
-      </SheetPortal>
-    </Sheet>
+            {/* Footer — siempre fijo en la parte inferior, si se provee */}
+            {footer && (
+              <div className="shrink-0 border-t px-6 py-4">
+                {footer}
+              </div>
+            )}
+          </SheetPrimitive.Content>
+        </SheetPortal>
+      </Sheet>
+
+      <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tenés cambios sin guardar en este formulario. Si cerrás ahora, se van a perder.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setConfirmDiscardOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

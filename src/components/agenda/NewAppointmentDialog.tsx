@@ -266,6 +266,7 @@ export function NewAppointmentDialog({
       onOpenChange={onOpenChange}
       title="Nueva cita"
       size="md"
+      isDirty={form.formState.isDirty}
       footer={
         <div className="flex w-full justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting}>

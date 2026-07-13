@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Users, Percent, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +23,7 @@ import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface ComisionEquipoConfigProps {
   barberId: string;
@@ -61,15 +67,30 @@ function mapDbBarber(row: any): Barber {
   };
 }
 
+const addReglaSchema = z.object({
+  barberoId: z.string().min(1, 'Seleccioná un barbero.'),
+  porcentaje: z.string().refine((v) => {
+    const n = parseFloat(v);
+    return !Number.isNaN(n) && n > 0 && n <= 100;
+  }, 'El porcentaje debe ser mayor a 0 y menor o igual a 100.'),
+});
+
+type AddReglaValues = z.infer<typeof addReglaSchema>;
+
 export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, allBarbers, forceShow }: ComisionEquipoConfigProps) {
   const [config, setConfig] = useState<Config | null>(null);
   const [reglas, setReglas] = useState<Regla[]>([]);
   const [filteredBarbers, setFilteredBarbers] = useState<Barber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedBarbero, setSelectedBarbero] = useState('');
-  const [newPorcentaje, setNewPorcentaje] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [porcentajeErrors, setPorcentajeErrors] = useState<Record<string, string>>({});
+
+  const addForm = useForm<AddReglaValues>({
+    resolver: zodResolver(addReglaSchema),
+    defaultValues: { barberoId: '', porcentaje: '' },
+  });
 
   const openRuleBarberIds = reglas.filter(r => r.activa && !r.vigencia_hasta).map(r => r.barbero_origen_id);
   const availableBarbers = filteredBarbers.filter(b => b.active && b.id !== barberId && !openRuleBarberIds.includes(b.id));
@@ -172,29 +193,22 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
     }
   };
 
-  const handleAddRegla = async () => {
-    if (!config || !selectedBarbero || !newPorcentaje) return;
-    const porcentaje = parseFloat(newPorcentaje);
-    if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
-      toast.error('Porcentaje debe ser entre 0.01 y 100');
-      return;
-    }
-
+  const onAddRegla = async (values: AddReglaValues) => {
+    if (!config) return;
     try {
       const { error } = await supabase
         .from('comision_equipo_reglas')
         .insert({
           config_id: config.id,
-          barbero_origen_id: selectedBarbero,
-          porcentaje,
+          barbero_origen_id: values.barberoId,
+          porcentaje: parseFloat(values.porcentaje),
           organization_id: organizationId,
           sucursal_id: sucursalId,
           vigencia_desde: format(new Date(), 'yyyy-MM-dd'),
         });
 
       if (error) throw error;
-      setSelectedBarbero('');
-      setNewPorcentaje('');
+      addForm.reset({ barberoId: '', porcentaje: '' });
       toast.success('Regla agregada');
       fetchData();
     } catch (e: any) {
@@ -204,12 +218,10 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
   };
 
   const handleBulkAdd = async () => {
-    if (!config || !newPorcentaje || availableBarbers.length === 0) return;
-    const porcentaje = parseFloat(newPorcentaje);
-    if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
-      toast.error('Ingresá un porcentaje válido antes de agregar todos');
-      return;
-    }
+    if (!config || availableBarbers.length === 0) return;
+    const valid = await addForm.trigger('porcentaje');
+    if (!valid) return;
+    const porcentaje = parseFloat(addForm.getValues('porcentaje'));
 
     setBulkLoading(true);
     try {
@@ -228,7 +240,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
         .insert(rows);
 
       if (error) throw error;
-      setNewPorcentaje('');
+      addForm.setValue('porcentaje', '');
       toast.success(`${rows.length} barberos agregados`);
       fetchData();
     } catch (e: any) {
@@ -241,7 +253,15 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
 
   const handleUpdatePorcentaje = async (regla: Regla, newValue: string) => {
     const porcentaje = parseFloat(newValue);
-    if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) return;
+    if (isNaN(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
+      setPorcentajeErrors((prev) => ({ ...prev, [regla.id]: 'Debe ser mayor a 0 y menor o igual a 100.' }));
+      return;
+    }
+    setPorcentajeErrors((prev) => {
+      if (!(regla.id in prev)) return prev;
+      const { [regla.id]: _removed, ...rest } = prev;
+      return rest;
+    });
     if (porcentaje === regla.porcentaje) return;
     if (!config) return;
 
@@ -329,100 +349,16 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
       </div>
 
       {config.activa && (
-        <>
-          {reglas.length > 0 && (
-            <div className="space-y-2">
-              {reglas.map(regla => {
-                const barberOrigen = allBarbers.find(b => b.id === regla.barbero_origen_id)
-                  || filteredBarbers.find(b => b.id === regla.barbero_origen_id);
-                return (
-                  <div key={regla.id} className="flex items-center justify-between gap-2 p-2 rounded bg-background border border-border">
-                    <span className="text-sm truncate">
-                      {barberOrigen ? getBarberDisplayName(barberOrigen) : 'Barbero eliminado'}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <Input
-                          type="number"
-                          className="w-16 h-7 text-xs text-right"
-                          defaultValue={regla.porcentaje}
-                          min={0.01}
-                          max={100}
-                          step={0.5}
-                          onBlur={(e) => handleUpdatePorcentaje(regla, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUpdatePorcentaje(regla, (e.target as HTMLInputElement).value);
-                            }
-                          }}
-                        />
-                        <Percent className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleRemoveRegla(regla)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {availableBarbers.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Select value={selectedBarbero} onValueChange={setSelectedBarbero}>
-                  <SelectTrigger className="h-8 text-xs flex-1">
-                    <SelectValue placeholder="Seleccionar barbero" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBarbers.map(b => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {getBarberDisplayName(b)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    className="w-16 h-8 text-xs text-right"
-                    placeholder="%"
-                    value={newPorcentaje}
-                    onChange={(e) => setNewPorcentaje(e.target.value)}
-                    min={0.01}
-                    max={100}
-                    step={0.5}
-                  />
-                  <Percent className="h-3 w-3 text-muted-foreground" />
-                </div>
-                <Button variant="outline" size="sm" className="h-8 text-xs"
-                  disabled={!selectedBarbero || !newPorcentaje}
-                  onClick={handleAddRegla}>
-                  Agregar
-                </Button>
-              </div>
-
-              {isBranchOnly && availableBarbers.length > 1 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs w-full"
-                  disabled={!newPorcentaje || bulkLoading}
-                  onClick={handleBulkAdd}
-                >
-                  <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                  Agregar todos los barberos de esta sucursal ({availableBarbers.length})
-                </Button>
-              )}
-            </div>
-          )}
-
-          {reglas.length === 0 && availableBarbers.length === 0 && (
-            <p className="text-xs text-muted-foreground">No hay barberos disponibles para asignar.</p>
-          )}
-        </>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            {reglas.length > 0
+              ? `${reglas.length} regla${reglas.length === 1 ? '' : 's'} configurada${reglas.length === 1 ? '' : 's'}`
+              : 'Sin reglas configuradas'}
+          </span>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setManageOpen(true)}>
+            Gestionar reglas
+          </Button>
+        </div>
       )}
 
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
@@ -448,6 +384,146 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <DrawerForm
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        title="Comisión extra por equipo"
+        size="sm"
+        isDirty={addForm.formState.isDirty}
+      >
+        <div className="space-y-4">
+          {reglas.length > 0 && (
+            <div className="space-y-2">
+              {reglas.map(regla => {
+                const barberOrigen = allBarbers.find(b => b.id === regla.barbero_origen_id)
+                  || filteredBarbers.find(b => b.id === regla.barbero_origen_id);
+                const rowError = porcentajeErrors[regla.id];
+                return (
+                  <div key={regla.id} className="rounded bg-background border border-border p-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm truncate">
+                        {barberOrigen ? getBarberDisplayName(barberOrigen) : 'Barbero eliminado'}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            className={cn(
+                              "w-16 h-7 text-xs text-right",
+                              rowError && "border-destructive focus-visible:ring-destructive",
+                            )}
+                            defaultValue={regla.porcentaje}
+                            min={0.01}
+                            max={100}
+                            step={0.5}
+                            aria-invalid={!!rowError}
+                            onBlur={(e) => handleUpdatePorcentaje(regla, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdatePorcentaje(regla, (e.target as HTMLInputElement).value);
+                              }
+                            }}
+                          />
+                          <Percent className="h-3 w-3 text-muted-foreground" />
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => handleRemoveRegla(regla)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    {rowError && (
+                      <p className="text-xs text-destructive text-right">{rowError}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {availableBarbers.length > 0 && (
+            <Form {...addForm}>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <FormField
+                    control={addForm.control}
+                    name="barberoId"
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Seleccionar barbero" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableBarbers.map(b => (
+                              <SelectItem key={b.id} value={b.id}>
+                                {getBarberDisplayName(b)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={addForm.control}
+                    name="porcentaje"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormControl>
+                            <Input
+                              type="number"
+                              className="w-16 h-8 text-xs text-right"
+                              placeholder="%"
+                              min={0.01}
+                              max={100}
+                              step={0.5}
+                              {...field}
+                            />
+                          </FormControl>
+                          <Percent className="h-3 w-3 text-muted-foreground shrink-0" />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    disabled={addForm.formState.isSubmitting}
+                    onClick={addForm.handleSubmit(onAddRegla)}
+                  >
+                    Agregar
+                  </Button>
+                </div>
+
+                {isBranchOnly && availableBarbers.length > 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs w-full"
+                    disabled={bulkLoading}
+                    onClick={handleBulkAdd}
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Agregar todos los barberos de esta sucursal ({availableBarbers.length})
+                  </Button>
+                )}
+              </div>
+            </Form>
+          )}
+
+          {reglas.length === 0 && availableBarbers.length === 0 && (
+            <p className="text-xs text-muted-foreground">No hay barberos disponibles para asignar.</p>
+          )}
+        </div>
+      </DrawerForm>
     </div>
   );
 }
