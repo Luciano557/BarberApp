@@ -304,3 +304,196 @@ Señalados, no arreglados, como pide el alcance. Orden aproximado de impacto par
 - **Vistas:** `barberos_safe` (barberos sin PII, para rol barber), `_phone_migration_report` y `_phone_dups_report` (diagnóstico de la migración de teléfonos).
 - **RPCs que tocan datos de negocio:** `registrar_movimiento_stock` (stock atómico + auditoría), `create_cliente_with_sucursal`, `import_clientes_with_sucursal`, `soft_delete_cliente`, `sucursal_tiene_historial`, `get_organization_subscription_access`, `notif_emit_view_event`.
 - **Edge functions:** `lookup-cliente-by-phone` (portal de reservas), `set-pin`/`validate-pin`, gestión de cuentas de sucursal.
+
+---
+
+## Estadísticas — Exploración técnica previa a Fase 4
+
+**Fecha:** 14 de julio de 2026. **Alcance:** factibilidad técnica y arquitectura para la reestructuración en 4 secciones (Resumen, Plata real, Equipo, Servicios y clientes). Solo lectura: código de `src/`, schema vivo y conteos reales por query directa (esta vez sí se consultaron datos, a diferencia del relevamiento original). No se modificó código.
+
+**Nota de alcance:** la lista canónica de las ~20 métricas no está escrita en ningún documento del repo; la lista de abajo se armó mapeando las 4 secciones acordadas contra los derivables del §4. Vale como lista de trabajo para validar viabilidad; la selección final se cierra en el plan de build.
+
+### 1. Arquitectura actual
+
+**Chart library.** Recharts, envuelto en el wrapper shadcn [chart.tsx](src/components/ui/chart.tsx) (`ChartContainer`/`ChartTooltip`/`ChartTooltipContent`, que inyecta la config de colores por CSS vars). Solo dos archivos importan Recharts en toda la app: `ui/chart.tsx` y `EstadisticasPanel.tsx`. Tipos en uso: **únicamente `ComposedChart` + `Bar` + `Line`** (más ejes/grid). **No existe ningún `PieChart`, `Pie`, `RadialBar` ni donut en ninguna parte de la app** — el donut es pieza 100% nueva, aunque el costo es bajo: la librería ya está instalada y el wrapper `ChartContainer` (tooltips, colores por token) le sirve igual. Tampoco existe ninguna barra horizontal Recharts (`layout="vertical"`: 0 usos).
+
+**Card de métrica.** Patrón intermedio: no es copy-paste puro pero tampoco es componente reutilizable. Dentro de `EstadisticasPanel.tsx` hay un tipo `MetricCardDef` (title, dataKey, icon, colores, formatters, description) y tres piezas locales que lo consumen: `renderMetricCard()` (la card con valor grande + badge de variación + mini-chart), `MetricChart` (el barra+línea de 40px de alto) y `MetricDetailDialog` (chart grande + tabla mensual al click). Diez de las 12 cards pasan por `renderMetricCard`; dos (Servicios y Tasa de Ocupación) duplican el JSX inline con variantes. **Nada de esto vive en `ui/` ni es importable desde otro panel.** Para el build: extraer estas tres piezas a componentes compartidos es el paso previo natural; el "donut card" y el "ranking card" nuevos pueden calzar en el mismo shell de card (header con título+descripción+icono, valor grande, chart abajo) cambiando solo el cuerpo.
+
+**Fetching/agregación.** Confirmado: fetch-completo-y-reduce-en-cliente, sin cambios respecto del relevamiento. `useEffect` + `useState` + `Promise.all` de 4 queries planas (`ingresos`, `Egresos`, `barberos`, `venta` solo `fecha_hora`) filtradas por org/sucursal/rango, y todo el agrupado mensual en JS. No usa react-query (que sí existe en el proyecto, pero solo en hooks de tareas/notificaciones). No hay RPC ni vista de agregación para estadísticas.
+
+**¿Hasta dónde aguanta ese patrón?** Volúmenes reales por query directa (org más grande de la plataforma, historia completa): `venta` 1.591 filas, `venta_pagos` 728, `ingresos` 511, `clientes` 396, `turnos` 252, `Egresos` 72. Un fetch de 12 meses de la org más activa anda hoy en ~1.500 filas por tabla; el patrón es cómodo hasta ~10-20k filas por query (unos pocos cientos de KB). Al ritmo actual (~250 ventas/mes en la org top) eso da **3-5 años de margen**. Conclusión: **ninguna métrica nueva necesita RPC/vista**, incluidas las por barbero (salen del mismo fetch de `ingresos` que ya se hace, ampliando el `select` a las columnas que faltan) y clientes nuevos por origen (una query de ~400 filas). La única mejora de fetching que vale la pena en el build es de higiene, no de escala: mover la data a un hook (`useEstadisticasData` o uno por sección) y considerar react-query para cache entre cambios de período.
+
+### 2. Viabilidad de cada métrica nueva contra el schema real
+
+Verificado contra las tablas vivas (columnas + conteos reales), no contra el documento de arriba. Formato: métrica → fuente → costo de query → veredicto.
+
+**Sección 1 — Resumen.** Reagrupa existentes (facturación, servicios, ticket, rentabilidad, ocupación). Sin métricas nuevas que validar; si se suma comparación entre sucursales, es el mismo fetch sin el filtro de sucursal + `group by sucursal_id` en cliente. ✅ Viable, costo cero de queries nuevas.
+
+**Sección 2 — Plata real.** Las 6 candidatas salen de **un solo fetch ampliado de `ingresos`** (el que ya existe, agregando columnas al select) más el par `venta`+`venta_pagos`:
+
+| Métrica | Fuente (columnas verificadas) | Veredicto |
+|---|---|---|
+| Total cobrado real (con recargos) | `ingresos.total_cobrado` | ✅ 1 query (la existente). Ventana: 0/NULL antes de abr/2026 |
+| Recargos cobrados | `ingresos.recargos_total` | ✅ misma query |
+| Efectivo vs digital real | `ingresos.efectivo_cobrado` / `digital_cobrado` | ✅ misma query |
+| Descuentos regalados | `ingresos.perdida` / `total_sin_descuento` | ✅ misma query, historia completa |
+| Costo laboral % de facturación | `ingresos.sueldo` + `comision_productos` vs `total_facturado` | ✅ misma query |
+| Desglose real por método (donut 5 métodos) | `venta_pagos.metodo_pago`+`monto` con fallback `venta.metodo_pago`+`total_final` | ✅ 2 queries chicas. **Dato real: 882 de 1.692 ventas no tienen filas en `venta_pagos`** (pre 17/abr/2026) — el fallback no es opcional, es la mitad de la historia. El patrón ya existe en `useTransactions.ts` |
+
+**Sección 3 — Equipo.** La buena noticia verificada: **`ingresos.barbero_id` tiene 0 NULLs sobre 535 filas** — el temor del §5.7 (legacy sin match) no se materializa en los datos actuales. Todo el bloque por barbero sale del fetch de `ingresos` ya existente + el de `barberos` ya existente (para nombres):
+
+| Métrica | Fuente | Veredicto |
+|---|---|---|
+| Ranking facturación por barbero | `ingresos.barbero_id` + `total_facturado` | ✅ 0 queries nuevas |
+| Servicios por barbero | `ingresos.cantidad_de_servicios` | ✅ ídem |
+| Ticket promedio por barbero | derivada de las dos anteriores | ✅ |
+| Comisión devengada por barbero | `ingresos.sueldo` (+ `comision_productos`) | ✅ ídem |
+| Evolución mensual por barbero (multilínea) | misma data pivoteada mes×barbero | ✅ solo trabajo de UI |
+| Venta de productos por barbero | `venta_producto.barbero_id` + `subtotal` | ✅ 1 query nueva. ⚠️ 22 filas en toda la plataforma: diseñar el estado vacío primero |
+| Rotación / antigüedad del equipo | `barbero_historial` (fecha_inicio/fin, motivo_egreso) | ✅ 1 query nueva. ⚠️ solo desde jun/2026, 31 filas |
+
+**Sección 4 — Servicios y clientes:**
+
+| Métrica | Fuente | Veredicto |
+|---|---|---|
+| Mix de servicios (donut/ranking) | `venta.servicio_nombre` + `total_final` | ✅ 0 queries nuevas: ampliar el select de la query de `venta` que hoy solo trae `fecha_hora`. Sesgo conocido: cierres diferidos no tienen tickets |
+| Mix por línea | `venta.servicio_id` → `servicios.linea_id` → `lineas` (catálogos de 21 y 2 filas) | ✅ 2 queries de catálogo chicas, join en cliente. Más sólido que el jsonb `servicios_por_linea` (matching por nombre, frágil) |
+| Extras: ingreso + tasa de attach | `venta_extra` — sin `organization_id` propio, pero con FK real a `venta` → embed PostgREST `venta_extra(precio_extra,cantidad)` en la misma query de venta | ✅ 1 query (embebida) |
+| Clientes nuevos por mes y origen | `clientes.created_at` + `origen` (+ `fecha_cliente_desde` para importados) | ✅ 1 query de ~400 filas. ⚠️ **dato real: 393 'importado', 20 'manual', 0 'reserva'** — hoy el gráfico sería una sola barra gigante de import Fresha; diseñar para que el origen 'reserva' aparezca cuando exista |
+| Reservas: tasa de cancelación, anticipación (`created_at` vs `fecha`), % eligió barbero | `turnos` (columnas verificadas: `estado`, `cancelado_motivo`, `eligio_barbero`, `created_at`) | ✅ 1 query. ⚠️ ~288 turnos globales, ventana corta |
+| Cumpleaños del mes / base contactable | `clientes.fecha_nacimiento` / `acepta_marketing`+`telefono` | ✅ misma query de clientes. ⚠️ solo 54/413 con fecha de nacimiento |
+
+**NO viables con query razonable** (reconfirmado contra datos vivos, no forzar):
+- **LTV / frecuencia / gasto por cliente** — `venta` sigue sin `cliente_id` (verificado en schema). Bloqueado estructuralmente.
+- **No-show y conversión reserva→venta** — verificado en datos: los 288 turnos están en `pendiente` (253) o `cancelado` (35); **cero** `completado`/`no_asistio`/`confirmado`. La tasa de cancelación sí es calculable; la de asistencia no.
+- **$/hora-silla débil** — solo 3 de 21 servicios tienen `duracion_min` distinta del default 30. Si entra, marcarla como estimativa o dejarla para cuando el catálogo esté curado.
+- **Margen de productos, a medias** — 5 de 16 `productos_sucursal` sin `precio_costo`. Ingreso por productos ✅; margen/rentabilidad ⚠️ parcial.
+
+### 3. Componentes de UI: crear vs reusar
+
+| Pieza | Estado | Acción |
+|---|---|---|
+| Shell de card de métrica (header + valor + variación + chart) | Existe como funciones locales de EstadisticasPanel (`MetricCardDef`/`renderMetricCard`) | **Extraer** a `estadisticas/MetricCard.tsx` (o `ui/` si se quiere generalizar) |
+| Chart barra+línea mensual | Existe (`MetricChart` local) | **Extraer** junto con la card |
+| Dialog de detalle (chart grande + tabla) | Existe (`MetricDetailDialog` local) | **Extraer**; sirve tal cual para las métricas nuevas de serie mensual |
+| Donut chart card | **No existe en ninguna parte de la app** | **Crear** (`DonutCard.tsx`): `Pie` de Recharts dentro del `ChartContainer` existente; tokens `--chart-*` ya definidos y en uso |
+| Barra horizontal de ranking | **No existe** (0 usos de `layout="vertical"`) | **Crear** (`RankingBarCard.tsx`). Alternativa sin Recharts: filas con [progress.tsx](src/components/ui/progress.tsx) (ya en `ui/`) + nombre + valor — más simple, mejor para 3-8 barberos con labels largos. Decidir en el plan; recomendación: progress-rows |
+| Wrapper de charts (`ChartContainer`/tooltip/config de colores) | Existe ([chart.tsx](src/components/ui/chart.tsx)) | **Reusar** para todo |
+| Tokens de color de charts | Existen (`--chart-cash/mp/cost/orange/amber/purple/indigo` + `--primary`) | **Reusar**; el donut de 5 métodos de pago necesita paleta categórica — verificar en el plan si alcanzan o falta 1-2 tokens |
+
+### 4. Estimación de archivos y partición del build
+
+**Archivos tocados/creados (build completo): ~12-14.**
+- 1 existente reescrito: `EstadisticasPanel.tsx` (pasa de ~1.100 líneas monolíticas a orquestador de 4 secciones).
+- ~10-12 nuevos en `src/components/estadisticas/`: `MetricCard.tsx`, `MetricChart.tsx`, `MetricDetailDialog.tsx`, `DonutCard.tsx`, `RankingBarCard.tsx`, `SeccionResumen.tsx`, `SeccionPlataReal.tsx`, `SeccionEquipo.tsx`, `SeccionServiciosClientes.tsx`, `useEstadisticasData.ts` (+ posibles `types.ts`/`formatters.ts`).
+- 0 migraciones de base, 0 RPCs, 0 vistas. `FinanzasPanel.tsx` sin cambios (solo monta la pestaña). Posible ajuste menor en `index.css` si faltan tokens categóricos para el donut.
+
+**Recomendación: partir en 5 builds, no 4 ni 1.**
+
+| Build | Contenido | Por qué en ese orden |
+|---|---|---|
+| 0 — Infraestructura | Extraer MetricCard/MetricChart/DetailDialog, crear DonutCard + RankingBarCard, hook de datos. Panel actual sigue funcionando igual (refactor sin cambio visual) | Deja el terreno listo y es verificable por comparación 1:1 con lo actual |
+| 1 — Resumen | Reagrupar existentes | Valida la infra con métricas conocidas, riesgo mínimo |
+| 2 — Plata real | 6 métricas, casi todas del fetch de `ingresos` ampliado | Una sola fuente nueva de complejidad: el fallback venta_pagos/venta |
+| 3 — Equipo | Ranking + multilínea por barbero | Primera UI nueva de verdad (ranking); data ya validada sin NULLs |
+| 4 — Servicios y clientes | Mix, extras, clientes por origen, reservas | La de más queries nuevas y más estados vacíos por diseñar; conviene llegar con todo lo demás estable |
+
+El monolito actual de 1.100 líneas es el argumento más fuerte contra un build único: cada sección nueva agregaría ~200-300 líneas a un archivo ya difícil de revisar, y un error de agregación en una sección bloquearía el review de las otras. Con el build 0 hecho, cada sección es un PR chico, autocontenido y verificable contra datos reales de una org.
+
+---
+
+## Estadísticas — Build 0 (Infraestructura)
+
+**Fecha:** 14 de julio de 2026. Refactor puro — sin cambio de métricas, cálculos ni panel visible. `EstadisticasPanel.tsx` pasa de monolito (~1.100 líneas con 3 piezas de UI definidas localmente) a orquestador que consume `src/components/estadisticas/`.
+
+### Archivos creados
+
+| Archivo | Contenido |
+|---|---|
+| `estadisticas/types.ts` | `DerivedMonthlyMetrics`, `MetricCardDef`, `varKeyMap` — compartidos por las 3 piezas de card y el panel |
+| `estadisticas/dateHelpers.ts` | `getWorkDaysInMonth`, `getWorkDaysUpTo`, `calcVariation` — extraídos tal cual |
+| `estadisticas/MetricChart.tsx` | El barra+línea de 40px, extraído. Ganó 2 props opcionales (default = comportamiento actual): `size` ('sm'\|'lg') y `tooltipFormatFn` — ver hallazgo Servicios abajo |
+| `estadisticas/MetricDetailDialog.tsx` | El dialog de detalle (chart grande + tabla), extraído sin cambios |
+| `estadisticas/MetricCard.tsx` | La card (valor + badge de variación + mini-chart), extraída de `renderMetricCard`/`renderVariationBadge`. Props nuevas para las 2 variantes reales (ver abajo): `className`, `chartSize`, `tooltipFormatFn`, `children` |
+| `estadisticas/DonutCard.tsx` | **Nuevo, sin consumidor todavía.** Shell de card + `Pie` de Recharts dentro del `ChartContainer` existente + leyenda con color/label/%. Props genéricas: `title`, `description?`, `icon?`, `data: {label,value,color}[]`, `total?`, `formatValue?` |
+| `estadisticas/RankingBarCard.tsx` | **Nuevo, sin consumidor todavía.** Filas con `ui/progress.tsx` (nombre + barra + valor), ordenadas de mayor a menor. Props genéricas: `title`, `description?`, `icon?`, `data: {label,value,formattedValue?}[]` |
+| `estadisticas/useEstadisticasData.ts` | El `Promise.all` de las 4 queries (ingresos/Egresos/barberos/venta) + la agregación mensual (incluida la lógica de "parcial" para comparación mismo-día), extraído tal cual. Mismos filtros org/sucursal/rango, mismo resultado. **No** se tocó el patrón de fetching ni se agregó react-query |
+
+`EstadisticasPanel.tsx` (modificado): ahora importa las 3 piezas + el hook en vez de definirlas localmente. Sin cambios de JSX en `behaviorSection` (Comportamiento del Cliente) ni en la lógica de `derivedMetrics` — se movieron literal las funciones de fecha usadas ahí, no se reescribieron.
+
+### Confirmación: el panel se ve y funciona igual
+
+Sí. Verificado por comparación 1:1 contra el código previo (no hay entorno visual corrido en esta sesión, la validación es de lectura de diff + tipos):
+- Las 10 cards que ya usaban `renderMetricCard` (Facturación, Ticket Promedio, Efectivo, Mercado Pago, Costos Fijos, Costo Fijo/Servicio, Costo Variable/Servicio, Ganancia/Servicio, Rentabilidad, Punto de Equilibrio) pasan a `<MetricCard>` sin ningún prop nuevo — comportamiento idéntico.
+- `behaviorSection`, `fetchCapacidad`/`saveCapacidadDiaria`, y el estado de loading (skeleton) no se tocaron.
+- `npx tsc --noEmit` pasa limpio (exit 0).
+
+### Servicios y Tasa de Ocupación — sí migraron, con 2 variantes reales documentadas (no forzadas)
+
+Ambas migraron a `MetricCard`, pero cada una tenía una diferencia real de comportamiento frente al shell común. En vez de forzarlas a verse igual que las demás (lo que hubiera sido un cambio visual encubierto) o abortar el build, se resolvieron con props aditivas opcionales que no alteran ninguna de las 10 cards existentes:
+
+1. **Servicios** — el chart inline usaba `h-52` y `fontSize 11` (más grande que el `h-40`/`fontSize 10` estándar), y su tooltip mostraba el formateador **largo** (`"42 servicios"`) en vez del corto que usan las demás cards (`"42"`). Esto último es una inconsistencia real preexistente que no estaba documentada. Resuelto con `chartSize="lg"` + `tooltipFormatFn={serviciosCard.formatFn}` en el único consumidor; el default de ambas props preserva el comportamiento de las otras 10 cards sin cambios.
+2. **Tasa de Ocupación** — ya usaba `MetricChart` (no duplicaba el chart), pero el `CardContent` tenía contenido extra debajo (input de capacidad diaria + `Collapsible` de explicación) que no existe en ninguna otra card. Resuelto agregando un slot `children` opcional a `MetricCard`, renderizado después del chart; el panel sigue armando ese JSX (con sus `stopPropagation` intactos) y solo lo pasa como children.
+
+**Criterio para los próximos builds:** este patrón (props opcionales con default = comportamiento actual, nunca forzar una card a la apariencia de otra) es el que hay que seguir si una métrica nueva de las Secciones 1-4 necesita algo que el shell de `MetricCard` no contempla — extender antes de bifurcar.
+
+---
+
+## Estadísticas — Build 1 (Resumen)
+
+**Fecha:** 14 de julio de 2026 (con una revisión posterior, mismo día, que reemplaza la fórmula de Ocupación por una versión más simple confirmada por el dueño — ver más abajo). Primera sección real de la reestructuración: Resumen (Facturación, Servicios, Ticket Promedio, Rentabilidad %, Punto de Equilibrio, Tasa de Ocupación), con el tooltip de Servicios igualado al resto. Secciones 2-4 no tocadas.
+
+### Archivos creados
+
+| Archivo | Contenido |
+|---|---|
+| `estadisticas/useOcupacionResumen.ts` | **Vigente.** Fetch de `barberos` (id + `roles_equipo`), `horarios_trabajo` general (`barbero_id IS NULL`) y `servicios.duracion_min` (activos) para el rango de meses; devuelve horas operativas por mes (completas y parciales para el mes anterior, para la comparación mismo-día) + duración promedio + flag de cobertura |
+| ~~`estadisticas/ocupacionHelpers.ts`~~ | **Huérfano de Estadísticas desde la revisión de este mismo día.** Funciones puras de resolución de horario efectivo por barbero/día con intersección override↔general y resta de `bloqueos_agenda`. No se borró: la lógica de horario-por-barbero-individual es exactamente lo que necesitará Agenda si en algún momento muestra disponibilidad real por barbero. Sigue en el repo, sin ningún import activo. |
+| ~~`estadisticas/useOcupacionData.ts`~~ | **Huérfano de Estadísticas, mismo motivo.** Hook que consumía `ocupacionHelpers.ts` para la versión "por barbero" de la Tasa de Ocupación. Reemplazado en `EstadisticasPanel.tsx` por `useOcupacionResumen.ts`. Sigue en el repo, sin ningún import activo. |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `EstadisticasPanel.tsx` | Nueva Sección 1 "Resumen" (header `text-xs uppercase tracking-wide text-muted-foreground`, patrón ya usado en `NotificationsConfig.tsx`) con las 6 métricas pedidas. Tooltip de Servicios sin `tooltipFormatFn` (usa el corto, igual que las demás). `tasaOcupacion` calculada con la fórmula plana (ver abajo). Se sacó el `Collapsible` "¿Cómo se calcula?" de la card de Ocupación — la card muestra el número y el banner de cobertura si corresponde, nada más (`Info`/`ChevronDown`/`Collapsible*`/`ocupacionOpen` quedaron sin uso y se retiraron). Grupos "📈 Ingresos y Ventas" y "💰 Costos y Rentabilidad" se achican a las 6 métricas que Build 2 todavía no reubica; el grupo "⚡ Capacidad y Eficiencia" desaparece |
+| `estadisticas/MetricCard.tsx` | Prop opcional `banner?: ReactNode`, renderizada antes del valor (no después del chart como `children`) — se usa para el aviso de cobertura, antepuesto al número en vez de solo acompañarlo |
+
+### Fórmula real de Tasa de Ocupación (versión vigente)
+
+Reemplaza la versión "por barbero" de la iteración anterior de este mismo build. Fórmula plana confirmada por el dueño del negocio:
+
+> Ocupación = horas vendidas ÷ (barberos activos con rol barbero × horas que abre el local ese día) × 100
+
+- **Numerador — horas vendidas:** `ingresos.cantidad_de_servicios` del mes × duración promedio de los servicios activos del catálogo (`servicios.duracion_min`, `activo=true, eliminado=false`, con fallback a 30 min si algún valor viniera nulo o ≤0) ÷ 60. Sigue siendo un promedio del catálogo, no un cruce por servicio puntual vendido (confirmado otra vez: `ingresos` no guarda qué servicio fue cada uno) — la card lo deja explícito con "(estimado)" en su descripción, visible siempre, sin desplegable.
+- **Denominador — horas operativas:** para cada día del rango, horas del horario **general** de la sucursal para ese día de semana (`horarios_trabajo` con `barbero_id IS NULL`, sumando todas las ventanas de ese día por si hay turno partido) × cantidad de **barberos activos con rol `barber`** (mismo filtro `roles_equipo.includes('barber')` que ya usa el fix de encargados en `DailySummary.tsx` — no el conteo genérico de "barberos activos" que mezclaba roles). **No mira horario individual de ningún barbero.** **No resta bloqueos ni vacaciones puntuales** — decisión explícita: la capacidad instalada es la del equipo activo completo, sin importar quién trabajó cada día en particular.
+- **Tasa:** (horas vendidas ÷ horas operativas) × 100.
+- **Mes en curso:** igual que el resto del panel, ambos lados se cortan en el día de hoy, y la variación % contra el mes anterior compara los mismos primeros N días de ambos lados.
+- **Cantidad de barberos — sin reconstrucción histórica, tal como se pidió:** se usa la cantidad ACTUAL de barberos activos con rol barbero para calcular TODOS los meses del rango (incluidos los más viejos), no la que había en cada mes vía `barbero_historial`. **Se marca la distorsión que esto puede introducir, sin resolverla:** si el equipo creció o se achicó durante el período mostrado (3/6/12 meses), los meses viejos quedan divididos por un número de barberos que no es el que realmente trabajaba entonces — la ocupación de esos meses puede leerse artificialmente alta o baja según para qué lado cambió el equipo. Queda para una decisión aparte si vale la pena resolverlo con `barbero_historial` en un build futuro.
+
+### Aviso de cobertura — redefinido, con una ambigüedad marcada
+
+Ya no depende de horarios por barbero. Se implementó como: **el banner aparece si la sucursal tiene CERO filas de horario general cargadas en total** (`horarios_trabajo` con `barbero_id IS NULL, activo=true` — ninguna fila, de ningún día). Mensaje: "El horario general de la sucursal no está configurado — el número puede no ser preciso."
+
+**Ambigüedad marcada, no resuelta unilateralmente:** la consigna decía "si, para algún día de semana relevante en el rango, NO existe ningún horario general cargado", lo que también admite una lectura día-por-día (¿falta el lunes específicamente?). Se descartó esa lectura literal porque, contra cualquier rango real de 3/6/12 meses, los 7 días de la semana ISO ocurren siempre — así que un negocio con un franco semanal legítimo y bien configurado (ej. cerrado los domingos, sin fila de horario general para ese día) dispararía el aviso permanentemente, todo el año, por una ausencia de horario que es intencional, no un dato faltante. La interpretación implementada ("nunca configuró SU horario general", cero filas en total) evita ese falso positivo casi universal y calza con la frase de la propia consigna ("o sea, si el local nunca configuró su horario general"). Si la intención real era la lectura día-por-día, avisar para ajustarlo.
+
+### Tooltip de Servicios — confirmado igualado
+
+`tooltipFormatFn` se sacó del único consumidor (`EstadisticasPanel.tsx`); `MetricChart` cae a su default (`formatValue`, el mismo corto que usan las otras 10 cards). `chartSize="lg"` se mantiene sin cambios.
+
+### `sucursal_settings.capacidad_diaria` — sigue huérfano, sin resolver todavía
+
+Sin cambios respecto de la nota anterior: el input y el fetch/save de `capacidad_diaria` se dejaron intactos (con su leyenda de "ya no se usa"), no forman parte de este fix. Decisión de quitarlo o reutilizarlo sigue pendiente para una sesión aparte.
+
+### Transitorio conocido (no es un hallazgo nuevo, es el costo esperado de partir el build en 5)
+
+"📈 Ingresos y Ventas" y "💰 Costos y Rentabilidad" quedan con headers en el estilo emoji viejo (`text-lg`) conviviendo con el header nuevo de "Resumen" (`text-xs uppercase tracking-wide`) hasta que Build 2 los reemplace. Ambos grupos legacy quedan con menos cards de las que tenían (2 y 4 respectivamente, contra 4 y 6 antes) porque las 4 que se mudaron a Resumen se sacaron de ahí — no se dejaron duplicadas.
+
+### Hallazgo incidental — código muerto retirado (sin impacto visual)
+
+Al reescribir el archivo se encontraron y no se re-trasladaron 4 elementos sin ningún consumidor en todo el archivo (confirmado por grep antes de tocar nada): el const `chartConfig` (líneas 77-90 del original), el import `CardDescription`, el import `differenceInWeeks`, el import `eachDayOfInterval`, y la función `formatPercent`. Ninguno se usaba en ningún render ni cálculo — no son parte del candado de alcance de este build (no son ninguna de las 3 piezas a extraer ni las 2 a crear), y su remoción no cambia nada observable. Se documentan acá por transparencia, no como una limpieza adicional buscada.
+
+### Decisiones de esta sesión — criterio para Builds 2-4
+
+- **RankingBarCard = progress-rows, no Recharts.** Confirmado en la implementación: no importa nada de `recharts`, solo `ui/progress.tsx`. Coherente con la recomendación de la exploración técnica.
+- **Clientes nuevos por origen = detalle secundario, no protagonista** en la Sección 4 (Servicios y clientes): con 393 'importado' vs 20 'manual' vs 0 'reserva' (dato real relevado), un donut o ranking de origen sería una sola barra dominante sin valor analítico hoy. Mostrar como dato de contexto (ej. una línea de texto o card chica), no como gráfico principal de la sección.
+- **% eligió barbero sí entra a Sección 4; cancelación y anticipación no.** `turnos.eligio_barbero` es un booleano simple con dato completo y significado estable. La tasa de cancelación y la anticipación (`created_at` vs `fecha`) quedan fuera del build inicial: son válidas como dato pero de menor prioridad frente a las ~20 métricas ya acordadas, y compiten por espacio en una sección que ya tiene mix de servicios + líneas + extras + clientes por origen. Quedan anotadas como candidatas para una iteración posterior de la Sección 4, no descartadas.
