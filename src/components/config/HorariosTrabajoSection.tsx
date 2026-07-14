@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +10,8 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -17,6 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Barber } from '@/types/barbershop';
 import { cn } from '@/lib/utils';
+import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 
 interface HorariosTrabajoSectionProps {
   sucursalId: string;
@@ -218,6 +223,41 @@ function QuickApplyCard({
 // ============================================================
 // Edit Sheet: edición individual por día
 // ============================================================
+const dayRangeSchema = z.object({
+  dbId: z.string().optional(),
+  hora_inicio: z.string().min(1, 'Obligatorio.'),
+  hora_fin: z.string().min(1, 'Obligatorio.'),
+  activo: z.boolean(),
+});
+
+const dayFormSchema = z.object({
+  ranges: z.array(dayRangeSchema),
+}).superRefine((data, ctx) => {
+  data.ranges.forEach((r, i) => {
+    if (r.hora_inicio >= r.hora_fin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ranges', i, 'hora_fin'],
+        message: 'La hora fin debe ser mayor que la de inicio.',
+      });
+    }
+  });
+  const byStart = data.ranges
+    .map((r, i) => ({ ...r, i }))
+    .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  for (let k = 1; k < byStart.length; k++) {
+    if (byStart[k].hora_inicio < byStart[k - 1].hora_fin) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ranges', byStart[k].i, 'hora_inicio'],
+        message: 'Este rango se superpone con otro.',
+      });
+    }
+  }
+});
+
+type DayFormValues = z.infer<typeof dayFormSchema>;
+
 function DayEditSheet({
   open, onOpenChange, dia, dayRanges, sucursalId, organizationId, barberoId, onChanged,
 }: {
@@ -230,107 +270,161 @@ function DayEditSheet({
   barberoId: string | null;
   onChanged: () => void;
 }) {
-  if (!dia) return null;
+  const form = useForm<DayFormValues>({
+    resolver: zodResolver(dayFormSchema),
+    defaultValues: { ranges: [] },
+  });
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'ranges' });
+  const originalRangesRef = useRef<HorarioRow[]>([]);
 
-  const addRange = async () => {
+  useEffect(() => {
+    if (!open || !dia) return;
     const sorted = [...dayRanges].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+    originalRangesRef.current = sorted;
+    form.reset({
+      ranges: sorted.map(h => ({ dbId: h.id, hora_inicio: h.hora_inicio, hora_fin: h.hora_fin, activo: h.activo })),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, dia?.num]);
+
+  const addRange = () => {
+    const current = form.getValues('ranges');
+    const sorted = [...current].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
     const lastEnd = sorted.length > 0 ? sorted[sorted.length - 1].hora_fin : '09:00';
     const startH = parseInt(lastEnd.split(':')[0]);
     const endH = Math.min(23, startH + 4);
-    const newStart = lastEnd;
-    const newEnd = `${String(endH).padStart(2, '0')}:00`;
+    append({ hora_inicio: lastEnd, hora_fin: `${String(endH).padStart(2, '0')}:00`, activo: true });
+  };
 
-    if (newStart >= newEnd) { toast.error('No hay espacio para otro rango'); return; }
+  const handleCancel = () => onOpenChange(false);
 
-    const insert: any = {
-      sucursal_id: sucursalId,
-      organization_id: organizationId,
-      dia_semana: dia.num,
-      hora_inicio: newStart,
-      hora_fin: newEnd,
-      activo: true,
-    };
-    if (barberoId) insert.barbero_id = barberoId;
+  const onSubmit = async (values: DayFormValues) => {
+    if (!dia) return;
+    const original = originalRangesRef.current;
+    const originalById = new Map(original.map(r => [r.id, r]));
+    const currentDbIds = new Set(values.ranges.filter(r => r.dbId).map(r => r.dbId!));
+    const toDelete = original.filter(r => !currentDbIds.has(r.id));
+    const toInsert = values.ranges.filter(r => !r.dbId);
+    const toUpdate = values.ranges.filter(r => {
+      if (!r.dbId) return false;
+      const orig = originalById.get(r.dbId);
+      return !!orig && (orig.hora_inicio !== r.hora_inicio || orig.hora_fin !== r.hora_fin || orig.activo !== r.activo);
+    });
 
-    const { error } = await supabase.from('horarios_trabajo').insert(insert);
-    if (error) { toast.error('Error al agregar rango'); return; }
+    try {
+      if (toDelete.length > 0) {
+        const { error } = await supabase.from('horarios_trabajo').delete().in('id', toDelete.map(r => r.id));
+        if (error) throw error;
+      }
+      if (toInsert.length > 0) {
+        const inserts = toInsert.map(r => {
+          const row: any = {
+            sucursal_id: sucursalId,
+            organization_id: organizationId,
+            dia_semana: dia.num,
+            hora_inicio: r.hora_inicio,
+            hora_fin: r.hora_fin,
+            activo: r.activo,
+          };
+          if (barberoId) row.barbero_id = barberoId;
+          return row;
+        });
+        const { error } = await supabase.from('horarios_trabajo').insert(inserts);
+        if (error) throw error;
+      }
+      for (const r of toUpdate) {
+        const { error } = await supabase
+          .from('horarios_trabajo')
+          .update({ hora_inicio: r.hora_inicio, hora_fin: r.hora_fin, activo: r.activo })
+          .eq('id', r.dbId!);
+        if (error) throw error;
+      }
+    } catch (e) {
+      toast.error('Error al guardar el horario');
+      return;
+    }
+
+    toast.success('Horario actualizado');
     onChanged();
-  };
-
-  const updateRange = async (id: string, updates: Partial<HorarioRow>) => {
-    const row = dayRanges.find(h => h.id === id);
-    if (!row) return;
-    const merged = { ...row, ...updates };
-    if (merged.hora_inicio >= merged.hora_fin) {
-      toast.error('La hora fin debe ser mayor que la de inicio');
-      return;
-    }
-    const others = dayRanges.filter(h => h.id !== id);
-    if (hasOverlap([...others, merged].map(r => ({ hora_inicio: r.hora_inicio, hora_fin: r.hora_fin })))) {
-      toast.error('Los rangos se superponen');
-      return;
-    }
-    const dbUpdates: any = {};
-    if (updates.hora_inicio !== undefined) dbUpdates.hora_inicio = updates.hora_inicio;
-    if (updates.hora_fin !== undefined) dbUpdates.hora_fin = updates.hora_fin;
-    if (updates.activo !== undefined) dbUpdates.activo = updates.activo;
-    const { error } = await supabase.from('horarios_trabajo').update(dbUpdates).eq('id', id);
-    if (error) toast.error('Error al actualizar');
-    else onChanged();
-  };
-
-  const deleteRange = async (id: string) => {
-    const { error } = await supabase.from('horarios_trabajo').delete().eq('id', id);
-    if (error) toast.error('Error al eliminar');
-    else onChanged();
+    onOpenChange(false);
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Editar {dia.full}</SheetTitle>
-          <SheetDescription>Agregá, ajustá o quitá rangos horarios de este día.</SheetDescription>
-        </SheetHeader>
-        <div className="mt-6 space-y-3">
-          {dayRanges.length === 0 && (
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title={dia ? `Editar ${dia.full}` : 'Editar día'}
+      size="md"
+      isDirty={form.formState.isDirty}
+      footer={
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="ghost" onClick={handleCancel} disabled={form.formState.isSubmitting}>Cancelar</Button>
+          <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        </div>
+      }
+    >
+      <p className="text-xs text-muted-foreground mb-4">Agregá, ajustá o quitá rangos horarios de este día.</p>
+      <Form {...form}>
+        <div className="space-y-3">
+          {fields.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">Este día no tiene horarios.</p>
           )}
-          {dayRanges
-            .slice()
-            .sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio))
-            .map(h => (
-              <div key={h.id} className="flex items-center gap-2 border rounded-lg p-2">
-                <Switch
-                  checked={h.activo}
-                  onCheckedChange={v => updateRange(h.id, { activo: v })}
+          {fields.map((field, index) => {
+            const isActive = form.watch(`ranges.${index}.activo`);
+            return (
+              <div key={field.id} className="flex items-start gap-2 border rounded-lg p-2">
+                <FormField
+                  control={form.control}
+                  name={`ranges.${index}.activo`}
+                  render={({ field: f }) => (
+                    <FormItem className="mt-1 space-y-0">
+                      <FormControl>
+                        <Switch checked={f.value} onCheckedChange={f.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
                 />
-                <Input
-                  type="time"
-                  value={h.hora_inicio}
-                  onChange={e => updateRange(h.id, { hora_inicio: e.target.value })}
-                  className="w-28 h-8 text-sm"
-                  disabled={!h.activo}
-                />
-                <span className="text-xs text-muted-foreground">a</span>
-                <Input
-                  type="time"
-                  value={h.hora_fin}
-                  onChange={e => updateRange(h.id, { hora_fin: e.target.value })}
-                  className="w-28 h-8 text-sm"
-                  disabled={!h.activo}
-                />
-                <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" onClick={() => deleteRange(h.id)}>
+                <div className="flex-1 flex items-center gap-2">
+                  <FormField
+                    control={form.control}
+                    name={`ranges.${index}.hora_inicio`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 space-y-0">
+                        <FormControl>
+                          <Input type="time" {...f} className="h-8 text-sm" disabled={!isActive} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <span className="text-xs text-muted-foreground">a</span>
+                  <FormField
+                    control={form.control}
+                    name={`ranges.${index}.hora_fin`}
+                    render={({ field: f }) => (
+                      <FormItem className="flex-1 space-y-0">
+                        <FormControl>
+                          <Input type="time" {...f} className="h-8 text-sm" disabled={!isActive} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => remove(index)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>
-            ))}
-          <Button variant="outline" size="sm" onClick={addRange} className="w-full">
+            );
+          })}
+          <Button type="button" variant="outline" size="sm" onClick={addRange} className="w-full">
             <Plus className="h-4 w-4 mr-1" /> Agregar rango
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </Form>
+    </DrawerForm>
   );
 }
 
@@ -509,6 +603,7 @@ export function HorariosTrabajoSection({ sucursalId, organizationId, barbers }: 
 
   useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
 
+  const activeBarbers = barbers.filter(b => b.active);
   const sucursalHorarios = allHorarios.filter(h => h.barbero_id === null);
   const selectedBarberHorarios = selectedBarberId
     ? allHorarios.filter(h => h.barbero_id === selectedBarberId)
@@ -602,25 +697,33 @@ export function HorariosTrabajoSection({ sucursalId, organizationId, barbers }: 
 
           <TabsContent value="barberos">
             <div className="space-y-4">
-              <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Seleccionar barbero" />
-                </SelectTrigger>
-                <SelectContent>
-                  {barbers.filter(b => b.active).map(b => (
-                    <SelectItem key={b.id} value={b.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{b.firstName} {b.lastName}</span>
-                        {barbersWithOverride.has(b.id) ? (
-                          <StatusPill status="success" label="Horario propio" />
-                        ) : (
-                          <StatusPill status="neutral" label="Usa sucursal" />
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {activeBarbers.length === 0 ? (
+                <EmptySelectHint
+                  message="No hay barberos activos en esta sucursal."
+                  ctaLabel="Añadir miembro del equipo"
+                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+                />
+              ) : (
+                <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Seleccionar barbero" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeBarbers.map(b => (
+                      <SelectItem key={b.id} value={b.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{b.firstName} {b.lastName}</span>
+                          {barbersWithOverride.has(b.id) ? (
+                            <StatusPill status="success" label="Horario propio" />
+                          ) : (
+                            <StatusPill status="neutral" label="Usa sucursal" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {selectedBarberId && !barberHasOverride && (
                 <div className="text-center py-6 border rounded-lg bg-muted/30">

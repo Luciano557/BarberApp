@@ -2174,3 +2174,152 @@ sucursal — no se conectó a ningún `DrawerForm`, tal como se pidió.
 ### Validación
 
 `npx tsc --noEmit` — limpio.
+
+---
+
+## Fase 4 - Tanda 2 - Build 3b (Horarios) — 2026-07-13
+
+Cuarto y último build de la Parte 1 (Configuración). Migra `DayEditSheet`
+(el editor por día dentro de `HorariosTrabajoSection.tsx`) de Sheet crudo
+con autosave instantáneo a `DrawerForm` + React Hook Form + Zod, con botón
+"Guardar cambios" explícito — decisión ya tomada en la sesión del canon
+(Fase 3), que este build ejecuta. Resuelve además el select de barbero
+mudo detectado en la auditoría de Parte 1.
+
+### Archivo modificado
+
+- `src/components/config/HorariosTrabajoSection.tsx` (único archivo del
+  build, por candado de alcance)
+
+### `DayEditSheet` — de autosave a Guardar explícito
+
+Antes: cada `onChange` (Switch de activo, input de hora inicio/fin, alta o
+borrado de rango) llamaba a Supabase directamente, sin acumular estado
+local ni validar forma. Ahora: `Sheet` crudo → `DrawerForm size="md"`,
+estado acumulado en un único `useForm<DayFormValues>` con
+`useFieldArray({ name: 'ranges' })` — un rango por fila del array, cada uno
+con `dbId` (id real si ya existía en la base, `undefined` si es un rango
+nuevo agregado en esta sesión de edición), `hora_inicio`, `hora_fin` y
+`activo`. "Agregar rango" y el ícono de papelera ahora solo
+`append`/`remove` en el array local — no tocan Supabase hasta que se
+confirma "Guardar cambios".
+
+**Validación (`dayFormSchema`, Zod + `superRefine`):** dos reglas, ambas
+inline por fila vía `FormMessage`, reemplazando los `toast.error`
+imperativos que tenía `updateRange` antes:
+- `hora_fin` debe ser mayor que `hora_inicio` de la misma fila (antes:
+  `toast.error('La hora fin debe ser mayor que la de inicio')`).
+- Ningún rango se superpone con otro del mismo día — mismo algoritmo que
+  `hasOverlap` (ordenar por inicio, comparar con el anterior), pero
+  reimplementado dentro del `superRefine` para poder anclar el error al
+  índice de fila exacto en vez de solo devolver un booleano; el mensaje
+  ("Este rango se superpone con otro.") queda en el campo `hora_inicio` de
+  la fila que arranca después. `hasOverlap` (la función a nivel de módulo)
+  **no se tocó** — sigue siendo la que usa `QuickApplyCard`, sin cambios,
+  por el candado de alcance.
+
+**Desvío del comportamiento anterior, señalado y no oculto:** `addRange`
+tenía antes un guard imperativo — si el rango auto-calculado (a partir del
+fin del último rango existente, +4hs, tope 23:00) no dejaba espacio
+(`newStart >= newEnd`), bloqueaba el alta con
+`toast.error('No hay espacio para otro rango')` y no agregaba nada. Ahora
+el rango se agrega igual al array local, y si resulta inválido lo marca el
+mismo mecanismo inline del `superRefine` al intentar guardar (mismo
+mensaje de "hora fin debe ser mayor que la de inicio" que cualquier otro
+rango inválido). Es un cambio de UX menor (el bloqueo pasa de ser
+preventivo a ser detectado al guardar) pero consistente con el criterio
+"campo → inline" que pedía esta migración — antes esto era de los pocos
+casos de validación de formulario que usaba toast en vez de inline.
+
+**Persistencia al guardar:** `onSubmit` compara el array final contra un
+snapshot de los rangos originales tomado al abrir el sheet
+(`originalRangesRef`, cargado en el mismo `useEffect` que hace
+`form.reset`, gateado por `open && dia` como en los demás consumidores)
+y arma 3 lotes: `delete` por los `id` que ya no están en el array final,
+`insert` para las filas sin `dbId`, `update` fila por fila para las que
+cambiaron `hora_inicio`/`hora_fin`/`activo` respecto del snapshot. Errores
+de cualquiera de los 3 → `toast.error('Error al guardar el horario')`
+(servidor/red → toast, según el criterio); éxito → `toast.success`,
+`onChanged()` (refetch del padre) y cierre del drawer — mismo patrón que
+`BloqueosSection.onSubmit`.
+
+**Guard de doble submit y loading:** `disabled={form.formState.isSubmitting}`
+en ambos botones del footer, con el label del botón principal alternando
+"Guardar cambios" / "Guardando..." — mismo patrón que el resto de los
+formularios ya migrados en esta tanda.
+
+**`isDirty` conectado:** `isDirty={form.formState.isDirty}` en el
+`DrawerForm`, para que cerrar por X/click afuera/Escape con cambios sin
+guardar dispare "¿Descartar cambios?" (antes no aplicaba: con autosave no
+existía el concepto de "sin guardar"). El botón "Cancelar" del footer sigue
+el mismo patrón que los otros 16 consumidores de la Fase 4 — llama
+`onOpenChange(false)` directo, sin pasar por la confirmación. Con este
+build, `DayEditSheet` pasa a ser el **17º consumidor** del mecanismo de
+confirmación al cerrar (el conteo de "16 consumidores" de la sección
+anterior queda como estaba: es una foto de ese build, no se reescribió).
+
+### Select de barbero mudo (tab "Por barbero") — resuelto
+
+`activeBarbers` (nuevo, `barbers.filter(b => b.active)`) reemplaza el
+`barbers.filter(b => b.active)` inline que estaba directo en el `.map()`.
+Si `activeBarbers.length === 0`, el `Select` se reemplaza por
+`EmptySelectHint` (`src/components/agenda/EmptySelectHint.tsx`, importado
+cross-carpeta desde `config/`, mismo patrón ya usado por
+`AgendaManagement.tsx`) con el mismo mensaje/CTA/acción que
+`UnavailableSlotDialog.tsx` usa para el mismo caso ("No hay barberos
+activos en esta sucursal." / "Añadir miembro del equipo" /
+`toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar
+barberos.')`) — no se inventó copy nuevo, se reusó el existente.
+
+### `QuickApplyCard` — sin ningún cambio
+
+Confirmado: no se tocó una sola línea del componente ni de su `hasOverlap`
+compartido, tal como fijaba el candado de alcance.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.
+
+---
+
+## Cierre de la Parte 1 — Tanda 2: Configuración (2026-07-13)
+
+Los 4 builds de la Parte 1 quedan cerrados:
+
+- **Build 1 (Catálogo):** Servicios, Líneas, Extras y Descuentos (los 4 ya
+  eran `DrawerForm`) migraron de `useState` + `toast.error` a RHF+Zod con
+  errores inline (`ui/form.tsx`), y el quick-create "Nueva línea" de
+  Servicios migró además de contenedor (Dialog → DrawerForm). Guard de
+  doble submit parejo en los 4 vía `form.formState.isSubmitting`.
+- **Build 2 (Productos + Marcas):** los 2 formularios de Producto (por
+  sucursal y global, confirmado que no se fusionan) y
+  `MarcasManagerDialog` migraron a DrawerForm + RHF/Zod; los 3 campos que
+  comparten Producto-sucursal y Producto-global se unificaron en
+  `productSharedFields.ts`. Cambio aditivo no pedido: `footer` de
+  `DrawerForm` pasó a ser opcional (lo necesitaba `MarcasManagerDialog`,
+  que no tiene barra de acciones fija).
+- **Build 3a:** Métodos de pago, Ausencias/Bloqueos, Comisión por equipo,
+  Comisión por productos y el editor rápido de línea migraron a RHF+Zod;
+  Bloqueos y las 2 Comisiones pasaron de "inline en página" a
+  entidad-en-lista (resumen + `DrawerForm`), igualándose al resto del
+  cluster. `PinConfigSection.tsx` quedó explícitamente afuera. Mismo build
+  en el que se implementó el mecanismo de confirmación al cerrar
+  (`isDirty` en `DrawerForm`) y se conectó a los 16 consumidores que ya
+  estaban en RHF en ese momento.
+- **Build 3b (Horarios):** `DayEditSheet` perdió el autosave instantáneo y
+  migró a `DrawerForm` + RHF/Zod con botón "Guardar cambios" explícito —
+  la única decisión de esta parte que quitaba una funcionalidad (autosave)
+  en vez de sumar validación sobre el mismo comportamiento. Se conectó como
+  17º consumidor de `isDirty`. Se resolvió el select de barbero mudo con
+  `EmptySelectHint`. `QuickApplyCard` quedó fuera de la migración por
+  decisión explícita (no es un formulario de alta/edición clásico).
+
+**Estado final del cluster de Configuración:** los 14 formularios
+relevados en la auditoría de Parte 1 (§1) están en `DrawerForm` + RHF/Zod,
+con errores de campo inline y errores de servidor/red por toast, guard de
+doble submit consistente (`form.formState.isSubmitting`), y — donde aplica
+un `DrawerForm` con campos editables — conectados al mecanismo de
+confirmación al cerrar. Quedan fuera por decisión explícita:
+`PinConfigSection.tsx` (Build 3a) y `QuickApplyCard` (Build 3b, no es un
+formulario de entidad). `ProductoPickerDialog.tsx` sigue bloqueado por ser
+compartido con Cobrar (Tanda 1, fuera de alcance de esta parte).
