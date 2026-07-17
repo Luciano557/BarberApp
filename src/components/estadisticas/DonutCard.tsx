@@ -1,8 +1,10 @@
-import { ComponentType } from 'react';
+import { ComponentType, ReactNode, useState } from 'react';
 import { Pie, PieChart, Cell } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { cn } from '@/lib/utils';
+import { DonutDetailDialog } from './DonutDetailDialog';
 
 export interface DonutCardSlice {
   label: string;
@@ -18,6 +20,8 @@ interface DonutCardProps {
   /** Total used for the % breakdown; defaults to the sum of all slice values. */
   total?: number;
   formatValue?: (v: number) => string;
+  /** Extra content rendered inside the card, below the chart+legend (e.g. a one-line trend caption). */
+  footer?: ReactNode;
 }
 
 export function DonutCard({
@@ -27,16 +31,22 @@ export function DonutCard({
   data,
   total,
   formatValue = (v) => `${v}`,
+  footer,
 }: DonutCardProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
+  const [detailOpen, setDetailOpen] = useState(false);
   const computedTotal = total ?? data.reduce((sum, d) => sum + d.value, 0);
   const config = data.reduce((acc, d) => {
     acc[d.label] = { label: d.label, color: d.color };
     return acc;
   }, {} as Record<string, { label: string; color: string }>);
+  const clickable = data.length > 0;
 
   return (
-    <Card>
+    <Card
+      className={cn(clickable && 'cursor-pointer transition-shadow hover:shadow-md')}
+      onClick={clickable ? () => setDetailOpen(true) : undefined}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div>
           <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -74,24 +84,26 @@ export function DonutCard({
               </PieChart>
             </ChartContainer>
             <div className="flex-1 w-full space-y-1.5">
-              {data.map((slice) => {
-                const pct = computedTotal > 0 ? (slice.value / computedTotal) * 100 : 0;
-                return (
-                  <div key={slice.label} className="flex items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="h-2 w-2 rounded-[2px] shrink-0" style={{ backgroundColor: slice.color }} />
-                      <span className="truncate text-muted-foreground">{slice.label}</span>
-                    </div>
-                    <span className="font-medium tabular-nums shrink-0">
-                      {formatValue(slice.value)} <span className="text-muted-foreground">({pct.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                );
-              })}
+              {data.map((slice) => (
+                <div key={slice.label} className="flex items-center gap-1.5 text-xs">
+                  <span className="h-2 w-2 rounded-[2px] shrink-0" style={{ backgroundColor: slice.color }} />
+                  <span className="max-w-[140px] truncate text-muted-foreground" title={slice.label}>{slice.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
+        {footer}
       </CardContent>
+      <DonutDetailDialog
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        title={title}
+        description={description}
+        data={data}
+        total={total}
+        formatValue={formatValue}
+      />
     </Card>
   );
 }

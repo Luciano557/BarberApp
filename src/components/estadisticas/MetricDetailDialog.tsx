@@ -64,6 +64,13 @@ export function MetricDetailDialog({
               <TableRow>
                 <TableHead>Mes</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
+                {metric.origenKeys && (
+                  <>
+                    <TableHead className="text-right">Manual</TableHead>
+                    <TableHead className="text-right">Importado</TableHead>
+                    <TableHead className="text-right">Reserva</TableHead>
+                  </>
+                )}
                 <TableHead className="text-right">Variación</TableHead>
               </TableRow>
             </TableHeader>
@@ -75,6 +82,13 @@ export function MetricDetailDialog({
                   <TableRow key={row.monthLabel}>
                     <TableCell className="font-medium">{row.monthLabel}</TableCell>
                     <TableCell className="text-right">{metric.formatFn(value)}</TableCell>
+                    {metric.origenKeys && (
+                      <>
+                        <TableCell className="text-right text-muted-foreground">{row[metric.origenKeys.manual] as number}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{row[metric.origenKeys.importado] as number}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{row[metric.origenKeys.reserva] as number}</TableCell>
+                      </>
+                    )}
                     <TableCell className="text-right">
                       {variation == null ? (
                         <span className="text-muted-foreground">—</span>

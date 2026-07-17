@@ -497,3 +497,205 @@ Al reescribir el archivo se encontraron y no se re-trasladaron 4 elementos sin n
 - **RankingBarCard = progress-rows, no Recharts.** Confirmado en la implementación: no importa nada de `recharts`, solo `ui/progress.tsx`. Coherente con la recomendación de la exploración técnica.
 - **Clientes nuevos por origen = detalle secundario, no protagonista** en la Sección 4 (Servicios y clientes): con 393 'importado' vs 20 'manual' vs 0 'reserva' (dato real relevado), un donut o ranking de origen sería una sola barra dominante sin valor analítico hoy. Mostrar como dato de contexto (ej. una línea de texto o card chica), no como gráfico principal de la sección.
 - **% eligió barbero sí entra a Sección 4; cancelación y anticipación no.** `turnos.eligio_barbero` es un booleano simple con dato completo y significado estable. La tasa de cancelación y la anticipación (`created_at` vs `fecha`) quedan fuera del build inicial: son válidas como dato pero de menor prioridad frente a las ~20 métricas ya acordadas, y compiten por espacio en una sección que ya tiene mix de servicios + líneas + extras + clientes por origen. Quedan anotadas como candidatas para una iteración posterior de la Sección 4, no descartadas.
+
+---
+
+## Estadísticas — Build 2 (Plata real)
+
+**Fecha:** 14 de julio de 2026. Sección 2 completa: 2 donuts (composición del mes actual) + 7 cards de tendencia mensual. Secciones 1/3/4 no tocadas. `RankingBarCard.tsx` sigue sin consumidor.
+
+**Nota sobre el conteo de cards:** la consigna decía dos cosas distintas — el resumen del objetivo hablaba de "5 cards (3 nuevas, 2 migradas)", pero el punto detallado #6 nombra explícitamente **4** cards migradas (Costos Fijos, Costo Fijo/Servicio, Costo Variable/Servicio, Ganancia/Servicio). Se siguió la instrucción detallada y explícita por sobre el resumen: **7 cards en total (3 nuevas + 4 migradas)**, no 5. Se marca acá por transparencia, no se decidió en silencio.
+
+### Cards retiradas del render
+
+`Efectivo` y `Mercado Pago` (antes en "📈 Ingresos y Ventas"). El array `ingresosCards` con sus `MetricCardDef` **no se borró** — sigue declarado en `EstadisticasPanel.tsx` con un comentario explicando el retiro y un `void ingresosCards;` para dejar explícito que es intencional, no un olvido. El grupo "📈 Ingresos y Ventas" completo desapareció del render (quedaba vacío al sacarle estas dos).
+
+### Cards migradas (sin cambio de cálculo)
+
+Costos Fijos, Costo Fijo por Servicio, Costo Variable por Servicio, Ganancia por Servicio — mismo `MetricCardDef` (mismo `dataKey`, mismo `formatFn`, mismo color) que tenían en "💰 Costos y Rentabilidad", ahora en el array `plataRealCards` dentro de la nueva Sección "Plata real". El grupo "💰 Costos y Rentabilidad" completo desapareció del render.
+
+### Cards nuevas
+
+| Card | Fuente | Nota |
+|---|---|---|
+| Recargos Cobrados | Σ `ingresos.recargos_total` por mes | 0/NULL antes de abr/2026 — se muestra en 0 sin aviso especial, es el dato real |
+| Descuentos Regalados | Σ `ingresos.perdida` por mes | Nombre deliberadamente positivo/neutro (no "Pérdida") — es plata que el dueño decidió no cobrar, no una pérdida operativa |
+| Costo Laboral % de Facturación | (Σ `ingresos.sueldo` + Σ `ingresos.comision_productos`) ÷ Σ `ingresos.total_facturado` × 100, por mes | Calculado una sola vez en `derivedMetrics` (`costoLaboralPct`); el texto debajo del donut de costos lee `latest.costoLaboralPct`, no lo recalcula |
+
+Las tres vinieron de **extender `useEstadisticasData.ts`** (ampliar el `select` de `ingresos` con `recargos_total, perdida, comision_productos`, y agregar la aggregación mensual correspondiente + sus versiones "parciales" para Recargos/Descuentos, mismo patrón mismo-día que Facturación/Servicios). Costo Laboral % es un ratio, como Rentabilidad — no usa comparación "parcial", se compara mes contra mes completo igual que los demás ratios. **No se tocó Sección 1** con este cambio: son campos nuevos y aditivos en `MonthlyData`, ningún campo ni cálculo existente cambió.
+
+### Donut "Cómo se cobra"
+
+Fuente: `venta_pagos.metodo_pago` + `monto`, con fallback a `venta.metodo_pago` + `total_final` para ventas sin filas en `venta_pagos` — **replicado idéntico** al patrón de `useTransactions.ts` (`loadTransactionsByDate`: si `pagos.length > 0` usar esas filas, si no un único pago con el método/monto de la venta). Nuevo hook dedicado `usePagoMetodoData.ts`, independiente del selector de período del panel (siempre mes calendario actual vs. el inmediato anterior, sea cual sea el rango de 3/6/12 meses elegido).
+
+**Mapeo color↔método confirmado** (no asumido a ciegas): mismo orden en que la consigna listó categorías y tokens, y mismo orden del CHECK de `venta.metodo_pago`:
+
+| Método | Token |
+|---|---|
+| Efectivo | `--chart-cash` |
+| Mercado Pago | `--chart-mp` |
+| Transferencia | `--chart-cost` |
+| Débito | `--chart-purple` |
+| Crédito | `--chart-indigo` |
+
+Los 5 tokens listados en la consigna alcanzaban exactamente para las 5 categorías — no hizo falta inventar ningún color nuevo, no hubo que detenerse por este motivo.
+
+Debajo del donut: línea de tendencia "Digital +X% vs. mes anterior" (arrow up/down + color success/error, mismo vocabulario visual que el resto del panel), comparando la suma de mercado_pago+transferencia+debito+credito entre mes actual y anterior. Si el mes anterior no tuvo nada digital (`calcVariation` devuelve `null` — no se puede sacar un % de una base 0), se muestra en cambio "Digital: $X este mes" sin porcentaje, para no forzar una comparación sin sentido.
+
+### Donut "Costos del mes"
+
+Fuente: **reutiliza `monthlyData`** (que `useEstadisticasData.ts` ya agrega desde `Egresos.tipo_costo` para Sección 1) — no se refetchea `Egresos`. 3 categorías, colores:
+
+| Tipo de costo | Token | Motivo |
+|---|---|---|
+| Fijo | `--chart-cost` | Mismo color que la card "Costos Fijos" migrada a esta misma sección — refuerza que son el mismo concepto |
+| Variable | `--chart-amber` | Mismo color que "Costo Variable por Servicio", ya migrada acá también |
+| Semivariable | `--chart-purple` | **Sin precedente de color en ningún otro lado de la app.** Elegido por descarte (no colisiona con fijo/variable dentro del mismo donut); se marca acá porque no es una reutilización semántica tan directa como las otras dos |
+
+Debajo: "Costo laboral: X% de la facturación", leyendo `latest.costoLaboralPct` (el mismo valor de la card de tendencia, no un cálculo aparte).
+
+### Archivos
+
+| Archivo | Cambio |
+|---|---|
+| `estadisticas/usePagoMetodoData.ts` | **Nuevo.** Fetch de `venta`+`venta_pagos` (mes actual + anterior) con el fallback de `useTransactions.ts` replicado |
+| `estadisticas/useEstadisticasData.ts` | Extendido: `recargos_total`, `perdida`, `comision_productos` en el select de `ingresos`; `recargosTotal`, `perdida`, `sueldoTotal`, `comisionProductos` + sus parciales en `MonthlyData` |
+| `estadisticas/types.ts` | `DerivedMonthlyMetrics` + `varKeyMap` extendidos con `recargos`, `descuentos`, `costoLaboralPct` y sus `...Var` |
+| `estadisticas/DonutCard.tsx` | Prop nueva `footer?: ReactNode` (primer uso real del componente — se aprovechó para darle el slot de caption que le faltaba, en vez de flotar un `<p>` suelto debajo de la card) |
+| `EstadisticasPanel.tsx` | Sección "Plata real" completa (header, 2 donuts, 7 cards); grupos legacy "📈 Ingresos y Ventas"/"💰 Costos y Rentabilidad" retirados del render |
+
+---
+
+## Estadísticas — Build 3 (Equipo)
+
+**Fecha:** 17 de julio de 2026. Sección 3 completa: 3 rankings del mes actual (facturación, servicios, comisión devengada) + 1 ranking condicional de venta de productos + detalle mensual al click. Secciones 1/2 no tocadas. Sección 4 sigue pendiente. `RankingBarCard.tsx` tuvo su primer consumidor real.
+
+### Filtro "barbero" (todo el build)
+
+`barberos.roles_equipo` incluye `'barber'` — mismo criterio que el fix de `DailySummary.tsx` y el ya usado en `useOcupacionResumen.ts` (Build 1). Se aplica en las 4 rankings y en el historial mensual: un `ingresos.barbero_id` o `venta_producto.barbero_id` que apunte a alguien sin rol barbero (ej. un encargado) queda excluido de todas las rankings, no solo de una.
+
+### Rankings 1-3 (mes actual)
+
+Nuevo hook `useEquipoData.ts`, fetch de `barberos` + `ingresos` (mismo rango de `periodoMeses` que el resto del panel, para poder alimentar también el historial del punto 5) + `venta_producto` (mes actual). Agregación en cliente, mismo patrón fetch-completo-y-reduce que el resto del panel.
+
+- **Facturación por Barbero**: Σ `ingresos.total_facturado` por `barbero_id`, mes actual. Debajo del nombre, texto chico: ticket promedio (`facturación ÷ cantidad_de_servicios` de ese barbero ese mes) — nuevo prop `sublabel?: string` en `RankingBarItem`.
+- **Servicios por Barbero**: Σ `ingresos.cantidad_de_servicios` por `barbero_id`, mes actual.
+- **Comisión Devengada por Barbero**: Σ `ingresos.sueldo` + Σ `ingresos.comision_productos` por `barbero_id`, mes actual.
+
+### Ranking 4 — Venta de Productos (condicional)
+
+Σ `venta_producto.subtotal` agrupado por `barbero_id`, mes actual. **Desvío menor respecto a la consigna, documentado por transparencia:** el ticket sugería "join a `venta` para filtrar por fecha/mes/sucursal", pero `venta_producto` ya tiene sus propias columnas `organization_id`, `sucursal_id` y `created_at` (confirmado en `integrations/supabase/types.ts`) — se filtró directo sobre esas columnas, sin joinear `venta`, porque es estrictamente más simple y da el mismo resultado. No es una ambigüedad de negocio, es evitar un join innecesario.
+
+Comportamiento condicional confirmado: si `productosRanking` queda vacío (0 filas para el mes/sucursal actual, filtradas ya por rol barbero), la card **no se renderiza** — `{productosRankingData.length > 0 && (<RankingBarCard .../>)}` en `EstadisticasPanel.tsx`, sin estado vacío intermedio.
+
+### Punto 5 — Detalle mensual al click
+
+**Se resolvió reusando `MetricDetailDialog` tal cual, sin modificarlo.** El componente solo lee `monthLabel` + `metric.dataKey` + su `...Var` del array `data` — no asume nada sobre qué representa esa serie. La adaptación mínima fue:
+
+1. Agregar `comisionDevengada` / `comisionDevengadaVar` a `DerivedMonthlyMetrics` y `varKeyMap` en `types.ts` (aditivo — a nivel organización queda siempre en 0/null, no representa nada ahí; solo tiene valor real en las series por-barbero).
+2. Nueva función `buildBarberoSeries()` en `EstadisticasPanel.tsx`: toma el historial mensual de un barbero (`historialPorBarbero.get(id)`, que ya viene del mismo rango de meses que el resto del panel) y arma un array con la forma completa de `DerivedMonthlyMetrics`, con el campo pedido (`facturacion` | `servicios` | `comisionDevengada`) real y el resto en 0/null.
+3. Segunda instancia de `<MetricDetailDialog>` en el render, con su propio estado (`selectedBarberoDetail`) — no comparte el diálogo de las Secciones 1/2, porque esas siempre muestran la serie global (`derivedMetrics`) y esta muestra una serie por-barbero; mezclar los dos en un solo estado hubiera complicado la lógica sin necesidad.
+
+Al hacer click en una fila de las rankings 1-3, se abre el diálogo con el título `"<Métrica> — <Nombre del barbero>"` y el chart+tabla mensual de esa métrica para ese barbero en el rango seleccionado. La ranking de productos (4) **no** tiene click-to-detail — no estaba pedido para esa ranking.
+
+### Archivos
+
+| Archivo | Cambio |
+|---|---|
+| `estadisticas/useEquipoData.ts` | **Nuevo.** Fetch de `barberos`+`ingresos`+`venta_producto`, filtrado por rol barbero; devuelve ranking del mes actual, historial mensual por barbero y ranking de productos |
+| `estadisticas/RankingBarCard.tsx` | Props nuevas: `id?` en `RankingBarItem` (key estable + identificador para el click), `sublabel?` (texto chico bajo el label), `onItemClick?` (filas clickeables) — todas opcionales, comportamiento default sin cambios |
+| `estadisticas/types.ts` | `DerivedMonthlyMetrics` + `varKeyMap` extendidos con `comisionDevengada`/`comisionDevengadaVar` |
+| `EstadisticasPanel.tsx` | Sección "Equipo" completa (header, 3 rankings + 1 condicional); `buildBarberoSeries()`; segundo `MetricDetailDialog` para el detalle por barbero |
+
+---
+
+## Estadísticas — Build 4 (Servicios y clientes)
+
+**Fecha:** 17 de julio de 2026. Última sección de las 4: donut de mix de servicios, tasa de attach de extras, reubicación de "Comportamiento del Cliente", clientes nuevos por mes (con origen como detalle secundario) y % que eligió barbero al reservar. Secciones 1/2/3 no tocadas.
+
+### Donut "Mix de Servicios" (mes actual)
+
+Fuente: `venta.servicio_nombre` + `total_final`, filtrado al mes actual sobre la misma `ventasData` que ya trae `useEstadisticasData.ts` para el behavior existente — se **amplió su `select`** (`id, fecha_hora, servicio_nombre, total_final`, antes solo `fecha_hora`), no se creó una query nueva. Top 5 servicios por facturación + "Otros" agrupando el resto (si hay 5 o menos servicios distintos, "Otros" no aparece — el slice se omite en vez de mostrarse en 0).
+
+**Colores:** no hay tokens dedicados a "servicios", se reusan de Sección 2 en este orden: `--chart-indigo`, `--chart-purple`, `--chart-mp`, `--chart-amber`, `--chart-orange`. Para "Otros" se usó **`--muted-foreground`** en vez de un `chart-*` — es el único slice de todo el panel pensado deliberadamente para pasar desapercibido (agrupa lo que no es protagonista), no para competir visualmente con el top 5. Se marca acá porque es un criterio distinto al resto de los donuts (que siempre usan tokens `chart-*`).
+
+### Tasa de Attach de Extras
+
+Fórmula: Σ `venta_extra.cantidad` (líneas, no cantidad de ventas) ÷ Σ `ingresos.cantidad_de_servicios`, × 100, por mes. Card de tendencia estándar (`MetricCard`), sin card aparte para el ingreso: la descripción de la card menciona dinámicamente "Ingreso por extras este mes: $X" (mismo patrón de string dinámico ya usado en `gananciaPorServicio.color`).
+
+**Nota técnica:** a diferencia de `venta_producto` (Build 3), `venta_extra` **no tiene** `organization_id`/`sucursal_id`/`created_at` propios — solo `venta_id`, `cantidad`, `precio_extra`. Acá sí hizo falta el join contra `venta` (al revés que en Build 3, donde se evitó): se resuelve reusando los ids de la misma `ventasData` ya fetcheada y acotada por rango/sucursal, sin fetchear `venta` de nuevo. Nuevo hook `useServiciosClientesData.ts`.
+
+Es un ratio (como Rentabilidad/Costo Laboral %): se compara mes completo contra mes completo, sin recorte "mismos primeros N días".
+
+### Comportamiento del Cliente — reubicación
+
+Bloque completo (ventas por día de semana, ventas por hora, horarios pico) movido tal cual, sin tocar `behaviorData` ni sus cálculos, desde su posición anterior (después de Sección 3) a esta sección, al final, después del resto de las cards nuevas. Mantiene su propio header interno ("👥 Comportamiento del Cliente", `text-lg font-semibold`) sin cambios — la sección contenedora "Servicios y clientes" usa el patrón `text-xs uppercase` estándar por fuera, ambos headers conviven (uno es el de la sección, el otro es el del bloque reubicado dentro de ella).
+
+### Clientes Nuevos por Mes
+
+Card principal: Σ `clientes.created_at` por mes — `MetricCard` estándar, sin desglose visible en la card ni en el mini-chart (protagonista = línea del total, como pedía la consigna). **Nuevo hook** `useServiciosClientesData.ts` hace un fetch propio a `clientes` (no existía en ningún otro build de Estadísticas), filtrando `eliminado = false`.
+
+**Nota de alcance, no resuelta silenciosamente:** `clientes` **no tiene columna `sucursal_id`** (confirmado en `integrations/supabase/types.ts`) — es una tabla a nivel organización, no por sucursal. "Clientes Nuevos" y su desglose de origen quedan **a nivel organización**, ignorando el filtro de sucursal activo, a diferencia de todo el resto del panel (que si hay una sucursal seleccionada, filtra por ella). Es una limitación de esquema, no una decisión de diseño — se documenta para que quede claro por qué esta card en particular no respeta el selector de sucursal.
+
+Es acumulativo (como Facturación/Servicios): usa el mismo patrón "parcial, mismos primeros N días" para comparar el mes en curso contra el mes anterior en igualdad de condiciones.
+
+### Punto 4 — Desglose de origen en el detalle al click
+
+**Se implementó completo, no fue necesario recortarlo.** Se evaluó el costo de agregar columnas condicionales a `MetricDetailDialog.tsx` y resultó bajo: la tabla ya iteraba filas simples, agregar 3 `<TableHead>`/`<TableCell>` condicionados a un nuevo campo opcional `MetricCardDef.origenKeys` (`{ manual, importado, reserva }`, cada uno una `keyof DerivedMonthlyMetrics`) fue un cambio acotado que no afecta a ningún otro consumidor del diálogo (el resto de las métricas no define `origenKeys`, así que sus tablas quedan exactamente igual). No hizo falta detenerse a proponer una alternativa — no resultó más invasivo de lo esperado.
+
+Se agregaron `clientesManual`/`clientesImportado`/`clientesReserva` a `DerivedMonthlyMetrics` (valores crudos, sin `...Var` — no son tendencias, son el desglose de un mes puntual) y `origenKeys` a la definición de la card "Clientes Nuevos". El chart grande del diálogo sigue mostrando el total (`dataKey: 'clientesNuevos'`), sin tocar — el desglose vive solo en las 3 columnas nuevas de la tabla.
+
+### % Que Eligió Barbero al Reservar
+
+Fórmula: `turnos.eligio_barbero = true` ÷ total de turnos del mes × 100, filtrado por `fecha` del turno (no `created_at`) y por sucursal (`turnos.sucursal_id`, a diferencia de `clientes`). Es un ratio — sin comparación parcial. Sin aviso de "pocos datos": el número bajo ya lo comunica por sí solo, tal como pedía la consigna.
+
+### Archivos
+
+| Archivo | Cambio |
+|---|---|
+| `estadisticas/useServiciosClientesData.ts` | **Nuevo.** Fetch de `clientes` + `turnos` + `venta_extra` (vía ids de `ventasData`); devuelve tasa de attach, clientes nuevos (+ desglose de origen) y % eligió barbero, por mes |
+| `estadisticas/useEstadisticasData.ts` | `select` de `venta` ampliado (`id`, `servicio_nombre`, `total_final`, antes solo `fecha_hora`); `ventasData` pasó a tipo `VentaRow[]` (exportado) |
+| `estadisticas/types.ts` | `DerivedMonthlyMetrics`/`varKeyMap` extendidos con `tasaAttachExtras`, `clientesNuevos`, `clientesManual`, `clientesImportado`, `clientesReserva`, `pctEligioBarbero` (+ sus `...Var` donde aplica); `MetricCardDef` ganó `origenKeys?` |
+| `estadisticas/MetricDetailDialog.tsx` | 3 columnas condicionales (Manual/Importado/Reserva) cuando `metric.origenKeys` está definido — sin efecto en los demás consumidores |
+| `EstadisticasPanel.tsx` | Sección "Servicios y clientes" completa (donut, 3 cards nuevas); reubicación de `behaviorSection` (sin tocar su lógica) |
+
+---
+
+## Estadísticas — Reestructuración completa
+
+Con Build 4 se completan las 4 secciones planificadas en la exploración técnica del 14/jul/2026: **Resumen** (Build 1), **Plata real** (Build 2), **Equipo** (Build 3), **Servicios y clientes** (Build 4), sobre la infraestructura de Build 0. `DonutCard.tsx` y `RankingBarCard.tsx` — creados en Build 0 sin consumidor — terminaron usados en 3 de las 4 secciones.
+
+**Explícitamente fuera de esta vuelta de 4 secciones** (para que quede escrito por qué, no como un olvido):
+
+- **LTV / frecuencia de compra por cliente**: `venta` no tiene `cliente_id` — el único puente es `turnos.cliente_id`, insuficiente para reconstruir el historial de compra real de un cliente.
+- **No-show / conversión reserva→venta**: `turnos` nunca se marca `completado`/`no_asistio` en este código base — no hay forma de distinguir un turno cumplido de uno simplemente vencido.
+- **Rotación/antigüedad de equipo**: `barbero_historial` existe pero reconstruir "cuántos barberos había cada mes pasado" quedó fuera — Build 1 ya documentó esta misma limitación en la Tasa de Ocupación (usa el conteo *actual* de barberos para todo el rango).
+- **Cancelación y anticipación de reservas**: dato disponible en `turnos` (columnas `cancelado_at`/`cancelado_motivo`, y la anticipación se puede derivar de `created_at` vs. `fecha`), pero decisión ya tomada de dejarlo para una iteración posterior, no por falta de datos.
+- **$/hora-silla**: solo 3 de 21 servicios en el catálogo tienen duración real cargada — insuficiente para una métrica de rentabilidad por hora.
+
+Ninguna de estas 5 quedó afuera por accidente — cada una tiene una razón de datos o una decisión explícita ya registrada en este documento (secciones de exploración técnica y Build 1).
+
+---
+
+## Estadísticas — Fix: leyenda de los donuts + detalle ampliado
+
+**Fecha:** 17 de julio de 2026. Fix de presentación sobre los 3 `DonutCard` existentes (Cómo se cobra, Costos del mes, Mix de Servicios) — no se tocó ningún cálculo de datos de ningún donut.
+
+**Diagnóstico del label vacío en "Costos del mes" (categoría del medio, "Variable"):** no era un bug de datos. `costosSlices` en `EstadisticasPanel.tsx` arma el label como string literal (`{ label: 'Variable', ... }`) — llega bien a `DonutCard`. La causa era un **bug de layout en la leyenda compacta anterior**: cada fila mostraba `label` + `monto (%)` en la misma línea, con el span del monto marcado `shrink-0` (nunca se achica) y el del label como único elemento flexible absorbiendo todo el déficit de espacio. Cuando el texto del monto+porcentaje de una fila era lo bastante ancho (que le tocó a "Variable" en el caso reportado, por el monto involucrado), el label podía quedar comprimido a 0px — no truncado con "…", literalmente sin ancho para pintar ningún carácter. No era específico de la palabra "Variable": le podía pasar a cualquier categoría, según qué fila tuviera el monto más ancho. La Parte 2 (sacar monto/% de la fila compacta) elimina la causa de raíz, no solo el síntoma.
+
+### Leyenda compacta simplificada
+
+Cada fila pasó a ser solo `punto de color + label` (sin monto ni %). Se mantiene `max-w-[140px] truncate` + `title={slice.label}` como red de seguridad — ya no compite por espacio con nada en la misma fila, así que en la práctica solo entra en juego para nombres de servicio largos en Mix de Servicios.
+
+### Card clickeable + detalle ampliado
+
+`DonutCard.tsx` pasó a manejar su propio estado de diálogo (`useState`, no requirió tocar ningún call site de los 3 donuts en `EstadisticasPanel.tsx`). La card entera es clickeable cuando tiene datos (mismo affordance visual que `MetricCard`: `cursor-pointer transition-shadow hover:shadow-md`).
+
+Nuevo componente **`DonutDetailDialog.tsx`** (pensado desde el inicio para los 3 donuts, recibe los mismos props que ya traía `DonutCard`: `title`/`description`/`data`/`total`/`formatValue`): donut más grande (h-64) arriba + tabla de 3 columnas (Nombre completo con su punto de color / Monto / Porcentaje) debajo, sin truncar nada — hay espacio de sobra en el diálogo.
+
+### Archivos
+
+| Archivo | Cambio |
+|---|---|
+| `estadisticas/DonutDetailDialog.tsx` | **Nuevo.** Diálogo reusable: donut ampliado + tabla sin truncar |
+| `estadisticas/DonutCard.tsx` | Leyenda compacta sin monto/%; card clickeable; renderiza su propio `DonutDetailDialog` |

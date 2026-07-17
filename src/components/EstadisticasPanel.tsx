@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, Scissors, Calendar, Target,
   PiggyBank, Receipt, BarChart3, Percent,
-  Clock, Trophy, DollarSign, TrendingUp, AlertTriangle
+  Clock, Trophy, DollarSign, TrendingUp, AlertTriangle,
+  ArrowUpRight, ArrowDownRight, CreditCard, Gift, Wallet, ShoppingBag,
+  Sparkles, UserPlus, UserCheck,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -18,10 +20,49 @@ import { Input } from '@/components/ui/input';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { MetricCard } from './estadisticas/MetricCard';
 import { MetricDetailDialog } from './estadisticas/MetricDetailDialog';
+import { DonutCard } from './estadisticas/DonutCard';
+import { RankingBarCard, RankingBarItem } from './estadisticas/RankingBarCard';
 import { useEstadisticasData } from './estadisticas/useEstadisticasData';
 import { useOcupacionResumen } from './estadisticas/useOcupacionResumen';
+import { usePagoMetodoData } from './estadisticas/usePagoMetodoData';
+import { useEquipoData, BarberoMonthStats } from './estadisticas/useEquipoData';
+import { useServiciosClientesData } from './estadisticas/useServiciosClientesData';
 import { calcVariation } from './estadisticas/dateHelpers';
 import { DerivedMonthlyMetrics, MetricCardDef } from './estadisticas/types';
+
+type BarberoMetricKey = 'facturacion' | 'servicios' | 'comisionDevengada';
+
+/**
+ * Adapta el historial mensual de UN barbero a la forma completa de DerivedMonthlyMetrics para
+ * poder reusar MetricDetailDialog (que solo lee monthLabel + metric.dataKey + su Var) sin
+ * tocarlo. Los campos ajenos a `key` quedan en 0/null — no representan nada en este contexto.
+ */
+function buildBarberoSeries(stats: BarberoMonthStats[], key: BarberoMetricKey): DerivedMonthlyMetrics[] {
+  return stats.map((s, i) => {
+    const value = s[key];
+    const prevValue = i > 0 ? stats[i - 1][key] : null;
+    const variation = prevValue !== null ? calcVariation(value, prevValue) : null;
+    const base: DerivedMonthlyMetrics = {
+      monthLabel: s.monthLabel,
+      facturacion: 0, servicios: 0, efectivo: 0, mp: 0, costosFijos: 0,
+      rentabilidad: 0, ticketPromedio: 0, costoFijoPorServicio: 0,
+      costoVariablePorServicio: 0, gananciaPorServicio: 0, puntoEquilibrio: 0,
+      tasaOcupacion: 0, recargos: 0, descuentos: 0, costoLaboralPct: 0,
+      comisionDevengada: 0, tasaAttachExtras: 0, clientesNuevos: 0,
+      clientesManual: 0, clientesImportado: 0, clientesReserva: 0, pctEligioBarbero: 0,
+      facturacionVar: null, serviciosVar: null, efectivoVar: null, mpVar: null,
+      costosFijosVar: null, rentabilidadVar: null, ticketPromedioVar: null,
+      costoFijoPorServicioVar: null, costoVariablePorServicioVar: null,
+      gananciaPorServicioVar: null, puntoEquilibrioVar: null, tasaOcupacionVar: null,
+      recargosVar: null, descuentosVar: null, costoLaboralPctVar: null,
+      comisionDevengadaVar: null, tasaAttachExtrasVar: null, clientesNuevosVar: null,
+      pctEligioBarberoVar: null,
+    };
+    (base as unknown as Record<string, number>)[key] = value;
+    (base as unknown as Record<string, number | null>)[`${key}Var`] = variation;
+    return base;
+  });
+}
 
 export function EstadisticasPanel() {
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -41,6 +82,23 @@ export function EstadisticasPanel() {
   const {
     ocupacionPorMes, avgDuracionMin, coberturaIncompleta, isLoading: isLoadingOcupacion,
   } = useOcupacionResumen(organization?.id, currentSucursal, periodoMeses);
+
+  const {
+    montosMesActual, montosMesAnterior, isLoading: isLoadingPagoMetodo,
+  } = usePagoMetodoData(organization?.id, currentSucursal);
+
+  const {
+    rankingActual, productosRanking, historialPorBarbero, isLoading: isLoadingEquipo,
+  } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
+
+  const {
+    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes,
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, ventasData, monthlyData);
+
+  const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
+    metric: MetricCardDef;
+    data: DerivedMonthlyMetrics[];
+  } | null>(null);
 
   // Fetch capacidad_diaria from DB when sucursal changes
   useEffect(() => {
@@ -84,6 +142,7 @@ export function EstadisticasPanel() {
     const currentMonthStr = format(today, 'yyyy-MM');
     const diaActual = today.getDate();
     const ocupacionByMonth = new Map(ocupacionPorMes.map(o => [o.month, o]));
+    const serviciosClientesByMonth = new Map(serviciosClientesData.map(s => [s.month, s]));
 
     const raw = monthlyData.map(m => {
       const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
@@ -101,6 +160,13 @@ export function EstadisticasPanel() {
       const horasDisponibles = ocupacionByMonth.get(m.month)?.horasDisponibles ?? 0;
       const tasaOcupacion = horasDisponibles > 0 ? (horasVendidas / horasDisponibles) * 100 : 0;
 
+      // Costo laboral % de facturación: sueldo devengado + comisión por productos, sobre
+      // facturación del mes. Se calcula acá una sola vez — la card de tendencia y el texto
+      // debajo del donut "Costos del mes" leen el mismo valor (latest.costoLaboralPct).
+      const costoLaboralPct = m.facturacion > 0 ? ((m.sueldoTotal + m.comisionProductos) / m.facturacion) * 100 : 0;
+
+      const sc = serviciosClientesByMonth.get(m.month);
+
       return {
         monthLabel: m.monthLabel,
         facturacion: m.facturacion,
@@ -115,6 +181,17 @@ export function EstadisticasPanel() {
         gananciaPorServicio,
         puntoEquilibrio,
         tasaOcupacion,
+        recargos: m.recargosTotal,
+        descuentos: m.perdida,
+        costoLaboralPct,
+        // Solo tiene sentido por-barbero (Sección Equipo) — a nivel organización queda en 0.
+        comisionDevengada: 0,
+        tasaAttachExtras: sc?.tasaAttachExtras ?? 0,
+        clientesNuevos: sc?.clientesNuevos ?? 0,
+        clientesManual: sc?.clientesManual ?? 0,
+        clientesImportado: sc?.clientesImportado ?? 0,
+        clientesReserva: sc?.clientesReserva ?? 0,
+        pctEligioBarbero: sc?.pctEligioBarbero ?? 0,
       };
     });
 
@@ -133,6 +210,15 @@ export function EstadisticasPanel() {
       const prevEfectivo = useSameDayComparison ? prevM!.parcialEfectivo! : prev?.efectivo ?? 0;
       const prevMp = useSameDayComparison ? prevM!.parcialMp! : prev?.mp ?? 0;
       const prevCostosFijos = useSameDayComparison ? prevM!.parcialCostosFijos! : prev?.costosFijos ?? 0;
+      const prevRecargos = useSameDayComparison ? prevM!.parcialRecargosTotal! : prev?.recargos ?? 0;
+      const prevDescuentos = useSameDayComparison ? prevM!.parcialPerdida! : prev?.descuentos ?? 0;
+
+      // Clientes nuevos es acumulativo (como Facturación/Servicios): usa el parcial "mismos
+      // primeros N días" del mes anterior cuando corresponde. Attach de extras y % eligió
+      // barbero son ratios — se comparan mes completo contra mes completo, sin recorte.
+      const prevSc = prevM ? serviciosClientesByMonth.get(prevM.month) : undefined;
+      const useSameDayClientes = useSameDayComparison && prevSc?.parcialClientesNuevos !== undefined;
+      const prevClientesNuevos = useSameDayClientes ? prevSc!.parcialClientesNuevos! : prev?.clientesNuevos ?? 0;
 
       // Ocupación parcial del mes anterior (mismos primeros N días), para comparar mes en curso vs
       // mes anterior en igualdad de condiciones — misma lógica que las demás métricas "parciales".
@@ -154,6 +240,8 @@ export function EstadisticasPanel() {
         efectivoVar: prev ? calcVariation(curr.efectivo, prevEfectivo) : null,
         mpVar: prev ? calcVariation(curr.mp, prevMp) : null,
         costosFijosVar: prev ? calcVariation(curr.costosFijos, prevCostosFijos) : null,
+        recargosVar: prev ? calcVariation(curr.recargos, prevRecargos) : null,
+        descuentosVar: prev ? calcVariation(curr.descuentos, prevDescuentos) : null,
         // Non-cumulative metrics: compare directly as before
         rentabilidadVar: prev ? calcVariation(curr.rentabilidad, prev.rentabilidad) : null,
         ticketPromedioVar: prev ? calcVariation(curr.ticketPromedio, prev.ticketPromedio) : null,
@@ -162,6 +250,11 @@ export function EstadisticasPanel() {
         gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
         puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
         tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prevTasaOcupacionParcial !== undefined ? prevTasaOcupacionParcial : prev.tasaOcupacion) : null,
+        costoLaboralPctVar: prev ? calcVariation(curr.costoLaboralPct, prev.costoLaboralPct) : null,
+        comisionDevengadaVar: null,
+        tasaAttachExtrasVar: prev ? calcVariation(curr.tasaAttachExtras, prev.tasaAttachExtras) : null,
+        clientesNuevosVar: prev ? calcVariation(curr.clientesNuevos, prevClientesNuevos) : null,
+        pctEligioBarberoVar: prev ? calcVariation(curr.pctEligioBarbero, prev.pctEligioBarbero) : null,
       };
     });
   })();
@@ -180,9 +273,9 @@ export function EstadisticasPanel() {
     description: 'Cantidad de servicios realizados por mes.',
   };
 
-  // Facturación, Ticket Promedio, Rentabilidad y Punto de Equilibrio viven ahora en la Sección
-  // Resumen (más abajo). Estas dos quedan en su grupo actual hasta que Build 2 (Plata real) las
-  // reubique — no se tocan por fuera de lo pedido en este build.
+  // Efectivo y Mercado Pago se retiraron del render en Build 2 (Plata real): las reemplaza el
+  // donut "Cómo se cobra" (desglose real por método vía venta_pagos, no esta suma agregada de
+  // ingresos). Se deja la definición sin uso en vez de borrarla, por si hiciera falta más adelante.
   const ingresosCards: MetricCardDef[] = [
     {
       title: 'Efectivo',
@@ -205,10 +298,12 @@ export function EstadisticasPanel() {
       description: 'Ingresos mensuales cobrados por Mercado Pago.',
     },
   ];
+  void ingresosCards; // ver comentario arriba: definición retenida, sin consumidor en el render
 
-  // Rentabilidad y Punto de Equilibrio viven ahora en Resumen (más abajo); estas 4 quedan en su
-  // grupo actual hasta Build 2, sin tocarlas por fuera de lo pedido en este build.
-  const costosCards: MetricCardDef[] = [
+  // ---- Sección 2: Plata real ----
+  // Costos Fijos / Costo Fijo por Servicio / Costo Variable por Servicio / Ganancia por Servicio
+  // se mudan acá tal cual estaban (mismo MetricCardDef, mismo cálculo) + 3 cards nuevas.
+  const plataRealCards: MetricCardDef[] = [
     {
       title: 'Costos Fijos',
       dataKey: 'costosFijos',
@@ -249,7 +344,184 @@ export function EstadisticasPanel() {
       shortFormatFn: formatCurrencyShort,
       description: 'Cuánto ganás realmente por cada cliente después de costos.',
     },
+    {
+      title: 'Recargos Cobrados',
+      dataKey: 'recargos',
+      icon: CreditCard,
+      color: 'text-status-info-foreground',
+      chartColor: 'hsl(var(--chart-mp))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Recargos por método de pago cobrados por mes.',
+    },
+    {
+      title: 'Descuentos Regalados',
+      dataKey: 'descuentos',
+      icon: Gift,
+      color: 'text-chart-orange',
+      chartColor: 'hsl(var(--chart-orange))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Plata que decidiste no cobrar por descuentos, por mes.',
+    },
+    {
+      title: 'Costo Laboral % de Facturación',
+      dataKey: 'costoLaboralPct',
+      icon: Wallet,
+      color: 'text-status-error-foreground',
+      chartColor: 'hsl(var(--chart-cost))',
+      formatFn: (v) => `${v.toFixed(1)}%`,
+      shortFormatFn: (v) => `${v.toFixed(0)}%`,
+      description: 'Sueldos + comisión de productos, sobre la facturación del mes.',
+    },
   ];
+
+  // Donut "Cómo se cobra": 5 métodos de venta_pagos (con fallback a venta.metodo_pago para
+  // ventas sin filas propias — mismo patrón que useTransactions.ts). Mapeo color↔método en el
+  // mismo orden en que están declarados acá y en el CHECK de metodo_pago: cash/mp/cost/purple/
+  // indigo → efectivo/mercado_pago/transferencia/debito/credito.
+  const metodoPagoSlices = [
+    { label: 'Efectivo', value: montosMesActual.efectivo, color: 'hsl(var(--chart-cash))' },
+    { label: 'Mercado Pago', value: montosMesActual.mercado_pago, color: 'hsl(var(--chart-mp))' },
+    { label: 'Transferencia', value: montosMesActual.transferencia, color: 'hsl(var(--chart-cost))' },
+    { label: 'Débito', value: montosMesActual.debito, color: 'hsl(var(--chart-purple))' },
+    { label: 'Crédito', value: montosMesActual.credito, color: 'hsl(var(--chart-indigo))' },
+  ];
+
+  const digitalActual = montosMesActual.mercado_pago + montosMesActual.transferencia + montosMesActual.debito + montosMesActual.credito;
+  const digitalAnterior = montosMesAnterior.mercado_pago + montosMesAnterior.transferencia + montosMesAnterior.debito + montosMesAnterior.credito;
+  const digitalVar = calcVariation(digitalActual, digitalAnterior);
+
+  const digitalTrendText = digitalVar === null ? (
+    <span className="text-muted-foreground">Digital: {formatCurrency(digitalActual)} este mes.</span>
+  ) : (
+    <span className={`inline-flex items-center gap-0.5 ${digitalVar > 0 ? 'text-status-success-foreground' : digitalVar < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
+      {digitalVar > 0 ? <ArrowUpRight className="h-3 w-3" /> : digitalVar < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+      Digital {digitalVar > 0 ? '+' : ''}{digitalVar.toFixed(1)}% vs. mes anterior
+    </span>
+  );
+
+  // Donut "Costos del mes": mismos totales que ya agrega useEstadisticasData (no se refetchea
+  // Egresos). fijo reusa el color de la card "Costos Fijos"; variable el de "Costo Variable por
+  // Servicio"; semivariable no tenía color asignado en ningún lado — se usa --chart-purple (sin
+  // uso en esta sección) para no repetir el mismo token 3 veces seguidas en el mismo donut.
+  const costosSlices = latest ? [
+    { label: 'Fijo', value: latest.costosFijos, color: 'hsl(var(--chart-cost))' },
+    { label: 'Variable', value: monthlyData[monthlyData.length - 1]?.costosVariables ?? 0, color: 'hsl(var(--chart-amber))' },
+    { label: 'Semivariable', value: monthlyData[monthlyData.length - 1]?.costosSemivariables ?? 0, color: 'hsl(var(--chart-purple))' },
+  ] : [];
+
+  const costoLaboralText = latest ? `Costo laboral: ${latest.costoLaboralPct.toFixed(1)}% de la facturación` : '';
+
+  // ---- Sección 3: Equipo ----
+  const openBarberoDetail = (barberoId: string, barberoNombre: string, key: BarberoMetricKey, config: {
+    title: string; icon: MetricCardDef['icon']; color: string; chartColor: string;
+    formatFn: (v: number) => string; shortFormatFn: (v: number) => string;
+  }) => {
+    const stats = historialPorBarbero.get(barberoId) || [];
+    setSelectedBarberoDetail({
+      metric: {
+        title: `${config.title} — ${barberoNombre}`,
+        dataKey: key,
+        icon: config.icon,
+        color: config.color,
+        chartColor: config.chartColor,
+        formatFn: config.formatFn,
+        shortFormatFn: config.shortFormatFn,
+        description: `Evolución mensual de ${barberoNombre}.`,
+      },
+      data: buildBarberoSeries(stats, key),
+    });
+  };
+
+  const facturacionRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.facturacion,
+    formattedValue: formatCurrency(r.facturacion),
+    sublabel: `Ticket promedio: ${formatCurrency(r.ticketPromedio)}`,
+  }));
+
+  const serviciosRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.servicios,
+    formattedValue: `${r.servicios} servicios`,
+  }));
+
+  const comisionRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.comisionDevengada,
+    formattedValue: formatCurrency(r.comisionDevengada),
+  }));
+
+  const productosRankingData: RankingBarItem[] = productosRanking.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.totalProductos,
+    formattedValue: formatCurrency(r.totalProductos),
+  }));
+
+  // ---- Sección 4: Servicios y clientes ----
+  // Donut "Mix de Servicios": top 5 servicios por facturación (venta.total_final) del mes
+  // actual + "Otros" agrupando el resto, sobre la misma `ventasData` que ya trae
+  // useEstadisticasData (extendida en Build 4 con servicio_nombre/total_final) — sin query nueva.
+  const currentMonthStrMix = format(new Date(), 'yyyy-MM');
+  const facturacionPorServicio = new Map<string, number>();
+  ventasData
+    .filter((v) => format(new Date(v.fecha_hora), 'yyyy-MM') === currentMonthStrMix)
+    .forEach((v) => {
+      const nombre = v.servicio_nombre || 'Sin especificar';
+      facturacionPorServicio.set(nombre, (facturacionPorServicio.get(nombre) || 0) + v.total_final);
+    });
+  const serviciosOrdenados = Array.from(facturacionPorServicio.entries()).sort((a, b) => b[1] - a[1]);
+  const top5Servicios = serviciosOrdenados.slice(0, 5);
+  const restoServiciosTotal = serviciosOrdenados.slice(5).reduce((sum, [, v]) => sum + v, 0);
+  // Colores reusados de Sección 2 (no hay tokens dedicados a servicios). "Otros" usa
+  // --muted-foreground en vez de un chart-* — es el único slice pensado para pasar
+  // desapercibido, no para competir por atención con los top 5.
+  const mixServiciosColores = ['hsl(var(--chart-indigo))', 'hsl(var(--chart-purple))', 'hsl(var(--chart-mp))', 'hsl(var(--chart-amber))', 'hsl(var(--chart-orange))'];
+  const mixServiciosSlices = [
+    ...top5Servicios.map(([label, value], i) => ({ label, value, color: mixServiciosColores[i] })),
+    ...(restoServiciosTotal > 0 ? [{ label: 'Otros', value: restoServiciosTotal, color: 'hsl(var(--muted-foreground))' }] : []),
+  ];
+
+  const latestServiciosClientes = serviciosClientesData.length > 0 ? serviciosClientesData[serviciosClientesData.length - 1] : null;
+
+  const tasaAttachExtrasCard: MetricCardDef = {
+    title: 'Tasa de Attach de Extras',
+    dataKey: 'tasaAttachExtras',
+    icon: Sparkles,
+    color: 'text-status-info-foreground',
+    chartColor: 'hsl(var(--chart-mp))',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: `% de servicios que sumaron al menos un extra. Ingreso por extras este mes: ${formatCurrency(latestServiciosClientes?.ingresoExtras ?? 0)}.`,
+  };
+
+  const clientesNuevosCard: MetricCardDef = {
+    title: 'Clientes Nuevos',
+    dataKey: 'clientesNuevos',
+    icon: UserPlus,
+    color: 'text-status-success-foreground',
+    chartColor: 'hsl(var(--chart-cash))',
+    formatFn: (v) => `${v} clientes`,
+    shortFormatFn: (v) => `${v}`,
+    description: 'Clientes nuevos registrados por mes.',
+    origenKeys: { manual: 'clientesManual', importado: 'clientesImportado', reserva: 'clientesReserva' },
+  };
+
+  const pctEligioBarberoCard: MetricCardDef = {
+    title: '% Eligió Barbero al Reservar',
+    dataKey: 'pctEligioBarbero',
+    icon: UserCheck,
+    color: 'text-status-purple-foreground',
+    chartColor: 'hsl(var(--chart-purple))',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: 'De los turnos reservados, qué % eligió un barbero específico en vez de "cualquiera disponible".',
+  };
 
   // ---- Sección 1: Resumen ----
   const resumenCards: MetricCardDef[] = [
@@ -475,7 +747,7 @@ export function EstadisticasPanel() {
     description: 'Horas de servicio vendidas sobre horas-silla disponibles del local (estimado).',
   };
 
-  if (isLoading || isLoadingOcupacion) {
+  if (isLoading || isLoadingOcupacion || isLoadingPagoMetodo || isLoadingEquipo || isLoadingServiciosClientes) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -561,34 +833,105 @@ export function EstadisticasPanel() {
         </div>
       </div>
 
-      {/* Ingresos y Ventas — resto pendiente de reubicar en Build 2 (Plata real) */}
+      {/* Sección 2: Plata real */}
       <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">📈 Ingresos y Ventas</h2>
-          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás vendiendo y cómo evoluciona tu facturación.</p>
-        </div>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plata real</h2>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {ingresosCards.map((metric) => (
+          <DonutCard
+            title="Cómo se cobra"
+            description="Composición de los cobros de este mes."
+            data={metodoPagoSlices}
+            formatValue={formatCurrency}
+            footer={<p className="mt-3 text-xs">{digitalTrendText}</p>}
+          />
+          <DonutCard
+            title="Costos del mes"
+            description="Fijo, variable y semivariable."
+            data={costosSlices}
+            formatValue={formatCurrency}
+            footer={<p className="mt-3 text-xs text-muted-foreground">{costoLaboralText}</p>}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {plataRealCards.map((metric) => (
             <MetricCard key={metric.dataKey} metric={metric} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
           ))}
         </div>
       </div>
 
-      {/* Costos y Rentabilidad — resto pendiente de reubicar en Build 2 (Plata real) */}
+      {/* Sección 3: Equipo */}
       <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">💰 Costos y Rentabilidad</h2>
-          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás ganando realmente después de todos los gastos.</p>
-        </div>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipo</h2>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {costosCards.map((metric) => (
-            <MetricCard key={metric.dataKey} metric={metric} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
-          ))}
+          <RankingBarCard
+            title="Facturación por Barbero"
+            description="Este mes, de mayor a menor."
+            icon={DollarSign}
+            data={facturacionRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'facturacion', {
+              title: 'Facturación', icon: DollarSign, color: 'text-status-success-foreground',
+              chartColor: 'hsl(var(--chart-cash))', formatFn: formatCurrency, shortFormatFn: formatCurrencyShort,
+            })}
+          />
+          <RankingBarCard
+            title="Servicios por Barbero"
+            description="Cantidad de servicios este mes."
+            icon={Scissors}
+            data={serviciosRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'servicios', {
+              title: 'Servicios', icon: Scissors, color: 'text-primary',
+              chartColor: 'hsl(var(--primary))', formatFn: (v) => `${v} servicios`, shortFormatFn: (v) => `${v}`,
+            })}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RankingBarCard
+            title="Comisión Devengada por Barbero"
+            description="Sueldo + comisión de productos, este mes."
+            icon={Wallet}
+            data={comisionRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'comisionDevengada', {
+              title: 'Comisión Devengada', icon: Wallet, color: 'text-status-error-foreground',
+              chartColor: 'hsl(var(--chart-cost))', formatFn: formatCurrency, shortFormatFn: formatCurrencyShort,
+            })}
+          />
+          {productosRankingData.length > 0 && (
+            <RankingBarCard
+              title="Venta de Productos por Barbero"
+              description="Este mes, de mayor a menor."
+              icon={ShoppingBag}
+              data={productosRankingData}
+            />
+          )}
         </div>
       </div>
 
-      {/* Comportamiento del Cliente */}
-      {behaviorSection}
+      {/* Sección 4: Servicios y clientes */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Servicios y clientes</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DonutCard
+            title="Mix de Servicios"
+            description="Facturación por servicio, este mes."
+            data={mixServiciosSlices}
+            formatValue={formatCurrency}
+          />
+          <MetricCard metric={tasaAttachExtrasCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <MetricCard metric={clientesNuevosCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+          <MetricCard metric={pctEligioBarberoCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+        </div>
+
+        {/* Comportamiento del Cliente — reubicado acá tal cual (Build 4), sin cambios de cálculo */}
+        {behaviorSection}
+      </div>
 
       {/* Detail Dialog */}
       <MetricDetailDialog
@@ -596,6 +939,14 @@ export function EstadisticasPanel() {
         onOpenChange={(v) => { if (!v) setSelectedMetric(null); }}
         metric={selectedMetric}
         data={derivedMetrics}
+      />
+
+      {/* Detail Dialog — evolución de un barbero (Sección Equipo) */}
+      <MetricDetailDialog
+        open={!!selectedBarberoDetail}
+        onOpenChange={(v) => { if (!v) setSelectedBarberoDetail(null); }}
+        metric={selectedBarberoDetail?.metric ?? null}
+        data={selectedBarberoDetail?.data ?? []}
       />
     </div>
   );

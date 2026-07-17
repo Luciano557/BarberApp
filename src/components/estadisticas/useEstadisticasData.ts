@@ -17,6 +17,10 @@ export interface MonthlyData {
   costosSemivariables: number;
   totalEgresos: number;
   barberosDelMes: number;
+  recargosTotal: number;
+  perdida: number;
+  sueldoTotal: number;
+  comisionProductos: number;
   // Partial sums for same-day comparison (first N days only)
   parcialFacturacion?: number;
   parcialServicios?: number;
@@ -24,12 +28,21 @@ export interface MonthlyData {
   parcialMp?: number;
   parcialCostosFijos?: number;
   parcialTasaOcupacion?: number;
+  parcialRecargosTotal?: number;
+  parcialPerdida?: number;
 }
 
 interface IngresoRawRow {
   created_at: string;
   cantidad_de_servicios: number;
   dia: string | null;
+}
+
+export interface VentaRow {
+  id: string;
+  fecha_hora: string;
+  servicio_nombre: string | null;
+  total_final: number;
 }
 
 /**
@@ -46,7 +59,7 @@ export function useEstadisticasData(
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [barberosActivos, setBarberosActivos] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [ventasData, setVentasData] = useState<{ fecha_hora: string }[]>([]);
+  const [ventasData, setVentasData] = useState<VentaRow[]>([]);
   const [ingresosRaw, setIngresosRaw] = useState<IngresoRawRow[]>([]);
 
   useEffect(() => {
@@ -67,7 +80,7 @@ export function useEstadisticasData(
 
       let ingresosQuery = supabase
         .from('ingresos')
-        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia, barbero_id')
+        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia, barbero_id, recargos_total, perdida, comision_productos')
         .eq('organization_id', organizationId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -101,7 +114,9 @@ export function useEstadisticasData(
 
       let ventasQuery = supabase
         .from('venta')
-        .select('fecha_hora')
+        // servicio_nombre/total_final se agregaron acá (Build 4) para el donut "Mix de Servicios"
+        // y la tasa de attach de extras — reusa esta misma query, no una nueva.
+        .select('id, fecha_hora, servicio_nombre, total_final')
         .eq('organization_id', organizationId)
         .eq('estado', 'activo')
         .gte('fecha_hora', startDate.toISOString())
@@ -122,7 +137,12 @@ export function useEstadisticasData(
       const ingresos = ingresosRes.data || [];
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
-      setVentasData((ventasRes.data || []) as { fecha_hora: string }[]);
+      setVentasData((ventasRes.data || []).map((v) => ({
+        id: v.id,
+        fecha_hora: v.fecha_hora,
+        servicio_nombre: v.servicio_nombre,
+        total_final: Number(v.total_final) || 0,
+      })));
       setIngresosRaw((ingresosRes.data || []).map(i => ({
         created_at: i.created_at,
         cantidad_de_servicios: i.cantidad_de_servicios || 0,
@@ -167,6 +187,8 @@ export function useEstadisticasData(
         let parcialMp: number | undefined;
         let parcialCostosFijos: number | undefined;
         let parcialTasaOcupacion: number | undefined;
+        let parcialRecargosTotal: number | undefined;
+        let parcialPerdida: number | undefined;
 
         if (needsPartial) {
           // Filter ingresos where day-of-month <= diaActual
@@ -184,6 +206,8 @@ export function useEstadisticasData(
           parcialEfectivo = partialIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
           parcialMp = partialIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
           parcialCostosFijos = partialEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
+          parcialRecargosTotal = partialIngresos.reduce((sum, i) => sum + (Number((i as any).recargos_total) || 0), 0);
+          parcialPerdida = partialIngresos.reduce((sum, i) => sum + (Number((i as any).perdida) || 0), 0);
 
           // Partial occupancy: services in first N days / capacity of first N work days
           const [py, pmo] = monthStr.split('-').map(Number);
@@ -205,12 +229,18 @@ export function useEstadisticasData(
           costosSemivariables,
           totalEgresos: costosFijos + costosVariables + costosSemivariables,
           barberosDelMes,
+          recargosTotal: monthIngresos.reduce((sum, i) => sum + (Number((i as any).recargos_total) || 0), 0),
+          perdida: monthIngresos.reduce((sum, i) => sum + (Number((i as any).perdida) || 0), 0),
+          sueldoTotal: monthIngresos.reduce((sum, i) => sum + (Number((i as any).sueldo) || 0), 0),
+          comisionProductos: monthIngresos.reduce((sum, i) => sum + (Number((i as any).comision_productos) || 0), 0),
           parcialFacturacion,
           parcialServicios,
           parcialEfectivo,
           parcialMp,
           parcialCostosFijos,
           parcialTasaOcupacion,
+          parcialRecargosTotal,
+          parcialPerdida,
         };
       });
 

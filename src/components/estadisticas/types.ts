@@ -14,6 +14,21 @@ export interface DerivedMonthlyMetrics {
   gananciaPorServicio: number;
   puntoEquilibrio: number;
   tasaOcupacion: number;
+  recargos: number;
+  descuentos: number;
+  costoLaboralPct: number;
+  /** Solo tiene valor real en las series por-barbero de la Sección Equipo (ver buildBarberoSeries
+   * en EstadisticasPanel.tsx); en la serie global de la organización queda en 0. Se agregó acá,
+   * en vez de crear un tipo nuevo, para poder reusar MetricDetailDialog sin modificarlo. */
+  comisionDevengada: number;
+  tasaAttachExtras: number;
+  clientesNuevos: number;
+  /** Desglose por origen — solo se completa para la métrica "Clientes nuevos" (Sección 4);
+   * ver MetricCardDef.origenKeys y su render condicional en MetricDetailDialog. */
+  clientesManual: number;
+  clientesImportado: number;
+  clientesReserva: number;
+  pctEligioBarbero: number;
   isCurrentMonth?: boolean;
   diasTranscurridos?: number;
   // Variation fields (% change vs previous month)
@@ -29,6 +44,13 @@ export interface DerivedMonthlyMetrics {
   gananciaPorServicioVar: number | null;
   puntoEquilibrioVar: number | null;
   tasaOcupacionVar: number | null;
+  recargosVar: number | null;
+  descuentosVar: number | null;
+  costoLaboralPctVar: number | null;
+  comisionDevengadaVar: number | null;
+  tasaAttachExtrasVar: number | null;
+  clientesNuevosVar: number | null;
+  pctEligioBarberoVar: number | null;
 }
 
 export type MetricCardDef = {
@@ -40,6 +62,14 @@ export type MetricCardDef = {
   formatFn: (v: number) => string;
   shortFormatFn: (v: number) => string;
   description: string;
+  /** Si se completa, MetricDetailDialog agrega 3 columnas de desglose en la tabla mensual
+   * (ej. Manual/Importado/Reserva para "Clientes nuevos"). Opcional — no afecta a los demás
+   * consumidores del diálogo. */
+  origenKeys?: {
+    manual: keyof DerivedMonthlyMetrics;
+    importado: keyof DerivedMonthlyMetrics;
+    reserva: keyof DerivedMonthlyMetrics;
+  };
 };
 
 export const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
@@ -55,4 +85,11 @@ export const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
   gananciaPorServicio: 'gananciaPorServicioVar',
   puntoEquilibrio: 'puntoEquilibrioVar',
   tasaOcupacion: 'tasaOcupacionVar',
+  recargos: 'recargosVar',
+  descuentos: 'descuentosVar',
+  costoLaboralPct: 'costoLaboralPctVar',
+  comisionDevengada: 'comisionDevengadaVar',
+  tasaAttachExtras: 'tasaAttachExtrasVar',
+  clientesNuevos: 'clientesNuevosVar',
+  pctEligioBarbero: 'pctEligioBarberoVar',
 };
