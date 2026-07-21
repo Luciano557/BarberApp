@@ -33,6 +33,7 @@ export function useServiciosClientesData(
   currentSucursal: Sucursal | null,
   periodoMeses: string,
   monthlyData: MonthlyData[],
+  parentIsLoading: boolean,
 ) {
   const [monthlyStats, setMonthlyStats] = useState<MonthlyServiciosClientesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,15 +46,24 @@ export function useServiciosClientesData(
     // `ventasData` se retiró de las dependencias: la query de venta_extra ahora filtra
     // server-side vía embed a `venta`, sin depender del array de IDs del hook hermano.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal, periodoMeses, monthlyData]);
+  }, [organizationId, currentSucursal, periodoMeses, monthlyData, parentIsLoading]);
 
   const fetchData = async () => {
     if (!organizationId) return;
 
-    // Guard: evita que un ciclo temprano (antes de que useEstadisticasData termine) pise el
-    // estado con ceros. monthlyData se publica con longitud = período cuando termina de
-    // cargar; length === 0 ⇒ el hook padre aún no resolvió.
-    if (monthlyData.length === 0) return;
+    // Guard contra ciclos parciales del padre: mientras useEstadisticasData siga cargando,
+    // no sabemos aún si habrá datos o no, así que no tocamos el estado ni disparamos fetch.
+    if (parentIsLoading) return;
+
+    // Vacío real: el padre terminó y no hay ventas en el período. Sincronizamos el estado
+    // como vacío y salimos del loading, sin intentar traer extras/clientes/turnos que no
+    // tendrían correspondencia en monthlyData.
+    if (monthlyData.length === 0) {
+      setMonthlyStats([]);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);

@@ -93,7 +93,7 @@ export function EstadisticasPanel() {
 
   const {
     monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
-  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData);
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
 
   const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
     metric: MetricCardDef;
