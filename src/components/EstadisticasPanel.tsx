@@ -914,6 +914,12 @@ export function EstadisticasPanel() {
       <div className="space-y-4">
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Servicios y clientes</h2>
 
+        {serviciosClientesError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {serviciosClientesError}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DonutCard
             title="Mix de Servicios"
