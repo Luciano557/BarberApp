@@ -115,7 +115,7 @@ export function usePagoMetodoData(
         const target = mesVenta === currentMonthStr ? montosActual : montosAnterior;
         efectivos.forEach((p) => {
           if (p.metodo_pago in target) {
-            (target as Record<string, number>)[p.metodo_pago] += p.monto;
+            (target as unknown as Record<string, number>)[p.metodo_pago] += p.monto;
           }
         });
       });
