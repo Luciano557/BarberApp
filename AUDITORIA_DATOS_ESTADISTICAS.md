@@ -699,3 +699,59 @@ Nuevo componente **`DonutDetailDialog.tsx`** (pensado desde el inicio para los 3
 |---|---|
 | `estadisticas/DonutDetailDialog.tsx` | **Nuevo.** Diálogo reusable: donut ampliado + tabla sin truncar |
 | `estadisticas/DonutCard.tsx` | Leyenda compacta sin monto/%; card clickeable; renderiza su propio `DonutDetailDialog` |
+
+
+## ✅ Cierre — Reestructuración de Estadísticas
+
+**Fecha de cierre:** [completar fecha]
+**Estado:** Cerrada. Los 5 builds (0-4) confirmados con captura, sin
+pendientes abiertos.
+
+### Resumen de lo entregado
+
+Estructura final en 4 secciones (Resumen / Plata real / Equipo /
+Servicios y clientes), reemplazando el monolito original de 12 cards
+sin agrupar. Detalle de la estructura y decisiones de gráficos en las
+secciones anteriores de este documento.
+
+### Bugs encontrados y resueltos durante el cierre
+
+1. **Tasa de Attach de Extras en 0%** (no reportado en los builds
+   originales, detectado en la revisión final):
+   - Causa raíz: `useServiciosClientesData.ts` armaba una lista de
+     ~1.000+ IDs de venta para filtrar `venta_extra` vía `.in()`,
+     superando el límite de longitud de URL de PostgREST → 400 Bad
+     Request, atrapado silenciosamente por el catch.
+   - Bug gemelo encontrado en el mismo pase: `usePagoMetodoData.ts`
+     tenía el mismo patrón sobre `venta_pagos` (sin síntoma visible
+     aún, pero mismo riesgo a futuro).
+   - Fix: ambas queries reescritas para filtrar server-side por
+     `organization_id` / `sucursal_id` / rango de fecha vía embed
+     `!inner` a `venta`, sin materializar listas de UUIDs en el
+     cliente.
+   - Efecto colateral corregido de paso: un ciclo de fetch temprano
+     (antes de que `useEstadisticasData` terminara) podía "pisar" el
+     estado con datos calculados a medias — se agregó guard contra
+     esto, más un segundo guard para distinguir "todavía cargando"
+     de "vacío real" (evita loading infinito en orgs sin datos en
+     el período).
+   - Se agregó manejo de error visible (banner sobrio) en la sección
+     "Servicios y clientes" para no volver a mostrar ceros silenciosos
+     ante un fallo real de red.
+
+2. **"Clientes Nuevos" no respeta el filtro de sucursal**:
+   - No es bug — decisión documentada. `clientes` no tiene
+     `sucursal_id` propio; la métrica queda a nivel organización.
+     Confirmado como límite conocido, no se resuelve en esta pasada.
+
+### Archivos tocados en el cierre (fuera de los 5 builds originales)
+
+- `src/components/estadisticas/useServiciosClientesData.ts`
+- `src/components/estadisticas/usePagoMetodoData.ts`
+- `src/components/EstadisticasPanel.tsx`
+
+### Datos no derivables (sin cambios respecto al informe original)
+
+LTV/frecuencia/gasto por cliente, tasa de no-show, $/hora-silla
+confiable — limitaciones estructurales de datos, no se resuelven en
+esta reestructuración (ver detalle en secciones anteriores).

@@ -1,9 +1,20 @@
+import { useState } from 'react';
 import { Repeat, Trash2, Pause, Play } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { GastoRecurrente } from '@/hooks/useGastosRecurrentes';
 import { getRepeatLabel } from '@/components/tareas/RepeatPicker';
 import { getCustomRepeatLabel } from '@/components/tareas/CustomRepeatSheet';
@@ -15,6 +26,8 @@ interface Props {
 }
 
 export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props) {
+  const [deleteConfirm, setDeleteConfirm] = useState<GastoRecurrente | null>(null);
+
   if (recurrentes.length === 0) return null;
 
   const getLabel = (r: GastoRecurrente) => {
@@ -80,7 +93,7 @@ export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => onDelete(r.id)}
+                      onClick={() => setDeleteConfirm(r)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -91,6 +104,31 @@ export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props
           </TableBody>
         </Table>
       </CardContent>
+
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar gasto recurrente</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm && (
+                <>Vas a eliminar el gasto recurrente <strong>{deleteConfirm.categoria}</strong>. Esta acción no se puede deshacer.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirm) onDelete(deleteConfirm.id);
+                setDeleteConfirm(null);
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
