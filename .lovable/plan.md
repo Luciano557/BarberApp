@@ -1,50 +1,57 @@
-## Contexto
-Se necesita agregar soporte para push notifications almacenando tokens de dispositivo por usuario y organización.
+# Build — Corrección de queries `.in(ventaIds)` en Estadísticas
 
-## Verificación de esquema
-- Tabla `organizations` existe en `public` y su columna `id` es `uuid` NOT NULL (confirmado vía `information_schema.columns`).
-- `auth.users(id)` es la tabla estándar de autenticación de Supabase y el proyecto ya la utiliza indirectamente (perfiles, roles, etc.).
-- El SQL no usa prefijo `public.` en `push_tokens` ni en `organizations`, pero Supabase resuelve `organizations` como `public.organizations` por `search_path` por defecto.
+Sigo en plan mode. Cambio a build mode para ejecutar. El detalle exacto de lo que voy a escribir:
 
-## Migración propuesta (SQL exacto)
-```sql
-create table push_tokens (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  organization_id uuid not null references organizations(id) on delete cascade,
-  token text not null,
-  platform text not null default 'android',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (user_id, token)
-);
+## Archivos
 
-create index idx_push_tokens_org on push_tokens(organization_id);
+### 1. `src/components/estadisticas/useServiciosClientesData.ts` (rewrite)
 
-alter table push_tokens enable row level security;
+- Firma nueva: sin `ventasData` (se retira del contrato porque ya no se consume).
+- Query de `venta_extra` vía embed `!inner` a `venta`, tipando el select como `string` plano (`sel(...)`) para no disparar el parser de tipos costoso de supabase-js sobre el embed, y `.returns<ExtraRow[]>()` para pinear la forma:
+  ```
+  .select(sel('venta_id, cantidad, precio_extra, venta!inner(fecha_hora, organization_id, sucursal_id, estado)'))
+  .eq('venta.organization_id', organizationId)
+  .eq('venta.estado', 'activo')
+  .gte('venta.fecha_hora', startDate.toISOString())
+  .lte('venta.fecha_hora', endDate.toISOString())
+  // + .eq('venta.sucursal_id', currentSucursal.id) si hay sucursal
+  ```
+- Agregación mensual usa `e.venta.fecha_hora` embebido — se elimina el `Map<venta_id, ...>` cruzado con `ventasData`.
+- `useEffect` deps: `[organizationId, currentSucursal, periodoMeses, monthlyData]` (sin `ventasData`).
+- Guard: `if (monthlyData.length === 0) return;` al inicio de `fetchData` — evita que un ciclo temprano pise el estado con ceros (padre aún cargando).
+- Nuevo estado `error: string | null`. Reset a `null` al inicio de cada fetch; en `catch`, `setError('No se pudieron cargar las métricas de servicios y clientes')`.
+- Return: `{ monthlyStats, isLoading, error }`.
 
-create policy "usuarios ven solo sus propios tokens"
-  on push_tokens for select
-  using (auth.uid() = user_id);
+### 2. `src/components/estadisticas/usePagoMetodoData.ts` (patch quirúrgico)
 
-create policy "usuarios insertan solo su propio token"
-  on push_tokens for insert
-  with check (auth.uid() = user_id);
+- Se mantiene la query de `venta` (necesaria para el fallback: ventas sin filas en `venta_pagos` cuentan con `venta.metodo_pago` + `venta.total_final`).
+- Reemplazo del segundo fetch: en vez de `.in('venta_id', ventaIds)`, usar embed `!inner` a `venta` filtrado por `organization_id`, `estado='activo'`, `fecha_hora` en `[rangeStart, rangeEnd]` y opcionalmente `sucursal_id`. Mismo patrón que arriba, mismo `sel(...)` + `.returns<T>()`.
+- El resultado (`{ venta_id, metodo_pago, monto }[]`) se sigue mapeando al `pagosPorVenta` existente sin cambios en el resto de la lógica.
+- No aplica guard adicional: este hook no depende de `ventasData` de otro hook — arma su propio `venta` set. El patrón de doble-fetch existente ya es coherente.
 
-create policy "usuarios actualizan solo su propio token"
-  on push_tokens for update
-  using (auth.uid() = user_id);
-```
+### 3. `src/components/EstadisticasPanel.tsx` (cambios mínimos)
 
-## Proceso
-1. Crear el archivo de migración con el SQL exacto de arriba usando la herramienta de migraciones de Supabase.
-2. Presentar el archivo para revisión sin aplicarlo a la base de datos.
-3. Aplicar solo cuando vos confirmes explícitamente.
+- Línea 96: quitar `ventasData` del llamado a `useServiciosClientesData`; desestructurar también `error: serviciosClientesError`.
+- Insertar banner sobrio arriba del bloque de la Sección 4 (línea ~917), solo si `serviciosClientesError` no es null. Estilo alineado a tokens semánticos ya vigentes en el proyecto:
+  ```tsx
+  {serviciosClientesError && (
+    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+      {serviciosClientesError}
+    </div>
+  )}
+  ```
+  (No introduce colores nuevos ni sombras; usa `destructive` — mismo token usado en el resto del panel para errores y acciones peligrosas.)
 
-## Nota importante sobre permisos
-El SQL proporcionado no incluye sentencias `GRANT`. En este proyecto, las tablas en el esquema `public` requieren `GRANT` explícito para `authenticated` y `service_role` según las reglas del proyecto; de lo contrario, PostgREST devolverá errores de permiso. Recomiendo agregar al SQL antes de aplicar:
-```sql
-GRANT SELECT, INSERT, UPDATE ON public.push_tokens TO authenticated;
-GRANT ALL ON public.push_tokens TO service_role;
-```
-Si preferís mantener el SQL exacto tal como lo pasaste, lo dejo con tu aprobación.
+## Candado de alcance (NO se toca)
+- `useEstadisticasData.ts`, `useTransactions.ts`, `useOcupacion*`, `useEquipoData`.
+- Componentes visuales existentes (`MetricCard`, `DonutCard`, `RankingBarCard`, etc.).
+- Migraciones SQL, RLS, edge functions.
+- Comportamiento de "0 mientras carga" en cards individuales.
+
+## Validación
+
+1. `npx tsgo --noEmit` limpio.
+2. `git status` + `git diff --stat` para confirmar los 3 archivos.
+3. Reporte manual del usuario con: valor de "Tasa de Attach de Extras" > 0, ausencia de 400 en Network para `venta_extra` y `venta_pagos`, y banner visible al bloquear la request.
+
+Necesito que apruebes para pasar a build mode y ejecutar.

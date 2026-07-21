@@ -61,19 +61,37 @@ export function usePagoMetodoData(
         ventaQuery = ventaQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      const { data: ventas, error: ventaError } = await ventaQuery;
-      if (ventaError) throw ventaError;
-
-      const ventaIds = (ventas || []).map((v) => v.id);
-      let pagos: { venta_id: string; metodo_pago: string; monto: number }[] = [];
-      if (ventaIds.length > 0) {
-        const { data: pagosData, error: pagosError } = await supabase
-          .from('venta_pagos')
-          .select('venta_id, metodo_pago, monto')
-          .in('venta_id', ventaIds);
-        if (pagosError) throw pagosError;
-        pagos = (pagosData || []).map((p) => ({ ...p, monto: Number(p.monto) || 0 }));
+      // venta_pagos vía embed `!inner` a `venta` — filtros server-side por org/sucursal/estado/
+      // rango, sin materializar una lista larga de UUIDs (evita 400 Bad Request por URL demasiado
+      // larga en organizaciones con alto volumen). Se tipa el select como `string` plano para
+      // no disparar el parser de tipos costoso de supabase-js sobre el embed.
+      const sel = (s: string): string => s;
+      let pagosQuery = supabase
+        .from('venta_pagos')
+        .select(sel('venta_id, metodo_pago, monto, venta!inner(organization_id, sucursal_id, estado, fecha_hora)'))
+        .eq('venta.organization_id', organizationId)
+        .eq('venta.estado', 'activo')
+        .gte('venta.fecha_hora', rangeStart.toISOString())
+        .lte('venta.fecha_hora', rangeEnd.toISOString());
+      if (currentSucursal) {
+        pagosQuery = pagosQuery.eq('venta.sucursal_id', currentSucursal.id);
       }
+
+      type PagoRow = { venta_id: string; metodo_pago: string; monto: number | string | null };
+
+      const [ventasRes, pagosRes] = await Promise.all([
+        ventaQuery,
+        pagosQuery.returns<PagoRow[]>(),
+      ]);
+      if (ventasRes.error) throw ventasRes.error;
+      if (pagosRes.error) throw pagosRes.error;
+
+      const ventas = ventasRes.data || [];
+      const pagos = (pagosRes.data || []).map((p) => ({
+        venta_id: p.venta_id,
+        metodo_pago: p.metodo_pago,
+        monto: Number(p.monto) || 0,
+      }));
 
       const pagosPorVenta = new Map<string, { metodo_pago: string; monto: number }[]>();
       pagos.forEach((p) => {
