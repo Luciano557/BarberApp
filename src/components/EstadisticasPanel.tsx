@@ -92,8 +92,8 @@ export function EstadisticasPanel() {
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
-    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes,
-  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, ventasData, monthlyData);
+    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData);
 
   const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
     metric: MetricCardDef;
@@ -913,6 +913,12 @@ export function EstadisticasPanel() {
       {/* Sección 4: Servicios y clientes */}
       <div className="space-y-4">
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Servicios y clientes</h2>
+
+        {serviciosClientesError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {serviciosClientesError}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DonutCard
