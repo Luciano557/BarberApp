@@ -275,7 +275,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         >
           <div className="flex items-center justify-center">
             <img
-              src="/IsotipoBlanco.png"
+              src="/IsotipoBlanco.PNG"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
               className="h-5 w-5 shrink-0 object-contain"
