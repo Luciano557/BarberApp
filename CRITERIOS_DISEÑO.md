@@ -2509,3 +2509,101 @@ de este build no lo pidió explícitamente y candado de alcance no lo
 nombra — se dejó **sin tocar**, todavía como `Dialog` centrado. Sigue
 pendiente de una decisión explícita, igual que el "cuarto tipo de
 contenedor" (card inline togglead) de Configuración/Inversiones/Deudas.
+
+---
+
+## Fase 4 - Tanda 2 - Parte 2 - Build B (Inversiones + Deudas) — CIERRE de Finanzas — 2026-07-17
+
+**2 archivos modificados:** `InversionesPanel.tsx`, `DeudasPanel.tsx`.
+`SueldosPanel.tsx`/`GastosPanel.tsx`/`GastosRecurrentesList.tsx` (Build A)
+no se tocaron. Validación: `npx tsc --noEmit` limpio.
+
+**Decisión de esta sesión aplicada**: el patrón "card inline togglead por
+estado" (`showForm && <Card>...`) de Inversiones y Deudas migró a
+`DrawerForm` — mismo criterio que Bloqueos/Comisiones en Configuración,
+no una excepción. Con esto, las 4 secciones de Finanzas quedan en el
+mismo contenedor canon.
+
+### 1. Inversiones (`InversionesPanel.tsx`)
+
+Card inline → `DrawerForm` (`size="md"`). Validación con RHF+Zod
+(`inversionSchema`): `nombre` requerido `max(80)`, `montoTotal` con
+`.refine()` > 0, `fechaCompra` requerida, `mesesAmortizacion` con
+`.refine()` a entero > 0, `categoria` opcional (Select, nunca vacío —
+array hardcodeado), `descripcion` opcional `max(240)` con contador,
+`financiada` (boolean) + los 4 campos que dispara (`acreedor`, `cuotas`,
+`montoCuota`, `fechaProximoPago`) **dentro del mismo schema** — un
+`.superRefine()` exige `acreedor` no vacío solo cuando `financiada` es
+`true` (validación condicional cruzada, en vez de un `if` imperativo
+suelto).
+
+- **Huecos de maxLength completados**: Nombre (80, mismo tier que el resto de los campos "nombre" de la app — Extras, Líneas, etc.) y Descripción (240, sin límite antes) — la auditoría los había marcado como huecos. Acreedor (dentro del bloque financiada) también a 80, igual que ya tenía Deudas.
+- **Asterisco → sin marca**: Nombre/Monto total/Meses de amortización/Acreedor perdieron el `*`. Categoría/Descripción/los 3 campos opcionales del bloque financiada llevan "(opcional)".
+- **El checkbox "¿Financiada?" y su bloque condicional quedaron dentro del mismo `<form>`** — no se partió en dos pasos ni se desarmó la operación combinada, tal como pedía el candado.
+
+### 2. Deudas (`DeudasPanel.tsx`)
+
+**Alta de deuda**: card inline → `DrawerForm` (`size="md"`), RHF+Zod
+(`deudaSchema`): `acreedor` requerido `max(80)` (ya lo tenía, se preservó
+el límite), `montoTotal` con `.refine()` > 0, `cuotasTotales`/
+`fechaProximoPago`/`descripcion` (`max(240)`) opcionales, `fechaInicio`
+requerida. "Monto por cuota" sigue **fuera del schema** — es un valor
+derivado de solo lectura (`montoTotalWatch`/`cuotasTotalesWatch` vía
+`form.watch()` + `useMemo`), no un campo que el usuario carga, igual que
+antes. Asterisco → sin marca en Acreedor/Monto total.
+
+**`RegistrarPagoDialog` — preservado tal cual, como pedía el ticket.**
+Su lógica de validación (inline, sin Zod: `montoInvalido` contra el
+saldo pendiente, mensaje de error condicional, guard `submitting`) **no
+se tocó ni una línea**. Lo único que cambió es el contenedor: `Dialog` →
+`DrawerForm` (`size="sm"`), moviendo el subtítulo dinámico
+(acreedor/saldo/cuota) a un `<p>` dentro del body, igual que ya hace
+`UnavailableSlotDialog`. Para conectar `isDirty` sin tocar la validación,
+se agregó un estado `initial` (capturado en el mismo `useMemo` de reset
+que ya existía) y `isDirty` se calcula comparando los valores actuales
+contra ese snapshot — no requirió RHF.
+
+### 3. Verificación explícita de la creación automática de Deuda
+
+**Confirmado — se sigue creando igual, en el mismo submit.** Comparé
+campo por campo el nuevo `onSubmit` contra el `handleSubmit` original:
+`addInversion` se llama primero con los mismos datos; si devuelve una
+inversión y `financiada` + `acreedor` (ahora ya garantizado no-vacío por
+el `.superRefine()` de Zod, antes por un chequeo imperativo), se llama
+`addDeuda` reusando **el mismo `monto_total` y la misma `fecha_compra`
+de la inversión** (no un monto ni una fecha aparte) más `inversion_id:
+inv.id` — idéntico al comportamiento previo. Lo único que cambió es que
+la validación de campos ahora ocurre antes (Zod bloquea el submit si
+faltan datos, en vez de un `if` al principio de la función) — la
+operación combinada Inversión→Deuda no se desarmó ni se partió en dos
+pasos.
+
+### Archivos
+
+| Archivo | Cambio |
+|---|---|
+| `InversionesPanel.tsx` | Card→`DrawerForm`, RHF+Zod con validación condicional (`.superRefine`), maxLength completado (Nombre 80, Descripción 240), sin asteriscos |
+| `DeudasPanel.tsx` | Alta de deuda: card→`DrawerForm`, RHF+Zod, sin asteriscos. `RegistrarPagoDialog`: `Dialog`→`DrawerForm`, `isDirty` agregado, validación interna sin tocar |
+
+---
+
+## Cierre de Finanzas (Fase 4, Tanda 2, Parte 2 completa)
+
+Con Build B se cierra el cluster completo de Finanzas: **Estadísticas**
+(reestructuración de 5 builds, cerrada en `AUDITORIA_DATOS_ESTADISTICAS.md`)
++ **Sueldos/Gastos** (Build A) + **Inversiones/Deudas** (Build B). Los 5
+formularios de alta/edición del cluster (pago de sueldo, gasto, gasto
+recurrente vía el mismo form, inversión, deuda, pago de deuda) quedan en
+`DrawerForm` + RHF/Zod (excepto `RegistrarPagoDialog`, que ya tenía una
+validación imperativa correcta y se preservó tal cual, solo con el
+contenedor migrado), sin asteriscos, con `isDirty` conectado y guard de
+doble submit.
+
+**Quedó explícitamente abierto, no resuelto en este cluster** (para que
+no se lea como un olvido):
+- El `Dialog` de "Anular gasto" — pregunta sobre si migra a `DrawerForm` o queda como excepción legítima (acción de 1 campo sobre una entidad existente).
+- El "cuarto tipo de contenedor" (card inline togglead) ya no existe en Finanzas — pero la pregunta de si aplica el mismo criterio en algún otro rincón de la app fuera de este cluster no se relevó acá.
+
+Con esto, Finanzas queda al mismo nivel de conformidad que Configuración
+(Fase 4, Tanda 1 y Tanda 2 Parte 1). Próximo cluster: a definir con el
+usuario.
