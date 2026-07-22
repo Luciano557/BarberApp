@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +28,19 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import { useAuth } from '@/contexts/AuthContext';
+
+const pagoSueldoSchema = z.object({
+  barberoId: z.string().min(1, 'Seleccioná un empleado.'),
+  monto: z.string().refine((v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n > 0;
+  }, 'Ingresá un monto válido.'),
+  concepto: z.string().max(240, 'El concepto no puede superar los 240 caracteres.').optional().default(''),
+});
+
+type PagoSueldoFormValues = z.infer<typeof pagoSueldoSchema>;
+
+const pagoSueldoDefaults: PagoSueldoFormValues = { barberoId: '', monto: '', concepto: '' };
 
 
 
@@ -363,14 +380,21 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Form state
-  const [selectedBarberId, setSelectedBarberId] = useState('');
-  const [monto, setMonto] = useState('');
-  const [concepto, setConcepto] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [isPagoDrawerOpen, setIsPagoDrawerOpen] = useState(false);
+
+  const pagoForm = useForm<PagoSueldoFormValues>({
+    resolver: zodResolver(pagoSueldoSchema),
+    defaultValues: pagoSueldoDefaults,
+  });
+
+  // Resync el formulario en cada apertura — antes se quedaba con los datos del pago anterior.
+  useEffect(() => {
+    if (isPagoDrawerOpen) {
+      pagoForm.reset(pagoSueldoDefaults);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPagoDrawerOpen]);
+
   // Date filter for devengado: rango personalizado [start, end]
   const [periodStartDate, setPeriodStartDate] = useState<Date | undefined>(startOfMonth(new Date()));
   const [periodEndDate, setPeriodEndDate] = useState<Date | undefined>(undefined);
@@ -809,19 +833,12 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     fetchData();
   }, [fetchData, periodStartDate, periodEndDate]);
 
-  const handleSubmitPago = async () => {
-    if (!organization || !selectedBarberId || !monto) {
-      toast.error('Complete todos los campos requeridos');
-      return;
-    }
+  const onSubmitPago = async (values: PagoSueldoFormValues) => {
+    if (!organization) return;
 
-    const montoNum = parseFloat(monto);
-    if (isNaN(montoNum) || montoNum <= 0) {
-      toast.error('Ingrese un monto válido');
-      return;
-    }
+    const montoNum = parseFloat(values.monto);
 
-    const barber = barbers.find(b => b.id === selectedBarberId);
+    const barber = barbers.find(b => b.id === values.barberoId);
     if (!barber) {
       toast.error('Barbero no encontrado');
       return;
@@ -830,7 +847,6 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     const gate = await requirePinForAction('registrar_pago_sueldo', currentSucursal?.id ?? null);
     if (!gate.ok) return;
 
-    setIsSubmitting(true);
     try {
       // Normalize name to avoid spacing issues
       const nombreNormalizado = `${barber.firstName.trim()} ${barber.lastName.trim()}`.replace(/\s+/g, ' ').trim();
@@ -839,10 +855,10 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       const { data: pagoInsertado, error } = await supabase
         .from('pagos_sueldos')
         .insert({
-          barbero_id: selectedBarberId,
+          barbero_id: values.barberoId,
           barbero_nombre: nombreNormalizado,
           monto: montoNum,
-          concepto: concepto || null,
+          concepto: values.concepto || null,
           organization_id: organization.id,
           sucursal_id: currentSucursal?.id || null,
         })
@@ -883,16 +899,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       }
 
       toast.success('Pago registrado correctamente');
-      setIsDialogOpen(false);
-      setSelectedBarberId('');
-      setMonto('');
-      setConcepto('');
+      setIsPagoDrawerOpen(false);
       fetchData();
     } catch (error) {
       console.error('Error registering payment:', error);
       toast.error('Error al registrar el pago');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -982,66 +993,97 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             </PopoverContent>
           </Popover>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Registrar Pago
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Registrar Pago de Sueldo</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="barber">Empleado *</Label>
-                  <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar empleado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {barbers.map(barber => (
-                        <SelectItem key={barber.id} value={barber.id}>
-                          {barber.firstName} {barber.lastName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="monto">Monto *</Label>
-                  <CurrencyInput
-                    id="monto"
-                    placeholder="0"
-                    value={monto}
-                    onChange={setMonto}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="concepto">Concepto (opcional)</Label>
-                  <Textarea
-                    id="concepto"
-                    placeholder="Ej: Adelanto de sueldo, Pago quincenal..."
-                    value={concepto}
-                    onChange={(e) => setConcepto(e.target.value)}
-                  />
-                </div>
-                
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSubmitPago} disabled={isSubmitting}>
-                    {isSubmitting ? 'Registrando...' : 'Registrar Pago'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={() => setIsPagoDrawerOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Registrar Pago
+          </Button>
       </div>
+
+      <DrawerForm
+        open={isPagoDrawerOpen}
+        onOpenChange={setIsPagoDrawerOpen}
+        title="Registrar Pago de Sueldo"
+        size="sm"
+        isDirty={pagoForm.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsPagoDrawerOpen(false)} disabled={pagoForm.formState.isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="pago-sueldo-form" disabled={pagoForm.formState.isSubmitting || barbers.length === 0}>
+              {pagoForm.formState.isSubmitting ? 'Registrando...' : 'Registrar Pago'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...pagoForm}>
+          <form id="pago-sueldo-form" onSubmit={pagoForm.handleSubmit(onSubmitPago)} className="space-y-4">
+            {barbers.length === 0 ? (
+              <EmptySelectHint
+                message="No hay empleados activos."
+                ctaLabel="Añadir miembro del equipo"
+                onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar empleados.')}
+              />
+            ) : (
+              <FormField
+                control={pagoForm.control}
+                name="barberoId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Empleado</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar empleado" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {barbers.map(barber => (
+                          <SelectItem key={barber.id} value={barber.id}>
+                            {barber.firstName} {barber.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <FormField
+              control={pagoForm.control}
+              name="monto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto</FormLabel>
+                  <FormControl>
+                    <CurrencyInput placeholder="0" value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={pagoForm.control}
+              name="concepto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Concepto (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      maxLength={240}
+                      placeholder="Ej: Adelanto de sueldo, Pago quincenal..."
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+      </DrawerForm>
 
       {shouldGateSueldosView ? (
         <Card>

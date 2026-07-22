@@ -1,286 +1,104 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  TrendingUp, DollarSign, Users, Scissors, Calendar, Target, 
-  PiggyBank, Receipt, BarChart3, Percent, Info, ChevronDown,
-  ArrowUpRight, ArrowDownRight, Clock, Trophy
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Users, Scissors, Calendar, Target,
+  PiggyBank, Receipt, BarChart3, Percent,
+  Clock, Trophy, DollarSign, TrendingUp, AlertTriangle,
+  ArrowUpRight, ArrowDownRight, CreditCard, Gift, Wallet, ShoppingBag,
+  Sparkles, UserPlus, UserCheck,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parseISO, getDaysInMonth, getDay, differenceInWeeks, differenceInDays, min, eachDayOfInterval, addDays } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { 
+import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, min, addDays } from 'date-fns';
+import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid,
-  Line, ResponsiveContainer
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { MetricCard } from './estadisticas/MetricCard';
+import { MetricDetailDialog } from './estadisticas/MetricDetailDialog';
+import { DonutCard } from './estadisticas/DonutCard';
+import { RankingBarCard, RankingBarItem } from './estadisticas/RankingBarCard';
+import { useEstadisticasData } from './estadisticas/useEstadisticasData';
+import { useOcupacionResumen } from './estadisticas/useOcupacionResumen';
+import { usePagoMetodoData } from './estadisticas/usePagoMetodoData';
+import { useEquipoData, BarberoMonthStats } from './estadisticas/useEquipoData';
+import { useServiciosClientesData } from './estadisticas/useServiciosClientesData';
+import { calcVariation } from './estadisticas/dateHelpers';
+import { DerivedMonthlyMetrics, MetricCardDef } from './estadisticas/types';
 
-interface MonthlyData {
-  month: string;
-  monthLabel: string;
-  facturacion: number;
-  servicios: number;
-  efectivo: number;
-  mp: number;
-  costosFijos: number;
-  costosVariables: number;
-  costosSemivariables: number;
-  totalEgresos: number;
-  barberosDelMes: number;
-  // Partial sums for same-day comparison (first N days only)
-  parcialFacturacion?: number;
-  parcialServicios?: number;
-  parcialEfectivo?: number;
-  parcialMp?: number;
-  parcialCostosFijos?: number;
-  parcialTasaOcupacion?: number;
+type BarberoMetricKey = 'facturacion' | 'servicios' | 'comisionDevengada';
+
+/**
+ * Adapta el historial mensual de UN barbero a la forma completa de DerivedMonthlyMetrics para
+ * poder reusar MetricDetailDialog (que solo lee monthLabel + metric.dataKey + su Var) sin
+ * tocarlo. Los campos ajenos a `key` quedan en 0/null — no representan nada en este contexto.
+ */
+function buildBarberoSeries(stats: BarberoMonthStats[], key: BarberoMetricKey): DerivedMonthlyMetrics[] {
+  return stats.map((s, i) => {
+    const value = s[key];
+    const prevValue = i > 0 ? stats[i - 1][key] : null;
+    const variation = prevValue !== null ? calcVariation(value, prevValue) : null;
+    const base: DerivedMonthlyMetrics = {
+      monthLabel: s.monthLabel,
+      facturacion: 0, servicios: 0, efectivo: 0, mp: 0, costosFijos: 0,
+      rentabilidad: 0, ticketPromedio: 0, costoFijoPorServicio: 0,
+      costoVariablePorServicio: 0, gananciaPorServicio: 0, puntoEquilibrio: 0,
+      tasaOcupacion: 0, recargos: 0, descuentos: 0, costoLaboralPct: 0,
+      comisionDevengada: 0, tasaAttachExtras: 0, clientesNuevos: 0,
+      clientesManual: 0, clientesImportado: 0, clientesReserva: 0, pctEligioBarbero: 0,
+      facturacionVar: null, serviciosVar: null, efectivoVar: null, mpVar: null,
+      costosFijosVar: null, rentabilidadVar: null, ticketPromedioVar: null,
+      costoFijoPorServicioVar: null, costoVariablePorServicioVar: null,
+      gananciaPorServicioVar: null, puntoEquilibrioVar: null, tasaOcupacionVar: null,
+      recargosVar: null, descuentosVar: null, costoLaboralPctVar: null,
+      comisionDevengadaVar: null, tasaAttachExtrasVar: null, clientesNuevosVar: null,
+      pctEligioBarberoVar: null,
+    };
+    (base as unknown as Record<string, number>)[key] = value;
+    (base as unknown as Record<string, number | null>)[`${key}Var`] = variation;
+    return base;
+  });
 }
-
-interface DerivedMonthlyMetrics {
-  monthLabel: string;
-  facturacion: number;
-  servicios: number;
-  efectivo: number;
-  mp: number;
-  costosFijos: number;
-  rentabilidad: number;
-  ticketPromedio: number;
-  costoFijoPorServicio: number;
-  costoVariablePorServicio: number;
-  gananciaPorServicio: number;
-  puntoEquilibrio: number;
-  tasaOcupacion: number;
-  isCurrentMonth?: boolean;
-  diasTranscurridos?: number;
-  // Variation fields (% change vs previous month)
-  facturacionVar: number | null;
-  serviciosVar: number | null;
-  efectivoVar: number | null;
-  mpVar: number | null;
-  costosFijosVar: number | null;
-  rentabilidadVar: number | null;
-  ticketPromedioVar: number | null;
-  costoFijoPorServicioVar: number | null;
-  costoVariablePorServicioVar: number | null;
-  gananciaPorServicioVar: number | null;
-  puntoEquilibrioVar: number | null;
-  tasaOcupacionVar: number | null;
-}
-
-const chartConfig = {
-  facturacion: { label: "Facturación", color: "hsl(var(--primary))" },
-  servicios: { label: "Servicios", color: "hsl(var(--secondary))" },
-  efectivo: { label: "Efectivo", color: "hsl(var(--chart-cash))" },
-  mp: { label: "Mercado Pago", color: "hsl(var(--chart-mp))" },
-  costosFijos: { label: "Costos Fijos", color: "hsl(var(--chart-cost))" },
-  rentabilidad: { label: "Rentabilidad", color: "hsl(var(--chart-cash))" },
-  ticketPromedio: { label: "Ticket Promedio", color: "hsl(var(--chart-mp))" },
-  costoFijoPorServicio: { label: "Costo Fijo/Servicio", color: "hsl(var(--chart-orange))" },
-  costoVariablePorServicio: { label: "Costo Variable/Servicio", color: "hsl(var(--chart-amber))" },
-  gananciaPorServicio: { label: "Ganancia/Servicio", color: "hsl(var(--chart-cash))" },
-  puntoEquilibrio: { label: "Punto de Equilibrio", color: "hsl(var(--chart-purple))" },
-  tasaOcupacion: { label: "Tasa de Ocupación", color: "hsl(var(--chart-indigo))" },
-};
-
-const varKeyMap: Record<string, keyof DerivedMonthlyMetrics> = {
-  facturacion: 'facturacionVar',
-  servicios: 'serviciosVar',
-  efectivo: 'efectivoVar',
-  mp: 'mpVar',
-  costosFijos: 'costosFijosVar',
-  rentabilidad: 'rentabilidadVar',
-  ticketPromedio: 'ticketPromedioVar',
-  costoFijoPorServicio: 'costoFijoPorServicioVar',
-  costoVariablePorServicio: 'costoVariablePorServicioVar',
-  gananciaPorServicio: 'gananciaPorServicioVar',
-  puntoEquilibrio: 'puntoEquilibrioVar',
-  tasaOcupacion: 'tasaOcupacionVar',
-};
-
-function getWorkDaysInMonth(year: number, month: number): number {
-  const daysInMonth = getDaysInMonth(new Date(year, month));
-  let workDays = 0;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const day = getDay(new Date(year, month, d));
-    if (day !== 0) workDays++;
-  }
-  return workDays;
-}
-
-function getWorkDaysUpTo(year: number, month: number, maxDay: number): number {
-  const daysInMonth = getDaysInMonth(new Date(year, month));
-  const limit = Math.min(maxDay, daysInMonth);
-  let workDays = 0;
-  for (let d = 1; d <= limit; d++) {
-    const day = getDay(new Date(year, month, d));
-    if (day !== 0) workDays++;
-  }
-  return workDays;
-}
-
-function calcVariation(current: number, previous: number): number | null {
-  if (previous === 0) return current === 0 ? 0 : null;
-  return ((current - previous) / Math.abs(previous)) * 100;
-}
-
-function MetricChart({ 
-  data, 
-  dataKey, 
-  color, 
-  formatValue,
-}: { 
-  data: DerivedMonthlyMetrics[]; 
-  dataKey: keyof DerivedMonthlyMetrics; 
-  color: string;
-  formatValue: (v: number) => string;
-}) {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  const config = { [dataKey]: { label: dataKey, color } };
-  const vKey = varKeyMap[dataKey as string];
-
-  return (
-    <ChartContainer config={config} className="h-40 w-full mt-3">
-      <ComposedChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-        <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-        <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} width={45} tickFormatter={(v) => formatValue(v)} />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              formatter={(value, name, item) => {
-                const varVal = vKey ? (item.payload as any)?.[vKey] : null;
-                const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
-                return `${formatValue(Number(value))}${varStr}`;
-              }}
-            />
-          }
-        />
-        <Bar dataKey={dataKey} fill={color} radius={[3, 3, 0, 0]} opacity={0.7} isAnimationActive={!prefersReducedMotion} />
-        <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} dot={false} isAnimationActive={!prefersReducedMotion} />
-      </ComposedChart>
-    </ChartContainer>
-  );
-}
-
-function MetricDetailDialog({
-  open,
-  onOpenChange,
-  metric,
-  data,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  metric: MetricCardDef | null;
-  data: DerivedMonthlyMetrics[];
-}) {
-  const prefersReducedMotion = usePrefersReducedMotion();
-  if (!metric) return null;
-  const config = { [metric.dataKey]: { label: metric.title, color: metric.chartColor } };
-  const vKey = varKeyMap[metric.dataKey as string];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <metric.icon className={`h-5 w-5 ${metric.color}`} />
-            {metric.title}
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">{metric.description}</p>
-        </DialogHeader>
-
-        {/* Big chart */}
-        <ChartContainer config={config} className="h-64 w-full">
-          <ComposedChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-            <XAxis dataKey="monthLabel" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-            <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} width={55} tickFormatter={(v) => metric.shortFormatFn(v)} />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value, name, item) => {
-                    const varVal = vKey ? (item.payload as any)?.[vKey] : null;
-                    const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
-                    return `${metric.formatFn(Number(value))}${varStr}`;
-                  }}
-                />
-              }
-            />
-            <Bar dataKey={metric.dataKey} fill={metric.chartColor} radius={[4, 4, 0, 0]} opacity={0.6} isAnimationActive={!prefersReducedMotion} />
-            <Line type="monotone" dataKey={metric.dataKey} stroke={metric.chartColor} strokeWidth={2.5} dot={{ r: 3, fill: metric.chartColor }} isAnimationActive={!prefersReducedMotion} />
-          </ComposedChart>
-        </ChartContainer>
-
-        {/* Detail table */}
-        <div className="rounded-md border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mes</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="text-right">Variación</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((row) => {
-                const value = row[metric.dataKey] as number;
-                const variation = vKey ? (row[vKey] as number | null) : null;
-                return (
-                  <TableRow key={row.monthLabel}>
-                    <TableCell className="font-medium">{row.monthLabel}</TableCell>
-                    <TableCell className="text-right">{metric.formatFn(value)}</TableCell>
-                    <TableCell className="text-right">
-                      {variation == null ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <span className={`inline-flex items-center gap-0.5 ${variation > 0 ? 'text-status-success-foreground' : variation < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
-                          {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
-                          {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type MetricCardDef = {
-  title: string;
-  dataKey: keyof DerivedMonthlyMetrics;
-  icon: typeof DollarSign;
-  color: string;
-  chartColor: string;
-  formatFn: (v: number) => string;
-  shortFormatFn: (v: number) => string;
-  description: string;
-};
 
 export function EstadisticasPanel() {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [barberosActivos, setBarberosActivos] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [periodoMeses, setPeriodoMeses] = useState('6');
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
-  const [ocupacionOpen, setOcupacionOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
-  const [ventasData, setVentasData] = useState<{ fecha_hora: string }[]>([]);
-  const [ingresosRaw, setIngresosRaw] = useState<{ created_at: string; cantidad_de_servicios: number; dia: string | null }[]>([]);
+
+  const { monthlyData, isLoading, ventasData, ingresosRaw } = useEstadisticasData(
+    organization?.id,
+    currentSucursal,
+    periodoMeses,
+    capacidadDiaria,
+  );
+
+  const {
+    ocupacionPorMes, avgDuracionMin, coberturaIncompleta, isLoading: isLoadingOcupacion,
+  } = useOcupacionResumen(organization?.id, currentSucursal, periodoMeses);
+
+  const {
+    montosMesActual, montosMesAnterior, isLoading: isLoadingPagoMetodo,
+  } = usePagoMetodoData(organization?.id, currentSucursal);
+
+  const {
+    rankingActual, productosRanking, historialPorBarbero, isLoading: isLoadingEquipo,
+  } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
+
+  const {
+    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
+
+  const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
+    metric: MetricCardDef;
+    data: DerivedMonthlyMetrics[];
+  } | null>(null);
 
   // Fetch capacidad_diaria from DB when sucursal changes
   useEffect(() => {
@@ -299,12 +117,6 @@ export function EstadisticasPanel() {
     fetchCapacidad();
   }, [currentSucursal?.id, organization?.id]);
 
-  useEffect(() => {
-    if (organization?.id) {
-      fetchData();
-    }
-  }, [organization?.id, periodoMeses, currentSucursal]);
-
   const saveCapacidadDiaria = async (value: number) => {
     if (!currentSucursal?.id || !organization?.id) return;
     await supabase
@@ -313,172 +125,6 @@ export function EstadisticasPanel() {
         { sucursal_id: currentSucursal.id, organization_id: organization.id, capacidad_diaria: value },
         { onConflict: 'sucursal_id' }
       );
-  };
-
-  const fetchData = async () => {
-    if (!organization?.id) return;
-    setIsLoading(true);
-
-    try {
-      const meses = parseInt(periodoMeses);
-      const endDate = endOfMonth(new Date());
-      const startDate = startOfMonth(subMonths(new Date(), meses - 1));
-
-      let ingresosQuery = supabase
-        .from('ingresos')
-        .select('id, created_at, total_facturado, efectivo, mp, cantidad_de_servicios, sueldo, estado, dia, barbero_id')
-        .eq('organization_id', organization.id)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .neq('estado', 'eliminado');
-
-      if (currentSucursal) {
-        ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      let egresosQuery = supabase
-        .from('Egresos')
-        .select('Monto, tipo_costo, Fecha')
-        .eq('organization_id', organization.id)
-        .eq('estado', 'activo')
-        .gte('Fecha', startDate.toISOString())
-        .lte('Fecha', endDate.toISOString());
-
-      if (currentSucursal) {
-        egresosQuery = egresosQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      let barberosQuery = supabase
-        .from('barberos')
-        .select('id')
-        .eq('organization_id', organization.id)
-        .eq('activo', true);
-
-      if (currentSucursal) {
-        barberosQuery = barberosQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      let ventasQuery = supabase
-        .from('venta')
-        .select('fecha_hora')
-        .eq('organization_id', organization.id)
-        .eq('estado', 'activo')
-        .gte('fecha_hora', startDate.toISOString())
-        .lte('fecha_hora', endDate.toISOString());
-
-      if (currentSucursal) {
-        ventasQuery = ventasQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      const [ingresosRes, egresosRes, barberosRes, ventasRes] = await Promise.all([
-        ingresosQuery, egresosQuery, barberosQuery, ventasQuery,
-      ]);
-
-      if (ingresosRes.error) throw ingresosRes.error;
-      if (egresosRes.error) throw egresosRes.error;
-      if (barberosRes.error) throw barberosRes.error;
-
-      const ingresos = ingresosRes.data || [];
-      const egresos = egresosRes.data || [];
-      setBarberosActivos((barberosRes.data || []).length);
-      setVentasData((ventasRes.data || []) as { fecha_hora: string }[]);
-      setIngresosRaw((ingresosRes.data || []).map(i => ({
-        created_at: i.created_at,
-        cantidad_de_servicios: i.cantidad_de_servicios || 0,
-        dia: i.dia || null,
-      })));
-      const months = eachMonthOfInterval({ start: startDate, end: endDate });
-
-      const today = new Date();
-      const diaActual = today.getDate();
-      const currentMonthStr = format(today, 'yyyy-MM');
-
-      const monthlyStats: MonthlyData[] = months.map((monthDate, idx) => {
-        const monthStart = startOfMonth(monthDate);
-        const monthEnd = endOfMonth(monthDate);
-
-        const monthIngresos = ingresos.filter(i => {
-          if (!i.created_at) return false;
-          const d = parseISO(i.created_at);
-          return d >= monthStart && d <= monthEnd;
-        });
-
-        const monthEgresos = egresos.filter(e => {
-          if (!e.Fecha) return false;
-          const d = parseISO(e.Fecha);
-          return d >= monthStart && d <= monthEnd;
-        });
-
-        const costosFijos = monthEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-        const costosVariables = monthEgresos.filter(e => e.tipo_costo === 'variable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-        const costosSemivariables = monthEgresos.filter(e => e.tipo_costo === 'semivariable').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-
-        const barberosDelMes = new Set(monthIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
-
-        const monthStr = format(monthDate, 'yyyy-MM');
-        // Check if the NEXT month in the array is the current month — if so, compute partial sums for first N days
-        const nextMonthStr = idx < months.length - 1 ? format(months[idx + 1], 'yyyy-MM') : null;
-        const needsPartial = nextMonthStr === currentMonthStr;
-
-        let parcialFacturacion: number | undefined;
-        let parcialServicios: number | undefined;
-        let parcialEfectivo: number | undefined;
-        let parcialMp: number | undefined;
-        let parcialCostosFijos: number | undefined;
-        let parcialTasaOcupacion: number | undefined;
-
-        if (needsPartial) {
-          // Filter ingresos where day-of-month <= diaActual
-          const partialIngresos = monthIngresos.filter(i => {
-            const d = parseISO(i.created_at);
-            return d.getDate() <= diaActual;
-          });
-          const partialEgresos = monthEgresos.filter(e => {
-            const d = parseISO(e.Fecha!);
-            return d.getDate() <= diaActual;
-          });
-
-          parcialFacturacion = partialIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0);
-          parcialServicios = partialIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0);
-          parcialEfectivo = partialIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0);
-          parcialMp = partialIngresos.reduce((sum, i) => sum + (i.mp || 0), 0);
-          parcialCostosFijos = partialEgresos.filter(e => e.tipo_costo === 'fijo').reduce((s, e) => s + (Number(e.Monto) || 0), 0);
-
-          // Partial occupancy: services in first N days / capacity of first N work days
-          const [py, pmo] = monthStr.split('-').map(Number);
-          const partialWorkDays = getWorkDaysUpTo(py, pmo - 1, diaActual);
-          const partialBarberos = new Set(partialIngresos.map(i => (i as any).barbero_id).filter(Boolean)).size;
-          const partialCap = capacidadDiaria * (partialBarberos || barberosActivos || 1) * partialWorkDays;
-          parcialTasaOcupacion = partialCap > 0 ? (parcialServicios / partialCap) * 100 : 0;
-        }
-
-        return {
-          month: monthStr,
-          monthLabel: format(monthDate, 'MMM yy', { locale: es }),
-          facturacion: monthIngresos.reduce((sum, i) => sum + (i.total_facturado || 0), 0),
-          servicios: monthIngresos.reduce((sum, i) => sum + (i.cantidad_de_servicios || 0), 0),
-          efectivo: monthIngresos.reduce((sum, i) => sum + (i.efectivo || 0), 0),
-          mp: monthIngresos.reduce((sum, i) => sum + (i.mp || 0), 0),
-          costosFijos,
-          costosVariables,
-          costosSemivariables,
-          totalEgresos: costosFijos + costosVariables + costosSemivariables,
-          barberosDelMes,
-          parcialFacturacion,
-          parcialServicios,
-          parcialEfectivo,
-          parcialMp,
-          parcialCostosFijos,
-          parcialTasaOcupacion,
-        };
-      });
-
-      setMonthlyData(monthlyStats);
-    } catch (error) {
-      console.error('Error fetching statistics:', error);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const formatCurrency = (value: number) =>
@@ -490,13 +136,13 @@ export function EstadisticasPanel() {
     return `$${value.toFixed(0)}`;
   };
 
-  const formatPercent = (value: number) => `${value.toFixed(1)}%`;
-
   // Derive per-month metrics with variation
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
     const today = new Date();
     const currentMonthStr = format(today, 'yyyy-MM');
     const diaActual = today.getDate();
+    const ocupacionByMonth = new Map(ocupacionPorMes.map(o => [o.month, o]));
+    const serviciosClientesByMonth = new Map(serviciosClientesData.map(s => [s.month, s]));
 
     const raw = monthlyData.map(m => {
       const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
@@ -507,14 +153,19 @@ export function EstadisticasPanel() {
       const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
       const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
 
-      const [y, mo] = m.month.split('-').map(Number);
-      const isCurrentMonth = m.month === currentMonthStr;
-      // For current month, use only elapsed work days for capacity
-      const workDays = isCurrentMonth
-        ? getWorkDaysUpTo(y, mo - 1, diaActual)
-        : getWorkDaysInMonth(y, mo - 1);
-      const cap = capacidadDiaria * (m.barberosDelMes || barberosActivos || 1) * workDays;
-      const tasaOcupacion = cap > 0 ? (m.servicios / cap) * 100 : 0;
+      // Ocupación: horas de servicio vendidas (estimadas con la duración promedio del catálogo
+      // activo) ÷ (barberos activos con rol barbero × horario general de la sucursal ese día).
+      // No mira horario individual ni bloqueos puntuales. Ver useOcupacionResumen.ts.
+      const horasVendidas = (m.servicios * avgDuracionMin) / 60;
+      const horasDisponibles = ocupacionByMonth.get(m.month)?.horasDisponibles ?? 0;
+      const tasaOcupacion = horasDisponibles > 0 ? (horasVendidas / horasDisponibles) * 100 : 0;
+
+      // Costo laboral % de facturación: sueldo devengado + comisión por productos, sobre
+      // facturación del mes. Se calcula acá una sola vez — la card de tendencia y el texto
+      // debajo del donut "Costos del mes" leen el mismo valor (latest.costoLaboralPct).
+      const costoLaboralPct = m.facturacion > 0 ? ((m.sueldoTotal + m.comisionProductos) / m.facturacion) * 100 : 0;
+
+      const sc = serviciosClientesByMonth.get(m.month);
 
       return {
         monthLabel: m.monthLabel,
@@ -530,6 +181,17 @@ export function EstadisticasPanel() {
         gananciaPorServicio,
         puntoEquilibrio,
         tasaOcupacion,
+        recargos: m.recargosTotal,
+        descuentos: m.perdida,
+        costoLaboralPct,
+        // Solo tiene sentido por-barbero (Sección Equipo) — a nivel organización queda en 0.
+        comisionDevengada: 0,
+        tasaAttachExtras: sc?.tasaAttachExtras ?? 0,
+        clientesNuevos: sc?.clientesNuevos ?? 0,
+        clientesManual: sc?.clientesManual ?? 0,
+        clientesImportado: sc?.clientesImportado ?? 0,
+        clientesReserva: sc?.clientesReserva ?? 0,
+        pctEligioBarbero: sc?.pctEligioBarbero ?? 0,
       };
     });
 
@@ -548,6 +210,26 @@ export function EstadisticasPanel() {
       const prevEfectivo = useSameDayComparison ? prevM!.parcialEfectivo! : prev?.efectivo ?? 0;
       const prevMp = useSameDayComparison ? prevM!.parcialMp! : prev?.mp ?? 0;
       const prevCostosFijos = useSameDayComparison ? prevM!.parcialCostosFijos! : prev?.costosFijos ?? 0;
+      const prevRecargos = useSameDayComparison ? prevM!.parcialRecargosTotal! : prev?.recargos ?? 0;
+      const prevDescuentos = useSameDayComparison ? prevM!.parcialPerdida! : prev?.descuentos ?? 0;
+
+      // Clientes nuevos es acumulativo (como Facturación/Servicios): usa el parcial "mismos
+      // primeros N días" del mes anterior cuando corresponde. Attach de extras y % eligió
+      // barbero son ratios — se comparan mes completo contra mes completo, sin recorte.
+      const prevSc = prevM ? serviciosClientesByMonth.get(prevM.month) : undefined;
+      const useSameDayClientes = useSameDayComparison && prevSc?.parcialClientesNuevos !== undefined;
+      const prevClientesNuevos = useSameDayClientes ? prevSc!.parcialClientesNuevos! : prev?.clientesNuevos ?? 0;
+
+      // Ocupación parcial del mes anterior (mismos primeros N días), para comparar mes en curso vs
+      // mes anterior en igualdad de condiciones — misma lógica que las demás métricas "parciales".
+      const prevOcupacionMes = prevM ? ocupacionByMonth.get(prevM.month) : undefined;
+      const prevHorasDisponiblesParciales = prevOcupacionMes?.horasDisponiblesParciales;
+      const prevHorasVendidasParciales = prevM?.parcialServicios !== undefined
+        ? (prevM.parcialServicios * avgDuracionMin) / 60
+        : undefined;
+      const prevTasaOcupacionParcial = (useSameDayComparison && prevHorasDisponiblesParciales !== undefined && prevHorasVendidasParciales !== undefined)
+        ? (prevHorasDisponiblesParciales > 0 ? (prevHorasVendidasParciales / prevHorasDisponiblesParciales) * 100 : 0)
+        : undefined;
 
       return {
         ...curr,
@@ -558,6 +240,8 @@ export function EstadisticasPanel() {
         efectivoVar: prev ? calcVariation(curr.efectivo, prevEfectivo) : null,
         mpVar: prev ? calcVariation(curr.mp, prevMp) : null,
         costosFijosVar: prev ? calcVariation(curr.costosFijos, prevCostosFijos) : null,
+        recargosVar: prev ? calcVariation(curr.recargos, prevRecargos) : null,
+        descuentosVar: prev ? calcVariation(curr.descuentos, prevDescuentos) : null,
         // Non-cumulative metrics: compare directly as before
         rentabilidadVar: prev ? calcVariation(curr.rentabilidad, prev.rentabilidad) : null,
         ticketPromedioVar: prev ? calcVariation(curr.ticketPromedio, prev.ticketPromedio) : null,
@@ -565,7 +249,12 @@ export function EstadisticasPanel() {
         costoVariablePorServicioVar: prev ? calcVariation(curr.costoVariablePorServicio, prev.costoVariablePorServicio) : null,
         gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
         puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
-        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, useSameDayComparison && prevM!.parcialTasaOcupacion !== undefined ? prevM!.parcialTasaOcupacion! : prev.tasaOcupacion) : null,
+        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prevTasaOcupacionParcial !== undefined ? prevTasaOcupacionParcial : prev.tasaOcupacion) : null,
+        costoLaboralPctVar: prev ? calcVariation(curr.costoLaboralPct, prev.costoLaboralPct) : null,
+        comisionDevengadaVar: null,
+        tasaAttachExtrasVar: prev ? calcVariation(curr.tasaAttachExtras, prev.tasaAttachExtras) : null,
+        clientesNuevosVar: prev ? calcVariation(curr.clientesNuevos, prevClientesNuevos) : null,
+        pctEligioBarberoVar: prev ? calcVariation(curr.pctEligioBarbero, prev.pctEligioBarbero) : null,
       };
     });
   })();
@@ -584,27 +273,10 @@ export function EstadisticasPanel() {
     description: 'Cantidad de servicios realizados por mes.',
   };
 
+  // Efectivo y Mercado Pago se retiraron del render en Build 2 (Plata real): las reemplaza el
+  // donut "Cómo se cobra" (desglose real por método vía venta_pagos, no esta suma agregada de
+  // ingresos). Se deja la definición sin uso en vez de borrarla, por si hiciera falta más adelante.
   const ingresosCards: MetricCardDef[] = [
-    {
-      title: 'Facturación',
-      dataKey: 'facturacion',
-      icon: DollarSign,
-      color: 'text-status-success-foreground',
-      chartColor: 'hsl(var(--chart-cash))',
-      formatFn: formatCurrency,
-      shortFormatFn: formatCurrencyShort,
-      description: 'Cuánto dinero entró al negocio cada mes.',
-    },
-    {
-      title: 'Ticket Promedio',
-      dataKey: 'ticketPromedio',
-      icon: Receipt,
-      color: 'text-status-info-foreground',
-      chartColor: 'hsl(var(--chart-mp))',
-      formatFn: formatCurrency,
-      shortFormatFn: formatCurrencyShort,
-      description: 'Cuánto gasta cada cliente en promedio por visita.',
-    },
     {
       title: 'Efectivo',
       dataKey: 'efectivo',
@@ -626,8 +298,12 @@ export function EstadisticasPanel() {
       description: 'Ingresos mensuales cobrados por Mercado Pago.',
     },
   ];
+  void ingresosCards; // ver comentario arriba: definición retenida, sin consumidor en el render
 
-  const costosCards: MetricCardDef[] = [
+  // ---- Sección 2: Plata real ----
+  // Costos Fijos / Costo Fijo por Servicio / Costo Variable por Servicio / Ganancia por Servicio
+  // se mudan acá tal cual estaban (mismo MetricCardDef, mismo cálculo) + 3 cards nuevas.
+  const plataRealCards: MetricCardDef[] = [
     {
       title: 'Costos Fijos',
       dataKey: 'costosFijos',
@@ -669,6 +345,207 @@ export function EstadisticasPanel() {
       description: 'Cuánto ganás realmente por cada cliente después de costos.',
     },
     {
+      title: 'Recargos Cobrados',
+      dataKey: 'recargos',
+      icon: CreditCard,
+      color: 'text-status-info-foreground',
+      chartColor: 'hsl(var(--chart-mp))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Recargos por método de pago cobrados por mes.',
+    },
+    {
+      title: 'Descuentos Regalados',
+      dataKey: 'descuentos',
+      icon: Gift,
+      color: 'text-chart-orange',
+      chartColor: 'hsl(var(--chart-orange))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Plata que decidiste no cobrar por descuentos, por mes.',
+    },
+    {
+      title: 'Costo Laboral % de Facturación',
+      dataKey: 'costoLaboralPct',
+      icon: Wallet,
+      color: 'text-status-error-foreground',
+      chartColor: 'hsl(var(--chart-cost))',
+      formatFn: (v) => `${v.toFixed(1)}%`,
+      shortFormatFn: (v) => `${v.toFixed(0)}%`,
+      description: 'Sueldos + comisión de productos, sobre la facturación del mes.',
+    },
+  ];
+
+  // Donut "Cómo se cobra": 5 métodos de venta_pagos (con fallback a venta.metodo_pago para
+  // ventas sin filas propias — mismo patrón que useTransactions.ts). Mapeo color↔método en el
+  // mismo orden en que están declarados acá y en el CHECK de metodo_pago: cash/mp/cost/purple/
+  // indigo → efectivo/mercado_pago/transferencia/debito/credito.
+  const metodoPagoSlices = [
+    { label: 'Efectivo', value: montosMesActual.efectivo, color: 'hsl(var(--chart-cash))' },
+    { label: 'Mercado Pago', value: montosMesActual.mercado_pago, color: 'hsl(var(--chart-mp))' },
+    { label: 'Transferencia', value: montosMesActual.transferencia, color: 'hsl(var(--chart-cost))' },
+    { label: 'Débito', value: montosMesActual.debito, color: 'hsl(var(--chart-purple))' },
+    { label: 'Crédito', value: montosMesActual.credito, color: 'hsl(var(--chart-indigo))' },
+  ];
+
+  const digitalActual = montosMesActual.mercado_pago + montosMesActual.transferencia + montosMesActual.debito + montosMesActual.credito;
+  const digitalAnterior = montosMesAnterior.mercado_pago + montosMesAnterior.transferencia + montosMesAnterior.debito + montosMesAnterior.credito;
+  const digitalVar = calcVariation(digitalActual, digitalAnterior);
+
+  const digitalTrendText = digitalVar === null ? (
+    <span className="text-muted-foreground">Digital: {formatCurrency(digitalActual)} este mes.</span>
+  ) : (
+    <span className={`inline-flex items-center gap-0.5 ${digitalVar > 0 ? 'text-status-success-foreground' : digitalVar < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
+      {digitalVar > 0 ? <ArrowUpRight className="h-3 w-3" /> : digitalVar < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
+      Digital {digitalVar > 0 ? '+' : ''}{digitalVar.toFixed(1)}% vs. mes anterior
+    </span>
+  );
+
+  // Donut "Costos del mes": mismos totales que ya agrega useEstadisticasData (no se refetchea
+  // Egresos). fijo reusa el color de la card "Costos Fijos"; variable el de "Costo Variable por
+  // Servicio"; semivariable no tenía color asignado en ningún lado — se usa --chart-purple (sin
+  // uso en esta sección) para no repetir el mismo token 3 veces seguidas en el mismo donut.
+  const costosSlices = latest ? [
+    { label: 'Fijo', value: latest.costosFijos, color: 'hsl(var(--chart-cost))' },
+    { label: 'Variable', value: monthlyData[monthlyData.length - 1]?.costosVariables ?? 0, color: 'hsl(var(--chart-amber))' },
+    { label: 'Semivariable', value: monthlyData[monthlyData.length - 1]?.costosSemivariables ?? 0, color: 'hsl(var(--chart-purple))' },
+  ] : [];
+
+  const costoLaboralText = latest ? `Costo laboral: ${latest.costoLaboralPct.toFixed(1)}% de la facturación` : '';
+
+  // ---- Sección 3: Equipo ----
+  const openBarberoDetail = (barberoId: string, barberoNombre: string, key: BarberoMetricKey, config: {
+    title: string; icon: MetricCardDef['icon']; color: string; chartColor: string;
+    formatFn: (v: number) => string; shortFormatFn: (v: number) => string;
+  }) => {
+    const stats = historialPorBarbero.get(barberoId) || [];
+    setSelectedBarberoDetail({
+      metric: {
+        title: `${config.title} — ${barberoNombre}`,
+        dataKey: key,
+        icon: config.icon,
+        color: config.color,
+        chartColor: config.chartColor,
+        formatFn: config.formatFn,
+        shortFormatFn: config.shortFormatFn,
+        description: `Evolución mensual de ${barberoNombre}.`,
+      },
+      data: buildBarberoSeries(stats, key),
+    });
+  };
+
+  const facturacionRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.facturacion,
+    formattedValue: formatCurrency(r.facturacion),
+    sublabel: `Ticket promedio: ${formatCurrency(r.ticketPromedio)}`,
+  }));
+
+  const serviciosRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.servicios,
+    formattedValue: `${r.servicios} servicios`,
+  }));
+
+  const comisionRankingData: RankingBarItem[] = rankingActual.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.comisionDevengada,
+    formattedValue: formatCurrency(r.comisionDevengada),
+  }));
+
+  const productosRankingData: RankingBarItem[] = productosRanking.map((r) => ({
+    id: r.id,
+    label: r.nombre,
+    value: r.totalProductos,
+    formattedValue: formatCurrency(r.totalProductos),
+  }));
+
+  // ---- Sección 4: Servicios y clientes ----
+  // Donut "Mix de Servicios": top 5 servicios por facturación (venta.total_final) del mes
+  // actual + "Otros" agrupando el resto, sobre la misma `ventasData` que ya trae
+  // useEstadisticasData (extendida en Build 4 con servicio_nombre/total_final) — sin query nueva.
+  const currentMonthStrMix = format(new Date(), 'yyyy-MM');
+  const facturacionPorServicio = new Map<string, number>();
+  ventasData
+    .filter((v) => format(new Date(v.fecha_hora), 'yyyy-MM') === currentMonthStrMix)
+    .forEach((v) => {
+      const nombre = v.servicio_nombre || 'Sin especificar';
+      facturacionPorServicio.set(nombre, (facturacionPorServicio.get(nombre) || 0) + v.total_final);
+    });
+  const serviciosOrdenados = Array.from(facturacionPorServicio.entries()).sort((a, b) => b[1] - a[1]);
+  const top5Servicios = serviciosOrdenados.slice(0, 5);
+  const restoServiciosTotal = serviciosOrdenados.slice(5).reduce((sum, [, v]) => sum + v, 0);
+  // Colores reusados de Sección 2 (no hay tokens dedicados a servicios). "Otros" usa
+  // --muted-foreground en vez de un chart-* — es el único slice pensado para pasar
+  // desapercibido, no para competir por atención con los top 5.
+  const mixServiciosColores = ['hsl(var(--chart-indigo))', 'hsl(var(--chart-purple))', 'hsl(var(--chart-mp))', 'hsl(var(--chart-amber))', 'hsl(var(--chart-orange))'];
+  const mixServiciosSlices = [
+    ...top5Servicios.map(([label, value], i) => ({ label, value, color: mixServiciosColores[i] })),
+    ...(restoServiciosTotal > 0 ? [{ label: 'Otros', value: restoServiciosTotal, color: 'hsl(var(--muted-foreground))' }] : []),
+  ];
+
+  const latestServiciosClientes = serviciosClientesData.length > 0 ? serviciosClientesData[serviciosClientesData.length - 1] : null;
+
+  const tasaAttachExtrasCard: MetricCardDef = {
+    title: 'Tasa de Attach de Extras',
+    dataKey: 'tasaAttachExtras',
+    icon: Sparkles,
+    color: 'text-status-info-foreground',
+    chartColor: 'hsl(var(--chart-mp))',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: `% de servicios que sumaron al menos un extra. Ingreso por extras este mes: ${formatCurrency(latestServiciosClientes?.ingresoExtras ?? 0)}.`,
+  };
+
+  const clientesNuevosCard: MetricCardDef = {
+    title: 'Clientes Nuevos',
+    dataKey: 'clientesNuevos',
+    icon: UserPlus,
+    color: 'text-status-success-foreground',
+    chartColor: 'hsl(var(--chart-cash))',
+    formatFn: (v) => `${v} clientes`,
+    shortFormatFn: (v) => `${v}`,
+    description: 'Clientes nuevos registrados por mes.',
+    origenKeys: { manual: 'clientesManual', importado: 'clientesImportado', reserva: 'clientesReserva' },
+  };
+
+  const pctEligioBarberoCard: MetricCardDef = {
+    title: '% Eligió Barbero al Reservar',
+    dataKey: 'pctEligioBarbero',
+    icon: UserCheck,
+    color: 'text-status-purple-foreground',
+    chartColor: 'hsl(var(--chart-purple))',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: 'De los turnos reservados, qué % eligió un barbero específico en vez de "cualquiera disponible".',
+  };
+
+  // ---- Sección 1: Resumen ----
+  const resumenCards: MetricCardDef[] = [
+    {
+      title: 'Facturación',
+      dataKey: 'facturacion',
+      icon: DollarSign,
+      color: 'text-status-success-foreground',
+      chartColor: 'hsl(var(--chart-cash))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Cuánto dinero entró al negocio cada mes.',
+    },
+    {
+      title: 'Ticket Promedio',
+      dataKey: 'ticketPromedio',
+      icon: Receipt,
+      color: 'text-status-info-foreground',
+      chartColor: 'hsl(var(--chart-mp))',
+      formatFn: formatCurrency,
+      shortFormatFn: formatCurrencyShort,
+      description: 'Cuánto gasta cada cliente en promedio por visita.',
+    },
+    {
       title: 'Rentabilidad',
       dataKey: 'rentabilidad',
       icon: Percent,
@@ -689,57 +566,6 @@ export function EstadisticasPanel() {
       description: 'Clientes necesarios para cubrir todos los costos fijos.',
     },
   ];
-
-  const renderVariationBadge = (metric: MetricCardDef) => {
-    const vKey = varKeyMap[metric.dataKey as string];
-    if (!latest || !vKey) return null;
-    const variation = latest[vKey] as number | null;
-    if (variation == null) return null;
-    const isPartial = latest.isCurrentMonth && latest.diasTranscurridos;
-    return (
-      <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${variation > 0 ? 'text-status-success-foreground' : variation < 0 ? 'text-status-error-foreground' : 'text-muted-foreground'}`}>
-        {variation > 0 ? <ArrowUpRight className="h-3 w-3" /> : variation < 0 ? <ArrowDownRight className="h-3 w-3" /> : null}
-        {variation > 0 ? '+' : ''}{variation.toFixed(1)}%
-        {isPartial && (
-          <span className="ml-1 text-muted-foreground" title={`Estimación basada en los primeros ${latest.diasTranscurridos} días del mes, comparados con los mismos ${latest.diasTranscurridos} días del mes anterior`}>
-            <Clock className="h-3 w-3 inline" />
-          </span>
-        )}
-      </span>
-    );
-  };
-
-  const renderMetricCard = (metric: MetricCardDef) => (
-    <Card
-      key={metric.dataKey}
-      className="cursor-pointer transition-shadow hover:shadow-md"
-      onClick={() => setSelectedMetric(metric)}
-    >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div>
-          <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
-          <p className="text-xs text-muted-foreground mt-0.5">{metric.description}</p>
-        </div>
-        <metric.icon className={`h-4 w-4 ${metric.color} shrink-0`} />
-      </CardHeader>
-      <CardContent>
-        {latest && (
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className={`text-2xl font-bold ${metric.color}`}>
-              {metric.formatFn(latest[metric.dataKey] as number)}
-            </span>
-            {renderVariationBadge(metric)}
-          </div>
-        )}
-        <MetricChart
-          data={derivedMetrics}
-          dataKey={metric.dataKey}
-          color={metric.chartColor}
-          formatValue={metric.shortFormatFn}
-        />
-      </CardContent>
-    </Card>
-  );
 
   // ---- Comportamiento del Cliente ----
   const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -918,10 +744,10 @@ export function EstadisticasPanel() {
     chartColor: 'hsl(var(--chart-indigo))',
     formatFn: (v) => `${v.toFixed(1)}%`,
     shortFormatFn: (v) => `${v.toFixed(0)}%`,
-    description: 'Qué tan llena está tu agenda mes a mes.',
+    description: 'Horas de servicio vendidas sobre horas-silla disponibles del local (estimado).',
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingOcupacion || isLoadingPagoMetodo || isLoadingEquipo || isLoadingServiciosClientes) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -952,144 +778,166 @@ export function EstadisticasPanel() {
         </Select>
       </div>
 
-      {/* Grupo 1: Ingresos y Ventas */}
+      {/* Sección 1: Resumen */}
       <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">📈 Ingresos y Ventas</h2>
-          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás vendiendo y cómo evoluciona tu facturación.</p>
-        </div>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resumen</h2>
+
         {/* Servicios - full width first */}
-        <Card
-          className="cursor-pointer transition-shadow hover:shadow-md md:col-span-2"
-          onClick={() => setSelectedMetric(serviciosCard)}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div>
-              <CardTitle className="text-sm font-medium">{serviciosCard.title}</CardTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">{serviciosCard.description}</p>
-            </div>
-            <serviciosCard.icon className={`h-4 w-4 ${serviciosCard.color} shrink-0`} />
-          </CardHeader>
-          <CardContent>
-            {latest && (
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className={`text-2xl font-bold ${serviciosCard.color}`}>
-                  {serviciosCard.formatFn(latest[serviciosCard.dataKey] as number)}
-                </span>
-                {renderVariationBadge(serviciosCard)}
+        <MetricCard
+          metric={serviciosCard}
+          data={derivedMetrics}
+          latest={latest}
+          onSelect={setSelectedMetric}
+          className="md:col-span-2"
+          chartSize="lg"
+        />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {resumenCards.map((metric) => (
+            <MetricCard key={metric.dataKey} metric={metric} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+          ))}
+
+          <MetricCard
+            metric={ocupacionMetricDef}
+            data={derivedMetrics}
+            latest={latest}
+            onSelect={setSelectedMetric}
+            banner={coberturaIncompleta ? (
+              <div
+                className="mb-3 flex items-start gap-1.5 rounded-md border border-status-warning bg-status-warning-bg px-2.5 py-2 text-xs text-status-warning-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>El horario general de la sucursal no está configurado — el número puede no ser preciso.</span>
               </div>
-            )}
-            <ChartContainer config={{ [serviciosCard.dataKey]: { label: serviciosCard.title, color: serviciosCard.chartColor } }} className="h-52 w-full mt-3">
-              <ComposedChart data={derivedMetrics} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="monthLabel" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} width={45} tickFormatter={serviciosCard.shortFormatFn} />
-                <ChartTooltip
-                  content={
-                    <ChartTooltipContent
-                      formatter={(value, name, item) => {
-                        const varVal = (item.payload as any)?.serviciosVar;
-                        const varStr = varVal != null ? ` (${varVal > 0 ? '+' : ''}${varVal.toFixed(1)}%)` : '';
-                        return `${serviciosCard.formatFn(Number(value))}${varStr}`;
-                      }}
-                    />
-                  }
-                />
-                <Bar dataKey="servicios" fill={serviciosCard.chartColor} radius={[3, 3, 0, 0]} opacity={0.7} isAnimationActive={!prefersReducedMotion} />
-                <Line type="monotone" dataKey="servicios" stroke={serviciosCard.chartColor} strokeWidth={2} dot={false} isAnimationActive={!prefersReducedMotion} />
-              </ComposedChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {ingresosCards.map(renderMetricCard)}
-        </div>
-
-      </div>
-
-      {/* Grupo 2: Costos y Rentabilidad */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">💰 Costos y Rentabilidad</h2>
-          <p className="text-sm text-muted-foreground">Estas métricas te muestran cuánto estás ganando realmente después de todos los gastos.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {costosCards.map(renderMetricCard)}
-        </div>
-      </div>
-
-      {/* Grupo 3: Capacidad y Eficiencia */}
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">⚡ Capacidad y Eficiencia</h2>
-          <p className="text-sm text-muted-foreground">Estas métricas te muestran qué tan bien estás aprovechando tu barbería.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card
-            className="cursor-pointer transition-shadow hover:shadow-md"
-            onClick={() => setSelectedMetric(ocupacionMetricDef)}
+            ) : undefined}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <div>
-                <CardTitle className="text-sm font-medium">Tasa de Ocupación</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Qué tan llena está tu agenda mes a mes.</p>
-              </div>
-              <Users className="h-4 w-4 text-status-indigo-foreground shrink-0" />
-            </CardHeader>
-            <CardContent>
-              {latest && (
-                <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-2xl font-bold text-status-indigo-foreground">
-                    {latest.tasaOcupacion.toFixed(1)}%
-                  </span>
-                  {renderVariationBadge(ocupacionMetricDef)}
-                </div>
-              )}
-              <MetricChart
-                data={derivedMetrics}
-                dataKey="tasaOcupacion"
-                color="hsl(var(--chart-indigo))"
-                formatValue={(v) => `${v.toFixed(0)}%`}
+            <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={100}
+                value={capacidadDiaria}
+                onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
+                onBlur={(e) => saveCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
+                className="h-7 w-16 text-xs"
               />
-
-              <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={100}
-                  value={capacidadDiaria}
-                  onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
-                  onBlur={(e) => saveCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="h-7 w-16 text-xs"
-                />
-                <span className="text-xs text-muted-foreground">cortes/barbero</span>
-              </div>
-
-              <div onClick={(e) => e.stopPropagation()}>
-                <Collapsible open={ocupacionOpen} onOpenChange={setOcupacionOpen}>
-                  <CollapsibleTrigger className="flex items-center gap-1 mt-2 text-xs text-primary hover:underline">
-                    <Info className="h-3 w-3" />
-                    ¿Cómo se calcula?
-                    <ChevronDown className={`h-3 w-3 transition-transform ${ocupacionOpen ? 'rotate-180' : ''}`} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="mt-2 p-3 bg-muted rounded-md text-xs text-muted-foreground space-y-1">
-                      <p><strong>Capacidad máxima:</strong> Cortes diarios × Barberos activos × Días laborables (lun-sáb)</p>
-                      <p><strong>Tasa:</strong> (Servicios reales ÷ Capacidad máxima) × 100</p>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
-            </CardContent>
-          </Card>
+              <span className="text-xs text-muted-foreground">cortes/barbero</span>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground/70" onClick={(e) => e.stopPropagation()}>
+              Ya no se usa para calcular la ocupación — pendiente de revisar.
+            </p>
+          </MetricCard>
         </div>
       </div>
 
-      {/* Grupo 4: Comportamiento del Cliente */}
-      {behaviorSection}
+      {/* Sección 2: Plata real */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plata real</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DonutCard
+            title="Cómo se cobra"
+            description="Composición de los cobros de este mes."
+            data={metodoPagoSlices}
+            formatValue={formatCurrency}
+            footer={<p className="mt-3 text-xs">{digitalTrendText}</p>}
+          />
+          <DonutCard
+            title="Costos del mes"
+            description="Fijo, variable y semivariable."
+            data={costosSlices}
+            formatValue={formatCurrency}
+            footer={<p className="mt-3 text-xs text-muted-foreground">{costoLaboralText}</p>}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {plataRealCards.map((metric) => (
+            <MetricCard key={metric.dataKey} metric={metric} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+          ))}
+        </div>
+      </div>
+
+      {/* Sección 3: Equipo */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipo</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RankingBarCard
+            title="Facturación por Barbero"
+            description="Este mes, de mayor a menor."
+            icon={DollarSign}
+            data={facturacionRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'facturacion', {
+              title: 'Facturación', icon: DollarSign, color: 'text-status-success-foreground',
+              chartColor: 'hsl(var(--chart-cash))', formatFn: formatCurrency, shortFormatFn: formatCurrencyShort,
+            })}
+          />
+          <RankingBarCard
+            title="Servicios por Barbero"
+            description="Cantidad de servicios este mes."
+            icon={Scissors}
+            data={serviciosRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'servicios', {
+              title: 'Servicios', icon: Scissors, color: 'text-primary',
+              chartColor: 'hsl(var(--primary))', formatFn: (v) => `${v} servicios`, shortFormatFn: (v) => `${v}`,
+            })}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RankingBarCard
+            title="Comisión Devengada por Barbero"
+            description="Sueldo + comisión de productos, este mes."
+            icon={Wallet}
+            data={comisionRankingData}
+            onItemClick={(item) => openBarberoDetail(item.id!, item.label, 'comisionDevengada', {
+              title: 'Comisión Devengada', icon: Wallet, color: 'text-status-error-foreground',
+              chartColor: 'hsl(var(--chart-cost))', formatFn: formatCurrency, shortFormatFn: formatCurrencyShort,
+            })}
+          />
+          {productosRankingData.length > 0 && (
+            <RankingBarCard
+              title="Venta de Productos por Barbero"
+              description="Este mes, de mayor a menor."
+              icon={ShoppingBag}
+              data={productosRankingData}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Sección 4: Servicios y clientes */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Servicios y clientes</h2>
+
+        {serviciosClientesError && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {serviciosClientesError}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <DonutCard
+            title="Mix de Servicios"
+            description="Facturación por servicio, este mes."
+            data={mixServiciosSlices}
+            formatValue={formatCurrency}
+          />
+          <MetricCard metric={tasaAttachExtrasCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <MetricCard metric={clientesNuevosCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+          <MetricCard metric={pctEligioBarberoCard} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
+        </div>
+
+        {/* Comportamiento del Cliente — reubicado acá tal cual (Build 4), sin cambios de cálculo */}
+        {behaviorSection}
+      </div>
 
       {/* Detail Dialog */}
       <MetricDetailDialog
@@ -1097,6 +945,14 @@ export function EstadisticasPanel() {
         onOpenChange={(v) => { if (!v) setSelectedMetric(null); }}
         metric={selectedMetric}
         data={derivedMetrics}
+      />
+
+      {/* Detail Dialog — evolución de un barbero (Sección Equipo) */}
+      <MetricDetailDialog
+        open={!!selectedBarberoDetail}
+        onOpenChange={(v) => { if (!v) setSelectedBarberoDetail(null); }}
+        metric={selectedBarberoDetail?.metric ?? null}
+        data={selectedBarberoDetail?.data ?? []}
       />
     </div>
   );

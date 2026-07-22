@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Trash2, ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react';
@@ -15,6 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { RepeatPicker, getRepeatLabel } from '@/components/tareas/RepeatPicker';
 import { CustomRepeatSheet, getCustomRepeatLabel } from '@/components/tareas/CustomRepeatSheet';
 import { GastosRecurrentesList } from '@/components/GastosRecurrentesList';
@@ -72,6 +77,37 @@ const TIPO_BADGE_VARIANT: Record<TipoCosto, 'default' | 'secondary' | 'outline'>
   semivariable: 'outline',
 };
 
+const gastoFormSchema = z.object({
+  tipoCosto: z.enum(['fijo', 'variable', 'semivariable']),
+  categoria: z.string().min(1, 'Seleccioná una categoría.'),
+  monto: z.string().refine((v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n > 0;
+  }, 'Ingresá un monto válido.'),
+  fecha: z.string().min(1, 'Seleccioná una fecha.'),
+  descripcion: z.string().max(240, 'La descripción no puede superar los 240 caracteres.').optional().default(''),
+  esRecurrente: z.boolean(),
+  repeatPreset: z.string(),
+  repeatFrequency: z.string(),
+  repeatInterval: z.number(),
+  repeatByweekday: z.array(z.number()),
+});
+
+type GastoFormValues = z.infer<typeof gastoFormSchema>;
+
+const getGastoFormDefaults = (): GastoFormValues => ({
+  tipoCosto: 'fijo',
+  categoria: '',
+  monto: '',
+  fecha: format(new Date(), 'yyyy-MM-dd'),
+  descripcion: '',
+  esRecurrente: false,
+  repeatPreset: 'monthly',
+  repeatFrequency: 'weekly',
+  repeatInterval: 1,
+  repeatByweekday: [],
+});
+
 export function GastosPanel() {
   const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
   const requirePinForAction = useRequirePinForAction();
@@ -105,168 +141,215 @@ export function GastosPanel() {
     setSyncRecurrentes(syncGastosRecurrentes);
   }, [setSyncRecurrentes, syncGastosRecurrentes]);
 
-  const [tipoCosto, setTipoCosto] = useState<TipoCosto>('fijo');
-  const [categoria, setCategoria] = useState('');
-  const [monto, setMonto] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [submitting, setSubmitting] = useState(false);
-
-  // Recurrence state
-  const [esRecurrente, setEsRecurrente] = useState(false);
-  const [repeatPreset, setRepeatPreset] = useState('monthly');
-  const [repeatFrequency, setRepeatFrequency] = useState('weekly');
-  const [repeatInterval, setRepeatInterval] = useState(1);
-  const [repeatByweekday, setRepeatByweekday] = useState<number[]>([]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [repeatPickerOpen, setRepeatPickerOpen] = useState(false);
   const [customRepeatOpen, setCustomRepeatOpen] = useState(false);
 
+  const form = useForm<GastoFormValues>({
+    resolver: zodResolver(gastoFormSchema),
+    defaultValues: getGastoFormDefaults(),
+  });
+
+  // Resync el formulario en cada apertura — evita arrastrar valores del gasto anterior.
+  useEffect(() => {
+    if (isFormOpen) {
+      form.reset(getGastoFormDefaults());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormOpen]);
+
+  const tipoCostoWatch = form.watch('tipoCosto');
+  const esRecurrenteWatch = form.watch('esRecurrente');
+
   const handleTipoCostoChange = (value: TipoCosto) => {
-    setTipoCosto(value);
-    setCategoria('');
+    form.setValue('tipoCosto', value, { shouldDirty: true });
+    form.setValue('categoria', '', { shouldDirty: true });
     if (value !== 'fijo') {
-      setEsRecurrente(false);
+      form.setValue('esRecurrente', false, { shouldDirty: true });
     }
   };
 
   const getRepeatDisplayLabel = () => {
-    if (repeatPreset === 'custom') {
-      return getCustomRepeatLabel(repeatFrequency, repeatInterval, repeatByweekday);
+    const preset = form.watch('repeatPreset');
+    if (preset === 'custom') {
+      return getCustomRepeatLabel(form.watch('repeatFrequency'), form.watch('repeatInterval'), form.watch('repeatByweekday'));
     }
-    return getRepeatLabel(repeatPreset);
+    return getRepeatLabel(preset);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!categoria || !monto) return;
+  const closeForm = () => setIsFormOpen(false);
 
-    setSubmitting(true);
-
-    if (esRecurrente && tipoCosto === 'fijo') {
+  const onSubmit = async (values: GastoFormValues) => {
+    if (values.esRecurrente && values.tipoCosto === 'fijo') {
       // Create recurring template
       const success = await addRecurrente({
-        categoria,
-        tipo_costo: tipoCosto,
-        monto: parseFloat(monto),
-        descripcion: descripcion || undefined,
-        repeat_preset: repeatPreset,
-        repeat_frequency: repeatPreset === 'custom' ? repeatFrequency : undefined,
-        repeat_interval: repeatPreset === 'custom' ? repeatInterval : undefined,
-        repeat_byweekday: repeatPreset === 'custom' ? repeatByweekday : undefined,
-        fecha_inicio: fecha,
+        categoria: values.categoria,
+        tipo_costo: values.tipoCosto,
+        monto: parseFloat(values.monto),
+        descripcion: values.descripcion || undefined,
+        repeat_preset: values.repeatPreset,
+        repeat_frequency: values.repeatPreset === 'custom' ? values.repeatFrequency : undefined,
+        repeat_interval: values.repeatPreset === 'custom' ? values.repeatInterval : undefined,
+        repeat_byweekday: values.repeatPreset === 'custom' ? values.repeatByweekday : undefined,
+        fecha_inicio: values.fecha,
       });
 
-      if (success) {
-        resetForm();
-      }
+      if (success) closeForm();
     } else {
       // Normal single gasto
       const gate = await requirePinForAction('registrar_gasto', currentSucursal?.id ?? null);
-      if (!gate.ok) { setSubmitting(false); return; }
+      if (!gate.ok) return;
       const success = await addGasto({
-        categoria,
-        monto: parseFloat(monto),
-        descripcion,
-        fecha: new Date(fecha + 'T12:00:00'),
-        tipoCosto,
+        categoria: values.categoria,
+        monto: parseFloat(values.monto),
+        descripcion: values.descripcion || '',
+        fecha: new Date(values.fecha + 'T12:00:00'),
+        tipoCosto: values.tipoCosto,
       });
 
-      if (success) {
-        resetForm();
-      }
+      if (success) closeForm();
     }
-    setSubmitting(false);
-  };
-
-  const resetForm = () => {
-    setCategoria('');
-    setMonto('');
-    setDescripcion('');
-    setFecha(format(new Date(), 'yyyy-MM-dd'));
-    setEsRecurrente(false);
-    setRepeatPreset('monthly');
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Formulario */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Registrar gasto</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tipo de costo *</Label>
-              <Select value={tipoCosto} onValueChange={handleTipoCostoChange}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fijo">🧱 Fijo</SelectItem>
-                  <SelectItem value="variable">📈 Variable</SelectItem>
-                  <SelectItem value="semivariable">⚖️ Semivariable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-foreground">Gastos</h3>
+        <Button size="sm" onClick={() => setIsFormOpen(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Registrar gasto
+        </Button>
+      </div>
 
-            <div className="space-y-2">
-              <Label>Categoría *</Label>
-              <Select value={categoria} onValueChange={setCategoria}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIAS_POR_TIPO[tipoCosto].map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <DrawerForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        title="Registrar gasto"
+        size="md"
+        isDirty={form.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={closeForm} disabled={form.formState.isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="gasto-form" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Registrando...' : esRecurrenteWatch ? 'Crear gasto recurrente' : 'Registrar gasto'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...form}>
+          <form id="gasto-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="tipoCosto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de costo</FormLabel>
+                  <Select value={field.value} onValueChange={handleTipoCostoChange}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="fijo">🧱 Fijo</SelectItem>
+                      <SelectItem value="variable">📈 Variable</SelectItem>
+                      <SelectItem value="semivariable">⚖️ Semivariable</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2">
-              <Label>Monto *</Label>
-              <CurrencyInput
-                placeholder="0"
-                value={monto}
-                onChange={setMonto}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="categoria"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoría</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar categoría" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CATEGORIAS_POR_TIPO[tipoCostoWatch].map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2">
-              <Label>{esRecurrente ? 'Fecha de inicio' : 'Fecha'}</Label>
-              <Input
-                type="date"
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="monto"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto</FormLabel>
+                  <FormControl>
+                    <CurrencyInput placeholder="0" value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Descripción (opcional)</Label>
-              <Textarea
-                placeholder="Detalle del gasto..."
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                rows={2}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="fecha"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{esRecurrenteWatch ? 'Fecha de inicio' : 'Fecha'}</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      maxLength={240}
+                      placeholder="Detalle del gasto..."
+                      rows={2}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Recurrence toggle - only for fijo */}
-            {tipoCosto === 'fijo' && (
+            {tipoCostoWatch === 'fijo' && (
               <div className="sm:col-span-2 space-y-3">
-                <div className="flex items-center gap-3">
-                  <Switch
-                    checked={esRecurrente}
-                    onCheckedChange={setEsRecurrente}
-                  />
-                  <Label className="flex items-center gap-2 cursor-pointer" onClick={() => setEsRecurrente(!esRecurrente)}>
-                    <Repeat className="h-4 w-4" />
-                    Gasto recurrente
-                  </Label>
-                </div>
+                <FormField
+                  control={form.control}
+                  name="esRecurrente"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormLabel className="!mt-0 flex cursor-pointer items-center gap-2">
+                        <Repeat className="h-4 w-4" />
+                        Gasto recurrente
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
 
-                {esRecurrente && (
+                {esRecurrenteWatch && (
                   <div className="flex items-center gap-2">
                     <Label className="text-sm text-muted-foreground">Repetir:</Label>
                     <Button
@@ -281,16 +364,9 @@ export function GastosPanel() {
                 )}
               </div>
             )}
-
-            <div className="sm:col-span-2">
-              <Button type="submit" disabled={submitting || !categoria || !monto}>
-                <Plus className="h-4 w-4 mr-2" />
-                {submitting ? 'Registrando...' : esRecurrente ? 'Crear gasto recurrente' : 'Registrar gasto'}
-              </Button>
-            </div>
           </form>
-        </CardContent>
-      </Card>
+        </Form>
+      </DrawerForm>
 
       {/* Gastos recurrentes list */}
       <GastosRecurrentesList
@@ -406,22 +482,22 @@ export function GastosPanel() {
       <RepeatPicker
         open={repeatPickerOpen}
         onOpenChange={setRepeatPickerOpen}
-        value={repeatPreset}
-        onChange={(val) => setRepeatPreset(val)}
+        value={form.watch('repeatPreset')}
+        onChange={(val) => form.setValue('repeatPreset', val, { shouldDirty: true })}
         onCustom={() => setCustomRepeatOpen(true)}
       />
 
       <CustomRepeatSheet
         open={customRepeatOpen}
         onOpenChange={setCustomRepeatOpen}
-        frequency={repeatFrequency}
-        interval={repeatInterval}
-        byweekday={repeatByweekday}
+        frequency={form.watch('repeatFrequency')}
+        interval={form.watch('repeatInterval')}
+        byweekday={form.watch('repeatByweekday')}
         onConfirm={(freq, interval, days) => {
-          setRepeatPreset('custom');
-          setRepeatFrequency(freq);
-          setRepeatInterval(interval);
-          setRepeatByweekday(days);
+          form.setValue('repeatPreset', 'custom', { shouldDirty: true });
+          form.setValue('repeatFrequency', freq, { shouldDirty: true });
+          form.setValue('repeatInterval', interval, { shouldDirty: true });
+          form.setValue('repeatByweekday', days, { shouldDirty: true });
         }}
       />
 

@@ -2174,3 +2174,338 @@ sucursal — no se conectó a ningún `DrawerForm`, tal como se pidió.
 ### Validación
 
 `npx tsc --noEmit` — limpio.
+
+---
+
+## Fase 4 - Tanda 2 - Build 3b (Horarios) — 2026-07-13
+
+Cuarto y último build de la Parte 1 (Configuración). Migra `DayEditSheet`
+(el editor por día dentro de `HorariosTrabajoSection.tsx`) de Sheet crudo
+con autosave instantáneo a `DrawerForm` + React Hook Form + Zod, con botón
+"Guardar cambios" explícito — decisión ya tomada en la sesión del canon
+(Fase 3), que este build ejecuta. Resuelve además el select de barbero
+mudo detectado en la auditoría de Parte 1.
+
+### Archivo modificado
+
+- `src/components/config/HorariosTrabajoSection.tsx` (único archivo del
+  build, por candado de alcance)
+
+### `DayEditSheet` — de autosave a Guardar explícito
+
+Antes: cada `onChange` (Switch de activo, input de hora inicio/fin, alta o
+borrado de rango) llamaba a Supabase directamente, sin acumular estado
+local ni validar forma. Ahora: `Sheet` crudo → `DrawerForm size="md"`,
+estado acumulado en un único `useForm<DayFormValues>` con
+`useFieldArray({ name: 'ranges' })` — un rango por fila del array, cada uno
+con `dbId` (id real si ya existía en la base, `undefined` si es un rango
+nuevo agregado en esta sesión de edición), `hora_inicio`, `hora_fin` y
+`activo`. "Agregar rango" y el ícono de papelera ahora solo
+`append`/`remove` en el array local — no tocan Supabase hasta que se
+confirma "Guardar cambios".
+
+**Validación (`dayFormSchema`, Zod + `superRefine`):** dos reglas, ambas
+inline por fila vía `FormMessage`, reemplazando los `toast.error`
+imperativos que tenía `updateRange` antes:
+- `hora_fin` debe ser mayor que `hora_inicio` de la misma fila (antes:
+  `toast.error('La hora fin debe ser mayor que la de inicio')`).
+- Ningún rango se superpone con otro del mismo día — mismo algoritmo que
+  `hasOverlap` (ordenar por inicio, comparar con el anterior), pero
+  reimplementado dentro del `superRefine` para poder anclar el error al
+  índice de fila exacto en vez de solo devolver un booleano; el mensaje
+  ("Este rango se superpone con otro.") queda en el campo `hora_inicio` de
+  la fila que arranca después. `hasOverlap` (la función a nivel de módulo)
+  **no se tocó** — sigue siendo la que usa `QuickApplyCard`, sin cambios,
+  por el candado de alcance.
+
+**Desvío del comportamiento anterior, señalado y no oculto:** `addRange`
+tenía antes un guard imperativo — si el rango auto-calculado (a partir del
+fin del último rango existente, +4hs, tope 23:00) no dejaba espacio
+(`newStart >= newEnd`), bloqueaba el alta con
+`toast.error('No hay espacio para otro rango')` y no agregaba nada. Ahora
+el rango se agrega igual al array local, y si resulta inválido lo marca el
+mismo mecanismo inline del `superRefine` al intentar guardar (mismo
+mensaje de "hora fin debe ser mayor que la de inicio" que cualquier otro
+rango inválido). Es un cambio de UX menor (el bloqueo pasa de ser
+preventivo a ser detectado al guardar) pero consistente con el criterio
+"campo → inline" que pedía esta migración — antes esto era de los pocos
+casos de validación de formulario que usaba toast en vez de inline.
+
+**Persistencia al guardar:** `onSubmit` compara el array final contra un
+snapshot de los rangos originales tomado al abrir el sheet
+(`originalRangesRef`, cargado en el mismo `useEffect` que hace
+`form.reset`, gateado por `open && dia` como en los demás consumidores)
+y arma 3 lotes: `delete` por los `id` que ya no están en el array final,
+`insert` para las filas sin `dbId`, `update` fila por fila para las que
+cambiaron `hora_inicio`/`hora_fin`/`activo` respecto del snapshot. Errores
+de cualquiera de los 3 → `toast.error('Error al guardar el horario')`
+(servidor/red → toast, según el criterio); éxito → `toast.success`,
+`onChanged()` (refetch del padre) y cierre del drawer — mismo patrón que
+`BloqueosSection.onSubmit`.
+
+**Guard de doble submit y loading:** `disabled={form.formState.isSubmitting}`
+en ambos botones del footer, con el label del botón principal alternando
+"Guardar cambios" / "Guardando..." — mismo patrón que el resto de los
+formularios ya migrados en esta tanda.
+
+**`isDirty` conectado:** `isDirty={form.formState.isDirty}` en el
+`DrawerForm`, para que cerrar por X/click afuera/Escape con cambios sin
+guardar dispare "¿Descartar cambios?" (antes no aplicaba: con autosave no
+existía el concepto de "sin guardar"). El botón "Cancelar" del footer sigue
+el mismo patrón que los otros 16 consumidores de la Fase 4 — llama
+`onOpenChange(false)` directo, sin pasar por la confirmación. Con este
+build, `DayEditSheet` pasa a ser el **17º consumidor** del mecanismo de
+confirmación al cerrar (el conteo de "16 consumidores" de la sección
+anterior queda como estaba: es una foto de ese build, no se reescribió).
+
+### Select de barbero mudo (tab "Por barbero") — resuelto
+
+`activeBarbers` (nuevo, `barbers.filter(b => b.active)`) reemplaza el
+`barbers.filter(b => b.active)` inline que estaba directo en el `.map()`.
+Si `activeBarbers.length === 0`, el `Select` se reemplaza por
+`EmptySelectHint` (`src/components/agenda/EmptySelectHint.tsx`, importado
+cross-carpeta desde `config/`, mismo patrón ya usado por
+`AgendaManagement.tsx`) con el mismo mensaje/CTA/acción que
+`UnavailableSlotDialog.tsx` usa para el mismo caso ("No hay barberos
+activos en esta sucursal." / "Añadir miembro del equipo" /
+`toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar
+barberos.')`) — no se inventó copy nuevo, se reusó el existente.
+
+### `QuickApplyCard` — sin ningún cambio
+
+Confirmado: no se tocó una sola línea del componente ni de su `hasOverlap`
+compartido, tal como fijaba el candado de alcance.
+
+### Validación
+
+`npx tsc --noEmit` — limpio.
+
+---
+
+## Cierre de la Parte 1 — Tanda 2: Configuración (2026-07-13)
+
+Los 4 builds de la Parte 1 quedan cerrados:
+
+- **Build 1 (Catálogo):** Servicios, Líneas, Extras y Descuentos (los 4 ya
+  eran `DrawerForm`) migraron de `useState` + `toast.error` a RHF+Zod con
+  errores inline (`ui/form.tsx`), y el quick-create "Nueva línea" de
+  Servicios migró además de contenedor (Dialog → DrawerForm). Guard de
+  doble submit parejo en los 4 vía `form.formState.isSubmitting`.
+- **Build 2 (Productos + Marcas):** los 2 formularios de Producto (por
+  sucursal y global, confirmado que no se fusionan) y
+  `MarcasManagerDialog` migraron a DrawerForm + RHF/Zod; los 3 campos que
+  comparten Producto-sucursal y Producto-global se unificaron en
+  `productSharedFields.ts`. Cambio aditivo no pedido: `footer` de
+  `DrawerForm` pasó a ser opcional (lo necesitaba `MarcasManagerDialog`,
+  que no tiene barra de acciones fija).
+- **Build 3a:** Métodos de pago, Ausencias/Bloqueos, Comisión por equipo,
+  Comisión por productos y el editor rápido de línea migraron a RHF+Zod;
+  Bloqueos y las 2 Comisiones pasaron de "inline en página" a
+  entidad-en-lista (resumen + `DrawerForm`), igualándose al resto del
+  cluster. `PinConfigSection.tsx` quedó explícitamente afuera. Mismo build
+  en el que se implementó el mecanismo de confirmación al cerrar
+  (`isDirty` en `DrawerForm`) y se conectó a los 16 consumidores que ya
+  estaban en RHF en ese momento.
+- **Build 3b (Horarios):** `DayEditSheet` perdió el autosave instantáneo y
+  migró a `DrawerForm` + RHF/Zod con botón "Guardar cambios" explícito —
+  la única decisión de esta parte que quitaba una funcionalidad (autosave)
+  en vez de sumar validación sobre el mismo comportamiento. Se conectó como
+  17º consumidor de `isDirty`. Se resolvió el select de barbero mudo con
+  `EmptySelectHint`. `QuickApplyCard` quedó fuera de la migración por
+  decisión explícita (no es un formulario de alta/edición clásico).
+
+**Estado final del cluster de Configuración:** los 14 formularios
+relevados en la auditoría de Parte 1 (§1) están en `DrawerForm` + RHF/Zod,
+con errores de campo inline y errores de servidor/red por toast, guard de
+doble submit consistente (`form.formState.isSubmitting`), y — donde aplica
+un `DrawerForm` con campos editables — conectados al mecanismo de
+confirmación al cerrar. Quedan fuera por decisión explícita:
+`PinConfigSection.tsx` (Build 3a) y `QuickApplyCard` (Build 3b, no es un
+formulario de entidad). `ProductoPickerDialog.tsx` sigue bloqueado por ser
+compartido con Cobrar (Tanda 1, fuera de alcance de esta parte).
+
+---
+
+## Fase 4 - Tanda 2 - Parte 2: Finanzas (Sueldos, Gastos, Inversiones, Deudas) (auditoría 2026-07-17)
+
+> Relevamiento puro contra los criterios ya cerrados (sombras/z-index/Inter/
+> timing, RHF+Zod, errores campo→inline/servidor→toast, "(opcional)" en no
+> obligatorios, selects vacíos con mensaje+CTA, maxLength 80/120/240/1500,
+> DrawerForm único canon salvo Cobrar/BackfillWizard/PinConfigSection, guard
+> de doble submit, confirmación al cerrar vía `isDirty`, Producto como caso
+> de 2 formularios separados a propósito). Sin implementación. Método:
+> lectura completa de los 4 archivos de panel (`SueldosPanel.tsx`,
+> `GastosPanel.tsx` + `GastosRecurrentesList.tsx`, `InversionesPanel.tsx`,
+> `DeudasPanel.tsx`) al 2026-07-17 — no de la auditoría vieja de Fase 3, que
+> se usó solo como punto de partida y quedó parcialmente desactualizada
+> (ver §2).
+
+### 1. Tabla por formulario
+
+| Formulario | Contenedor actual → destino | Validación actual | maxLength | Obligatorio | Guard doble submit | Selects vacíos |
+|---|---|---|---|---|---|---|
+| Registrar Pago de Sueldo (`SueldosPanel.tsx:985`) | Dialog centrado → DrawerForm | toast-only (`toast.error('Complete todos los campos requeridos')` / `'Ingrese un monto válido'`) | ❌ Concepto sin maxLength | "Empleado \*"/"Monto \*" con asterisco (variante incorrecta); "Concepto (opcional)" ✅ | ✅ `disabled={isSubmitting}` (manual, no RHF) | Select de empleado (`barbers.map`) sin fallback si `barbers` está vacío — queda mudo |
+| Registrar gasto (`GastosPanel.tsx:193`) | **Card siempre visible** (sin toggle) → DrawerForm | ninguna visible — `if (!categoria \|\| !monto) return` silencioso; el botón ya viene `disabled` por la misma condición, así que el guard nunca llega a mostrar feedback | ❌ Descripción sin maxLength | "Tipo de costo \*"/"Categoría \*"/"Monto \*" con asterisco; "Descripción (opcional)" ✅ | ✅ `disabled={submitting \|\| !categoria \|\| !monto}` (manual) | N/A — Tipo de costo y Categoría son arrays hardcodeados, nunca vacíos |
+| ↳ Anular gasto (`GastosPanel.tsx:428`, Dialog) | Dialog centrado → DrawerForm (¿o excepción por ser acción de 1 campo, no alta/edición? no lo resuelvo) | toast implícito vía el hook (`anularGasto`) | Motivo 240 ✅ **con contador visible** ("X/240") — único del cluster con contador | "Motivo de anulación" sin marca ✅ (correcto, es obligatorio) | ✅ `disabled={anulando \|\| !anularState?.motivo.trim()}` | N/A |
+| Nueva inversión (`InversionesPanel.tsx:99`) | **Card togglead** (`showForm`, no Dialog) → DrawerForm | ninguna visible — `if (!nombre \|\| !montoTotal \|\| !mesesAmortizacion) return` silencioso | ❌ Nombre/Descripción/Acreedor sin maxLength | "Nombre \*"/"Monto total \*"/"Meses de amortización \*"/"Acreedor \*" con asterisco; el resto de opcionales sin marca alguna (ni siquiera "(opcional)") | ❌ **ninguno** — `handleSubmit` es async, el botón solo valida campos, no hay estado de carga | N/A — Categoría es array hardcodeado |
+| Nueva deuda (`DeudasPanel.tsx:115`) | **Card togglead** (`showForm`, no Dialog) → DrawerForm | ninguna visible — `if (!acreedor \|\| !montoTotal) return` silencioso | Acreedor 80 ✅, Descripción 240 ✅ (sin contador visible, a diferencia de Anular gasto) | "Acreedor \*"/"Monto total \*" con asterisco; el resto sin marca | ❌ **ninguno** — mismo problema que Inversiones | N/A — sin selects (Acreedor es texto libre) |
+| Registrar pago de deuda (`RegistrarPagoDialog` en `DeudasPanel.tsx:230`) | Dialog centrado → DrawerForm | **inline** ✅ — `montoInvalido` con mensaje de error propio bajo el campo ("El monto debe ser mayor a 0" / "No puede superar el saldo pendiente") | Observación 240 ✅ | "Monto a pagar"/"Fecha de pago" sin marca ✅; "Observación (opcional)" ✅ — **el único formulario 100% alineado** a la convención obligatorio/opcional de todo el cluster | ✅ `disabled={submitting \|\| montoInvalido \|\| !fecha}` | N/A |
+
+**6 formularios en 4 archivos** (`SueldosPanel.tsx` 1, `GastosPanel.tsx` 2,
+`InversionesPanel.tsx` 1, `DeudasPanel.tsx` 2).
+
+### 2. Discrepancias con la auditoría vieja de Fase 3
+
+La nota del pedido decía "0 de 4 en DrawerForm (3 Dialog, 1 card siempre
+visible)". Verificado contra el código actual, **la clasificación de
+contenedores cambió**:
+
+- Solo **1** formulario de alta es un Dialog real: Registrar Pago de Sueldo.
+- Gastos sí es "card siempre visible", como decía la auditoría vieja.
+- **Inversiones y Deudas NO son Dialog — son un cuarto patrón**: `<Card>`
+  togglead por estado local (`showForm`), ni modal ni Sheet ni DrawerForm.
+  Es el mismo patrón "inline en página" que Configuración/Parte 1 ya había
+  identificado en `BloqueosSection`/`ComisionEquipoConfig`/etc. (hallazgo
+  #1 de esa parte) — la pregunta abierta de si el canon "DrawerForm sin
+  excepción" aplica también a este patrón sigue sin resolver, y ahora
+  aparece también acá.
+- Hay además **2 Dialog de acciones secundarias** que la nota original no
+  contaba como parte del "cluster de alta" pero sí son formularios reales
+  con validación propia: Anular gasto y Registrar pago de deuda.
+
+No corrijo el número original en la nota — lo señalo como desactualizado,
+como pidió el CONTEXTO ("puede haber cambiado").
+
+### 3. Hallazgos nuevos que no encajan en criterios ya cerrados
+
+1. **Convención obligatorio/opcional invertida en 4 de los 6 formularios**
+   (todos salvo Anular gasto y Registrar pago de deuda): los campos
+   obligatorios llevan asterisco (`"Nombre *"`, `"Monto *"`, etc.) en vez
+   de no llevar marca, y varios opcionales no llevan `"(opcional)"` en
+   absoluto (quedan sin ninguna indicación). Es el hallazgo más extendido
+   y parejo de todo el cluster — aparece en Sueldos, Gastos, Inversiones y
+   Deudas por igual.
+2. **Ningún formulario de alta usa RHF+Zod** — los 4 paneles validan con
+   `useState` + un `if` que corta en silencio o dispara un `toast`. El
+   único con un patrón de validación ya "casi correcto" es
+   `RegistrarPagoDialog` (inline, sin RHF pero con la forma final que RHF
+   debería producir).
+3. **El guard de doble submit no es parejo dentro del propio cluster**:
+   Sueldos y Gastos SÍ tienen guard manual (`isSubmitting`/`submitting`);
+   Inversiones y Deudas NO tienen ninguno. La auditoría vieja decía "sin
+   guard de doble submit en ninguno" — verificado, es más matizado: 2 de 4
+   ya lo tenían.
+4. **Patrones sanos a preservar** (para no perderlos en la migración):
+   - `RegistrarPagoDialog` — error inline, convención obligatorio/opcional
+     correcta, guard de doble submit. Es el formulario más cerca del canon
+     de todo Finanzas, sin haber migrado a RHF todavía.
+   - Anular gasto — único con contador de caracteres visible ("X/240").
+   - Nueva deuda — Acreedor (80) y Descripción (240) ya tienen los
+     maxLength correctos, a diferencia de sus equivalentes en Inversiones.
+   - "Monto por cuota" en Nueva deuda es un campo **calculado y de solo
+     lectura** (no un input editable) — evita que se pueda cargar un dato
+     inconsistente con monto total/cuotas. Buen patrón, no una omisión.
+5. **Cruce de entidades dentro de un mismo formulario**: el checkbox
+   "¿Financiada?" en Nueva inversión crea, dentro del mismo `handleSubmit`,
+   una Deuda asociada llamando a `useDeudas().addDeuda`. Es el caso
+   inverso a la decisión ya tomada para Producto (2 formularios separados
+   a propósito) — acá es **1 formulario que persiste en 2 entidades**. No
+   propongo fusionar ni separar; lo señalo porque migrar esto a RHF+Zod
+   requiere decidir cómo modelar la validación condicional de los campos
+   de deuda (Zod `.refine()` condicional o similar) — es una decisión de
+   la fase de plan, no de esta auditoría.
+6. **`GastosRecurrentesList.tsx` no tiene confirmación al eliminar** — el
+   ícono de basura llama `onDelete(r.id)` directo, sin `AlertDialog`. Es
+   una inconsistencia frente a Inversiones y Deudas, que sí confirman sus
+   eliminaciones con `AlertDialog`. No es un formulario de alta/edición
+   (por eso no tiene fila en la tabla del §1), pero es una acción
+   destructiva sin el patrón que el resto del cluster ya usa — lo marco
+   para que se decida si entra en el mismo build o queda para después.
+
+### 4. Estimación de archivos
+
+**4 archivos núcleo** tocarían contenedor + validación: `SueldosPanel.tsx`,
+`GastosPanel.tsx` (2 formularios, alta + anular), `InversionesPanel.tsx`,
+`DeudasPanel.tsx` (2 formularios, alta + registrar pago). Si se decide
+resolver el hallazgo #6, se suma `GastosRecurrentesList.tsx` (agregar un
+`AlertDialog`, sin tocar RHF ya que no tiene campos de formulario).
+
+**Conviene partir en más de un build**, por acoplamiento real entre
+archivos, no por tamaño:
+
+- **Build A — Sueldos + Gastos**: Sueldos es standalone. Gastos trae 2
+  formularios en el mismo archivo (alta + anular) más el picker de
+  recurrencia (`RepeatPicker`/`CustomRepeatSheet`, ya migrados aparte, no
+  se tocan) — conviene resolverlos juntos porque comparten el mismo
+  `resetForm`/estado del archivo.
+- **Build B — Inversiones + Deudas**: acoplados por el cruce de entidades
+  del hallazgo #5 (Inversión → Deuda) y por ser los 2 únicos con el mismo
+  patrón de "card togglead" a resolver — conviene decidir el contenedor y
+  el modelo de validación condicional una sola vez y aplicarlo a ambos.
+
+El hallazgo #6 (confirmación de borrado en recurrentes) puede ir en
+cualquiera de los dos builds o quedar como mejora aparte — no bloquea a
+ninguno.
+
+---
+
+## Fase 4 - Tanda 2 - Parte 2 - Build A (Sueldos + Gastos) — 2026-07-17
+
+**3 archivos modificados:** `SueldosPanel.tsx`, `GastosPanel.tsx`,
+`GastosRecurrentesList.tsx`. `InversionesPanel.tsx`/`DeudasPanel.tsx` no
+se tocaron (van en Build B). Validación: `npx tsc --noEmit` limpio.
+
+### 1. Sueldos (`SueldosPanel.tsx`)
+
+Dialog de "Registrar Pago de Sueldo" → `DrawerForm` (`size="sm"`),
+validación con RHF+Zod (`pagoSueldoSchema`: `barberoId` requerido,
+`monto` con `.refine()` a número > 0, `concepto` opcional con `max(240)`).
+
+- **Reset corregido**: `useEffect(() => { if (isPagoDrawerOpen) pagoForm.reset(pagoSueldoDefaults); }, [isPagoDrawerOpen])` — mismo patrón que `UnavailableSlotDialog.tsx` (sync sobre `open`). Ya no arrastra el empleado/monto/concepto del pago anterior.
+- **maxLength**: se agregó `240` a Concepto (hueco no pedido explícitamente en el ticket de este build, pero es el mismo campo tipo "motivo/descripción" que el resto del sistema ya trae a 240 — se corrigió de una vez ya que se estaba reescribiendo el campo entero a RHF).
+- **Asterisco → sin marca**: "Empleado"/"Monto" perdieron el `*`; "Concepto (opcional)" ya estaba bien y se mantuvo.
+- **Selects vacíos resuelto**: si `barbers.length === 0`, se muestra `EmptySelectHint` ("No hay empleados activos." + CTA) en vez de un Select mudo — mismo componente y mensaje que ya usa Agenda.
+- **Guard de doble submit**: pasó de `isSubmitting` manual a `pagoForm.formState.isSubmitting` (automático de RHF).
+- **`isDirty` conectado**: `isDirty={pagoForm.formState.isDirty}` en el `DrawerForm`. El botón "Cancelar" del footer sigue cerrando directo (`setIsPagoDrawerOpen(false)`), sin pasar por la confirmación — mismo criterio que el resto de los `DrawerForm` ya migrados.
+
+### 2. Gastos (`GastosPanel.tsx`)
+
+La card "Registrar gasto" **siempre visible** pasó a un botón "+ Registrar
+gasto" que abre un `DrawerForm` (`size="md"`) — mismo patrón de header +
+botón que ya usan Inversiones/Deudas (aunque esos paneles no se tocaron en
+este build, se alineó el disparador para no introducir un cuarto estilo
+distinto). Validación con RHF+Zod (`gastoFormSchema`): `tipoCosto`
+(`enum`), `categoria` requerida, `monto` con `.refine()` > 0, `fecha`
+requerida, `descripcion` opcional con `max(240)`, más `esRecurrente` y
+los 4 campos de recurrencia (`repeatPreset`/`repeatFrequency`/
+`repeatInterval`/`repeatByweekday`) — **se incluyeron en el schema**, no
+se dejaron como estado suelto, para que cambiarlos cuente como "cambios
+sin guardar" (`isDirty`) igual que cualquier otro campo.
+
+- **Hueco de maxLength completado**: Descripción pasó de sin límite a `240` (escala de "descripciones/motivos"), con contador visible `X/240` — mismo patrón que `Motivo (opcional)` en Ausencias/Bloqueos y otros ya migrados.
+- **Asterisco → sin marca**: "Tipo de costo"/"Categoría"/"Monto" perdieron el `*`; "Descripción (opcional)" ya estaba bien.
+- **`RepeatPicker`/`CustomRepeatSheet` sin tocar** (ya eran componentes propios migrados de `tareas/`) — solo se re-cableó su `value`/`onChange` desde `form.watch()`/`form.setValue(..., { shouldDirty: true })` en vez de `useState` suelto.
+- **Selects vacíos**: no aplica — Tipo de costo y Categoría son arrays hardcodeados (`CATEGORIAS_POR_TIPO`), nunca vacíos, como ya decía la auditoría.
+- **Guard de doble submit**: `submitting` manual → `form.formState.isSubmitting`.
+- **`isDirty` conectado**: igual que Sueldos, Cancelar bypasea la confirmación.
+- **`Anular gasto` (Dialog aparte, mismo archivo) — sin tocar**, tal como pedía el ticket. Sigue con su `maxLength=240` + contador ya correcto y sin asterisco (ya estaba bien).
+
+### 3. Gastos recurrentes — confirmación de borrado (`GastosRecurrentesList.tsx`)
+
+El ícono de basura ya no llama `onDelete(id)` directo — abre un
+`AlertDialog` ("Eliminar gasto recurrente", con el nombre de la
+categoría) y solo borra al confirmar. Mismo patrón exacto que ya usan
+Inversiones/Deudas para sus propias eliminaciones (`AlertDialog` +
+`AlertDialogAction` con estilo `bg-destructive`). No se tocó RHF ni
+`DrawerForm` — no era un formulario, era la acción destructiva que
+faltaba confirmar (hallazgo #6 de la Parte 2).
+
+### Nota sobre el `Dialog` de "Anular gasto" (pendiente, no resuelto en este build)
+
+La auditoría de la Parte 2 había marcado una pregunta abierta: si "Anular
+gasto" (acción de 1 campo sobre una entidad ya existente, no un alta)
+debía migrar a `DrawerForm` o quedar como excepción legítima. El ticket
+de este build no lo pidió explícitamente y candado de alcance no lo
+nombra — se dejó **sin tocar**, todavía como `Dialog` centrado. Sigue
+pendiente de una decisión explícita, igual que el "cuarto tipo de
+contenedor" (card inline togglead) de Configuración/Inversiones/Deudas.
