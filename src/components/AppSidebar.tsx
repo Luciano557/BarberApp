@@ -278,7 +278,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               src="/LogotipoBlanco.png"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
-              className="h-16 w-16 shrink-0 object-contain"
+              className="h-20 w-20 shrink-0 object-contain"
             />
             {isMobile && (
               <button
