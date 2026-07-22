@@ -275,7 +275,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         >
           <div className="flex items-center justify-center">
             <img
-              src="/favicon.png"
+              src="/IsotipoBlanco.png"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
               className="h-5 w-5 shrink-0 object-contain"
@@ -293,9 +293,6 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               }}
               aria-hidden={railMode}
             >
-              <p className="min-w-0 truncate text-[15px] font-semibold leading-tight text-primary-foreground">
-                {organization?.name || 'Barbería'}
-              </p>
             </div>
             {isMobile && (
               <button
