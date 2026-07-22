@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { TrendingUp, Trash2, Plus, Package } from 'lucide-react';
 import { useInversiones, type Inversion } from '@/hooks/useInversiones';
 import { useDeudas } from '@/hooks/useDeudas';
@@ -16,74 +19,107 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { format } from 'date-fns';
 
 const CATEGORIAS = ['Mobiliario', 'Equipamiento', 'Reforma', 'Tecnología', 'Vehículo', 'Otro'];
+
+const inversionSchema = z
+  .object({
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+    montoTotal: z.string().refine((v) => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) && n > 0;
+    }, 'Ingresá un monto válido.'),
+    fechaCompra: z.string().min(1, 'Seleccioná una fecha.'),
+    mesesAmortizacion: z.string().refine((v) => {
+      const n = parseInt(v, 10);
+      return Number.isFinite(n) && n > 0;
+    }, 'Ingresá una cantidad de meses válida.'),
+    categoria: z.string().optional().default(''),
+    descripcion: z.string().max(240, 'La descripción no puede superar los 240 caracteres.').optional().default(''),
+    financiada: z.boolean(),
+    acreedor: z.string().max(80, 'El acreedor no puede superar los 80 caracteres.').optional().default(''),
+    cuotas: z.string().optional().default(''),
+    montoCuota: z.string().optional().default(''),
+    fechaProximoPago: z.string().optional().default(''),
+  })
+  .superRefine((data, ctx) => {
+    if (data.financiada && !data.acreedor.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'El acreedor es obligatorio para una inversión financiada.', path: ['acreedor'] });
+    }
+  });
+
+type InversionFormValues = z.infer<typeof inversionSchema>;
+
+const getInversionFormDefaults = (): InversionFormValues => ({
+  nombre: '',
+  montoTotal: '',
+  fechaCompra: format(new Date(), 'yyyy-MM-dd'),
+  mesesAmortizacion: '12',
+  categoria: '',
+  descripcion: '',
+  financiada: false,
+  acreedor: '',
+  cuotas: '',
+  montoCuota: '',
+  fechaProximoPago: '',
+});
 
 export function InversionesPanel() {
   const { inversiones, isLoading, addInversion, deleteInversion, getAmortizacionMensual, getMesesTranscurridos } = useInversiones();
   const { addDeuda } = useDeudas();
 
-  const [nombre, setNombre] = useState('');
-  const [montoTotal, setMontoTotal] = useState('');
-  const [fechaCompra, setFechaCompra] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [mesesAmortizacion, setMesesAmortizacion] = useState('12');
-  const [categoria, setCategoria] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [financiada, setFinanciada] = useState(false);
-  const [acreedor, setAcreedor] = useState('');
-  const [cuotas, setCuotas] = useState('');
-  const [montoCuota, setMontoCuota] = useState('');
-  const [fechaProximoPago, setFechaProximoPago] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [inversionAEliminar, setInversionAEliminar] = useState<Inversion | null>(null);
 
-  const resetForm = () => {
-    setNombre('');
-    setMontoTotal('');
-    setFechaCompra(format(new Date(), 'yyyy-MM-dd'));
-    setMesesAmortizacion('12');
-    setCategoria('');
-    setDescripcion('');
-    setFinanciada(false);
-    setAcreedor('');
-    setCuotas('');
-    setMontoCuota('');
-    setFechaProximoPago('');
-  };
+  const form = useForm<InversionFormValues>({
+    resolver: zodResolver(inversionSchema),
+    defaultValues: getInversionFormDefaults(),
+  });
 
-  const handleSubmit = async () => {
-    if (!nombre || !montoTotal || !mesesAmortizacion) return;
+  // Resync el formulario en cada apertura — evita arrastrar valores de la inversión anterior.
+  useEffect(() => {
+    if (isFormOpen) {
+      form.reset(getInversionFormDefaults());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormOpen]);
 
+  const financiadaWatch = form.watch('financiada');
+
+  const onSubmit = async (values: InversionFormValues) => {
     const inv = await addInversion({
-      nombre: nombre.trim(),
-      monto_total: parseFloat(montoTotal),
-      fecha_compra: new Date(fechaCompra),
-      meses_amortizacion: parseInt(mesesAmortizacion),
-      categoria: categoria || undefined,
-      descripcion: descripcion || undefined,
+      nombre: values.nombre.trim(),
+      monto_total: parseFloat(values.montoTotal),
+      fecha_compra: new Date(values.fechaCompra),
+      meses_amortizacion: parseInt(values.mesesAmortizacion, 10),
+      categoria: values.categoria || undefined,
+      descripcion: values.descripcion || undefined,
     });
 
-    if (inv && financiada && acreedor) {
+    // Mismo comportamiento de siempre: la Deuda se crea en el mismo submit, con los
+    // mismos datos (monto_total y fecha_compra de la inversión), solo cambió el
+    // contenedor/validación que envuelve al formulario — no se desarma la operación.
+    if (inv && values.financiada && values.acreedor.trim()) {
       await addDeuda({
-        acreedor: acreedor.trim(),
-        monto_total: parseFloat(montoTotal),
-        cuotas_totales: cuotas ? parseInt(cuotas) : undefined,
-        monto_cuota: montoCuota ? parseFloat(montoCuota) : undefined,
-        fecha_inicio: new Date(fechaCompra),
-        fecha_proximo_pago: fechaProximoPago ? new Date(fechaProximoPago) : undefined,
+        acreedor: values.acreedor.trim(),
+        monto_total: parseFloat(values.montoTotal),
+        cuotas_totales: values.cuotas ? parseInt(values.cuotas, 10) : undefined,
+        monto_cuota: values.montoCuota ? parseFloat(values.montoCuota) : undefined,
+        fecha_inicio: new Date(values.fechaCompra),
+        fecha_proximo_pago: values.fechaProximoPago ? new Date(values.fechaProximoPago) : undefined,
         inversion_id: inv.id,
       });
     }
 
     if (inv) {
-      resetForm();
-      setShowForm(false);
+      setIsFormOpen(false);
     }
   };
 
@@ -91,81 +127,190 @@ export function InversionesPanel() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground">Inversiones</h3>
-        <Button size="sm" onClick={() => setShowForm(!showForm)}>
+        <Button size="sm" onClick={() => setIsFormOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> Nueva
         </Button>
       </div>
 
-      {showForm && (
-        <Card>
-          <CardContent className="pt-6 space-y-4">
+      <DrawerForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        title="Nueva inversión"
+        size="md"
+        isDirty={form.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsFormOpen(false)} disabled={form.formState.isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="inversion-form" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...form}>
+          <form id="inversion-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Nombre *</Label>
-                <Input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Sillón nuevo" />
-              </div>
-              <div>
-                <Label>Monto total *</Label>
-                <CurrencyInput value={montoTotal} onChange={setMontoTotal} placeholder="0" />
-              </div>
-              <div>
-                <Label>Fecha de compra</Label>
-                <Input type="date" value={fechaCompra} onChange={e => setFechaCompra(e.target.value)} />
-              </div>
-              <div>
-                <Label>Meses de amortización *</Label>
-                <Input type="number" inputMode="numeric" value={mesesAmortizacion} onChange={e => setMesesAmortizacion(e.target.value)} placeholder="12" />
-              </div>
-              <div>
-                <Label>Categoría</Label>
-                <Select value={categoria} onValueChange={setCategoria}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>Descripción</Label>
-              <Textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Opcional" />
+              <FormField
+                control={form.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={80} placeholder="Ej: Sillón nuevo" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="montoTotal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monto total</FormLabel>
+                    <FormControl>
+                      <CurrencyInput value={field.value} onChange={field.onChange} placeholder="0" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fechaCompra"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha de compra</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mesesAmortizacion"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meses de amortización</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" {...field} placeholder="12" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="categoria"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoría (opcional)</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div className="flex items-center space-x-2 pt-2">
-              <Checkbox id="financiada" checked={financiada} onCheckedChange={v => setFinanciada(!!v)} />
-              <Label htmlFor="financiada" className="cursor-pointer">¿Financiada? (crea deuda asociada)</Label>
-            </div>
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} maxLength={240} placeholder="Detalle de la inversión..." />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {financiada && (
+            <FormField
+              control={form.control}
+              name="financiada"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0 pt-2">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={(v) => field.onChange(!!v)} />
+                  </FormControl>
+                  <FormLabel className="!mt-0 cursor-pointer">¿Financiada? (crea deuda asociada)</FormLabel>
+                </FormItem>
+              )}
+            />
+
+            {financiadaWatch && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 border-l-2 border-primary/20">
-                <div>
-                  <Label>Acreedor *</Label>
-                  <Input value={acreedor} onChange={e => setAcreedor(e.target.value)} placeholder="Ej: Banco Nación" />
-                </div>
-                <div>
-                  <Label>Cantidad de cuotas</Label>
-                  <Input type="number" inputMode="numeric" value={cuotas} onChange={e => setCuotas(e.target.value)} />
-                </div>
-                <div>
-                  <Label>Monto por cuota</Label>
-                  <CurrencyInput value={montoCuota} onChange={setMontoCuota} />
-                </div>
-                <div>
-                  <Label>Próximo pago</Label>
-                  <Input type="date" value={fechaProximoPago} onChange={e => setFechaProximoPago(e.target.value)} />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="acreedor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Acreedor</FormLabel>
+                      <FormControl>
+                        <Input {...field} maxLength={80} placeholder="Ej: Banco Nación" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="cuotas"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cantidad de cuotas (opcional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" inputMode="numeric" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="montoCuota"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monto por cuota (opcional)</FormLabel>
+                      <FormControl>
+                        <CurrencyInput value={field.value} onChange={field.onChange} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="fechaProximoPago"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Próximo pago (opcional)</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
-
-            <div className="flex gap-2 pt-2">
-              <Button onClick={handleSubmit} disabled={!nombre || !montoTotal || !mesesAmortizacion || (financiada && !acreedor)}>
-                Guardar
-              </Button>
-              <Button variant="outline" onClick={() => { resetForm(); setShowForm(false); }}>Cancelar</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          </form>
+        </Form>
+      </DrawerForm>
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Cargando...</p>

@@ -1,4 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Landmark, Trash2, Plus, CreditCard, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDeudas, type Deuda, type PagoDeuda } from '@/hooks/useDeudas';
 import { useInversiones } from '@/hooks/useInversiones';
@@ -20,66 +23,81 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { format } from 'date-fns';
 
 function formatARS(n: number): string {
   return new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
+const deudaSchema = z.object({
+  acreedor: z.string().trim().min(1, 'El acreedor es obligatorio.').max(80, 'El acreedor no puede superar los 80 caracteres.'),
+  montoTotal: z.string().refine((v) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) && n > 0;
+  }, 'Ingresá un monto válido.'),
+  cuotasTotales: z.string().optional().default(''),
+  fechaInicio: z.string().min(1, 'Seleccioná una fecha.'),
+  fechaProximoPago: z.string().optional().default(''),
+  descripcion: z.string().max(240, 'La descripción no puede superar los 240 caracteres.').optional().default(''),
+});
+
+type DeudaFormValues = z.infer<typeof deudaSchema>;
+
+const getDeudaFormDefaults = (): DeudaFormValues => ({
+  acreedor: '',
+  montoTotal: '',
+  cuotasTotales: '',
+  fechaInicio: format(new Date(), 'yyyy-MM-dd'),
+  fechaProximoPago: '',
+  descripcion: '',
+});
+
 export function DeudasPanel() {
   const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda, fetchPagosDeuda } = useDeudas();
   const { inversiones } = useInversiones();
 
-  const [acreedor, setAcreedor] = useState('');
-  const [montoTotal, setMontoTotal] = useState('');
-  const [cuotasTotales, setCuotasTotales] = useState('');
-  const [fechaInicio, setFechaInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [fechaProximoPago, setFechaProximoPago] = useState('');
-  const [descripcion, setDescripcion] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [deudaAEliminar, setDeudaAEliminar] = useState<Deuda | null>(null);
   const [deudaAPagar, setDeudaAPagar] = useState<Deuda | null>(null);
   const [mostrarPagadas, setMostrarPagadas] = useState(false);
 
+  const form = useForm<DeudaFormValues>({
+    resolver: zodResolver(deudaSchema),
+    defaultValues: getDeudaFormDefaults(),
+  });
+
+  // Resync el formulario en cada apertura — evita arrastrar valores de la deuda anterior.
+  useEffect(() => {
+    if (isFormOpen) {
+      form.reset(getDeudaFormDefaults());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFormOpen]);
+
   // Monto por cuota calculado
+  const montoTotalWatch = form.watch('montoTotal');
+  const cuotasTotalesWatch = form.watch('cuotasTotales');
   const montoCuotaCalculado = useMemo(() => {
-    const total = parseFloat(montoTotal);
-    const cuotas = parseInt(cuotasTotales);
+    const total = parseFloat(montoTotalWatch);
+    const cuotas = parseInt(cuotasTotalesWatch, 10);
     if (!isFinite(total) || !isFinite(cuotas) || cuotas <= 0 || total <= 0) return 0;
     return total / cuotas;
-  }, [montoTotal, cuotasTotales]);
+  }, [montoTotalWatch, cuotasTotalesWatch]);
 
-  const resetForm = () => {
-    setAcreedor('');
-    setMontoTotal('');
-    setCuotasTotales('');
-    setFechaInicio(format(new Date(), 'yyyy-MM-dd'));
-    setFechaProximoPago('');
-    setDescripcion('');
-  };
-
-  const handleSubmit = async () => {
-    if (!acreedor || !montoTotal) return;
+  const onSubmit = async (values: DeudaFormValues) => {
     const ok = await addDeuda({
-      acreedor: acreedor.trim(),
-      monto_total: parseFloat(montoTotal),
-      cuotas_totales: cuotasTotales ? parseInt(cuotasTotales) : undefined,
+      acreedor: values.acreedor.trim(),
+      monto_total: parseFloat(values.montoTotal),
+      cuotas_totales: values.cuotasTotales ? parseInt(values.cuotasTotales, 10) : undefined,
       monto_cuota: montoCuotaCalculado > 0 ? montoCuotaCalculado : undefined,
-      fecha_inicio: new Date(fechaInicio),
-      fecha_proximo_pago: fechaProximoPago ? new Date(fechaProximoPago) : undefined,
-      descripcion: descripcion || undefined,
+      fecha_inicio: new Date(values.fechaInicio),
+      fecha_proximo_pago: values.fechaProximoPago ? new Date(values.fechaProximoPago) : undefined,
+      descripcion: values.descripcion || undefined,
     });
     if (ok) {
-      resetForm();
-      setShowForm(false);
+      setIsFormOpen(false);
     }
   };
 
@@ -107,54 +125,121 @@ export function DeudasPanel() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground">Deudas Activas</h3>
-        <Button size="sm" onClick={() => setShowForm(!showForm)}>
+        <Button size="sm" onClick={() => setIsFormOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> Nueva
         </Button>
       </div>
 
-      {showForm && (
-        <Card>
-          <CardContent className="pt-6 space-y-4">
+      <DrawerForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        title="Nueva deuda"
+        size="md"
+        isDirty={form.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsFormOpen(false)} disabled={form.formState.isSubmitting}>
+              Cancelar
+            </Button>
+            <Button type="submit" form="deuda-form" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...form}>
+          <form id="deuda-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Acreedor *</Label>
-                <Input value={acreedor} onChange={e => setAcreedor(e.target.value)} placeholder="Ej: Banco Nación" maxLength={80} />
-              </div>
-              <div>
-                <Label>Monto total *</Label>
-                <CurrencyInput value={montoTotal} onChange={setMontoTotal} placeholder="0" />
-              </div>
-              <div>
-                <Label>Cantidad de cuotas</Label>
-                <Input type="number" inputMode="numeric" value={cuotasTotales} onChange={e => setCuotasTotales(e.target.value)} />
-              </div>
-              <div>
-                <Label>Monto por cuota</Label>
+              <FormField
+                control={form.control}
+                name="acreedor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Acreedor</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={80} placeholder="Ej: Banco Nación" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="montoTotal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monto total</FormLabel>
+                    <FormControl>
+                      <CurrencyInput value={field.value} onChange={field.onChange} placeholder="0" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="cuotasTotales"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cantidad de cuotas (opcional)</FormLabel>
+                    <FormControl>
+                      <Input type="number" inputMode="numeric" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormItem>
+                <FormLabel>Monto por cuota</FormLabel>
                 <div className="h-10 px-3 flex items-center rounded-md border border-input bg-muted text-sm text-muted-foreground">
                   {montoCuotaCalculado > 0 ? `$${formatARS(montoCuotaCalculado)}` : 'Se calcula automáticamente'}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Calculado en base al monto total y la cantidad de cuotas.</p>
-              </div>
-              <div>
-                <Label>Fecha inicio</Label>
-                <Input type="date" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} />
-              </div>
-              <div>
-                <Label>Próximo pago</Label>
-                <Input type="date" value={fechaProximoPago} onChange={e => setFechaProximoPago(e.target.value)} />
-              </div>
+              </FormItem>
+              <FormField
+                control={form.control}
+                name="fechaInicio"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fecha inicio</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fechaProximoPago"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Próximo pago (opcional)</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
-            <div>
-              <Label>Descripción</Label>
-              <Textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Opcional" maxLength={240} />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button onClick={handleSubmit} disabled={!acreedor || !montoTotal}>Guardar</Button>
-              <Button variant="outline" onClick={() => { resetForm(); setShowForm(false); }}>Cancelar</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <FormField
+              control={form.control}
+              name="descripcion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descripción (opcional)</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} maxLength={240} placeholder="Detalle de la deuda..." />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground text-right">{(field.value ?? '').length}/240</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </form>
+        </Form>
+      </DrawerForm>
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Cargando...</p>
@@ -257,16 +342,24 @@ function RegistrarPagoDialog({
   const [fecha, setFecha] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [observacion, setObservacion] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  // Valores iniciales de esta apertura, para detectar cambios sin guardar (isDirty del
+  // DrawerForm) sin tocar la lógica de validación de arriba, que ya está bien.
+  const [initial, setInitial] = useState({ monto: '', fecha: '', observacion: '' });
 
   // Reset on open
   useMemo(() => {
     if (deuda) {
-      setMonto(sugerido > 0 ? sugerido.toFixed(2) : '');
-      setFecha(format(new Date(), 'yyyy-MM-dd'));
+      const initMonto = sugerido > 0 ? sugerido.toFixed(2) : '';
+      const initFecha = format(new Date(), 'yyyy-MM-dd');
+      setMonto(initMonto);
+      setFecha(initFecha);
       setObservacion('');
+      setInitial({ monto: initMonto, fecha: initFecha, observacion: '' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deuda?.id]);
+
+  const isDirty = monto !== initial.monto || fecha !== initial.fecha || observacion !== initial.observacion;
 
   const montoNum = parseFloat(monto);
   const montoInvalido =
@@ -283,62 +376,14 @@ function RegistrarPagoDialog({
   };
 
   return (
-    <Dialog open={!!deuda} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Registrar pago</DialogTitle>
-          {deuda && (
-            <DialogDescription>
-              {deuda.acreedor} · Saldo pendiente ${formatARS(saldoPendiente)}
-              {deuda.cuotas_totales && deuda.cuotas_totales > 0 ? (
-                <> · Cuota {deuda.cuotas_pagadas + 1} de {deuda.cuotas_totales}</>
-              ) : null}
-            </DialogDescription>
-          )}
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-monto">Monto a pagar</Label>
-            <CurrencyInput
-              id="pago-monto"
-              value={monto}
-              onChange={setMonto}
-              placeholder="0,00"
-            />
-            {montoInvalido && monto !== '' && (
-              <p className="text-xs text-destructive">
-                {montoNum <= 0
-                  ? 'El monto debe ser mayor a 0'
-                  : 'No puede superar el saldo pendiente'}
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-fecha">Fecha de pago</Label>
-            <Input
-              id="pago-fecha"
-              type="date"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="pago-obs">Observación (opcional)</Label>
-            <Textarea
-              id="pago-obs"
-              value={observacion}
-              onChange={(e) => setObservacion(e.target.value)}
-              maxLength={240}
-              rows={2}
-              placeholder="Nota interna sobre este pago"
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
+    <DrawerForm
+      open={!!deuda}
+      onOpenChange={(open) => !open && onClose()}
+      title="Registrar pago"
+      size="sm"
+      isDirty={isDirty}
+      footer={
+        <div className="flex w-full justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancelar
           </Button>
@@ -348,9 +393,59 @@ function RegistrarPagoDialog({
           >
             Registrar pago
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      }
+    >
+      {deuda && (
+        <p className="text-xs text-muted-foreground mb-4">
+          {deuda.acreedor} · Saldo pendiente ${formatARS(saldoPendiente)}
+          {deuda.cuotas_totales && deuda.cuotas_totales > 0 ? (
+            <> · Cuota {deuda.cuotas_pagadas + 1} de {deuda.cuotas_totales}</>
+          ) : null}
+        </p>
+      )}
+
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-monto">Monto a pagar</Label>
+          <CurrencyInput
+            id="pago-monto"
+            value={monto}
+            onChange={setMonto}
+            placeholder="0,00"
+          />
+          {montoInvalido && monto !== '' && (
+            <p className="text-xs text-destructive">
+              {montoNum <= 0
+                ? 'El monto debe ser mayor a 0'
+                : 'No puede superar el saldo pendiente'}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-fecha">Fecha de pago</Label>
+          <Input
+            id="pago-fecha"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="pago-obs">Observación (opcional)</Label>
+          <Textarea
+            id="pago-obs"
+            value={observacion}
+            onChange={(e) => setObservacion(e.target.value)}
+            maxLength={240}
+            rows={2}
+            placeholder="Nota interna sobre este pago"
+          />
+        </div>
+      </div>
+    </DrawerForm>
   );
 }
 
