@@ -266,7 +266,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             Persiste en el DOM en ambos estados: solo el padding del header
             y el bloque de texto (nombre) transicionan. */}
         <div
-          className="bg-primary py-4"
+          className="bg-primary py-2"
           style={{
             paddingLeft: railMode ? '0px' : '1rem',
             paddingRight: railMode ? '0px' : '1rem',
