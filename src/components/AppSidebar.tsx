@@ -278,22 +278,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               src="/IsotipoBlanco.PNG"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
-              className="h-12 w-12 shrink-0 object-contain"
+              className="h-15 w-15 shrink-0 object-contain"
             />
-            <div
-              className="min-w-0"
-              style={{
-                opacity: railMode ? 0 : 1,
-                marginLeft: railMode ? '0px' : '0.75rem',
-                // Mismo motivo que en renderNavItem: flex-basis explícito en
-                // vez de flex-1, para que el bloque de texto colapse a 0
-                // real y no corra el ícono del logo del centro.
-                flexBasis: railMode ? '0px' : '200px',
-                transition: textTransition(`margin-left 200ms ${SIZE_EASE}, flex-basis 200ms ${SIZE_EASE}`),
-              }}
-              aria-hidden={railMode}
-            >
-            </div>
             {isMobile && (
               <button
                 type="button"
