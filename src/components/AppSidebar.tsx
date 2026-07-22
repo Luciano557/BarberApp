@@ -273,19 +273,19 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             transition: `padding-left 200ms ${SIZE_EASE}, padding-right 200ms ${SIZE_EASE}`,
           }}
         >
-          <div className="flex items-center justify-center">
+          <div className="relative flex items-center justify-center">
             <img
               src="/IsotipoBlanco.PNG"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
-              className="h-11 w-11 shrink-0 object-contain"
+              className="h-13 w-13 shrink-0 object-contain"
             />
             {isMobile && (
               <button
                 type="button"
                 onClick={() => setCollapsed(true)}
                 aria-label="Cerrar navegación"
-                className="ml-2 grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                className="absolute right-0 top-0 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
