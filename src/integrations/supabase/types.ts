@@ -4589,6 +4589,17 @@ export type Database = {
         Args: { _action_key: string; _sucursal_id: string }
         Returns: undefined
       }
+      notif_emit_crm_sync_fallo: {
+        Args: {
+          _body: string
+          _metadata: Json
+          _organization_id: string
+          _sucursal_id: string
+          _title: string
+          _turno_id: string
+        }
+        Returns: undefined
+      }
       notif_emit_login_sucursal_account: {
         Args: { _sucursal_id: string }
         Returns: undefined

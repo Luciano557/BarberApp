@@ -66,6 +66,8 @@ const TYPE_META: Record<string, { label: string; icon: typeof ClipboardList; ton
   accion_bloqueada_permisos: { label: 'Acción bloqueada', icon: Lock, tone: 'text-status-warning-foreground' },
   inicio_sesion_cuenta_sucursal: { label: 'Inicio de sesión', icon: LogIn, tone: 'text-muted-foreground' },
   accion_autorizada_pin: { label: 'Acción autorizada con PIN', icon: KeyRound, tone: 'text-status-info-foreground' },
+  crm_sync_fallo: { label: 'Turno sin vínculo a cliente', icon: AlertTriangle, tone: 'text-status-warning-foreground' },
+
 };
 
 const TURNO_TYPES = new Set([
