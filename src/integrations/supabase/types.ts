@@ -3743,6 +3743,7 @@ export type Database = {
           cliente_nombre: string | null
           cliente_telefono: string | null
           created_at: string
+          crm_sync_error: string | null
           eligio_barbero: boolean
           estado: string
           fecha: string
@@ -3768,6 +3769,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          crm_sync_error?: string | null
           eligio_barbero?: boolean
           estado?: string
           fecha: string
@@ -3793,6 +3795,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          crm_sync_error?: string | null
           eligio_barbero?: boolean
           estado?: string
           fecha?: string
