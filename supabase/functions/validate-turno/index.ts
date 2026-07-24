@@ -395,7 +395,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ===== CRM sync failure: surface without blocking the reservation =====
+    // ===== CRM sync failure: log and persist without blocking the reservation =====
     if (crmFailure && turno) {
       const turnoId = (turno as any).id as string;
       const { stage, code, message } = crmFailure;
@@ -406,33 +406,8 @@ Deno.serve(async (req) => {
           .from('turnos')
           .update({ crm_sync_error: detalle })
           .eq('id', turnoId);
-
-        const bodyLines = [
-          `Cliente: ${nombreCompleto || finalNombre}`,
-          `Tel: ${finalTelefono}`,
-          finalEmail ? `Email: ${finalEmail}` : null,
-          `Turno: ${turnoId}`,
-          `Etapa: ${stage}`,
-        ].filter(Boolean).join('\n');
-
-        await supabase.rpc('notif_emit_crm_sync_fallo', {
-          _organization_id: organization_id,
-          _sucursal_id: sucursal_id,
-          _turno_id: turnoId,
-          _title: 'Turno creado sin vínculo a cliente',
-          _body: bodyLines,
-          _metadata: {
-            turno_id: turnoId,
-            stage,
-            error_code: code,
-            error_message: message,
-            cliente_nombre: nombreCompleto || finalNombre,
-            cliente_telefono: finalTelefono,
-            cliente_email: finalEmail,
-          },
-        });
       } catch (reportErr) {
-        console.error('[validate-turno][crm_sync_fallo][report_failed]', reportErr);
+        console.error('[validate-turno][crm_sync_fallo][persist_failed]', reportErr);
       }
     }
 
