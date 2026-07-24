@@ -736,22 +736,6 @@ export const NOTIFICATION_CATALOG: NotificationEventDef[] = [
     requiresDetails: true,
     sourceModule: 'seguridad',
   },
-  {
-    eventType: 'crm_sync_fallo',
-    category: 'sistema_seguridad',
-    label: 'Turno sin vínculo a cliente',
-    description: 'Cuando una reserva del portal público no logra sincronizar con la ficha del cliente y queda sin vínculo en el CRM.',
-    defaultEnabled: true,
-    configurable: true,
-    implemented: true,
-    phase: 4,
-    rolesAllowed: ['owner', 'general_manager', 'manager'],
-    showForSucursalAccount: true,
-    showForBarber: false,
-    sensitive: false,
-    requiresDetails: true,
-    sourceModule: 'agenda',
-  },
 ];
 
 
