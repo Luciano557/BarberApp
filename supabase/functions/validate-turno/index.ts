@@ -257,6 +257,9 @@ Deno.serve(async (req) => {
 
     // ===== CRM sync: phone-first match within org =====
     let clienteId: string | null = null;
+    type CrmFailure = { stage: 'insert_cliente' | 'update_cliente' | 'insert_relacion' | 'crm_sync'; code: string | null; message: string };
+    let crmFailure: CrmFailure | null = null;
+
     try {
       let cliente: any = null;
 
@@ -292,13 +295,13 @@ Deno.serve(async (req) => {
             telefono: finalTelefono,
             email: finalEmail,
             fecha_nacimiento: finalFechaNac,
-            origen: "portal_publico",
+            origen: "reserva",
             eliminado: false,
           })
           .select()
           .single();
         if (insertCliErr) {
-          console.error("CRM: insert cliente failed", insertCliErr);
+          crmFailure = { stage: 'insert_cliente', code: (insertCliErr as any).code ?? null, message: insertCliErr.message };
         } else {
           cliente = nuevo;
         }
@@ -315,7 +318,9 @@ Deno.serve(async (req) => {
           })
           .eq("id", cliente.id)
           .eq("organization_id", organization_id);
-        if (updErr) console.error("CRM: update cliente failed", updErr);
+        if (updErr) {
+          crmFailure = { stage: 'update_cliente', code: (updErr as any).code ?? null, message: updErr.message };
+        }
       }
 
       if (cliente) {
@@ -334,13 +339,19 @@ Deno.serve(async (req) => {
               organization_id,
               cliente_id: cliente.id,
               sucursal_id,
-              origen_relacion: "portal_publico",
+              origen_relacion: "reserva",
             });
-          if (relErr) console.error("CRM: insert clientes_sucursales failed", relErr);
+          if (relErr && !crmFailure) {
+            crmFailure = { stage: 'insert_relacion', code: (relErr as any).code ?? null, message: relErr.message };
+          }
         }
       }
     } catch (crmErr) {
-      console.error("CRM sync error (non-blocking):", crmErr);
+      crmFailure = {
+        stage: 'crm_sync',
+        code: (crmErr as any)?.code ?? null,
+        message: (crmErr as any)?.message ?? String(crmErr),
+      };
     }
 
     const nombreCompleto = [finalNombre, finalApellido].filter(Boolean).join(" ").trim();
@@ -384,10 +395,52 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ===== CRM sync failure: surface without blocking the reservation =====
+    if (crmFailure && turno) {
+      const turnoId = (turno as any).id as string;
+      const { stage, code, message } = crmFailure;
+      console.error('[validate-turno][crm_sync_fallo]', { turno_id: turnoId, stage, code, message });
+      try {
+        const detalle = JSON.stringify({ stage, code, message, at: new Date().toISOString() });
+        await supabase
+          .from('turnos')
+          .update({ crm_sync_error: detalle })
+          .eq('id', turnoId);
+
+        const bodyLines = [
+          `Cliente: ${nombreCompleto || finalNombre}`,
+          `Tel: ${finalTelefono}`,
+          finalEmail ? `Email: ${finalEmail}` : null,
+          `Turno: ${turnoId}`,
+          `Etapa: ${stage}`,
+        ].filter(Boolean).join('\n');
+
+        await supabase.rpc('notif_emit_crm_sync_fallo', {
+          _organization_id: organization_id,
+          _sucursal_id: sucursal_id,
+          _turno_id: turnoId,
+          _title: 'Turno creado sin vínculo a cliente',
+          _body: bodyLines,
+          _metadata: {
+            turno_id: turnoId,
+            stage,
+            error_code: code,
+            error_message: message,
+            cliente_nombre: nombreCompleto || finalNombre,
+            cliente_telefono: finalTelefono,
+            cliente_email: finalEmail,
+          },
+        });
+      } catch (reportErr) {
+        console.error('[validate-turno][crm_sync_fallo][report_failed]', reportErr);
+      }
+    }
+
     return new Response(
       JSON.stringify({ turno }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (e) {
     console.error("validate-turno error:", e);
     return new Response(JSON.stringify({ error: "Internal error" }), {
