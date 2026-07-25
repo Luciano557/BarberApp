@@ -48,7 +48,12 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [aceptaMarketing, setAceptaMarketing] = useState(true);
 
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  // Aviso de duplicado potencial
+  const [duplicateMatch, setDuplicateMatch] = useState<ClienteMatch | null>(null);
+  const [pendingSucursalId, setPendingSucursalId] = useState<string>('');
 
   useEffect(() => {
     if (open) {
@@ -65,15 +70,48 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setOtraRed('');
       setAlergias('');
       setAceptaMarketing(true);
+      setDuplicateMatch(null);
+      setPendingSucursalId('');
     }
   }, [open, currentSucursal?.id]);
 
   const needsSucursalPicker = isAllMode || !currentSucursal;
   const noBranchAvailable = needsSucursalPicker && sucursales.length === 0;
 
-  const handleSubmit = async () => {
+  const doCreate = async (targetSucursalId: string, posibleDuplicadoDe: string | null) => {
     const n = nombre.trim();
     const a = apellido.trim();
+    const t = (phoneOut?.e164 ?? '').trim();
+    const e = email.trim();
+
+    setSaving(true);
+    const { id, error } = await createCliente({
+      nombre: n,
+      apellido: a || '',
+      sucursalId: targetSucursalId,
+      telefono: t || null,
+      email: e || null,
+      fecha_nacimiento: fechaNac,
+      instagram: instagram.trim() || null,
+      tiktok: tiktok.trim() || null,
+      otra_red_social: otraRed.trim() || null,
+      alergias: alergias.trim() || null,
+      acepta_marketing: aceptaMarketing,
+      posible_duplicado_de: posibleDuplicadoDe,
+    });
+    setSaving(false);
+
+    if (error || !id) {
+      toast.error(error || 'No se pudo crear el cliente');
+      return;
+    }
+    toast.success('Cliente creado');
+    onCreated?.(id);
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async () => {
+    const n = nombre.trim();
     const t = (phoneOut?.e164 ?? '').trim();
     const e = email.trim();
 
@@ -93,30 +131,53 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       return;
     }
 
-    setSaving(true);
-    const { id, error } = await createCliente({
-      nombre: n,
-      apellido: a || '',
-      sucursalId: targetSucursalId,
-      telefono: t || null,
-      email: e || null,
-      fecha_nacimiento: fechaNac,
-      instagram: instagram.trim() || null,
-      tiktok: tiktok.trim() || null,
-      otra_red_social: otraRed.trim() || null,
-      alergias: alergias.trim() || null,
-      acepta_marketing: aceptaMarketing,
-    });
-    setSaving(false);
+    // Detección previa de duplicados por teléfono
+    if (t) {
+      setChecking(true);
+      const { matches, error: matchErr } = await findClienteByPhone(t);
+      setChecking(false);
+      if (matchErr) {
+        // Falla blanda: si no podemos verificar, seguimos flujo normal.
+        console.warn('[NuevoClienteDialog] duplicate check failed:', matchErr);
+      } else {
+        const first = matches.find((m) => !m.eliminado) ?? null;
+        if (first) {
+          setPendingSucursalId(targetSucursalId);
+          setDuplicateMatch(first);
+          return;
+        }
+      }
+    }
 
-    if (error || !id) {
-      toast.error(error || 'No se pudo crear el cliente');
+    await doCreate(targetSucursalId, null);
+  };
+
+  const handleLinkExisting = async () => {
+    if (!duplicateMatch || !pendingSucursalId) return;
+    setSaving(true);
+    const { error } = await linkClienteToSucursal(duplicateMatch.cliente_id, pendingSucursalId);
+    setSaving(false);
+    if (error) {
+      toast.error(error);
       return;
     }
-    toast.success('Cliente creado');
-    onCreated?.(id);
+    toast.success('Cliente vinculado a la sucursal');
+    onCreated?.(duplicateMatch.cliente_id);
+    setDuplicateMatch(null);
     onOpenChange(false);
   };
+
+  const handleCreateAnyway = async () => {
+    if (!duplicateMatch || !pendingSucursalId) return;
+    const dupId = duplicateMatch.cliente_id;
+    const suc = pendingSucursalId;
+    setDuplicateMatch(null);
+    await doCreate(suc, dupId);
+  };
+
+  const alreadyLinkedHere = !!duplicateMatch && !!pendingSucursalId &&
+    duplicateMatch.sucursales.some((s) => s.sucursal_id === pendingSucursalId);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
