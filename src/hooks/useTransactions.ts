@@ -266,6 +266,7 @@ export function useTransactions() {
       productos?: ProductoCartInput[];
       mpPaymentIntentId?: string | null;
       mpDeviceId?: string | null;
+      clienteId?: string | null;
     }
   ) => {
     if (!organization) {
