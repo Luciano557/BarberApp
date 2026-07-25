@@ -876,6 +876,7 @@ export function PaymentRegistration({
         productos: productosPayload,
         mpPaymentIntentId: intentId,
         mpDeviceId: deviceId,
+        clienteId: clienteSearch.selectedCliente?.id ?? null,
       });
 
       if (result) {
