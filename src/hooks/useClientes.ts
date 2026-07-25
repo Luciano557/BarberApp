@@ -165,6 +165,7 @@ export function useClientes() {
         _fecha_nacimiento: params.fecha_nacimiento ?? null,
         _alergias: params.alergias ?? null,
         _acepta_marketing: params.acepta_marketing ?? true,
+        _posible_duplicado_de: params.posible_duplicado_de ?? null,
       } as any);
       if (error) return { id: null, error: error.message };
       await fetchClientes();
@@ -173,6 +174,52 @@ export function useClientes() {
       return { id: null, error: e?.message || 'Error al crear cliente' };
     }
   }, [fetchClientes]);
+
+  const findClienteByPhone = useCallback(async (
+    telefonoE164: string
+  ): Promise<{ matches: ClienteMatch[]; error: string | null }> => {
+    if (!organization?.id) return { matches: [], error: null };
+    const tel = (telefonoE164 || '').trim();
+    if (!tel) return { matches: [], error: null };
+    try {
+      const { data, error } = await supabase.rpc('find_cliente_by_phone_in_org', {
+        _telefono: tel,
+        _organization_id: organization.id,
+      } as any);
+      if (error) return { matches: [], error: error.message };
+      const rows = (data as any[]) || [];
+      const matches: ClienteMatch[] = rows.map((r) => ({
+        cliente_id: r.cliente_id,
+        nombre: r.nombre,
+        apellido: r.apellido,
+        telefono: r.telefono,
+        email: r.email,
+        eliminado: !!r.eliminado,
+        sucursales: Array.isArray(r.sucursales) ? r.sucursales : [],
+      }));
+      return { matches, error: null };
+    } catch (e: any) {
+      return { matches: [], error: e?.message || 'Error al buscar duplicados' };
+    }
+  }, [organization?.id]);
+
+  const linkClienteToSucursal = useCallback(async (
+    clienteId: string,
+    sucursalId: string
+  ): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.rpc('link_cliente_to_sucursal', {
+        _cliente_id: clienteId,
+        _sucursal_id: sucursalId,
+      } as any);
+      if (error) return { error: error.message };
+      await fetchClientes();
+      return { error: null };
+    } catch (e: any) {
+      return { error: e?.message || 'Error al vincular cliente' };
+    }
+  }, [fetchClientes]);
+
 
   const updateCliente = useCallback(async (
     id: string,
