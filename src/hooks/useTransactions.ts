@@ -357,6 +357,7 @@ export function useTransactions() {
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       tipo_venta: tipoVenta,
+      cliente_id: transaction.clienteId ?? null,
       mp_payment_intent_id: transaction.mpPaymentIntentId ?? null,
       mp_device_id: transaction.mpDeviceId ?? null,
       mp_status: transaction.mpPaymentIntentId ? 'approved' : null,
