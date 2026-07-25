@@ -1572,8 +1572,44 @@ export function PaymentRegistration({
               </div>
             )}
 
+            {/* Cliente (opcional) */}
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Cliente</span>
+                  <span className="text-xs text-muted-foreground">(opcional)</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 text-xs"
+                  onClick={() => setNuevoClienteOpen(true)}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Nuevo cliente
+                </Button>
+              </div>
+              <ClienteSearchPicker
+                label=""
+                selectedCliente={clienteSearch.selectedCliente}
+                onSelect={clienteSearch.setSelectedCliente}
+                searchOpen={clienteSearch.searchOpen}
+                onSearchOpenChange={clienteSearch.setSearchOpen}
+                query={clienteSearch.query}
+                onQueryChange={clienteSearch.setQuery}
+                results={clienteResultsInSucursal}
+                searching={clienteSearch.searching}
+              />
+              <p className="text-xs text-muted-foreground">
+                Asociá la venta a un cliente para que quede registrada en su historial. Podés dejarlo vacío.
+              </p>
+            </div>
+
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+
               <div className="space-y-3 text-sm">
                 {(() => {
                   let displayBarberName: string | null = null;
