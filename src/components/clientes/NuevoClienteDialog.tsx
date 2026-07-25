@@ -10,13 +10,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useClientes } from '@/hooks/useClientes';
+import { useClientes, type ClienteMatch } from '@/hooks/useClientes';
 import { toast } from 'sonner';
-import { Loader2, ChevronDown, CalendarIcon, X } from 'lucide-react';
+import { Loader2, ChevronDown, CalendarIcon, X, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
+
 
 interface NuevoClienteDialogProps {
   open: boolean;
