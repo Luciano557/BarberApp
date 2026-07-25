@@ -38,6 +38,7 @@ interface VentaInsert {
   organization_id: string;
   sucursal_id?: string | null;
   tipo_venta: 'servicio' | 'productos' | 'mixta';
+  cliente_id?: string | null;
   mp_payment_intent_id?: string | null;
   mp_device_id?: string | null;
   mp_status?: string | null;
