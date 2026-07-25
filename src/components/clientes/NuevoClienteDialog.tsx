@@ -10,13 +10,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSucursal } from '@/contexts/SucursalContext';
-import { useClientes } from '@/hooks/useClientes';
+import { useClientes, type ClienteMatch } from '@/hooks/useClientes';
 import { toast } from 'sonner';
-import { Loader2, ChevronDown, CalendarIcon, X } from 'lucide-react';
+import { Loader2, ChevronDown, CalendarIcon, X, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
+
 
 interface NuevoClienteDialogProps {
   open: boolean;
@@ -26,7 +28,8 @@ interface NuevoClienteDialogProps {
 
 export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClienteDialogProps) {
   const { sucursales, currentSucursal, isAllMode } = useSucursal();
-  const { createCliente } = useClientes();
+  const { createCliente, findClienteByPhone, linkClienteToSucursal } = useClientes();
+
 
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -45,7 +48,12 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const [aceptaMarketing, setAceptaMarketing] = useState(true);
 
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  // Aviso de duplicado potencial
+  const [duplicateMatch, setDuplicateMatch] = useState<ClienteMatch | null>(null);
+  const [pendingSucursalId, setPendingSucursalId] = useState<string>('');
 
   useEffect(() => {
     if (open) {
@@ -62,15 +70,48 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       setOtraRed('');
       setAlergias('');
       setAceptaMarketing(true);
+      setDuplicateMatch(null);
+      setPendingSucursalId('');
     }
   }, [open, currentSucursal?.id]);
 
   const needsSucursalPicker = isAllMode || !currentSucursal;
   const noBranchAvailable = needsSucursalPicker && sucursales.length === 0;
 
-  const handleSubmit = async () => {
+  const doCreate = async (targetSucursalId: string, posibleDuplicadoDe: string | null) => {
     const n = nombre.trim();
     const a = apellido.trim();
+    const t = (phoneOut?.e164 ?? '').trim();
+    const e = email.trim();
+
+    setSaving(true);
+    const { id, error } = await createCliente({
+      nombre: n,
+      apellido: a || '',
+      sucursalId: targetSucursalId,
+      telefono: t || null,
+      email: e || null,
+      fecha_nacimiento: fechaNac,
+      instagram: instagram.trim() || null,
+      tiktok: tiktok.trim() || null,
+      otra_red_social: otraRed.trim() || null,
+      alergias: alergias.trim() || null,
+      acepta_marketing: aceptaMarketing,
+      posible_duplicado_de: posibleDuplicadoDe,
+    });
+    setSaving(false);
+
+    if (error || !id) {
+      toast.error(error || 'No se pudo crear el cliente');
+      return;
+    }
+    toast.success('Cliente creado');
+    onCreated?.(id);
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async () => {
+    const n = nombre.trim();
     const t = (phoneOut?.e164 ?? '').trim();
     const e = email.trim();
 
@@ -90,30 +131,53 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
       return;
     }
 
-    setSaving(true);
-    const { id, error } = await createCliente({
-      nombre: n,
-      apellido: a || '',
-      sucursalId: targetSucursalId,
-      telefono: t || null,
-      email: e || null,
-      fecha_nacimiento: fechaNac,
-      instagram: instagram.trim() || null,
-      tiktok: tiktok.trim() || null,
-      otra_red_social: otraRed.trim() || null,
-      alergias: alergias.trim() || null,
-      acepta_marketing: aceptaMarketing,
-    });
-    setSaving(false);
+    // Detección previa de duplicados por teléfono
+    if (t) {
+      setChecking(true);
+      const { matches, error: matchErr } = await findClienteByPhone(t);
+      setChecking(false);
+      if (matchErr) {
+        // Falla blanda: si no podemos verificar, seguimos flujo normal.
+        console.warn('[NuevoClienteDialog] duplicate check failed:', matchErr);
+      } else {
+        const first = matches.find((m) => !m.eliminado) ?? null;
+        if (first) {
+          setPendingSucursalId(targetSucursalId);
+          setDuplicateMatch(first);
+          return;
+        }
+      }
+    }
 
-    if (error || !id) {
-      toast.error(error || 'No se pudo crear el cliente');
+    await doCreate(targetSucursalId, null);
+  };
+
+  const handleLinkExisting = async () => {
+    if (!duplicateMatch || !pendingSucursalId) return;
+    setSaving(true);
+    const { error } = await linkClienteToSucursal(duplicateMatch.cliente_id, pendingSucursalId);
+    setSaving(false);
+    if (error) {
+      toast.error(error);
       return;
     }
-    toast.success('Cliente creado');
-    onCreated?.(id);
+    toast.success('Cliente vinculado a la sucursal');
+    onCreated?.(duplicateMatch.cliente_id);
+    setDuplicateMatch(null);
     onOpenChange(false);
   };
+
+  const handleCreateAnyway = async () => {
+    if (!duplicateMatch || !pendingSucursalId) return;
+    const dupId = duplicateMatch.cliente_id;
+    const suc = pendingSucursalId;
+    setDuplicateMatch(null);
+    await doCreate(suc, dupId);
+  };
+
+  const alreadyLinkedHere = !!duplicateMatch && !!pendingSucursalId &&
+    duplicateMatch.sucursales.some((s) => s.sucursal_id === pendingSucursalId);
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,15 +343,82 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || checking}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || noBranchAvailable}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Crear cliente
+          <Button onClick={handleSubmit} disabled={saving || checking || noBranchAvailable}>
+            {(saving || checking) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {checking ? 'Verificando…' : 'Crear cliente'}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog
+        open={!!duplicateMatch}
+        onOpenChange={(o) => { if (!o) setDuplicateMatch(null); }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Ya existe un cliente con ese teléfono
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p className="text-foreground">
+                  <span className="font-medium">
+                    {duplicateMatch?.nombre}{duplicateMatch?.apellido ? ` ${duplicateMatch.apellido}` : ''}
+                  </span>{' '}
+                  ya está registrado en tu organización con este teléfono.
+                </p>
+                {duplicateMatch && duplicateMatch.sucursales.length > 0 && (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2">
+                    <p className="text-xs text-muted-foreground mb-1">Vinculado en:</p>
+                    <ul className="text-sm space-y-0.5">
+                      {duplicateMatch.sucursales.map((s) => (
+                        <li key={s.sucursal_id}>• {s.nombre}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {alreadyLinkedHere && (
+                  <p className="text-xs text-muted-foreground">
+                    Este cliente ya está vinculado a la sucursal seleccionada.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Recomendamos vincular el cliente existente en lugar de crear uno nuevo.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <Button
+              variant="ghost"
+              onClick={() => setDuplicateMatch(null)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateAnyway}
+              disabled={saving}
+            >
+              Crear cliente nuevo igual
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleLinkExisting}
+              disabled={saving || alreadyLinkedHere}
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Vincular a esta sucursal
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
+
