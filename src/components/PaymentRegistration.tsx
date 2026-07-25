@@ -144,6 +144,7 @@ interface PaymentRegistrationProps {
     productos?: ProductoCartInput[];
     mpPaymentIntentId?: string | null;
     mpDeviceId?: string | null;
+    clienteId?: string | null;
   }) => Promise<unknown | null>;
 }
 
