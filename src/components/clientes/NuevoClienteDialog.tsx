@@ -28,7 +28,8 @@ interface NuevoClienteDialogProps {
 
 export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClienteDialogProps) {
   const { sucursales, currentSucursal, isAllMode } = useSucursal();
-  const { createCliente } = useClientes();
+  const { createCliente, findClienteByPhone, linkClienteToSucursal } = useClientes();
+
 
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
