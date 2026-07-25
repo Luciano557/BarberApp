@@ -893,7 +893,7 @@ export function PaymentRegistration({
       setIsSubmitting(false);
       setPendingMpPayload(null);
     }
-  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
+  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm, clienteSearch.selectedCliente]);
 
   // ── "Cobrar con Terminal" explicit handler ───────────────────────────────────
   // Called only when the user explicitly clicks the terminal button.
