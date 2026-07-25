@@ -677,6 +677,7 @@ export function PaymentRegistration({
     setCartBarberName(null);
     setProductSaleAssignment('pending');
     setCurrentStep('barber');
+    clienteSearch.reset();
     form.reset({
       barberId: '',
       serviceId: '',
@@ -686,7 +687,7 @@ export function PaymentRegistration({
       cart: [],
       split: { enabled: false, efectivo: '', digital: '', digitalMethod: '' },
     });
-  }, [form]);
+  }, [form, clienteSearch]);
 
   const onValidCobro = useCallback(async () => {
     // Guard previo: ítems sin precio (depende de config externa de precios — no es
