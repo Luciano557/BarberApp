@@ -784,7 +784,7 @@ export function PaymentRegistration({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form]);
+  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form, clienteSearch.selectedCliente]);
 
   const handleSubmit = useCallback(async () => {
     await form.handleSubmit(onValidCobro)();
