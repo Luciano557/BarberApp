@@ -1797,7 +1797,25 @@ export function PaymentRegistration({
         />
       )}
 
+      <NuevoClienteDialog
+        open={nuevoClienteOpen}
+        onOpenChange={setNuevoClienteOpen}
+        onCreated={(id) => {
+          // Autoseleccionar el cliente recién creado buscándolo en los resultados.
+          // El hook re-fetchea al abrir el popover; acá disparamos una búsqueda por id.
+          (async () => {
+            const { data } = await import('@/integrations/supabase/client').then(m =>
+              m.supabase.from('clientes').select('id, nombre, apellido, telefono, email').eq('id', id).maybeSingle()
+            );
+            if (data) {
+              clienteSearch.setSelectedCliente({ ...(data as any), inSucursal: true } as ClienteLite);
+            }
+          })();
+        }}
+      />
+
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cancelar venta?</AlertDialogTitle>
