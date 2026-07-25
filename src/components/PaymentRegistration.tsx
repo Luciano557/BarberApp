@@ -762,6 +762,7 @@ export function PaymentRegistration({
         subtotal,
         total,
         productos: productosPayload,
+        clienteId: clienteSearch.selectedCliente?.id ?? null,
       });
 
       if (result) {
