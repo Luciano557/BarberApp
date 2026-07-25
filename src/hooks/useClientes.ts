@@ -51,7 +51,19 @@ export interface CreateClienteParams {
   fecha_nacimiento?: string | null;
   alergias?: string | null;
   acepta_marketing?: boolean;
+  posible_duplicado_de?: string | null;
 }
+
+export interface ClienteMatch {
+  cliente_id: string;
+  nombre: string;
+  apellido: string | null;
+  telefono: string | null;
+  email: string | null;
+  eliminado: boolean;
+  sucursales: { sucursal_id: string; nombre: string }[];
+}
+
 
 export type ClienteUpdate = Partial<Pick<Cliente,
   | 'nombre'
