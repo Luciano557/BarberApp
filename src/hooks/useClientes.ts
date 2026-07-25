@@ -340,6 +340,8 @@ export function useClientes() {
     error,
     refresh: fetchClientes,
     createCliente,
+    findClienteByPhone,
+    linkClienteToSucursal,
     updateCliente,
     blockCliente,
     unblockCliente,
