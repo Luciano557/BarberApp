@@ -262,6 +262,21 @@ export function PaymentRegistration({
   // Cancelar venta
   const [cancelOpen, setCancelOpen] = useState(false);
 
+  // Cliente asociado (opcional) — filtrado SOLO a clientes de la sucursal actual.
+  const { organization } = useOrganization();
+  const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
+  const clienteSearch = useClienteSearch({
+    organizationId: organization?.id || '',
+    sucursalId: sucursalId || currentSucursal?.id || '',
+    enabled: !!(organization?.id && (sucursalId || currentSucursal?.id)),
+  });
+  // En Cobrar solo mostramos clientes vinculados a la sucursal activa
+  // (a diferencia de Agenda, que permite ver clientes de otras sucursales).
+  const clienteResultsInSucursal = useMemo(
+    () => clienteSearch.results.filter(c => c.inSucursal),
+    [clienteSearch.results],
+  );
+
   const teamSetupDescription = useMemo(() => {
     if (isSucursalAccount) {
       return 'Contactá al dueño, al general manager o al manager para que configure el equipo de esta sucursal.';
