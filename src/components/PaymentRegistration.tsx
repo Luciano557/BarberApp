@@ -1630,6 +1630,12 @@ export function PaymentRegistration({
                     </div>
                   );
                 })()}
+                {clienteSearch.selectedCliente && (
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="shrink-0 text-right font-medium">{clienteFullName(clienteSearch.selectedCliente)}</span>
+                  </div>
+                )}
                 {service && (
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-muted-foreground">Servicio</span>
