@@ -4004,6 +4004,7 @@ export type Database = {
           anulado_por_id: string | null
           barbero_id: string | null
           barbero_nombre: string | null
+          cliente_id: string | null
           created_at: string
           descuento_pct: number | null
           estado: string | null
@@ -4029,6 +4030,7 @@ export type Database = {
           anulado_por_id?: string | null
           barbero_id?: string | null
           barbero_nombre?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -4054,6 +4056,7 @@ export type Database = {
           anulado_por_id?: string | null
           barbero_id?: string | null
           barbero_nombre?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -4086,6 +4089,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
