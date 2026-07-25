@@ -27,12 +27,16 @@ import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMercadoPago } from '@/hooks/useMercadoPago';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { MpTerminalPaymentDialog } from '@/components/MpTerminalPaymentDialog';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 import { SelectableCard } from '@/components/ui/SelectableCard';
+import { ClienteSearchPicker } from '@/components/agenda/ClienteSearchPicker';
+import { useClienteSearch, clienteFullName, type ClienteLite } from '@/components/agenda/hooks/useClienteSearch';
+import { NuevoClienteDialog } from '@/components/clientes/NuevoClienteDialog';
 import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
