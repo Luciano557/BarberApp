@@ -343,15 +343,82 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || checking}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={saving || noBranchAvailable}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Crear cliente
+          <Button onClick={handleSubmit} disabled={saving || checking || noBranchAvailable}>
+            {(saving || checking) && <Loader2 className="h-4 w-4 animate-spin" />}
+            {checking ? 'Verificando…' : 'Crear cliente'}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog
+        open={!!duplicateMatch}
+        onOpenChange={(o) => { if (!o) setDuplicateMatch(null); }}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Ya existe un cliente con ese teléfono
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p className="text-foreground">
+                  <span className="font-medium">
+                    {duplicateMatch?.nombre}{duplicateMatch?.apellido ? ` ${duplicateMatch.apellido}` : ''}
+                  </span>{' '}
+                  ya está registrado en tu organización con este teléfono.
+                </p>
+                {duplicateMatch && duplicateMatch.sucursales.length > 0 && (
+                  <div className="rounded-md border bg-muted/40 px-3 py-2">
+                    <p className="text-xs text-muted-foreground mb-1">Vinculado en:</p>
+                    <ul className="text-sm space-y-0.5">
+                      {duplicateMatch.sucursales.map((s) => (
+                        <li key={s.sucursal_id}>• {s.nombre}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {alreadyLinkedHere && (
+                  <p className="text-xs text-muted-foreground">
+                    Este cliente ya está vinculado a la sucursal seleccionada.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Recomendamos vincular el cliente existente en lugar de crear uno nuevo.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <Button
+              variant="ghost"
+              onClick={() => setDuplicateMatch(null)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleCreateAnyway}
+              disabled={saving}
+            >
+              Crear cliente nuevo igual
+            </Button>
+            <Button
+              variant="default"
+              onClick={handleLinkExisting}
+              disabled={saving || alreadyLinkedHere}
+            >
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              Vincular a esta sucursal
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
+
