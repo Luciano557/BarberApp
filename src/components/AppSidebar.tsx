@@ -266,43 +266,26 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             Persiste en el DOM en ambos estados: solo el padding del header
             y el bloque de texto (nombre) transicionan. */}
         <div
-          className="bg-primary py-4"
+          className="bg-primary py-1"
           style={{
             paddingLeft: railMode ? '0px' : '1rem',
             paddingRight: railMode ? '0px' : '1rem',
             transition: `padding-left 200ms ${SIZE_EASE}, padding-right 200ms ${SIZE_EASE}`,
           }}
         >
-          <div className="flex items-center justify-center">
+          <div className="relative flex items-center justify-center">
             <img
-              src="/favicon.png"
+              src="/MagotipoBlanco.png"
               alt="Vittro"
               title={railMode ? organization?.name || 'Barbería' : undefined}
-              className="h-5 w-5 shrink-0 object-contain"
+              className="h-20 w-20 shrink-0 object-contain"
             />
-            <div
-              className="min-w-0"
-              style={{
-                opacity: railMode ? 0 : 1,
-                marginLeft: railMode ? '0px' : '0.75rem',
-                // Mismo motivo que en renderNavItem: flex-basis explícito en
-                // vez de flex-1, para que el bloque de texto colapse a 0
-                // real y no corra el ícono del logo del centro.
-                flexBasis: railMode ? '0px' : '200px',
-                transition: textTransition(`margin-left 200ms ${SIZE_EASE}, flex-basis 200ms ${SIZE_EASE}`),
-              }}
-              aria-hidden={railMode}
-            >
-              <p className="min-w-0 truncate text-[15px] font-semibold leading-tight text-primary-foreground">
-                {organization?.name || 'Barbería'}
-              </p>
-            </div>
             {isMobile && (
               <button
                 type="button"
                 onClick={() => setCollapsed(true)}
                 aria-label="Cerrar navegación"
-                className="ml-2 grid h-8 w-8 shrink-0 place-items-center self-start rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
+                className="absolute right-0 top-0 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-primary-foreground/70 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
               >
                 <X className="h-4 w-4" />
               </button>

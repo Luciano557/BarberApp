@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.notif_emit_crm_sync_fallo(_organization_id uuid, _sucursal_id uuid, _turno_id uuid, _title text, _body text, _metadata jsonb);

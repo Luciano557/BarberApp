@@ -738,6 +738,7 @@ export const NOTIFICATION_CATALOG: NotificationEventDef[] = [
   },
 ];
 
+
 /**
  * Mapping de tipos legacy persistidos en `notifications.type` (Fase 1)
  * hacia el catálogo de Fase 2.

@@ -1,0 +1,1 @@
+ALTER TABLE public.turnos ADD COLUMN crm_sync_error TEXT NULL;

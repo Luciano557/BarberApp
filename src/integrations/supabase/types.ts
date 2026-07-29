@@ -565,6 +565,7 @@ export type Database = {
           organization_id: string
           origen: string
           otra_red_social: string | null
+          posible_duplicado_de: string | null
           telefono: string | null
           tiktok: string | null
           updated_at: string
@@ -592,6 +593,7 @@ export type Database = {
           organization_id: string
           origen?: string
           otra_red_social?: string | null
+          posible_duplicado_de?: string | null
           telefono?: string | null
           tiktok?: string | null
           updated_at?: string
@@ -619,11 +621,20 @@ export type Database = {
           organization_id?: string
           origen?: string
           otra_red_social?: string | null
+          posible_duplicado_de?: string | null
           telefono?: string | null
           tiktok?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_posible_duplicado_de_fkey"
+            columns: ["posible_duplicado_de"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clientes_sucursales: {
         Row: {
@@ -3743,6 +3754,7 @@ export type Database = {
           cliente_nombre: string | null
           cliente_telefono: string | null
           created_at: string
+          crm_sync_error: string | null
           eligio_barbero: boolean
           estado: string
           fecha: string
@@ -3768,6 +3780,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          crm_sync_error?: string | null
           eligio_barbero?: boolean
           estado?: string
           fecha: string
@@ -3793,6 +3806,7 @@ export type Database = {
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           created_at?: string
+          crm_sync_error?: string | null
           eligio_barbero?: boolean
           estado?: string
           fecha?: string
@@ -4001,6 +4015,7 @@ export type Database = {
           anulado_por_id: string | null
           barbero_id: string | null
           barbero_nombre: string | null
+          cliente_id: string | null
           created_at: string
           descuento_pct: number | null
           estado: string | null
@@ -4026,6 +4041,7 @@ export type Database = {
           anulado_por_id?: string | null
           barbero_id?: string | null
           barbero_nombre?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -4051,6 +4067,7 @@ export type Database = {
           anulado_por_id?: string | null
           barbero_id?: string | null
           barbero_nombre?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_pct?: number | null
           estado?: string | null
@@ -4083,6 +4100,13 @@ export type Database = {
             columns: ["barbero_id"]
             isOneToOne: false
             referencedRelation: "barberos_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venta_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
           {
@@ -4508,27 +4532,57 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      create_cliente_with_sucursal: {
-        Args: {
-          _acepta_marketing?: boolean
-          _alergias?: string
-          _apellido?: string
-          _email?: string
-          _fecha_nacimiento?: string
-          _instagram?: string
-          _nombre: string
-          _otra_red_social?: string
-          _sucursal_id?: string
-          _telefono?: string
-          _tiktok?: string
-        }
-        Returns: string
-      }
+      create_cliente_with_sucursal:
+        | {
+            Args: {
+              _acepta_marketing?: boolean
+              _alergias?: string
+              _apellido?: string
+              _email?: string
+              _fecha_nacimiento?: string
+              _instagram?: string
+              _nombre: string
+              _otra_red_social?: string
+              _sucursal_id?: string
+              _telefono?: string
+              _tiktok?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _acepta_marketing?: boolean
+              _alergias?: string
+              _apellido?: string
+              _email?: string
+              _fecha_nacimiento?: string
+              _instagram?: string
+              _nombre: string
+              _otra_red_social?: string
+              _posible_duplicado_de?: string
+              _sucursal_id?: string
+              _telefono?: string
+              _tiktok?: string
+            }
+            Returns: string
+          }
       current_user_has_pin: { Args: never; Returns: boolean }
       delete_mp_connection: { Args: { _org_id: string }; Returns: undefined }
       ensure_organization_subscription: {
         Args: { _org_id: string }
         Returns: string
+      }
+      find_cliente_by_phone_in_org: {
+        Args: { _organization_id: string; _telefono: string }
+        Returns: {
+          apellido: string
+          cliente_id: string
+          eliminado: boolean
+          email: string
+          nombre: string
+          sucursales: Json
+          telefono: string
+        }[]
       }
       get_mp_connection_status: {
         Args: { _org_id: string }
@@ -4582,6 +4636,10 @@ export type Database = {
         Returns: Json
       }
       is_sucursal_account: { Args: { _user_id: string }; Returns: boolean }
+      link_cliente_to_sucursal: {
+        Args: { _cliente_id: string; _sucursal_id: string }
+        Returns: undefined
+      }
       notif_emit_action_blocked: {
         Args: { _action_key: string; _sucursal_id: string }
         Returns: undefined
