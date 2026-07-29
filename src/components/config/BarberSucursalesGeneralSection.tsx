@@ -1,4 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Trash2, MapPin, Loader2, Repeat, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -263,98 +267,147 @@ interface AgregarRecurrenteSheetProps {
   onCreated: () => void | Promise<void>;
 }
 
+const agregarRecurrenteSchema = z.object({
+  sucursalId: z.string().min(1, 'Elegí una sucursal.'),
+  dias: z.array(z.number()).min(1, 'Elegí al menos un día de la semana.'),
+  fechaInicio: z.string().optional().default(''),
+  fechaFin: z.string().optional().default(''),
+}).superRefine((data, ctx) => {
+  if (data.fechaInicio && data.fechaFin && data.fechaFin < data.fechaInicio) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaFin'], message: 'No puede ser anterior a la fecha de inicio.' });
+  }
+});
+type AgregarRecurrenteFormValues = z.infer<typeof agregarRecurrenteSchema>;
+
 function AgregarRecurrenteSheet({
   open, onOpenChange, organizationId, barberoId, sucursales, principalSucursalId, onCreated,
 }: AgregarRecurrenteSheetProps) {
   const bs = useBarberosSucursales(organizationId);
-  const [sucursalId, setSucursalId] = useState('');
-  const [dias, setDias] = useState<number[]>([]);
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
-  const [saving, setSaving] = useState(false);
+  const selectable = sucursales.filter(s => s.id !== principalSucursalId);
+
+  const defaults = (): AgregarRecurrenteFormValues => ({ sucursalId: '', dias: [], fechaInicio: '', fechaFin: '' });
+  const form = useForm<AgregarRecurrenteFormValues>({
+    resolver: zodResolver(agregarRecurrenteSchema),
+    defaultValues: defaults(),
+  });
+  const saving = form.formState.isSubmitting;
+  const fechaInicioWatch = form.watch('fechaInicio');
 
   useEffect(() => {
-    if (open) {
-      setSucursalId('');
-      setDias([]);
-      setFechaInicio('');
-      setFechaFin('');
-    }
+    if (open) form.reset(defaults());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const selectable = sucursales.filter(s => s.id !== principalSucursalId);
-  const canSave =
-    !!sucursalId && dias.length > 0 &&
-    (!fechaInicio || !fechaFin || fechaFin >= fechaInicio);
+  const handleClose = () => {
+    onOpenChange(false);
+    form.reset(defaults());
+  };
 
-  const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
+  const onSubmit = async (values: AgregarRecurrenteFormValues) => {
     try {
       await bs.insertRecurrente({
         barbero_id: barberoId,
-        sucursal_id: sucursalId,
-        dias_semana: dias,
-        fecha_inicio: fechaInicio || null,
-        fecha_fin: fechaFin || null,
+        sucursal_id: values.sucursalId,
+        dias_semana: values.dias,
+        fecha_inicio: values.fechaInicio || null,
+        fecha_fin: values.fechaFin || null,
       });
       toast.success('Asignación recurrente creada');
-      onOpenChange(false);
+      handleClose();
       await onCreated();
     } catch (e: any) {
       toast.error(e?.message || 'No se pudo crear');
-    } finally {
-      setSaving(false);
     }
   };
 
   return (
     <DrawerForm
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(o) => { if (!o) handleClose(); }}
       title="Sucursal secundaria recurrente"
       size="sm"
+      isDirty={form.formState.isDirty}
       footer={
         <div className="flex w-full justify-between">
-          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" disabled={saving} onClick={handleClose}>
             Cancelar
           </Button>
-          <Button disabled={saving || !canSave} onClick={handleSave}>
+          <Button disabled={saving} onClick={form.handleSubmit(onSubmit)}>
             {saving ? 'Guardando...' : 'Guardar'}
           </Button>
         </div>
       }
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Definí en qué sucursal trabaja este barbero ciertos días de la semana.
-        </p>
-        <div className="space-y-2">
-          <Label>Sucursal</Label>
-          <Select value={sucursalId} onValueChange={setSucursalId}>
-            <SelectTrigger><SelectValue placeholder="Elegí una sucursal" /></SelectTrigger>
-            <SelectContent>
-              {selectable.map(s => (
-                <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Días de la semana</Label>
-          <WeekdayPicker value={dias} onChange={setDias} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>Desde (opcional)</Label>
-            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+      <Form {...form}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Definí en qué sucursal trabaja este barbero ciertos días de la semana.
+          </p>
+          <FormField
+            control={form.control}
+            name="sucursalId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Sucursal</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Elegí una sucursal" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {selectable.length === 0 ? (
+                      <SelectItem value="__empty__" disabled>Sin sucursales configuradas</SelectItem>
+                    ) : (
+                      selectable.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dias"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Días de la semana</FormLabel>
+                <WeekdayPicker value={field.value} onChange={field.onChange} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="fechaInicio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Desde (opcional)</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fechaFin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hasta (opcional)</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} min={fechaInicioWatch || undefined} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Hasta (opcional)</Label>
-            <Input type="date" value={fechaFin} onChange={(e) => setFechaFin(e.target.value)} />
-          </div>
         </div>
-      </div>
+      </Form>
     </DrawerForm>
   );
 }
