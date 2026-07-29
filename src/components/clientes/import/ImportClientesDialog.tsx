@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from '@/components/ui/dialog';
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -13,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 import { ImportMethodStep } from './ImportMethodStep';
 import { ImportPreviewStep, PreviewFilter } from './ImportPreviewStep';
 import { ImportSummaryStep } from './ImportSummaryStep';
@@ -31,6 +34,10 @@ type Step = 'method' | 'sucursal' | 'preview' | 'summary';
 
 interface AccessibleSucursal { id: string; nombre: string; }
 
+/**
+ * Wizard multi-paso — mismo estatus de excepción que BackfillWizard: Sheet
+ * propio, no entra al canon de DrawerForm plano.
+ */
 export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) {
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
@@ -47,6 +54,7 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
   const [importing, setImporting] = useState(false);
   const [summary, setSummary] = useState<{ inserted: number; total: number; errors: Array<{ index: number; error: string }> } | null>(null);
   const [previewFilter, setPreviewFilter] = useState<PreviewFilter>('all');
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
 
   // Reset on open
   useEffect(() => {
@@ -176,6 +184,28 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
     }
   };
 
+  // Hay un archivo parseado (preview con filas cargadas) que todavía no se
+  // confirmó — perderlo al cerrar por accidente descartaría el trabajo de
+  // corregir/revisar filas. `summary` significa que ya se confirmó la
+  // importación, así que ahí no hay nada que proteger.
+  const hasUnconfirmedPreview = rows.length > 0 && step !== 'summary';
+
+  // Cierre explícito (botones Cancelar/Cerrar/Listo del footer): bypasea la
+  // confirmación, mismo criterio que el botón Cancelar de DrawerForm.
+  const forceClose = () => onOpenChange(false);
+
+  // Cierre vía X / Escape / click afuera del Sheet: protegido mientras se
+  // importa, y ahora también mientras haya un preview sin confirmar.
+  const handleSheetOpenChange = (o: boolean) => {
+    if (o) { onOpenChange(true); return; }
+    if (importing) return;
+    if (hasUnconfirmedPreview) {
+      setConfirmDiscardOpen(true);
+      return;
+    }
+    onOpenChange(false);
+  };
+
   const titleByStep: Record<Step, string> = {
     method: 'Importar clientes',
     sucursal: 'Elegí la sucursal',
@@ -190,137 +220,169 @@ export function ImportClientesDialog({ open, onOpenChange, onImported }: Props) 
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!importing) onOpenChange(o); }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            {(step === 'preview' || step === 'sucursal') && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 -ml-1"
-                onClick={() => setStep(step === 'preview' && rows.length ? 'sucursal' : 'method')}
-                disabled={importing}
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            )}
-            <DialogTitle>{titleByStep[step]}</DialogTitle>
-          </div>
-          <DialogDescription>{descByStep[step]}</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
-        {parsing ? (
-          <div className="flex items-center justify-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Procesando archivo...
-          </div>
-        ) : step === 'method' ? (
-          <ImportMethodStep
-            onPickVittroTemplate={() => { /* download handled inside */ }}
-            onPickFile={handleFile}
-            onPickFreshaFile={handleFreshaFile}
-          />
-        ) : step === 'sucursal' ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Sucursal de destino</Label>
-              <Select value={sucursalId} onValueChange={setSucursalId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Elegí una sucursal" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accessible.length === 0 ? (
-                    <div className="px-2 py-2 text-sm text-muted-foreground">
-                      No tenés sucursales disponibles para importar.
-                    </div>
-                  ) : (
-                    accessible.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Solo aparecen las sucursales en las que tenés permiso para crear clientes.
-              </p>
-            </div>
-          </div>
-        ) : step === 'preview' ? (
-          <ImportPreviewStep
-            rows={rows}
-            onChange={setRows}
-            unknownHeaders={unknownHeaders}
-            truncated={truncated}
-            totalParsed={totalParsed}
-            filter={previewFilter}
-            onFilterChange={setPreviewFilter}
-          />
-        ) : (
-          <ImportSummaryStep
-            inserted={summary?.inserted ?? 0}
-            total={summary?.total ?? 0}
-            errors={summary?.errors ?? []}
-          />
-        )}
-        </div>
-
-        <DialogFooter className="gap-2 sm:gap-2">
-          {step === 'method' && (
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>Cerrar</Button>
-          )}
-          {step === 'sucursal' && (
-            <>
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
-              <Button
-                disabled={!sucursalId || rows.length === 0}
-                onClick={() => setStep('preview')}
-              >
-                Continuar
-              </Button>
-            </>
-          )}
-          {step === 'preview' && (
-            <>
-              <Button variant="ghost" disabled={importing} onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <div className="flex flex-col items-end gap-1">
-                {(blockingCount.errs > 0 || blockingCount.dups > 0) && (
-                  <div className="flex flex-wrap items-center justify-end gap-1.5">
-                    <p className="text-[11px] text-muted-foreground">
-                      Hay {blockingCount.errs} {blockingCount.errs === 1 ? 'error' : 'errores'}
-                      {blockingCount.errs > 0 && blockingCount.dups > 0 ? ' y ' : ''}
-                      {blockingCount.dups > 0 ? `${blockingCount.dups} duplicado${blockingCount.dups === 1 ? '' : 's'}` : ''}
-                      {' '}pendientes.
-                    </p>
-                    {blockingCount.errs > 0 && (
-                      <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
-                        onClick={() => setPreviewFilter('errors')}>
-                        Ver errores
-                      </Button>
-                    )}
-                    {blockingCount.dups > 0 && (
-                      <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
-                        onClick={() => setPreviewFilter('duplicates')}>
-                        Ver duplicados
-                      </Button>
-                    )}
-                  </div>
-                )}
-                <Button onClick={handleImport} disabled={!canImport || importing}>
-                  {importing && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Importar {validRows.length} {validRows.length === 1 ? 'cliente' : 'clientes'}
+    <>
+      <Sheet open={open} onOpenChange={handleSheetOpenChange}>
+        <SheetContent side="right" className="w-[calc(100%-48px)] sm:max-w-3xl flex flex-col p-0 gap-0">
+          {/* Header */}
+          <div className="shrink-0 px-6 py-4 border-b pr-12">
+            <div className="flex items-center gap-2">
+              {(step === 'preview' || step === 'sucursal') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 -ml-1"
+                  onClick={() => setStep(step === 'preview' && rows.length ? 'sucursal' : 'method')}
+                  disabled={importing}
+                >
+                  <ArrowLeft className="h-4 w-4" />
                 </Button>
+              )}
+              <h2 className="text-lg font-semibold text-foreground">{titleByStep[step]}</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">{descByStep[step]}</p>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+            {parsing ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Procesando archivo...
               </div>
-            </>
-          )}
-          {step === 'summary' && (
-            <Button onClick={() => onOpenChange(false)}>Listo</Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            ) : step === 'method' ? (
+              <ImportMethodStep
+                onPickVittroTemplate={() => { /* download handled inside */ }}
+                onPickFile={handleFile}
+                onPickFreshaFile={handleFreshaFile}
+              />
+            ) : step === 'sucursal' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Sucursal de destino</Label>
+                  {accessible.length === 0 ? (
+                    <EmptySelectHint
+                      message="No tenés sucursales disponibles para importar."
+                      ctaLabel="Cómo resolverlo"
+                      onCta={() => toast.message('Cerrá esta ventana y creá una sucursal desde Mi Negocio, o pedile a un encargado que te dé acceso a una.')}
+                    />
+                  ) : (
+                    <>
+                      <Select value={sucursalId} onValueChange={setSucursalId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Elegí una sucursal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accessible.map(s => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Solo aparecen las sucursales en las que tenés permiso para crear clientes.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : step === 'preview' ? (
+              <ImportPreviewStep
+                rows={rows}
+                onChange={setRows}
+                unknownHeaders={unknownHeaders}
+                truncated={truncated}
+                totalParsed={totalParsed}
+                filter={previewFilter}
+                onFilterChange={setPreviewFilter}
+              />
+            ) : (
+              <ImportSummaryStep
+                inserted={summary?.inserted ?? 0}
+                total={summary?.total ?? 0}
+                errors={summary?.errors ?? []}
+              />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 border-t px-6 py-4 flex items-center justify-end gap-2">
+            {step === 'method' && (
+              <Button variant="ghost" onClick={forceClose}>Cerrar</Button>
+            )}
+            {step === 'sucursal' && (
+              <>
+                <Button variant="ghost" onClick={forceClose}>Cancelar</Button>
+                <Button
+                  disabled={!sucursalId || rows.length === 0}
+                  onClick={() => setStep('preview')}
+                >
+                  Continuar
+                </Button>
+              </>
+            )}
+            {step === 'preview' && (
+              <>
+                <Button variant="ghost" disabled={importing} onClick={forceClose}>
+                  Cancelar
+                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  {(blockingCount.errs > 0 || blockingCount.dups > 0) && (
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        Hay {blockingCount.errs} {blockingCount.errs === 1 ? 'error' : 'errores'}
+                        {blockingCount.errs > 0 && blockingCount.dups > 0 ? ' y ' : ''}
+                        {blockingCount.dups > 0 ? `${blockingCount.dups} duplicado${blockingCount.dups === 1 ? '' : 's'}` : ''}
+                        {' '}pendientes.
+                      </p>
+                      {blockingCount.errs > 0 && (
+                        <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
+                          onClick={() => setPreviewFilter('errors')}>
+                          Ver errores
+                        </Button>
+                      )}
+                      {blockingCount.dups > 0 && (
+                        <Button size="sm" variant="link" className="h-auto p-0 text-[11px]"
+                          onClick={() => setPreviewFilter('duplicates')}>
+                          Ver duplicados
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  <Button onClick={handleImport} disabled={!canImport || importing}>
+                    {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Importar {validRows.length} {validRows.length === 1 ? 'cliente' : 'clientes'}
+                  </Button>
+                </div>
+              </>
+            )}
+            {step === 'summary' && (
+              <Button onClick={forceClose}>Listo</Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={confirmDiscardOpen} onOpenChange={setConfirmDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tenés un archivo importado sin confirmar. Si cerrás ahora, se va a perder.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setConfirmDiscardOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

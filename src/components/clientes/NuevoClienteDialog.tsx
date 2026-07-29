@@ -1,14 +1,18 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useClientes, type ClienteMatch } from '@/hooks/useClientes';
 import { toast } from 'sonner';
@@ -16,9 +20,52 @@ import { Loader2, ChevronDown, CalendarIcon, X, AlertCircle } from 'lucide-react
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '@/components/ui/alert-dialog';
+import { ClienteFormFields } from '@/components/agenda/ClienteFormFields';
+import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
+import { clienteModeFieldsSchema } from '@/components/agenda/clienteModeSchema';
+import { isValidEmail } from '@/components/clientes/import/lib/normalize';
 
+/**
+ * Reusa la forma/maxLength de nombre-apellido-telefono-email de clienteModeSchema
+ * (Fase 3, Agenda), pero con su propia validación cruzada: acá no hay modo
+ * existing/new, y la regla de negocio del alta standalone es distinta a la de
+ * NewAppointmentDialog (apellido opcional, telefono O email en vez de ambos
+ * obligatorios) — por eso no se reusa `validateClienteMode` tal cual.
+ */
+function buildNuevoClienteSchema(needsSucursalPicker: boolean) {
+  return clienteModeFieldsSchema
+    .omit({ clienteId: true })
+    .extend({
+      sucursalId: z.string().optional().default(''),
+      fechaNacimiento: z.string().optional().default(''),
+      instagram: z.string().max(80).optional().default(''),
+      tiktok: z.string().max(80).optional().default(''),
+      otraRedSocial: z.string().max(80).optional().default(''),
+      alergias: z.string().max(240).optional().default(''),
+      aceptaMarketing: z.boolean().default(true),
+    })
+    .superRefine((data, ctx) => {
+      if (!data.nombre.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['nombre'], message: 'Ingresá el nombre' });
+      }
+      if (data.telefono && !data.telefono.isValid && data.telefono.reason !== 'empty') {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['telefono'], message: 'Revisá el teléfono antes de guardar' });
+      }
+      const hasTelefono = !!data.telefono?.e164;
+      const hasEmail = !!data.email.trim();
+      if (!hasTelefono && !hasEmail) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['email'], message: 'Ingresá teléfono o email' });
+      }
+      if (data.email.trim() && !isValidEmail(data.email.trim())) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['email'], message: 'Email inválido' });
+      }
+      if (needsSucursalPicker && !data.sucursalId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['sucursalId'], message: 'Seleccioná una sucursal' });
+      }
+    });
+}
+
+type NuevoClienteFormValues = z.infer<ReturnType<typeof buildNuevoClienteSchema>>;
 
 interface NuevoClienteDialogProps {
   open: boolean;
@@ -30,76 +77,63 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
   const { sucursales, currentSucursal, isAllMode } = useSucursal();
   const { createCliente, findClienteByPhone, linkClienteToSucursal } = useClientes();
 
-
-  const [nombre, setNombre] = useState('');
-  const [apellido, setApellido] = useState('');
-  const [telefono, setTelefono] = useState('');
-  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
-  const [email, setEmail] = useState('');
-  const [fechaNac, setFechaNac] = useState<string | null>(null);
-  const [sucursalId, setSucursalId] = useState<string>('');
-
-  // Más datos
   const [showMore, setShowMore] = useState(false);
-  const [instagram, setInstagram] = useState('');
-  const [tiktok, setTiktok] = useState('');
-  const [otraRed, setOtraRed] = useState('');
-  const [alergias, setAlergias] = useState('');
-  const [aceptaMarketing, setAceptaMarketing] = useState(true);
-
-  const [saving, setSaving] = useState(false);
-  const [checking, setChecking] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
-  // Aviso de duplicado potencial
+  // Aviso de duplicado potencial — flujo secundario disparado tras el submit,
+  // fuera del ciclo de vida de RHF (por eso tiene su propio `saving`).
   const [duplicateMatch, setDuplicateMatch] = useState<ClienteMatch | null>(null);
   const [pendingSucursalId, setPendingSucursalId] = useState<string>('');
-
-  useEffect(() => {
-    if (open) {
-      setNombre('');
-      setApellido('');
-      setTelefono('');
-      setPhoneOut(null);
-      setEmail('');
-      setFechaNac(null);
-      setSucursalId(currentSucursal?.id ?? '');
-      setShowMore(false);
-      setInstagram('');
-      setTiktok('');
-      setOtraRed('');
-      setAlergias('');
-      setAceptaMarketing(true);
-      setDuplicateMatch(null);
-      setPendingSucursalId('');
-    }
-  }, [open, currentSucursal?.id]);
+  const [saving, setSaving] = useState(false);
 
   const needsSucursalPicker = isAllMode || !currentSucursal;
   const noBranchAvailable = needsSucursalPicker && sucursales.length === 0;
 
-  const doCreate = async (targetSucursalId: string, posibleDuplicadoDe: string | null) => {
-    const n = nombre.trim();
-    const a = apellido.trim();
-    const t = (phoneOut?.e164 ?? '').trim();
-    const e = email.trim();
+  const defaultValues = (): NuevoClienteFormValues => ({
+    nombre: '',
+    apellido: '',
+    telefono: null,
+    email: '',
+    sucursalId: currentSucursal?.id ?? '',
+    fechaNacimiento: '',
+    instagram: '',
+    tiktok: '',
+    otraRedSocial: '',
+    alergias: '',
+    aceptaMarketing: true,
+  });
 
-    setSaving(true);
+  const form = useForm<NuevoClienteFormValues>({
+    resolver: zodResolver(buildNuevoClienteSchema(needsSucursalPicker)),
+    defaultValues: defaultValues(),
+  });
+
+  useEffect(() => {
+    if (open) {
+      form.reset(defaultValues());
+      setShowMore(false);
+      setDuplicateMatch(null);
+      setPendingSucursalId('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentSucursal?.id]);
+
+  const doCreate = async (targetSucursalId: string, posibleDuplicadoDe: string | null) => {
+    const values = form.getValues();
     const { id, error } = await createCliente({
-      nombre: n,
-      apellido: a || '',
+      nombre: values.nombre.trim(),
+      apellido: values.apellido.trim(),
       sucursalId: targetSucursalId,
-      telefono: t || null,
-      email: e || null,
-      fecha_nacimiento: fechaNac,
-      instagram: instagram.trim() || null,
-      tiktok: tiktok.trim() || null,
-      otra_red_social: otraRed.trim() || null,
-      alergias: alergias.trim() || null,
-      acepta_marketing: aceptaMarketing,
+      telefono: values.telefono?.e164 ?? null,
+      email: values.email.trim() || null,
+      fecha_nacimiento: values.fechaNacimiento || null,
+      instagram: values.instagram.trim() || null,
+      tiktok: values.tiktok.trim() || null,
+      otra_red_social: values.otraRedSocial.trim() || null,
+      alergias: values.alergias.trim() || null,
+      acepta_marketing: values.aceptaMarketing,
       posible_duplicado_de: posibleDuplicadoDe,
     });
-    setSaving(false);
 
     if (error || !id) {
       toast.error(error || 'No se pudo crear el cliente');
@@ -110,32 +144,12 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     onOpenChange(false);
   };
 
-  const handleSubmit = async () => {
-    const n = nombre.trim();
-    const t = (phoneOut?.e164 ?? '').trim();
-    const e = email.trim();
+  const onSubmit = async (values: NuevoClienteFormValues) => {
+    const targetSucursalId = needsSucursalPicker ? values.sucursalId : currentSucursal!.id;
+    const t = values.telefono?.e164 ?? '';
 
-    if (!n) { toast.error('El nombre es obligatorio'); return; }
-    if (phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty') {
-      toast.error('Revisá el teléfono antes de guardar.');
-      return;
-    }
-    if (!t && !e) { toast.error('Ingresá teléfono o email'); return; }
-    if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      toast.error('Email inválido');
-      return;
-    }
-    const targetSucursalId = needsSucursalPicker ? sucursalId : currentSucursal!.id;
-    if (!targetSucursalId) {
-      toast.error('Seleccioná una sucursal antes de crear el cliente');
-      return;
-    }
-
-    // Detección previa de duplicados por teléfono
     if (t) {
-      setChecking(true);
       const { matches, error: matchErr } = await findClienteByPhone(t);
-      setChecking(false);
       if (matchErr) {
         // Falla blanda: si no podemos verificar, seguimos flujo normal.
         console.warn('[NuevoClienteDialog] duplicate check failed:', matchErr);
@@ -171,131 +185,144 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
     if (!duplicateMatch || !pendingSucursalId) return;
     const dupId = duplicateMatch.cliente_id;
     const suc = pendingSucursalId;
+    setSaving(true);
     setDuplicateMatch(null);
     await doCreate(suc, dupId);
+    setSaving(false);
   };
 
   const alreadyLinkedHere = !!duplicateMatch && !!pendingSucursalId &&
     duplicateMatch.sucursales.some((s) => s.sucursal_id === pendingSucursalId);
 
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Nuevo cliente</DialogTitle>
-          <DialogDescription>
+    <DrawerForm
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Nuevo cliente"
+      size="md"
+      isDirty={form.formState.isDirty}
+      footer={
+        <div className="flex w-full justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={form.formState.isSubmitting || saving}>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="nuevo-cliente-form"
+            disabled={form.formState.isSubmitting || saving || noBranchAvailable}
+          >
+            {form.formState.isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {form.formState.isSubmitting ? 'Guardando...' : 'Crear cliente'}
+          </Button>
+        </div>
+      }
+    >
+      <Form {...form}>
+        <form id="nuevo-cliente-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             Cargá los datos básicos. Podés completar más información desde el perfil del cliente.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
 
-        <div className="space-y-4 py-2">
-          {/* Datos principales */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="nombre">Nombre *</Label>
-              <Input id="nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Juan" autoFocus />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="apellido">Apellido</Label>
-              <Input id="apellido" value={apellido} onChange={(e) => setApellido(e.target.value)} placeholder="Pérez" />
-            </div>
-          </div>
+          <ClienteFormFields
+            control={form.control}
+            nombreName="nombre"
+            apellidoName="apellido"
+            telefonoName="telefono"
+            emailName="email"
+          />
 
-          <div className="space-y-1.5">
-            <Label htmlFor="telefono">Teléfono</Label>
-            <PhoneInput
-              id="telefono"
-              value={phoneOut?.e164 ?? null}
-              onChange={(o) => {
-                setPhoneOut(o);
-                setTelefono(o.e164 ?? '');
-              }}
-              defaultCountry="AR"
-              allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-              mode="mobile"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@email.com" />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Fecha de nacimiento</Label>
-            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={cn("w-full justify-start text-left font-normal", !fechaNac && "text-muted-foreground")}
-                >
-                  <CalendarIcon className="h-4 w-4" />
-                  {fechaNac ? format(parseISO(fechaNac), "d 'de' MMMM yyyy", { locale: es }) : 'Seleccionar fecha'}
-                  {fechaNac && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      onClick={(ev) => { ev.stopPropagation(); setFechaNac(null); }}
-                      onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); setFechaNac(null); } }}
-                      className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
-                      aria-label="Limpiar fecha"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={fechaNac ? parseISO(fechaNac) : undefined}
-                  onSelect={(d) => {
-                    setFechaNac(d ? format(d, 'yyyy-MM-dd') : null);
-                    setDatePickerOpen(false);
-                  }}
-                  disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-                  initialFocus
-                  className={cn('p-3 pointer-events-auto')}
-                  captionLayout="dropdown-buttons"
-                  fromYear={1900}
-                  toYear={new Date().getFullYear()}
-                />
-                <div className="border-t p-2 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setFechaNac(null); setDatePickerOpen(false); }}
-                  >
-                    Limpiar
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
+          <FormField
+            control={form.control}
+            name="fechaNacimiento"
+            render={({ field }) => (
+              <FormItem className="space-y-1">
+                <FormLabel className="text-xs">Fecha de nacimiento (opcional)</FormLabel>
+                <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="h-4 w-4" />
+                        {field.value ? format(parseISO(field.value), "d 'de' MMMM yyyy", { locale: es }) : 'Seleccionar fecha'}
+                        {field.value && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(ev) => { ev.stopPropagation(); field.onChange(''); }}
+                            onKeyDown={(ev) => { if (ev.key === 'Enter') { ev.stopPropagation(); field.onChange(''); } }}
+                            className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded hover:bg-accent"
+                            aria-label="Limpiar fecha"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value ? parseISO(field.value) : undefined}
+                      onSelect={(d) => {
+                        field.onChange(d ? format(d, 'yyyy-MM-dd') : '');
+                        setDatePickerOpen(false);
+                      }}
+                      disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+                      initialFocus
+                      className={cn('p-3 pointer-events-auto')}
+                      captionLayout="dropdown-buttons"
+                      fromYear={1900}
+                      toYear={new Date().getFullYear()}
+                    />
+                    <div className="border-t p-2 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { field.onChange(''); setDatePickerOpen(false); }}
+                      >
+                        Limpiar
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {needsSucursalPicker && (
-            <div className="space-y-1.5">
-              <Label htmlFor="sucursal">Sucursal *</Label>
-              {noBranchAvailable ? (
-                <p className="text-sm text-muted-foreground">
-                  No hay sucursales disponibles. Creá una sucursal antes de cargar clientes.
-                </p>
-              ) : (
-                <Select value={sucursalId} onValueChange={setSucursalId}>
-                  <SelectTrigger id="sucursal">
-                    <SelectValue placeholder="Seleccioná una sucursal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sucursales.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+            noBranchAvailable ? (
+              <EmptySelectHint
+                message="No hay sucursales creadas todavía."
+                ctaLabel="Cómo resolverlo"
+                onCta={() => toast.message('Cerrá esta ventana y creá una sucursal desde Mi Negocio antes de cargar un cliente.')}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="sucursalId"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Sucursal</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Seleccioná una sucursal" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sucursales.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )
           )}
 
           {/* Más datos */}
@@ -307,51 +334,86 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="instagram">Instagram</Label>
-                <Input id="instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@usuario" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tiktok">TikTok</Label>
-                <Input id="tiktok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} placeholder="@usuario" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="otra_red">Otra red social</Label>
-                <Input id="otra_red" value={otraRed} onChange={(e) => setOtraRed(e.target.value)} placeholder="Ej: Twitter @usuario" />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="alergias">Alergias</Label>
-                <Textarea
-                  id="alergias"
-                  value={alergias}
-                  onChange={(e) => setAlergias(e.target.value)}
-                  placeholder="Ej: alergia a tintes, productos con amoníaco..."
-                  rows={2}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="instagram"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Instagram (opcional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} maxLength={80} placeholder="@usuario" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="tiktok"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">TikTok (opcional)</FormLabel>
+                      <FormControl>
+                        <Input {...field} maxLength={80} placeholder="@usuario" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="otraRedSocial"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Otra red social (opcional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={80} placeholder="Ej: Twitter @usuario" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-                <div className="space-y-0.5">
-                  <Label htmlFor="acepta_marketing" className="text-sm">Acepta marketing</Label>
-                  <p className="text-xs text-muted-foreground">Promociones y novedades por mensajes.</p>
-                </div>
-                <Switch id="acepta_marketing" checked={aceptaMarketing} onCheckedChange={setAceptaMarketing} />
-              </div>
+              <FormField
+                control={form.control}
+                name="alergias"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Alergias (opcional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        maxLength={240}
+                        rows={2}
+                        placeholder="Ej: alergia a tintes, productos con amoníaco..."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="aceptaMarketing"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border px-3 py-2.5 space-y-0">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-sm">Acepta marketing</FormLabel>
+                      <p className="text-xs text-muted-foreground">Promociones y novedades por mensajes.</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
             </CollapsibleContent>
           </Collapsible>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || checking}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={saving || checking || noBranchAvailable}>
-            {(saving || checking) && <Loader2 className="h-4 w-4 animate-spin" />}
-            {checking ? 'Verificando…' : 'Crear cliente'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+        </form>
+      </Form>
 
       <AlertDialog
         open={!!duplicateMatch}
@@ -418,7 +480,6 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </DrawerForm>
   );
 }
-

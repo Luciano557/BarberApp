@@ -2984,3 +2984,221 @@ no se tocó — ya estaba bien.
 ### Validación
 
 `npx tsc --noEmit` — **0 errores**.
+
+## Fase 4 - Tanda 2 - Parte 3 - Build C1 (Alta de cliente + Importador) — 2026-07-28
+
+Primero de los 2 builds de Clientes. Alcance: `NuevoClienteDialog.tsx` e
+`ImportClientesDialog.tsx`. `ClienteDetailDialog.tsx` queda para el Build
+C2, aparte.
+
+### `NuevoClienteDialog.tsx` — Dialog → `DrawerForm`, reusa Agenda
+
+Contenedor migrado a `DrawerForm` (`size="md"`). La validación manual
+(`useState` + `if`s encadenados) se reemplazó por RHF+Zod, reusando
+directo `ClienteFormFields.tsx` + `clienteModeFieldsSchema` de Agenda para
+Nombre/Apellido/Teléfono/Email — ninguno de los dos archivos se tocó, solo
+se importan. Esto resuelve de una los 3 síntomas que traía el pedido: sin
+asterisco en Nombre (el schema no los usa), `maxLength` 80/80/120 ya
+incluido, y el regex de email ya no vive duplicado a mano (ver más abajo).
+
+No se reusó `validateClienteMode` (la función de validación cruzada de
+`clienteModeSchema.ts`): esa función exige Apellido y Teléfono
+obligatorios porque está pensada para el alta rápida dentro de un turno
+(`NewAppointmentDialog`). El alta standalone tiene una regla de negocio
+distinta y ya existente — Apellido opcional, Teléfono **o** Email (al
+menos uno) — así que `NuevoClienteDialog` define su propio
+`superRefine` en `buildNuevoClienteSchema(needsSucursalPicker)`, mismo
+patrón de "schema como función" que `buildInviteSchema`/`buildPinSchema`
+del Build B, porque la sucursal obligatoria depende de un dato externo
+(`isAllMode`/`currentSucursal`). Para el regex de email no se duplicó un
+literal nuevo: `clienteModeSchema.ts` no exporta el suyo, así que se reusa
+`isValidEmail` de `clientes/import/lib/normalize.ts` (mismo patrón exacto,
+ya exportado, ya usado por el importador) — un import ya existente en vez
+de una tercera copia del mismo regex.
+
+Los campos que no vive en el sub-formulario compartido (fecha de
+nacimiento, Instagram/TikTok/otra red social, alergias, acepta marketing)
+se mantuvieron, ahora como `FormField` del mismo `useForm` — necesario
+para que `isDirty` reaccione a cualquier campo del formulario, no solo a
+los 4 compartidos. `maxLength` agregado donde no había: redes sociales 80
+(bucket nombres/títulos), alergias 240 (bucket descripciones/motivos).
+Select "Sucursal": sin asterisco, `EmptySelectHint` con CTA "Cómo
+resolverlo" en vez del párrafo mudo que tenía antes (mismo texto/patrón
+que `InviteUserDialog.tsx`, Build B). `isDirty={form.formState.isDirty}`
+conectado. `saving`/`checking` manuales eliminados del submit principal —
+ahora es `form.formState.isSubmitting` (doble submit resuelto de fábrica).
+
+**Hallazgo en el camino, no pedido**: el archivo tenía, al momento de
+escribir este build, un flujo de detección de duplicados por teléfono
+(`findClienteByPhone` + `AlertDialog` "Ya existe un cliente con ese
+teléfono" con opciones vincular/crear igual/cancelar) que no estaba en el
+alcance original de este build ni en la lectura inicial del archivo — se
+preservó intacto, adaptado a leer del form (`form.getValues()`) en vez de
+estado plano, con su propio `saving` local porque se dispara fuera del
+ciclo de `form.handleSubmit` (mismo patrón que el `isSaving` manual de
+`BackfillWizard` conviviendo con RHF).
+
+### `ImportClientesDialog.tsx` — Dialog → `Sheet`, mismo estatus que `BackfillWizard`
+
+Wizard de 4 pasos (`method`/`sucursal`/`preview`/`summary`): contenedor
+migrado de `Dialog` centrado a `Sheet` propio (`sm:max-w-3xl`), con
+header/body/footer armados a mano igual que `BackfillWizard.tsx` — no es
+un consumidor de `DrawerForm`, mismo motivo que ese wizard (multi-paso, no
+es alta/edición plana de una entidad). Ninguno de los 4 pasos ni la lógica
+de parseo/preview se tocó.
+
+**Guard de cierre extendido**: antes solo bloqueaba el cierre en
+silencio mientras `importing` estaba en curso (sin diálogo, sin feedback).
+Ahora también protege el caso "hay un archivo parseado con preview sin
+confirmar" (`rows.length > 0 && step !== 'summary'`) — cerrar en ese
+estado perdería el trabajo de corregir/resolver duplicados antes de
+importar. Mismo mecanismo que `DrawerForm` (`AlertDialog` "¿Descartar
+cambios?" / "Seguir editando" / "Descartar cambios"), pero armado a mano
+en el propio componente porque acá no hay un `isDirty` de RHF que pasarle
+a nada — es un wizard de pasos, no un form. Igual que el criterio de
+`DrawerForm`, la protección aplica solo a X/Escape/click afuera
+(`handleSheetOpenChange`); los botones explícitos del footer (Cerrar/
+Cancelar/Listo) siguen bypaseando y cerrando directo, sin preguntar.
+
+Select "Sucursal de destino" (paso `sucursal`): el mensaje mudo dentro de
+`SelectContent` para el caso sin sucursales accesibles se reemplazó por
+`EmptySelectHint` con CTA, mismo patrón que el resto del cluster.
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+## Fase 4 - Tanda 2 - Parte 3 - Build C2 (ClienteDetailDialog) — CIERRE de la Tanda 2
+
+Segundo y último build de Clientes. Un solo archivo:
+`clientes/ClienteDetailDialog.tsx`. Referencia exacta a copiar (según
+pedido de esta sesión): `agenda/AppointmentDetailDialog.tsx` — no se tocó,
+solo se leyó.
+
+### Contenedor: Dialog → `DrawerForm`
+
+`size="lg"` (el `Dialog` original era `sm:max-w-2xl`, el bucket más
+cercano en la escala de `DrawerForm`). Título compuesto: nombre completo +
+badge "Bloqueado" condicional, mismo patrón que `AppointmentDetailDialog`
+(avatar/nombre/pill). El botón "WhatsApp" (placeholder, `toast('Próximamente')`)
+vivía dentro del `DialogTitle` original en un layout `justify-between` —
+se movió al tope del body en vez de forzarlo dentro del slot `title` de
+`DrawerForm`: ese slot es un `SheetPrimitive.Title` sin `flex-1`, así que
+un hijo con "empujar a la derecha" ahí no se estira contra el botón de
+cerrar sin tocar `drawer-form.tsx` (fuera de alcance de este build). No es
+una regresión — el botón sigue existiendo, mismo comportamiento, solo
+cambió de fila.
+
+### Las 4 secciones editables — todas a RHF+Zod, todas con `EditableSectionHeader`
+
+**Contacto**: reusa `ClienteFormFields.tsx` + `clienteModeFieldsSchema`
+(mismo componente que `NuevoClienteDialog`, Build C1 — sin tocarlo, solo
+import) con un `superRefine` propio, mismo motivo que en C1: la regla acá
+es Apellido opcional + Teléfono *o* Email, no la de
+`validateClienteMode` (pensada para el turno). Efecto colateral bueno:
+al usar `PhoneInputChange` completo en el campo (en vez del string plano +
+"¿el usuario tocó el teléfono?" que tenía el código viejo), el caso
+"usuario no toca el teléfono" ahora simplemente no ensucia el campo — RHF
+ya sabe no incluir cambios si `isDirty` es falso, se cayó la rama especial
+`editedPhone` que existía antes.
+
+**Redes** y **Personal**: sin validación real antes (`useState` +
+`persist` directo, sin ningún chequeo). Ahora tienen su propio
+`useForm`/schema — sin reglas obligatorias (son todas opcionales), pero
+con `maxLength` real por primera vez.
+
+**Nota interna**: reimplementaba su propio toggle editar/guardar/cancelar
+a mano (`editingNota` + botones con `Pencil`/`Save`/`X`/`Loader2`
+sueltos). Ahora usa `EditableSectionHeader`, igual que las otras 3 — ya no
+queda una sección afuera del patrón. Efecto colateral importante, no
+cosmético: antes `editingNota` era un estado aparte de `editing`
+(`EditingSection`), así que editar la Nota **no bloqueaba** las otras 3
+secciones — un hueco real en la exclusión mutua. Se resolvió extendiendo
+el propio `EditingSection` (`null | 'contacto' | 'redes' | 'personal' |
+'nota'`), no agregando un boolean más — las 4 secciones comparten un único
+estado mutuamente excluyente, mismo mecanismo que ya usaban 3 de las 4.
+
+**maxLength aplicado**: Nombre/Apellido 80 y Email 120 (vía
+`clienteModeFieldsSchema`, sin duplicar); Alergias y Nota interna 240
+(bucket descripciones/motivos); Instagram/TikTok/otra red social **120**
+según el pedido explícito de esta sesión ("120 para redes sociales/
+dirección"). **Nota de inconsistencia, no se corrigió**: en
+`NuevoClienteDialog.tsx` (Build C1) esos mismos 3 campos quedaron en 80
+(bucket nombres/títulos, el criterio vigente en ese momento) — el candado
+de alcance de este build prohíbe tocar ese archivo, así que el mismo
+campo lógico hoy tiene dos `maxLength` distintos según por dónde se cargue
+el cliente (alta vs. edición). No es un bug de este build, es una decisión
+de sesión que quedó grabada en dos lugares distintos — que un build futuro
+decida cuál de los dos criterios es el correcto y unifique.
+
+**Regex de email**: mismo criterio que C1 — no se duplicó un literal
+nuevo, se reusó `isValidEmail` de `clientes/import/lib/normalize.ts`.
+
+**Asteriscos sacados**: "Nombre *" (Contacto, automático al migrar a
+`ClienteFormFields`) y "Motivo *" (modal Bloquear cliente, corregido
+aparte — ver abajo).
+
+### Exclusión mutua — confirmada y extendida a las 4
+
+Ya existía para Contacto/Redes/Personal vía el `EditingSection` único con
+`disabled={editing !== null}` en cada `EditableSectionHeader` (el mismo
+prop deshabilita el botón "Editar" de las demás; la sección activa ignora
+`disabled` porque mientras `isEditing` es true muestra Guardar/Cancelar,
+no el botón "Editar"). Nota interna se sumó al mismo union en vez de
+quedar con su propio boolean — con 4 secciones (vs. las 2 de
+`AppointmentDetailDialog`), un único estado compartido es más simple que
+4 booleans cruzados a mano.
+
+### `isDirty` — unión de las 4 secciones activas
+
+Mismo patrón que `AppointmentDetailDialog` con `clienteForm`/`turnoForm`:
+`(editing === 'contacto' && contactoForm.formState.isDirty) || (...redes)
+|| (...personal) || (...nota)`. Antes no había ningún guard de cierre — cerrar
+el `Dialog` con cambios sin guardar en cualquier sección no avisaba nada
+(solo el botón "Cancelar" de cada sección revertía bien). Ahora
+`DrawerForm` pregunta "¿Descartar cambios?" si cerrás por X/Escape/click
+afuera con una sección dirty.
+
+### Qué no se tocó (fuera de alcance de este build)
+
+La sección "Bloquear cliente" (modal `Dialog` con motivo + botón, guard
+`actionBusy`) y sus dos hermanas de confirmación pura (`Desbloquear`,
+`Eliminar`, ambas en `AlertDialog`) — no se migraron a RHF, ya estaban
+conformes. Único cambio ahí: se sacó el asterisco de "Motivo *" → "Motivo"
+(el campo ya era obligatorio de forma funcional, vía el botón deshabilitado
+hasta que se completa — no necesitaba la marca). `NuevoClienteDialog.tsx`
+e `ImportClientesDialog.tsx` (Build C1) no se tocaron.
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+## Cierre de la Parte 3 (Fase 4, Tanda 2): Mi Negocio + Clientes
+
+Tres builds — Build A (Mi Negocio + Sucursales), Build B (Equipo/Staff),
+Build C1+C2 (Clientes) — migraron el cluster completo a `DrawerForm` +
+RHF+Zod, con `isDirty` conectado y el patrón de Select vacío
+(`SelectItem disabled` o `EmptySelectHint`, según si el campo entero
+desaparece) generalizado en todo el cluster. `ClienteDetailDialog.tsx`
+suma un patrón nuevo al canon: edición-en-el-lugar por sección con
+`EditableSectionHeader` + exclusión mutua vía un único estado compartido
+(`AppointmentDetailDialog` ya lo probó con 2 secciones; acá se confirmó
+que escala a 4). Pendiente conocido, no bloqueante: el `maxLength` de
+redes sociales quedó en 80 en C1 y en 120 en C2 (ver nota en Build C2) —
+a resolver en un build futuro, no en un hotfix de esta sesión.
+
+## Cierre de la Tanda 2 (Fase 4): Configuración + Finanzas + Mi Negocio/Clientes
+
+Con este build se cierran las 3 partes de la Tanda 2:
+**Configuración** (18 formularios), **Finanzas** (Sueldos/Gastos/
+Inversiones/Deudas) y **Mi Negocio/Clientes** (Sucursales/Equipo/
+Clientes) migraron a `DrawerForm` + RHF+Zod como contenedor y stack
+únicos, con las excepciones ya documentadas y vigentes (`Cobrar` stepper
+propio, `BackfillWizard`/`ImportClientesDialog` como wizards en `Sheet`,
+`PinConfigSection`/`ProductoPickerDialog` fuera del canon por diseño).
+`isDirty` conectado en todos los consumidores editables del cluster.
+Alcance ya migrado a este sistema, actualizado: Sidebar, Agenda, Cobrar,
+Caja, Configuración completa, Finanzas completa, Mi Negocio + Clientes
+completos. Todavía sin migrar: el portal público de reservas (fuera del
+sistema de diseño unificado por decisión ya tomada, ver
+`vittro-ui-patterns`).
