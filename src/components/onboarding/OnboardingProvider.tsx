@@ -311,8 +311,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     registerSubTabSetter,
     registerSectionOpener,
     registerSubTabProbe,
+    setTooltipFits,
     notifyEvent,
   }), [isActive, currentStep, currentIndex, steps.length, targetRect, targetMissing, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, registerSectionOpener, registerSubTabProbe, notifyEvent]);
+
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 }
