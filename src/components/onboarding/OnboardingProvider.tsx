@@ -25,8 +25,11 @@ interface OnboardingContextValue {
   registerSectionOpener: (id: string, fn: (() => void) | null) => void;
   /** Permite consultar si la sub-tab activa corresponde a una sucursal válida */
   registerSubTabProbe: (fn: (() => boolean) | null) => void;
+  /** El tooltip informa si entra completo en el viewport; si no, se libera el scroll */
+  setTooltipFits: (fits: boolean) => void;
   notifyEvent: (event: OnboardingEvent) => void;
 }
+
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
