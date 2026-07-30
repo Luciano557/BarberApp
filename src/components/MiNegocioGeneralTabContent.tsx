@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useOnboarding } from './onboarding/OnboardingProvider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Loader2, ChevronDown, Info } from 'lucide-react';
