@@ -52,6 +52,47 @@ export function OnboardingTooltip() {
     );
   }
 
+  // === Target ausente: fallback centrado, siempre con salida ===
+  if (targetMissing) {
+    return (
+      <Dialog open onOpenChange={(open) => { if (!open) skip(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+              Paso {currentIndex + 1} de {totalSteps}
+            </span>
+            <DialogTitle>{currentStep.title}</DialogTitle>
+            <DialogDescription className="leading-relaxed pt-1">
+              {currentStep.description}
+            </DialogDescription>
+          </DialogHeader>
+
+          {currentStep.bullets && currentStep.bullets.length > 0 && (
+            <ul className="space-y-1.5">
+              {currentStep.bullets.map((b, i) => (
+                <li key={i} className="flex gap-2 text-sm text-foreground">
+                  <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
+                  <span className="leading-relaxed">{b}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={skip} className="sm:mr-auto">
+              Omitir tutorial
+            </Button>
+            <Button onClick={next} className="gap-1.5">
+              Continuar
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+
   // === Mobile: bottom sheet fijo ===
   if (isMobile) {
     return (
