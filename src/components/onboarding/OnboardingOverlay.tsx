@@ -7,7 +7,7 @@ export function OnboardingOverlay() {
   if (currentStep?.isWelcome) return null;
 
   const pad = 8;
-  const r = targetRect
+  const r = targetRect && !targetMissing
     ? {
         top: Math.max(0, targetRect.top - pad),
         left: Math.max(0, targetRect.left - pad),
@@ -16,7 +16,8 @@ export function OnboardingOverlay() {
       }
     : null;
 
-  // Sin target visible (típico en mobile con sidebar colapsada): fondo suave sin spotlight
+  // Sin target visible (mobile con sidebar colapsada, o target ausente):
+  // fondo suave sin spotlight; el tooltip pasa a modo centrado.
   if (!r) {
     return <div className="fixed inset-0 z-[60] bg-foreground/40 backdrop-blur-[1px] animate-fade-in pointer-events-none" />;
   }
