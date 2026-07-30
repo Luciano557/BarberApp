@@ -192,14 +192,31 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     raf = requestAnimationFrame(tick);
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
-    // Scroll into view once
-    const scrollT = setTimeout(() => {
-      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 200);
+    // Scroll del target dejando aire para el tooltip.
+    // Un target alto (por ejemplo un colapsable recién abierto) centrado deja su
+    // borde inferior debajo del centro y no queda lugar para el card: en ese caso
+    // lo alineamos arriba.
+    let lastScrolledH = -1;
+    const scrollTargetIntoView = () => {
+      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;
+      if (!el) return;
+      const h = el.getBoundingClientRect().height;
+      lastScrolledH = h;
+      const block: ScrollLogicalPosition = h > window.innerHeight * 0.45 ? 'start' : 'center';
+      el.scrollIntoView({ behavior: 'smooth', block });
+    };
+    const scrollT = setTimeout(scrollTargetIntoView, 200);
+    // Si el target cambia de tamaño (animación del colapsable), reajustamos.
+    const resizeT = setInterval(() => {
+      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;
+      if (!el || lastScrolledH < 0) return;
+      const h = el.getBoundingClientRect().height;
+      if (Math.abs(h - lastScrolledH) > 40) scrollTargetIntoView();
+    }, 250);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(scrollT);
+      clearInterval(resizeT);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
@@ -210,8 +227,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // entre un paso y el siguiente: nunca hay una ventana sin bloqueo.
   // Se bloquea la interacción (wheel / touch / teclas de scroll) en lugar de
   // usar overflow:hidden, para que el scrollIntoView programático siga funcionando.
+  // Excepción: si el tooltip no entra completo en el viewport, se libera el scroll
+  // para que el usuario nunca quede sin forma de alcanzar el contenido.
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !tooltipFits) return;
     const prevent = (e: Event) => { e.preventDefault(); };
     const SCROLL_KEYS = new Set([
       'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar',
@@ -230,7 +249,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('touchmove', prevent);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [isActive]);
+  }, [isActive, tooltipFits]);
+
+  // Escape siempre omite el tour, desde cualquier paso.
+  useEffect(() => {
+    if (!isActive) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') skip();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [isActive, skip]);
+
+
 
 
 
