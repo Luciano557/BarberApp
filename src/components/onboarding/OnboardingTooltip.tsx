@@ -9,7 +9,7 @@ const TOOLTIP_W = 340;
 const MARGIN = 16;
 
 export function OnboardingTooltip() {
-  const { isActive, currentStep, currentIndex, totalSteps, targetRect, next, skip } = useOnboarding();
+  const { isActive, currentStep, currentIndex, totalSteps, targetRect, targetMissing, next, skip } = useOnboarding();
   const isMobile = useIsMobile();
   const [vp, setVp] = useState({
     w: typeof window !== 'undefined' ? window.innerWidth : 1024,
