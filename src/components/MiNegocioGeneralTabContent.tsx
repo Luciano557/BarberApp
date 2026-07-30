@@ -151,7 +151,7 @@ export function MiNegocioGeneralTabContent({
 
         {/* Equipo General (solo owner/GM) */}
         {canManageEquipo && (
-          <div id="seccion-equipo" className="mt-8 space-y-4">
+          <div id="seccion-equipo" data-onboarding-id="equipo-general-section" className="mt-8 space-y-4">
             <h3 className="text-base font-medium text-foreground">Equipo</h3>
             <EquipoGeneralConfig
               organizationId={organizationId}
