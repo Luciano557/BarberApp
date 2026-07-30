@@ -31,7 +31,7 @@ interface OnboardingContextValue {
 }
 
 
-const OnboardingContext = createContext<OnboardingContextValue | null>(null);
+export const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 export function useOnboarding() {
   const ctx = useContext(OnboardingContext);
