@@ -184,7 +184,8 @@ export function OnboardingTooltip() {
   }
 
   // === Target ausente: fallback centrado, siempre con salida ===
-  if (targetMissing) {
+  // Si ningún lado evita el solapamiento con el target, usamos el mismo fallback.
+  if (targetMissing || (!isMobile && placement === 'center')) {
     return (
       <Dialog open onOpenChange={(open) => { if (!open) skip(); }}>
         <DialogContent className="sm:max-w-md">
