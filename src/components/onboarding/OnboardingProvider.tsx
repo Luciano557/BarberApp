@@ -200,6 +200,35 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     };
   }, [currentStep, next]);
 
+  // Bloqueo de scroll del usuario mientras el tour está activo.
+  // Se activa por `isActive` (no por paso), así cubre también la transición
+  // entre un paso y el siguiente: nunca hay una ventana sin bloqueo.
+  // Se bloquea la interacción (wheel / touch / teclas de scroll) en lugar de
+  // usar overflow:hidden, para que el scrollIntoView programático siga funcionando.
+  useEffect(() => {
+    if (!isActive) return;
+    const prevent = (e: Event) => { e.preventDefault(); };
+    const SCROLL_KEYS = new Set([
+      'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar',
+    ]);
+    const onKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+      if (SCROLL_KEYS.has(e.key)) e.preventDefault();
+    };
+    window.addEventListener('wheel', prevent, { passive: false });
+    window.addEventListener('touchmove', prevent, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('wheel', prevent);
+      window.removeEventListener('touchmove', prevent);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isActive]);
+
+
+
   const isAllowedTab = useCallback((tabId: string) => {
     if (!currentStep) return true;
     if (currentStep.requiredTab && tabId === currentStep.requiredTab) return true;
