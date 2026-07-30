@@ -56,6 +56,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [targetMissing, setTargetMissing] = useState(false);
+  const [tooltipFits, setTooltipFits] = useState(true);
+
 
   const isActive = currentIndex >= 0 && currentIndex < steps.length;
   const currentStep = isActive ? steps[currentIndex] : null;
