@@ -25,8 +25,11 @@ interface OnboardingContextValue {
   registerSectionOpener: (id: string, fn: (() => void) | null) => void;
   /** Permite consultar si la sub-tab activa corresponde a una sucursal válida */
   registerSubTabProbe: (fn: (() => boolean) | null) => void;
+  /** El tooltip informa si entra completo en el viewport; si no, se libera el scroll */
+  setTooltipFits: (fits: boolean) => void;
   notifyEvent: (event: OnboardingEvent) => void;
 }
+
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
@@ -53,6 +56,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [targetMissing, setTargetMissing] = useState(false);
+  const [tooltipFits, setTooltipFits] = useState(true);
+
 
   const isActive = currentIndex >= 0 && currentIndex < steps.length;
   const currentStep = isActive ? steps[currentIndex] : null;
@@ -187,14 +192,31 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     raf = requestAnimationFrame(tick);
     window.addEventListener('resize', update);
     window.addEventListener('scroll', update, true);
-    // Scroll into view once
-    const scrollT = setTimeout(() => {
-      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 200);
+    // Scroll del target dejando aire para el tooltip.
+    // Un target alto (por ejemplo un colapsable recién abierto) centrado deja su
+    // borde inferior debajo del centro y no queda lugar para el card: en ese caso
+    // lo alineamos arriba.
+    let lastScrolledH = -1;
+    const scrollTargetIntoView = () => {
+      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;
+      if (!el) return;
+      const h = el.getBoundingClientRect().height;
+      lastScrolledH = h;
+      const block: ScrollLogicalPosition = h > window.innerHeight * 0.45 ? 'start' : 'center';
+      el.scrollIntoView({ behavior: 'smooth', block });
+    };
+    const scrollT = setTimeout(scrollTargetIntoView, 200);
+    // Si el target cambia de tamaño (animación del colapsable), reajustamos.
+    const resizeT = setInterval(() => {
+      const el = document.querySelector(`[data-onboarding-id="${currentStep.targetId}"]`) as HTMLElement | null;
+      if (!el || lastScrolledH < 0) return;
+      const h = el.getBoundingClientRect().height;
+      if (Math.abs(h - lastScrolledH) > 40) scrollTargetIntoView();
+    }, 250);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(scrollT);
+      clearInterval(resizeT);
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
     };
@@ -205,8 +227,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // entre un paso y el siguiente: nunca hay una ventana sin bloqueo.
   // Se bloquea la interacción (wheel / touch / teclas de scroll) en lugar de
   // usar overflow:hidden, para que el scrollIntoView programático siga funcionando.
+  // Excepción: si el tooltip no entra completo en el viewport, se libera el scroll
+  // para que el usuario nunca quede sin forma de alcanzar el contenido.
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || !tooltipFits) return;
     const prevent = (e: Event) => { e.preventDefault(); };
     const SCROLL_KEYS = new Set([
       'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar',
@@ -225,7 +249,19 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('touchmove', prevent);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [isActive]);
+  }, [isActive, tooltipFits]);
+
+  // Escape siempre omite el tour, desde cualquier paso.
+  useEffect(() => {
+    if (!isActive) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') skip();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [isActive, skip]);
+
+
 
 
 
@@ -275,8 +311,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     registerSubTabSetter,
     registerSectionOpener,
     registerSubTabProbe,
+    setTooltipFits,
     notifyEvent,
   }), [isActive, currentStep, currentIndex, steps.length, targetRect, targetMissing, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, registerSectionOpener, registerSubTabProbe, notifyEvent]);
+
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 }
