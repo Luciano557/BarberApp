@@ -17,6 +17,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import Reservar from "./pages/Reservar";
+import OnboardingHarness from "./pages/__OnboardingHarness";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/__onboarding-harness" element={<OnboardingHarness />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />
                 </Routes>
