@@ -1,7 +1,7 @@
 import { useOnboarding } from './OnboardingProvider';
 
 export function OnboardingOverlay() {
-  const { isActive, currentStep, targetRect } = useOnboarding();
+  const { isActive, currentStep, targetRect, targetMissing } = useOnboarding();
   if (!isActive) return null;
   // El paso de bienvenida usa Dialog con su propio backdrop
   if (currentStep?.isWelcome) return null;
