@@ -104,10 +104,11 @@ export function OnboardingTooltip() {
   // el provider libera el bloqueo de scroll para que el usuario nunca quede trabado.
   useEffect(() => {
     if (!isActive) return;
-    setTooltipFits(isMobile || !!currentStep?.isWelcome || targetMissing || fits);
+    setTooltipFits?.(isMobile || !!currentStep?.isWelcome || targetMissing || fits);
   }, [isActive, isMobile, currentStep, targetMissing, fits, setTooltipFits]);
 
-  useEffect(() => () => setTooltipFits(true), [setTooltipFits]);
+  useEffect(() => () => setTooltipFits?.(true), [setTooltipFits]);
+
 
   if (!isActive || !currentStep) return null;
 
