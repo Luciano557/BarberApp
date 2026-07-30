@@ -26,6 +26,7 @@ export default function OnboardingHarness() {
   const index = Number(params.get('step') ?? '0');
   const step = ONBOARDING_STEPS[index] ?? ONBOARDING_STEPS[0];
   const [rect, setRect] = useState<DOMRect | null>(null);
+  const [fits, setFits] = useState(true);
 
   useLayoutEffect(() => {
     const update = () => {
@@ -58,7 +59,8 @@ export default function OnboardingHarness() {
     registerSubTabSetter: noop,
     registerSectionOpener: noop,
     registerSubTabProbe: noop,
-    setTooltipFits: noop,
+    setTooltipFits: setFits,
+    tooltipFits: fits,
     notifyEvent: noop,
   } as never;
 
