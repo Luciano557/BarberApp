@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
-import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard } from 'lucide-react';
+import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useToast } from '@/hooks/use-toast';
@@ -27,12 +27,16 @@ import { usePaymentMethodsConfig } from '@/hooks/usePaymentMethodsConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMercadoPago } from '@/hooks/useMercadoPago';
 import { useSucursal } from '@/contexts/SucursalContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { MpTerminalPaymentDialog } from '@/components/MpTerminalPaymentDialog';
 import { ProductoPickerDialog, CartItem } from '@/components/productos/ProductoPickerDialog';
 import { ProductoCartInput } from '@/hooks/useTransactions';
 import { Badge } from '@/components/ui/badge';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
 import { SelectableCard } from '@/components/ui/SelectableCard';
+import { ClienteSearchPicker } from '@/components/agenda/ClienteSearchPicker';
+import { useClienteSearch, clienteFullName, type ClienteLite } from '@/components/agenda/hooks/useClienteSearch';
+import { NuevoClienteDialog } from '@/components/clientes/NuevoClienteDialog';
 import type { BillingPlanCode } from '@/hooks/useSubscriptionAccess';
 
 const isPriceMissing = (p: number | null | undefined) => !p || p <= 0;
@@ -140,6 +144,7 @@ interface PaymentRegistrationProps {
     productos?: ProductoCartInput[];
     mpPaymentIntentId?: string | null;
     mpDeviceId?: string | null;
+    clienteId?: string | null;
   }) => Promise<unknown | null>;
 }
 
@@ -256,6 +261,21 @@ export function PaymentRegistration({
     : false;
   // Cancelar venta
   const [cancelOpen, setCancelOpen] = useState(false);
+
+  // Cliente asociado (opcional) — filtrado SOLO a clientes de la sucursal actual.
+  const { organization } = useOrganization();
+  const [nuevoClienteOpen, setNuevoClienteOpen] = useState(false);
+  const clienteSearch = useClienteSearch({
+    organizationId: organization?.id || '',
+    sucursalId: sucursalId || currentSucursal?.id || '',
+    enabled: !!(organization?.id && (sucursalId || currentSucursal?.id)),
+  });
+  // En Cobrar solo mostramos clientes vinculados a la sucursal activa
+  // (a diferencia de Agenda, que permite ver clientes de otras sucursales).
+  const clienteResultsInSucursal = useMemo(
+    () => clienteSearch.results.filter(c => c.inSucursal),
+    [clienteSearch.results],
+  );
 
   const teamSetupDescription = useMemo(() => {
     if (isSucursalAccount) {
@@ -657,6 +677,7 @@ export function PaymentRegistration({
     setCartBarberName(null);
     setProductSaleAssignment('pending');
     setCurrentStep('barber');
+    clienteSearch.reset();
     form.reset({
       barberId: '',
       serviceId: '',
@@ -666,7 +687,7 @@ export function PaymentRegistration({
       cart: [],
       split: { enabled: false, efectivo: '', digital: '', digitalMethod: '' },
     });
-  }, [form]);
+  }, [form, clienteSearch]);
 
   const onValidCobro = useCallback(async () => {
     // Guard previo: ítems sin precio (depende de config externa de precios — no es
@@ -741,6 +762,7 @@ export function PaymentRegistration({
         subtotal,
         total,
         productos: productosPayload,
+        clienteId: clienteSearch.selectedCliente?.id ?? null,
       });
 
       if (result) {
@@ -762,7 +784,7 @@ export function PaymentRegistration({
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form]);
+  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form, clienteSearch.selectedCliente]);
 
   const handleSubmit = useCallback(async () => {
     await form.handleSubmit(onValidCobro)();
@@ -854,6 +876,7 @@ export function PaymentRegistration({
         productos: productosPayload,
         mpPaymentIntentId: intentId,
         mpDeviceId: deviceId,
+        clienteId: clienteSearch.selectedCliente?.id ?? null,
       });
 
       if (result) {
@@ -870,7 +893,7 @@ export function PaymentRegistration({
       setIsSubmitting(false);
       setPendingMpPayload(null);
     }
-  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm]);
+  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm, clienteSearch.selectedCliente]);
 
   // ── "Cobrar con Terminal" explicit handler ───────────────────────────────────
   // Called only when the user explicitly clicks the terminal button.
@@ -1549,8 +1572,44 @@ export function PaymentRegistration({
               </div>
             )}
 
+            {/* Cliente (opcional) */}
+            <div className="rounded-lg border border-border bg-card p-4 sm:p-6 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">Cliente</span>
+                  <span className="text-xs text-muted-foreground">(opcional)</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1 text-xs"
+                  onClick={() => setNuevoClienteOpen(true)}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Nuevo cliente
+                </Button>
+              </div>
+              <ClienteSearchPicker
+                label=""
+                selectedCliente={clienteSearch.selectedCliente}
+                onSelect={clienteSearch.setSelectedCliente}
+                searchOpen={clienteSearch.searchOpen}
+                onSearchOpenChange={clienteSearch.setSearchOpen}
+                query={clienteSearch.query}
+                onQueryChange={clienteSearch.setQuery}
+                results={clienteResultsInSucursal}
+                searching={clienteSearch.searching}
+              />
+              <p className="text-xs text-muted-foreground">
+                Asociá la venta a un cliente para que quede registrada en su historial. Podés dejarlo vacío.
+              </p>
+            </div>
+
             {/* Summary */}
             <div className="rounded-lg border border-border bg-card p-4 sm:p-6">
+
               <div className="space-y-3 text-sm">
                 {(() => {
                   let displayBarberName: string | null = null;
@@ -1571,6 +1630,12 @@ export function PaymentRegistration({
                     </div>
                   );
                 })()}
+                {clienteSearch.selectedCliente && (
+                  <div className="flex items-start justify-between gap-4">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span className="shrink-0 text-right font-medium">{clienteFullName(clienteSearch.selectedCliente)}</span>
+                  </div>
+                )}
                 {service && (
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-muted-foreground">Servicio</span>
@@ -1732,7 +1797,25 @@ export function PaymentRegistration({
         />
       )}
 
+      <NuevoClienteDialog
+        open={nuevoClienteOpen}
+        onOpenChange={setNuevoClienteOpen}
+        onCreated={(id) => {
+          // Autoseleccionar el cliente recién creado buscándolo en los resultados.
+          // El hook re-fetchea al abrir el popover; acá disparamos una búsqueda por id.
+          (async () => {
+            const { data } = await import('@/integrations/supabase/client').then(m =>
+              m.supabase.from('clientes').select('id, nombre, apellido, telefono, email').eq('id', id).maybeSingle()
+            );
+            if (data) {
+              clienteSearch.setSelectedCliente({ ...(data as any), inSucursal: true } as ClienteLite);
+            }
+          })();
+        }}
+      />
+
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cancelar venta?</AlertDialogTitle>

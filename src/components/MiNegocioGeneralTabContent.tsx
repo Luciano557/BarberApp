@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useOnboarding } from './onboarding/OnboardingProvider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Loader2, ChevronDown, Info } from 'lucide-react';
@@ -78,6 +79,15 @@ export function MiNegocioGeneralTabContent({
   const [cuentasOpen, setCuentasOpen] = useState(false);
   const [serviciosTab, setServiciosTab] = useState<'services' | 'lines' | 'extras'>('services');
 
+  // El onboarding necesita poder abrir esta sección antes de mostrar su paso.
+  const { registerSectionOpener } = useOnboarding();
+  useEffect(() => {
+    registerSectionOpener('cuentas-sucursal', () => setCuentasOpen(true));
+    return () => registerSectionOpener('cuentas-sucursal', null);
+  }, [registerSectionOpener]);
+
+
+
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
       if (!isReady) {
@@ -151,7 +161,7 @@ export function MiNegocioGeneralTabContent({
 
         {/* Equipo General (solo owner/GM) */}
         {canManageEquipo && (
-          <div id="seccion-equipo" className="mt-8 space-y-4">
+          <div id="seccion-equipo" data-onboarding-id="equipo-general-section" className="mt-8 space-y-4">
             <h3 className="text-base font-medium text-foreground">Equipo</h3>
             <EquipoGeneralConfig
               organizationId={organizationId}

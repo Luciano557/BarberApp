@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useImperativeHandle } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Edit2, X, Lock, Mail, Phone, MapPin, CreditCard, UserX, UserCheck, Shield, Scissors, ChevronDown, Users, KeyRound, Copy, AlertTriangle, Check } from 'lucide-react';
 import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
@@ -7,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 import { formatPhoneDisplay } from '@/lib/phone';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -314,6 +318,7 @@ export function EquipoUnificado({
   // En general mode, sucursal principal a usar al crear un nuevo barbero.
   const [addPrincipalSucursalId, setAddPrincipalSucursalId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStaffFormDirty, setIsStaffFormDirty] = useState(false);
   const formRef = useRef<StaffFormRef>(null);
 
   const activeBarbers = barbers.filter(b => b.active);
@@ -1269,6 +1274,7 @@ export function EquipoUnificado({
         }}
         title={isAdding ? 'Agregar integrante' : 'Editar integrante'}
         size="md"
+        isDirty={isStaffFormDirty}
         footer={
           <div className="flex w-full justify-between">
             <Button variant="ghost" disabled={isSubmitting} onClick={cancelEdit}>
@@ -1292,9 +1298,13 @@ export function EquipoUnificado({
                   <SelectValue placeholder="Elegí la sucursal principal" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sucursalesForSection.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                  ))}
+                  {sucursalesForSection.length === 0 ? (
+                    <SelectItem value="__empty__" disabled>Sin sucursales configuradas</SelectItem>
+                  ) : (
+                    sucursalesForSection.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -1309,6 +1319,7 @@ export function EquipoUnificado({
             initialData={formData}
             onSave={(data) => handleFormSave(data, editingId ?? undefined)}
             onSubmittingChange={setIsSubmitting}
+            onDirtyChange={setIsStaffFormDirty}
           />
         </div>
       </DrawerForm>
@@ -1536,202 +1547,326 @@ interface StaffFormProps {
   initialData: StaffFormData;
   onSave: (data: StaffFormData) => void;
   onSubmittingChange?: (v: boolean) => void;
+  onDirtyChange?: (v: boolean) => void;
 }
+
+/** Shape interna del form — el teléfono viaja como PhoneInputChange completo
+ * (mismo patrón que Sucursal/Cliente); se aplana a e164 recién al llamar onSave,
+ * que sigue esperando StaffFormData tal cual la usa el resto de este archivo. */
+type StaffFormValues = Omit<StaffFormData, 'phone'> & { phone: PhoneInputChange | null };
+
+function staffFormValuesFromData(data: StaffFormData): StaffFormValues {
+  return {
+    ...data,
+    phone: data.phone ? { e164: data.phone, isValid: true, country: null, display: '' } : null,
+  };
+}
+
+function staffDataFromFormValues(values: StaffFormValues): StaffFormData {
+  return { ...values, phone: values.phone?.e164 ?? '' };
+}
+
+const staffFormSchema = z.object({
+  firstName: z.string().trim().min(1, 'Ingresá el nombre.').max(80, 'El nombre no puede superar los 80 caracteres.'),
+  lastName: z.string().trim().min(1, 'Ingresá el apellido.').max(80, 'El apellido no puede superar los 80 caracteres.'),
+  phone: z.custom<PhoneInputChange | null>().nullable(),
+  commission: z.string().optional().default(''),
+  address: z.string().max(120, 'La dirección no puede superar los 120 caracteres.').optional(),
+  dni: z.string().max(20, 'El DNI no puede superar los 20 caracteres.').optional(),
+  roles: z.array(z.custom<AppRole>()).min(1),
+  compensationType: z.enum(['comision', 'fijo']),
+  fixedSalary: z.string().optional().default(''),
+  payDay: z.string().optional().default('1'),
+}).superRefine((data, ctx) => {
+  if (data.phone && !data.phone.isValid && data.phone.reason !== 'empty') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['phone'], message: 'Revisá el teléfono antes de guardar.' });
+  }
+  const isComision = data.compensationType === 'comision';
+  if (isComision) {
+    const commissionRequired = data.roles.includes('barber');
+    const value = data.commission ?? '';
+    if (!commissionRequired && (value === '' || value === '0')) {
+      // Comisión opcional, vacía o en 0 — válido sin más chequeo.
+    } else {
+      const num = Number(value);
+      if (value === '' || Number.isNaN(num)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['commission'], message: 'Ingresa un número válido' });
+      } else if (num < 0 || num > 100) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['commission'], message: 'Debe estar entre 0 y 100' });
+      }
+    }
+  } else if (!data.fixedSalary) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fixedSalary'], message: 'Ingresá el sueldo fijo.' });
+  }
+});
 
 const StaffForm = React.memo(
   React.forwardRef<StaffFormRef, StaffFormProps>(
-    function StaffForm({ isEdit, barberId, initialData, onSave, onSubmittingChange }, ref) {
-  const [localData, setLocalData] = useState<StaffFormData>(initialData);
-  const [localCommissionError, setLocalCommissionError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
+    function StaffForm({ isEdit, barberId, initialData, onSave, onSubmittingChange, onDirtyChange }, ref) {
+  const form = useForm<StaffFormValues>({
+    resolver: zodResolver(staffFormSchema),
+    defaultValues: staffFormValuesFromData(initialData),
+  });
   const submittingRef = useRef(false);
-  const phoneHasInvalidContent = !!phoneOut && !phoneOut.isValid && phoneOut.reason !== 'empty';
-
 
   // Reset only when switching to a different barber (or entering/leaving add mode).
   // Do NOT reset on every initialData reference change — the parent may re-render
   // and produce a new object while the user is editing.
   useEffect(() => {
-    setLocalData(initialData);
-    setLocalCommissionError('');
+    form.reset(staffFormValuesFromData(initialData));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [barberId]);
 
-  const isComision = localData.compensationType === 'comision';
-  const commissionRequired = isComision && localData.roles.includes('barber');
+  useEffect(() => {
+    onDirtyChange?.(form.formState.isDirty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.formState.isDirty]);
 
-  const validateLocalCommission = (value: string): boolean => {
-    if (!commissionRequired && (value === '' || value === '0')) {
-      setLocalCommissionError(''); return true;
-    }
-    const num = Number(value);
-    if (value === '' || isNaN(num)) { setLocalCommissionError('Ingresa un número válido'); return false; }
-    if (num < 0 || num > 100) { setLocalCommissionError('Debe estar entre 0 y 100'); return false; }
-    setLocalCommissionError(''); return true;
-  };
+  const rolesWatch = form.watch('roles');
+  const compensationTypeWatch = form.watch('compensationType');
+  const isComision = compensationTypeWatch === 'comision';
+  const commissionRequired = isComision && rolesWatch.includes('barber');
 
-  const handleSubmit = async () => {
+  const onSubmit = async (values: StaffFormValues) => {
     if (submittingRef.current) return;
-    if (!localData.firstName || !localData.lastName) return;
-    if (phoneHasInvalidContent) return;
-    if (isComision && commissionRequired && !localData.commission) return;
-    if (isComision && !validateLocalCommission(localData.commission)) return;
-    if (!isComision && !localData.fixedSalary) return;
     submittingRef.current = true;
-    setIsSubmitting(true);
     onSubmittingChange?.(true);
     try {
-      await Promise.resolve(onSave(localData));
+      await Promise.resolve(onSave(staffDataFromFormValues(values)));
     } finally {
       submittingRef.current = false;
-      setIsSubmitting(false);
       onSubmittingChange?.(false);
     }
   };
 
-  useImperativeHandle(ref, () => ({ submit: handleSubmit }));
+  useImperativeHandle(ref, () => ({ submit: () => form.handleSubmit(onSubmit)() }));
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input placeholder="Nombre *" value={localData.firstName} onChange={(e) => setLocalData(prev => ({ ...prev, firstName: e.target.value }))} autoComplete="off" />
-        <Input placeholder="Apellido *" value={localData.lastName} onChange={(e) => setLocalData(prev => ({ ...prev, lastName: e.target.value }))} autoComplete="off" />
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <PhoneInput
-          value={localData.phone || null}
-          onChange={(o) => {
-            setLocalData(prev => ({ ...prev, phone: o.e164 ?? '' }));
-            setPhoneOut(o);
-          }}
-          defaultCountry="AR"
-          allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+    <Form {...form}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="firstName"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input {...field} placeholder="Nombre" maxLength={80} autoComplete="off" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lastName"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input {...field} placeholder="Apellido" maxLength={80} autoComplete="off" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <PhoneInput
+                  value={field.value?.e164 ?? null}
+                  onChange={(o) => field.onChange(o)}
+                  defaultCountry="AR"
+                  allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+                />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dni"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input {...field} placeholder="DNI (opcional)" maxLength={20} autoComplete="off" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Input {...field} placeholder="Dirección (opcional)" maxLength={120} autoComplete="off" name="staff-address-field" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <FormField
+          control={form.control}
+          name="compensationType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs font-medium text-muted-foreground">Tipo de compensación</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="comision">Por comisión (%)</SelectItem>
+                  <SelectItem value="fijo">Sueldo fijo mensual ($)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
         />
-        <Input placeholder="DNI (opcional)" value={localData.dni} onChange={(e) => setLocalData(prev => ({ ...prev, dni: e.target.value }))} autoComplete="off" />
-      </div>
-      <div className="grid grid-cols-1 gap-3">
-        <Input placeholder="Dirección (opcional)" value={localData.address} onChange={(e) => setLocalData(prev => ({ ...prev, address: e.target.value }))} autoComplete="off" name="staff-address-field" />
-      </div>
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-muted-foreground">Tipo de compensación *</label>
-        <Select value={localData.compensationType} onValueChange={(v) => setLocalData(prev => ({ ...prev, compensationType: v as CompensationType }))}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="comision">Por comisión (%)</SelectItem>
-            <SelectItem value="fijo">Sueldo fijo mensual ($)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      {isComision ? (
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">{commissionRequired ? 'Comisión % *' : 'Comisión % (opcional)'}</label>
-          <Input type="text" inputMode="numeric" placeholder="Ej: 40" value={localData.commission}
-            onChange={(e) => { setLocalData(prev => ({ ...prev, commission: e.target.value })); if (e.target.value) validateLocalCommission(e.target.value); }}
-            onBlur={() => validateLocalCommission(localData.commission)}
-            className={localCommissionError ? 'border-destructive' : ''} autoComplete="off" />
-          {localCommissionError && <p className="text-xs text-destructive mt-1">{localCommissionError}</p>}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual *</label>
-            <CurrencyInput placeholder="Ej: 350.000" value={localData.fixedSalary}
-              onChange={(v) => setLocalData(prev => ({ ...prev, fixedSalary: v }))} />
+        {isComision ? (
+          <FormField
+            control={form.control}
+            name="commission"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xs font-medium text-muted-foreground">
+                  {commissionRequired ? 'Comisión %' : 'Comisión % (opcional)'}
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} type="text" inputMode="numeric" placeholder="Ej: 40" autoComplete="off" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : (
+          <div className="space-y-3">
+            <FormField
+              control={form.control}
+              name="fixedSalary"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-medium text-muted-foreground">Sueldo fijo mensual</FormLabel>
+                  <FormControl>
+                    <CurrencyInput placeholder="Ej: 350.000" value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="payDay"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs font-medium text-muted-foreground">Día de cobro (1-28)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number" inputMode="numeric" placeholder="1" min={1} max={28}
+                      value={field.value}
+                      onChange={(e) => field.onChange(String(Math.min(28, Math.max(1, Number(e.target.value) || 1))))}
+                      autoComplete="off"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Día de cobro (1-28) *</label>
-            <Input type="number" inputMode="numeric" placeholder="1" min={1} max={28} value={localData.payDay}
-              onChange={(e) => {
-                const val = Math.min(28, Math.max(1, Number(e.target.value) || 1));
-                setLocalData(prev => ({ ...prev, payDay: String(val) }));
-              }} autoComplete="off" />
-          </div>
-        </div>
-      )}
-      {(() => {
-        const isOwnerLocal = localData.roles.includes('owner');
-        const hier = getHierarchicalRole(localData.roles);
-        const gmSelected = hier === 'general_manager';
-        const mgrSelected = hier === 'manager';
-        const barberSelected = hasOperationalBarber(localData.roles);
+        )}
+        {(() => {
+          const isOwnerLocal = rolesWatch.includes('owner');
+          const hier = getHierarchicalRole(rolesWatch);
+          const gmSelected = hier === 'general_manager';
+          const mgrSelected = hier === 'manager';
+          const barberSelected = hasOperationalBarber(rolesWatch);
 
-        return (
-          <div className="space-y-4">
-            {isOwnerLocal && (
-              <div className="flex items-start gap-2 p-3 rounded-md border border-border bg-muted/40">
-                <Shield className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                <div className="text-xs text-muted-foreground">
-                  Este integrante es <span className="font-medium text-foreground">Dueño del negocio</span>. Este cargo no se puede modificar desde Equipo.
+          return (
+            <div className="space-y-4">
+              {isOwnerLocal && (
+                <div className="flex items-start gap-2 p-3 rounded-md border border-border bg-muted/40">
+                  <Shield className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                  <div className="text-xs text-muted-foreground">
+                    Este integrante es <span className="font-medium text-foreground">Dueño del negocio</span>. Este cargo no se puede modificar desde Equipo.
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div>
+                  <div className="text-sm font-medium text-foreground">Cargo jerárquico</div>
+                  <div className="text-xs text-muted-foreground">Define responsabilidades de gestión dentro del negocio.</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <RoleCard
+                    icon={<Shield className="h-4 w-4" />}
+                    title="Encargado General"
+                    description="Acceso amplio a gestión y configuración."
+                    selected={gmSelected}
+                    state={isOwnerLocal ? 'disabled' : (mgrSelected ? 'replaceable' : 'normal')}
+                    auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (mgrSelected ? 'Reemplaza Encargado de Sucursal.' : undefined)}
+                    onClick={isOwnerLocal ? undefined : () => form.setValue('roles', toggleHierarchical(rolesWatch, 'general_manager'), { shouldDirty: true })}
+                  />
+                  <RoleCard
+                    icon={<UserCheck className="h-4 w-4" />}
+                    title="Encargado de Sucursal"
+                    description="Gestiona la operación de esta sucursal."
+                    selected={mgrSelected}
+                    state={isOwnerLocal ? 'disabled' : (gmSelected ? 'replaceable' : 'normal')}
+                    auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (gmSelected ? 'Reemplaza Encargado General.' : undefined)}
+                    onClick={isOwnerLocal ? undefined : () => form.setValue('roles', toggleHierarchical(rolesWatch, 'manager'), { shouldDirty: true })}
+                  />
                 </div>
               </div>
-            )}
 
-            <div className="space-y-2">
-              <div>
-                <div className="text-sm font-medium text-foreground">Cargo jerárquico</div>
-                <div className="text-xs text-muted-foreground">Define responsabilidades de gestión dentro del negocio.</div>
+              <div className="space-y-2">
+                <div>
+                  <div className="text-sm font-medium text-foreground">Trabajo operativo</div>
+                  <div className="text-xs text-muted-foreground">Indica si esta persona también trabaja realizando servicios.</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <RoleCard
+                    icon={<Scissors className="h-4 w-4" />}
+                    title="Barbero"
+                    description="Puede recibir turnos, ventas y comisiones."
+                    selected={barberSelected}
+                    onClick={() => form.setValue('roles', toggleBarber(rolesWatch), { shouldDirty: true })}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <RoleCard
-                  icon={<Shield className="h-4 w-4" />}
-                  title="Encargado General"
-                  description="Acceso amplio a gestión y configuración."
-                  selected={gmSelected}
-                  state={isOwnerLocal ? 'disabled' : (mgrSelected ? 'replaceable' : 'normal')}
-                  auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (mgrSelected ? 'Reemplaza Encargado de Sucursal.' : undefined)}
-                  onClick={isOwnerLocal ? undefined : () => setLocalData(prev => ({ ...prev, roles: toggleHierarchical(prev.roles, 'general_manager') }))}
-                />
-                <RoleCard
-                  icon={<UserCheck className="h-4 w-4" />}
-                  title="Encargado de Sucursal"
-                  description="Gestiona la operación de esta sucursal."
-                  selected={mgrSelected}
-                  state={isOwnerLocal ? 'disabled' : (gmSelected ? 'replaceable' : 'normal')}
-                  auxiliaryLabel={isOwnerLocal ? 'No disponible para dueños.' : (gmSelected ? 'Reemplaza Encargado General.' : undefined)}
-                  onClick={isOwnerLocal ? undefined : () => setLocalData(prev => ({ ...prev, roles: toggleHierarchical(prev.roles, 'manager') }))}
-                />
+
+              <div className="space-y-1.5">
+                <div className="text-xs text-muted-foreground">Este integrante quedará como:</div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {rolesWatch.map((role, idx) => (
+                    <React.Fragment key={role}>
+                      {idx > 0 && <span className="text-xs text-muted-foreground">+</span>}
+                      <Badge variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
+                        {getRoleIcon(role)} {getRoleLabel(role)}
+                      </Badge>
+                    </React.Fragment>
+                  ))}
+                </div>
+                {rolesWatch.length === 1 && rolesWatch[0] === 'otros' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este rol no puede combinarse con otros rangos.
+                  </p>
+                )}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div>
-                <div className="text-sm font-medium text-foreground">Trabajo operativo</div>
-                <div className="text-xs text-muted-foreground">Indica si esta persona también trabaja realizando servicios.</div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <RoleCard
-                  icon={<Scissors className="h-4 w-4" />}
-                  title="Barbero"
-                  description="Puede recibir turnos, ventas y comisiones."
-                  selected={barberSelected}
-                  onClick={() => setLocalData(prev => ({ ...prev, roles: toggleBarber(prev.roles) }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="text-xs text-muted-foreground">Este integrante quedará como:</div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {localData.roles.map((role, idx) => (
-                  <React.Fragment key={role}>
-                    {idx > 0 && <span className="text-xs text-muted-foreground">+</span>}
-                    <Badge variant={getRoleBadgeVariant(role)} className="flex items-center gap-1 text-xs">
-                      {getRoleIcon(role)} {getRoleLabel(role)}
-                    </Badge>
-                  </React.Fragment>
-                ))}
-              </div>
-              {localData.roles.length === 1 && localData.roles[0] === 'otros' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Este rol no puede combinarse con otros rangos.
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-    </div>
+          );
+        })()}
+      </div>
+    </Form>
   );
     }
   )

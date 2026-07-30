@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { MapPin, Phone, Building2, AlertTriangle, KeyRound, Info, MoreVertical } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { CuentaSucursalBlock } from '@/components/config/CuentaSucursalBlock';
+import { sucursalFieldsSchema, sucursalDefaultsFromExisting, type SucursalFieldsValues } from './sucursalFormSchema';
 import { useSucursal } from '@/contexts/SucursalContext';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -99,24 +103,19 @@ export function SucursalTabContent({
 
   // --- Info editing ---
   const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [infoForm, setInfoForm] = useState({
-    nombre: sucursal.nombre,
-    direccion: sucursal.direccion || '',
-    telefono: sucursal.telefono || '',
+  const infoForm = useForm<SucursalFieldsValues>({
+    resolver: zodResolver(sucursalFieldsSchema),
+    defaultValues: sucursalDefaultsFromExisting(sucursal),
   });
-  const [isSavingInfo, setIsSavingInfo] = useState(false);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
   const [fechaDesactivacion, setFechaDesactivacion] = useState<string | null>(null);
   const [futureTurnosCount, setFutureTurnosCount] = useState<number | null>(null);
   const [showToggleDialog, setShowToggleDialog] = useState(false);
 
   useEffect(() => {
-    setInfoForm({
-      nombre: sucursal.nombre,
-      direccion: sucursal.direccion || '',
-      telefono: sucursal.telefono || '',
-    });
+    infoForm.reset(sucursalDefaultsFromExisting(sucursal));
     setIsEditingInfo(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sucursal.id]);
 
   // Cargar fecha_desactivacion para esta sucursal
@@ -133,24 +132,27 @@ export function SucursalTabContent({
     return () => { cancelled = true; };
   }, [sucursal.id, sucursal.activa]);
 
-  const handleSaveInfo = async () => {
-    setIsSavingInfo(true);
+  const handleSaveInfo = async (values: SucursalFieldsValues) => {
     const { error } = await supabase
       .from('sucursales')
       .update({
-        nombre: infoForm.nombre.trim(),
-        direccion: infoForm.direccion || null,
-        telefono: infoForm.telefono || null,
+        nombre: values.nombre.trim(),
+        direccion: values.direccion?.trim() || null,
+        telefono: values.telefono?.e164 ?? null,
       })
       .eq('id', sucursal.id);
     if (error) {
       toast.error('Error al guardar');
-    } else {
-      toast.success('Sucursal actualizada');
-      setIsEditingInfo(false);
-      onSucursalUpdated();
+      return;
     }
-    setIsSavingInfo(false);
+    toast.success('Sucursal actualizada');
+    setIsEditingInfo(false);
+    onSucursalUpdated();
+  };
+
+  const closeEditingInfo = () => {
+    setIsEditingInfo(false);
+    infoForm.reset(sucursalDefaultsFromExisting(sucursal));
   };
 
   const formatFechaDDMMYYYY = (iso: string | null | undefined): string => {
@@ -202,10 +204,6 @@ export function SucursalTabContent({
   };
 
   const isInactive = !sucursal.activa;
-  const isDirty =
-    infoForm.nombre !== sucursal.nombre ||
-    infoForm.direccion !== (sucursal.direccion || '') ||
-    infoForm.telefono !== (sucursal.telefono || '');
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -413,24 +411,19 @@ export function SucursalTabContent({
 
       <DrawerForm
         open={isEditingInfo}
-        onOpenChange={(o) => {
-          if (!o) {
-            setIsEditingInfo(false);
-            setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' });
-          }
-        }}
+        onOpenChange={(o) => { if (!o) closeEditingInfo(); }}
         title="Editar información"
         size="sm"
+        isDirty={infoForm.formState.isDirty}
         footer={
           <div className="flex w-full items-center justify-between">
             <Button
               variant={isInactive ? 'outline' : 'destructive'}
-              disabled={isDirty || isSavingInfo}
-              title={isDirty ? 'Guardá los cambios antes de continuar' : undefined}
+              disabled={infoForm.formState.isDirty || infoForm.formState.isSubmitting}
+              title={infoForm.formState.isDirty ? 'Guardá los cambios antes de continuar' : undefined}
               onClick={() => {
                 void openToggleDialog();
-                setIsEditingInfo(false);
-                setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' });
+                closeEditingInfo();
               }}
             >
               {isInactive ? 'Reactivar' : 'Desactivar'}
@@ -438,67 +431,100 @@ export function SucursalTabContent({
             <div className="flex gap-2">
               <Button
                 variant="ghost"
-                disabled={isSavingInfo}
-                onClick={() => { setIsEditingInfo(false); setInfoForm({ nombre: sucursal.nombre, direccion: sucursal.direccion || '', telefono: sucursal.telefono || '' }); }}
+                disabled={infoForm.formState.isSubmitting}
+                onClick={closeEditingInfo}
               >
                 Cancelar
               </Button>
               <Button
-                disabled={isSavingInfo || !infoForm.nombre.trim()}
-                onClick={handleSaveInfo}
+                disabled={infoForm.formState.isSubmitting}
+                onClick={infoForm.handleSubmit(handleSaveInfo)}
               >
-                {isSavingInfo ? 'Guardando...' : 'Guardar'}
+                {infoForm.formState.isSubmitting ? 'Guardando...' : 'Guardar'}
               </Button>
             </div>
           </div>
         }
       >
-        <div className="space-y-5">
-          {/* Context card — qué sucursal se está editando */}
-          <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                <span className="truncate text-sm font-medium text-foreground">{sucursal.nombre}</span>
-                {sucursal.activa ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-status-success-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
-                    Activa
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                    Inactiva
-                  </span>
-                )}
+        <Form {...infoForm}>
+          <div className="space-y-5">
+            {/* Context card — qué sucursal se está editando */}
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                  <span className="truncate text-sm font-medium text-foreground">{sucursal.nombre}</span>
+                  {sucursal.activa ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-status-success-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-status-success" />
+                      Activa
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                      Inactiva
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Campos editables */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Nombre</Label>
-              <Input value={infoForm.nombre} onChange={(e) => setInfoForm(p => ({ ...p, nombre: e.target.value }))} maxLength={80} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                Dirección
-              </Label>
-              <Input value={infoForm.direccion} onChange={(e) => setInfoForm(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                Teléfono
-              </Label>
-              <Input value={infoForm.telefono} onChange={(e) => setInfoForm(p => ({ ...p, telefono: e.target.value }))} placeholder="+54 11 1234-5678" maxLength={20} />
+            {/* Campos editables */}
+            <div className="space-y-4">
+              <FormField
+                control={infoForm.control}
+                name="nombre"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nombre</FormLabel>
+                    <FormControl>
+                      <Input {...field} maxLength={80} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={infoForm.control}
+                name="direccion"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      Dirección (opcional)
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Av. Corrientes 1234" maxLength={120} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={infoForm.control}
+                name="telefono"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                      Teléfono (opcional)
+                    </FormLabel>
+                    <PhoneInput
+                      value={field.value?.e164 ?? null}
+                      onChange={(o) => field.onChange(o)}
+                      defaultCountry="AR"
+                      allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+                      mode="any"
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
           </div>
-        </div>
+        </Form>
       </DrawerForm>
 
       <Sheet open={cuentaOpen} onOpenChange={setCuentaOpen}>

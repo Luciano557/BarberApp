@@ -38,6 +38,7 @@ interface VentaInsert {
   organization_id: string;
   sucursal_id?: string | null;
   tipo_venta: 'servicio' | 'productos' | 'mixta';
+  cliente_id?: string | null;
   mp_payment_intent_id?: string | null;
   mp_device_id?: string | null;
   mp_status?: string | null;
@@ -265,6 +266,7 @@ export function useTransactions() {
       productos?: ProductoCartInput[];
       mpPaymentIntentId?: string | null;
       mpDeviceId?: string | null;
+      clienteId?: string | null;
     }
   ) => {
     if (!organization) {
@@ -355,6 +357,7 @@ export function useTransactions() {
       organization_id: organization.id,
       sucursal_id: currentSucursal.id,
       tipo_venta: tipoVenta,
+      cliente_id: transaction.clienteId ?? null,
       mp_payment_intent_id: transaction.mpPaymentIntentId ?? null,
       mp_device_id: transaction.mpDeviceId ?? null,
       mp_status: transaction.mpPaymentIntentId ? 'approved' : null,

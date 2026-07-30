@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Building2, Settings, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DrawerForm } from '@/components/ui/drawer-form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
-import { canonicalizePhone, phoneErrorMessage } from '@/lib/phone';
-import { Label } from '@/components/ui/label';
+import { PhoneInput } from '@/components/ui/phone-input';
+import { sucursalFieldsSchema, emptySucursalDefaults, type SucursalFieldsValues } from './sucursalFormSchema';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -87,9 +89,10 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
   const [allBarbers, setAllBarbers] = useState<BarberWithSucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
-  const [formData, setFormData] = useState({ nombre: '', direccion: '', telefono: '' });
-  const [phoneOut, setPhoneOut] = useState<PhoneInputChange | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const sucursalForm = useForm<SucursalFieldsValues>({
+    resolver: zodResolver(sucursalFieldsSchema),
+    defaultValues: emptySucursalDefaults(),
+  });
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
   const [pendingHighlightBarberoId, setPendingHighlightBarberoId] = useState<string | null>(null);
   const [pendingHighlightSucursalId, setPendingHighlightSucursalId] = useState<string | null>(null);
@@ -268,6 +271,17 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
     return () => onb.registerSubTabSetter(null);
   }, [onb, handleTabChange, showGeneralTab, visibleSucursales]);
 
+  // Probe para el onboarding: ¿la sub-tab activa es una sucursal válida (no General)?
+  // Permite que el paso de "elegí tu sucursal" se auto-avance si el usuario ya está parado ahí.
+  useEffect(() => {
+    onb.registerSubTabProbe(() =>
+      activeTab !== GENERAL_TAB && visibleSucursalesActivas.some(s => s.id === activeTab)
+    );
+    return () => onb.registerSubTabProbe(null);
+  }, [onb, activeTab, visibleSucursalesActivas]);
+
+
+
   const generalIsReady = activeTab === GENERAL_TAB;
 
   // --- Barber CRUD ---
@@ -314,46 +328,37 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
 
   // --- Sucursal CRUD ---
   const handleOpenCreate = () => {
-    setFormData({ nombre: '', direccion: '', telefono: '' });
-    setPhoneOut(null);
+    sucursalForm.reset(emptySucursalDefaults());
     setShowDialog(true);
   };
 
-  const handleSaveSucursal = async () => {
-    if (!organization?.id || !formData.nombre.trim()) return;
-    let telefonoToSave: string | null = formData.telefono || null;
-    if (phoneOut) {
-      if (!phoneOut.isValid && phoneOut.reason !== 'empty') {
-        toast.error(phoneErrorMessage(phoneOut.reason ?? 'invalid'));
-        return;
-      }
-      telefonoToSave = phoneOut.e164;
-    } else if (telefonoToSave) {
-      const r = canonicalizePhone(telefonoToSave, { defaultCountry: 'AR', allowLandline: true });
-      telefonoToSave = r.ok ? r.e164 : telefonoToSave;
-    }
-    setIsSaving(true);
+  const handleCloseCreate = () => {
+    setShowDialog(false);
+    sucursalForm.reset(emptySucursalDefaults());
+  };
+
+  const handleSaveSucursal = async (values: SucursalFieldsValues) => {
+    if (!organization?.id) return;
     const { data: insData, error } = await supabase.from('sucursales').insert({
       organization_id: organization.id,
-      nombre: formData.nombre.trim(),
-      direccion: formData.direccion || null,
-      telefono: telefonoToSave,
+      nombre: values.nombre.trim(),
+      direccion: values.direccion?.trim() || null,
+      telefono: values.telefono?.e164 ?? null,
       timezone: organization.timezone,
     }).select('id').single();
     if (error) {
       toast.error(error.message || 'Error al crear');
-    } else {
-      toast.success('Sucursal creada');
-      // Auto-create the Cuenta de sucursal for this branch (best-effort).
-      if (insData?.id) {
-        supabase.functions.invoke('create-sucursal-account', { body: { sucursalId: insData.id } })
-          .catch((e) => console.warn('create-sucursal-account failed:', e));
-      }
-      setShowDialog(false);
-      await fetchAllSucursales();
-      await refreshSucursales();
+      return;
     }
-    setIsSaving(false);
+    toast.success('Sucursal creada');
+    // Auto-create the Cuenta de sucursal for this branch (best-effort).
+    if (insData?.id) {
+      supabase.functions.invoke('create-sucursal-account', { body: { sucursalId: insData.id } })
+        .catch((e) => console.warn('create-sucursal-account failed:', e));
+    }
+    handleCloseCreate();
+    await fetchAllSucursales();
+    await refreshSucursales();
   };
 
   // --- Helpers to scope catalog data by sucursal ---
@@ -512,7 +517,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
             )}
           </div>
           {canCreateSucursal && (
-            <Button variant="outline" size="sm" onClick={() => setShowDialog(true)}>
+            <Button variant="outline" size="sm" onClick={handleOpenCreate}>
               Nueva sucursal
             </Button>
           )}
@@ -520,39 +525,71 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       )}
 
       {/* Crear sucursal */}
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nueva sucursal</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre</Label>
-              <Input value={formData.nombre} onChange={(e) => setFormData(p => ({ ...p, nombre: e.target.value }))} placeholder="Ej: Sucursal Centro" maxLength={80} />
-            </div>
-            <div className="space-y-2">
-              <Label>Dirección</Label>
-              <Input value={formData.direccion} onChange={(e) => setFormData(p => ({ ...p, direccion: e.target.value }))} placeholder="Av. Corrientes 1234" maxLength={120} />
-            </div>
-            <div className="space-y-2">
-              <Label>Teléfono</Label>
-              <PhoneInput
-                value={phoneOut?.e164 ?? (formData.telefono || null)}
-                onChange={(o) => { setPhoneOut(o); setFormData(p => ({ ...p, telefono: o.e164 ?? '' })); }}
-                defaultCountry="AR"
-                allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
-                mode="any"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSaveSucursal} disabled={isSaving || !formData.nombre.trim()}>
-              {isSaving ? 'Guardando...' : 'Crear'}
+      <DrawerForm
+        open={showDialog}
+        onOpenChange={(o) => { if (!o) handleCloseCreate(); }}
+        title="Nueva sucursal"
+        size="sm"
+        isDirty={sucursalForm.formState.isDirty}
+        footer={
+          <div className="flex w-full justify-between">
+            <Button variant="ghost" disabled={sucursalForm.formState.isSubmitting} onClick={handleCloseCreate}>
+              Cancelar
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button onClick={sucursalForm.handleSubmit(handleSaveSucursal)} disabled={sucursalForm.formState.isSubmitting}>
+              {sucursalForm.formState.isSubmitting ? 'Guardando...' : 'Crear'}
+            </Button>
+          </div>
+        }
+      >
+        <Form {...sucursalForm}>
+          <div className="space-y-4">
+            <FormField
+              control={sucursalForm.control}
+              name="nombre"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Ej: Sucursal Centro" maxLength={80} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={sucursalForm.control}
+              name="direccion"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Dirección (opcional)</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Av. Corrientes 1234" maxLength={120} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={sucursalForm.control}
+              name="telefono"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Teléfono (opcional)</FormLabel>
+                  <PhoneInput
+                    value={field.value?.e164 ?? null}
+                    onChange={(o) => field.onChange(o)}
+                    defaultCountry="AR"
+                    allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
+                    mode="any"
+                  />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Form>
+      </DrawerForm>
     </div>
   );
   }

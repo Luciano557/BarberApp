@@ -1,16 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useOnboarding } from './OnboardingProvider';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles, X } from 'lucide-react';
 
 const TOOLTIP_W = 340;
 const MARGIN = 16;
+/** Aire mínimo entre el card y el borde del viewport */
+const EDGE = 12;
+/** Altura estimada mientras no hay medición real (primer frame) */
+const FALLBACK_H = 300;
+
+type Placement = 'bottom' | 'top' | 'right' | 'left' | 'center';
 
 export function OnboardingTooltip() {
-  const { isActive, currentStep, currentIndex, totalSteps, targetRect, next, skip } = useOnboarding();
+  const { isActive, currentStep, currentIndex, totalSteps, targetRect, targetMissing, next, skip, setTooltipFits } = useOnboarding();
   const isMobile = useIsMobile();
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: TOOLTIP_W, h: FALLBACK_H });
   const [vp, setVp] = useState({
     w: typeof window !== 'undefined' ? window.innerWidth : 1024,
     h: typeof window !== 'undefined' ? window.innerHeight : 768,
@@ -22,7 +30,130 @@ export function OnboardingTooltip() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Medición real del card (alto y ancho) para decidir el lado y aplicar clamp.
+  const measure = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setSize(prev => (Math.abs(prev.h - r.height) < 1 && Math.abs(prev.w - r.width) < 1 ? prev : { w: r.width, h: r.height }));
+  }, []);
+
+  useLayoutEffect(() => {
+    measure();
+    const el = cardRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [measure, currentStep, isMobile, targetMissing]);
+
+  // Al cambiar de paso, volvemos a la estimación conservadora hasta medir.
+  useEffect(() => {
+    setSize({ w: TOOLTIP_W, h: FALLBACK_H });
+  }, [currentStep?.id]);
+
+  // === Cálculo de posición (desktop) ===
+  const maxH = Math.max(160, vp.h - EDGE * 2);
+  const h = Math.min(size.h, maxH);
+  const w = size.w || TOOLTIP_W;
+
+  let placement: Placement = 'center';
+  let top = vp.h / 2;
+  let left = vp.w / 2;
+  let transform = 'translate(-50%, -50%)';
+
+  if (targetRect && !targetMissing) {
+    const spaceBelow = vp.h - targetRect.bottom;
+    const spaceAbove = targetRect.top;
+    const spaceRight = vp.w - targetRect.right;
+    const spaceLeft = targetRect.left;
+    const needV = h + MARGIN + EDGE;
+    const needH = w + MARGIN + EDGE;
+
+    // Geometría resultante para un lado dado, con los clamps ya aplicados.
+    const compute = (p: Exclude<Placement, 'center'>) => {
+      let t: number;
+      let l: number;
+      let tr: string;
+      if (p === 'bottom' || p === 'top') {
+        const halfW = w / 2;
+        l = targetRect.left + targetRect.width / 2;
+        l = Math.min(Math.max(l, halfW + EDGE), vp.w - halfW - EDGE);
+        tr = p === 'bottom' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
+        t = p === 'bottom' ? targetRect.bottom + MARGIN : targetRect.top - MARGIN;
+        if (p === 'bottom') t = Math.max(Math.min(t, vp.h - h - EDGE), EDGE);
+        else t = Math.min(Math.max(t, h + EDGE), vp.h - EDGE);
+        return { top: t, left: l, transform: tr, box: { top: p === 'bottom' ? t : t - h, left: l - halfW, right: l + halfW, bottom: p === 'bottom' ? t + h : t } };
+      }
+      const halfH = h / 2;
+      tr = p === 'right' ? 'translate(0, -50%)' : 'translate(-100%, -50%)';
+      l = p === 'right' ? targetRect.right + MARGIN : targetRect.left - MARGIN;
+      l = p === 'right' ? Math.min(l, vp.w - w - EDGE) : Math.max(l, w + EDGE);
+      t = targetRect.top + targetRect.height / 2;
+      t = Math.min(Math.max(t, halfH + EDGE), vp.h - halfH - EDGE);
+      return { top: t, left: l, transform: tr, box: { top: t - halfH, bottom: t + halfH, left: p === 'right' ? l : l - w, right: p === 'right' ? l + w : l } };
+    };
+
+    // El tooltip nunca puede solaparse con el área del target.
+    const overlapsTarget = (b: { top: number; bottom: number; left: number; right: number }) =>
+      b.left < targetRect.right && b.right > targetRect.left && b.top < targetRect.bottom && b.bottom > targetRect.top;
+
+    const candidates: Array<[Exclude<Placement, 'center'>, boolean]> = [
+      ['bottom', spaceBelow >= needV],
+      ['top', spaceAbove >= needV],
+      ['right', spaceRight >= needH],
+      ['left', spaceLeft >= needH],
+    ];
+
+    for (const [p, hasSpace] of candidates) {
+      if (!hasSpace) continue;
+      const geo = compute(p);
+      if (overlapsTarget(geo.box)) continue;
+      placement = p;
+      top = geo.top;
+      left = geo.left;
+      transform = geo.transform;
+      break;
+    }
+
+    if (placement === 'center') {
+      top = vp.h / 2;
+      left = vp.w / 2;
+      transform = 'translate(-50%, -50%)';
+    }
+  }
+
+
+  const fits = placement !== 'center';
+
+  // Informamos al provider si el tooltip entra donde corresponde: si no entra,
+  // el provider libera el bloqueo de scroll para que el usuario nunca quede trabado.
+  useEffect(() => {
+    if (!isActive) return;
+    setTooltipFits?.(isMobile || !!currentStep?.isWelcome || targetMissing || fits);
+  }, [isActive, isMobile, currentStep, targetMissing, fits, setTooltipFits]);
+
+  useEffect(() => () => setTooltipFits?.(true), [setTooltipFits]);
+
+
   if (!isActive || !currentStep) return null;
+
+  const stepLabel = (
+    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+      Paso {currentIndex + 1} de {totalSteps}
+    </span>
+  );
+
+  const bullets = currentStep.bullets && currentStep.bullets.length > 0 && (
+    <ul className="mt-3 space-y-1.5">
+      {currentStep.bullets.map((b, i) => (
+        <li key={i} className="flex gap-2 text-sm text-foreground">
+          <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
+          <span className="leading-relaxed">{b}</span>
+        </li>
+      ))}
+    </ul>
+  );
 
   // === Paso de bienvenida: diálogo centrado ===
   if (currentStep.isWelcome) {
@@ -52,21 +183,22 @@ export function OnboardingTooltip() {
     );
   }
 
-  // === Mobile: bottom sheet fijo ===
-  if (isMobile) {
+  // === Target ausente: fallback centrado, siempre con salida ===
+  // Si ningún lado evita el solapamiento con el target, usamos el mismo fallback.
+  if (targetMissing || (!isMobile && placement === 'center')) {
     return (
-      <div className="fixed inset-x-0 bottom-0 z-[70] animate-fade-in px-3 pb-3 pt-2">
-        <div className="rounded-2xl border border-border bg-popover text-popover-foreground shadow-md p-4">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              Paso {currentIndex + 1} de {totalSteps}
-            </span>
-          </div>
-          <h3 className="text-base font-semibold text-foreground">{currentStep.title}</h3>
-          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{currentStep.description}</p>
+      <Dialog open onOpenChange={(open) => { if (!open) skip(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            {stepLabel}
+            <DialogTitle>{currentStep.title}</DialogTitle>
+            <DialogDescription className="leading-relaxed pt-1">
+              {currentStep.description}
+            </DialogDescription>
+          </DialogHeader>
 
           {currentStep.bullets && currentStep.bullets.length > 0 && (
-            <ul className="mt-3 space-y-1.5">
+            <ul className="space-y-1.5">
               {currentStep.bullets.map((b, i) => (
                 <li key={i} className="flex gap-2 text-sm text-foreground">
                   <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
@@ -76,108 +208,114 @@ export function OnboardingTooltip() {
             </ul>
           )}
 
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-            <button
-              onClick={skip}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={skip} className="sm:mr-auto">
               Omitir tutorial
-            </button>
-            {currentStep.hideContinueButton ? (
-              <span className="text-xs text-muted-foreground italic">Tocá para continuar</span>
-            ) : (
-              <Button size="sm" onClick={next} className="gap-1.5">
-                Continuar
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            </Button>
+            <Button onClick={next} className="gap-1.5">
+              Continuar
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const footer = (
+    <div className="flex items-center justify-between mt-4 pt-3 border-t border-border shrink-0">
+      <button
+        onClick={skip}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Omitir tutorial
+      </button>
+      {currentStep.hideContinueButton ? (
+        <span className="text-xs text-muted-foreground italic">
+          {isMobile ? 'Tocá para continuar' : 'Elegí una sucursal para continuar'}
+        </span>
+      ) : (
+        <Button size="sm" onClick={next} className="gap-1.5">
+          Continuar
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const closeButton = (
+    <button
+      type="button"
+      onClick={skip}
+      aria-label="Cerrar tutorial"
+      className="absolute right-2.5 top-2.5 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+    >
+      <X className="h-3.5 w-3.5" />
+    </button>
+  );
+
+  // === Mobile: bottom sheet fijo ===
+  if (isMobile) {
+    return (
+      <div className="fixed inset-x-0 bottom-0 z-[70] animate-fade-in px-3 pb-3 pt-2">
+        <div
+          ref={cardRef}
+          className="relative rounded-2xl border border-border bg-popover text-popover-foreground shadow-md p-4 flex flex-col"
+          style={{ maxHeight: vp.h - 80 }}
+        >
+          {closeButton}
+          <div className="flex items-center justify-between mb-1.5 pr-7 shrink-0">
+            {stepLabel}
           </div>
+          <div className="min-h-0 overflow-y-auto">
+            <h3 className="text-base font-semibold text-foreground pr-7">{currentStep.title}</h3>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{currentStep.description}</p>
+            {bullets}
+          </div>
+          {footer}
         </div>
       </div>
     );
   }
 
-  // === Desktop: tooltip posicionado sobre el target ===
-  let top = vp.h / 2 - 100;
-  let left = vp.w / 2;
-  let transform = 'translate(-50%, -50%)';
-  let arrow: 'top' | 'bottom' | 'left' | 'right' | null = null;
+  // === Desktop: tooltip posicionado sobre el target (con flip + clamp) ===
+  const arrow: 'top' | 'bottom' | 'left' | 'right' | null =
+    placement === 'bottom' ? 'top'
+    : placement === 'top' ? 'bottom'
+    : placement === 'right' ? 'left'
+    : placement === 'left' ? 'right'
+    : null;
 
-  if (targetRect) {
-    const spaceBelow = vp.h - targetRect.bottom;
-    const spaceAbove = targetRect.top;
-    const spaceRight = vp.w - targetRect.right;
-
-    if (spaceBelow > 220) {
-      top = targetRect.bottom + MARGIN;
-      left = targetRect.left + targetRect.width / 2;
-      transform = 'translate(-50%, 0)';
-      arrow = 'top';
-    } else if (spaceAbove > 220) {
-      top = targetRect.top - MARGIN;
-      left = targetRect.left + targetRect.width / 2;
-      transform = 'translate(-50%, -100%)';
-      arrow = 'bottom';
-    } else if (spaceRight > TOOLTIP_W + 40) {
-      top = targetRect.top + targetRect.height / 2;
-      left = targetRect.right + MARGIN;
-      transform = 'translate(0, -50%)';
-      arrow = 'left';
-    } else {
-      top = targetRect.top + targetRect.height / 2;
-      left = targetRect.left - MARGIN;
-      transform = 'translate(-100%, -50%)';
-      arrow = 'right';
-    }
-
-    const halfW = TOOLTIP_W / 2;
-    if (transform.startsWith('translate(-50%')) {
-      left = Math.min(Math.max(left, halfW + 12), vp.w - halfW - 12);
-    }
-  }
+  // Con el clamp aplicado la flecha puede dejar de apuntar al target: la ocultamos.
+  const arrowAligned =
+    !!targetRect && (
+      (placement === 'bottom' && Math.abs(top - (targetRect.bottom + MARGIN)) < 2) ||
+      (placement === 'top' && Math.abs(top - (targetRect.top - MARGIN)) < 2) ||
+      (placement === 'right' && Math.abs(left - (targetRect.right + MARGIN)) < 2) ||
+      (placement === 'left' && Math.abs(left - (targetRect.left - MARGIN)) < 2)
+    );
 
   return (
     <div
       className="fixed z-[70] animate-fade-in"
       style={{ top, left, transform, width: TOOLTIP_W }}
     >
-      <div className="relative rounded-xl border border-border bg-popover text-popover-foreground shadow-md p-4">
-        {arrow && <Arrow direction={arrow} />}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            Paso {currentIndex + 1} de {totalSteps}
-          </span>
+      <div
+        ref={cardRef}
+        className="relative rounded-xl border border-border bg-popover text-popover-foreground shadow-md p-4 flex flex-col"
+        style={{ maxHeight: maxH }}
+      >
+        {arrow && arrowAligned && <Arrow direction={arrow} />}
+        {closeButton}
+        <div className="flex items-center justify-between mb-2 pr-7 shrink-0">
+          {stepLabel}
         </div>
-        <h3 className="text-base font-semibold text-foreground">{currentStep.title}</h3>
-        <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{currentStep.description}</p>
-
-        {currentStep.bullets && currentStep.bullets.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
-            {currentStep.bullets.map((b, i) => (
-              <li key={i} className="flex gap-2 text-sm text-foreground">
-                <span className="mt-1.5 h-1 w-1 rounded-full bg-primary shrink-0" />
-                <span className="leading-relaxed">{b}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-border">
-          <button
-            onClick={skip}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Omitir tutorial
-          </button>
-          {currentStep.hideContinueButton ? (
-            <span className="text-xs text-muted-foreground italic">Elegí una sucursal para continuar</span>
-          ) : (
-            <Button size="sm" onClick={next} className="gap-1.5">
-              Continuar
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-          )}
+        <div className="min-h-0 overflow-y-auto">
+          <h3 className="text-base font-semibold text-foreground pr-7">{currentStep.title}</h3>
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{currentStep.description}</p>
+          {bullets}
         </div>
+        {footer}
       </div>
     </div>
   );

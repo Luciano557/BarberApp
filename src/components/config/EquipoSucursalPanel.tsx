@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck, UserX, ChevronDown, MoreVertical, User, Phone, Mail, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -667,19 +670,31 @@ interface SheetBaseProps {
 
 }
 
+const temporalSchema = z.object({
+  barberoId: z.string().min(1, 'Elegí un barbero.'),
+  fechaInicio: z.string().min(1, 'Elegí la fecha de inicio.'),
+  fechaFin: z.string().min(1, 'Elegí la fecha de fin.'),
+}).superRefine((data, ctx) => {
+  if (data.fechaInicio && data.fechaFin && data.fechaFin < data.fechaInicio) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaFin'], message: 'No puede ser anterior a la fecha de inicio.' });
+  }
+});
+type TemporalFormValues = z.infer<typeof temporalSchema>;
+
 function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initialBarberoId, onCreated }: SheetBaseProps) {
   const bs = useBarberosSucursales(organizationId);
   const [barberos, setBarberos] = useState<BarberoMini[]>([]);
-  const [barberoId, setBarberoId] = useState<string>('');
-  const [fechaInicio, setFechaInicio] = useState<string>(todayLocalIso());
-  const [fechaFin, setFechaFin] = useState<string>('');
-  const [saving, setSaving] = useState(false);
+
+  const form = useForm<TemporalFormValues>({
+    resolver: zodResolver(temporalSchema),
+    defaultValues: { barberoId: initialBarberoId ?? '', fechaInicio: todayLocalIso(), fechaFin: '' },
+  });
+  const saving = form.formState.isSubmitting;
+  const fechaInicioWatch = form.watch('fechaInicio');
 
   useEffect(() => {
     if (!open) return;
-    setBarberoId(initialBarberoId ?? '');
-    setFechaInicio(todayLocalIso());
-    setFechaFin('');
+    form.reset({ barberoId: initialBarberoId ?? '', fechaInicio: todayLocalIso(), fechaFin: '' });
     (async () => {
       const { data } = await supabase
         .from('barberos')
@@ -689,90 +704,138 @@ function TemporalSheet({ open, onOpenChange, organizationId, sucursalId, initial
         .order('nombre');
       setBarberos((data ?? []) as BarberoMini[]);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, organizationId, initialBarberoId]);
 
-  const canSave = !!barberoId && !!fechaInicio && !!fechaFin && fechaFin >= fechaInicio;
+  const handleClose = () => {
+    onOpenChange(false);
+    form.reset({ barberoId: initialBarberoId ?? '', fechaInicio: todayLocalIso(), fechaFin: '' });
+  };
 
-
-  const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
+  const onSubmit = async (values: TemporalFormValues) => {
     try {
       await bs.insertTemporal({
-        barbero_id: barberoId,
+        barbero_id: values.barberoId,
         sucursal_id: sucursalId,
-        fecha_inicio: fechaInicio,
-        fecha_fin: fechaFin,
+        fecha_inicio: values.fechaInicio,
+        fecha_fin: values.fechaFin,
       });
       toast.success('Asignación temporal creada');
-      onOpenChange(false);
+      handleClose();
       await onCreated();
     } catch (e: any) {
       toast.error(e?.message || 'No se pudo crear la asignación');
-    } finally {
-      setSaving(false);
     }
   };
 
   return (
     <DrawerForm
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(o) => { if (!o) handleClose(); }}
       title="Asignación temporal"
       size="sm"
+      isDirty={form.formState.isDirty}
       footer={
         <div className="flex w-full justify-between">
-          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" disabled={saving} onClick={handleClose}>
             Cancelar
           </Button>
-          <Button disabled={saving || !canSave} onClick={handleSave}>
+          <Button disabled={saving} onClick={form.handleSubmit(onSubmit)}>
             {saving ? 'Guardando...' : 'Crear asignación'}
           </Button>
         </div>
       }
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Asigná a un barbero a esta sucursal por un período concreto. Al vencer, vuelve solo a su principal.
-        </p>
-        <div className="space-y-2">
-          <Label>Barbero</Label>
-          <Select value={barberoId} onValueChange={setBarberoId}>
-            <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
-            <SelectContent>
-              {barberos.map(b => (
-                <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label>Desde</Label>
-            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+      <Form {...form}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Asigná a un barbero a esta sucursal por un período concreto. Al vencer, vuelve solo a su principal.
+          </p>
+          <FormField
+            control={form.control}
+            name="barberoId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Barbero</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {barberos.length === 0 ? (
+                      <SelectItem value="__empty__" disabled>Sin barberos disponibles</SelectItem>
+                    ) : (
+                      barberos.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="fechaInicio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Desde</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fechaFin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hasta</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} min={fechaInicioWatch} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="space-y-2">
-            <Label>Hasta</Label>
-            <Input type="date" value={fechaFin} min={fechaInicio} onChange={(e) => setFechaFin(e.target.value)} />
-          </div>
         </div>
-      </div>
+      </Form>
     </DrawerForm>
   );
 }
 
+const recurrenteSchema = z.object({
+  barberoId: z.string().min(1, 'Elegí un barbero.'),
+  dias: z.array(z.number()).min(1, 'Elegí al menos un día de la semana.'),
+  fechaInicio: z.string().optional().default(''),
+  fechaFin: z.string().optional().default(''),
+}).superRefine((data, ctx) => {
+  if (data.fechaInicio && data.fechaFin && data.fechaFin < data.fechaInicio) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaFin'], message: 'No puede ser anterior a la fecha de inicio.' });
+  }
+});
+type RecurrenteFormValues = z.infer<typeof recurrenteSchema>;
+
 function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, initialBarberoId, onCreated }: SheetBaseProps) {
   const bs = useBarberosSucursales(organizationId);
   const [barberos, setBarberos] = useState<BarberoMini[]>([]);
-  const [barberoId, setBarberoId] = useState<string>('');
-  const [dias, setDias] = useState<number[]>([]);
-  const [fechaInicio, setFechaInicio] = useState<string>('');
-  const [fechaFin, setFechaFin] = useState<string>('');
-  const [saving, setSaving] = useState(false);
+
+  const defaults = (): RecurrenteFormValues => ({ barberoId: initialBarberoId ?? '', dias: [], fechaInicio: '', fechaFin: '' });
+  const form = useForm<RecurrenteFormValues>({
+    resolver: zodResolver(recurrenteSchema),
+    defaultValues: defaults(),
+  });
+  const saving = form.formState.isSubmitting;
+  const fechaInicioWatch = form.watch('fechaInicio');
 
   useEffect(() => {
     if (!open) return;
-    setBarberoId(initialBarberoId ?? ''); setDias([]); setFechaInicio(''); setFechaFin('');
+    form.reset(defaults());
     (async () => {
       const { data } = await supabase
         .from('barberos')
@@ -782,78 +845,119 @@ function RecurrenteSheet({ open, onOpenChange, organizationId, sucursalId, initi
         .order('nombre');
       setBarberos((data ?? []) as BarberoMini[]);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, organizationId, initialBarberoId]);
 
-  const canSave = !!barberoId && dias.length > 0 && (!fechaFin || !fechaInicio || fechaFin >= fechaInicio);
+  const handleClose = () => {
+    onOpenChange(false);
+    form.reset(defaults());
+  };
 
-  const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
+  const onSubmit = async (values: RecurrenteFormValues) => {
     try {
       await bs.insertRecurrente({
-        barbero_id: barberoId,
+        barbero_id: values.barberoId,
         sucursal_id: sucursalId,
-        dias_semana: dias,
-        fecha_inicio: fechaInicio || null,
-        fecha_fin: fechaFin || null,
+        dias_semana: values.dias,
+        fecha_inicio: values.fechaInicio || null,
+        fecha_fin: values.fechaFin || null,
       });
       toast.success('Asignación recurrente creada');
-      onOpenChange(false);
+      handleClose();
       await onCreated();
     } catch (e: any) {
       toast.error(e?.message || 'No se pudo crear la asignación');
-    } finally {
-      setSaving(false);
     }
   };
 
   return (
     <DrawerForm
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(o) => { if (!o) handleClose(); }}
       title="Asignación recurrente"
       size="sm"
+      isDirty={form.formState.isDirty}
       footer={
         <div className="flex w-full justify-between">
-          <Button variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" disabled={saving} onClick={handleClose}>
             Cancelar
           </Button>
-          <Button disabled={saving || !canSave} onClick={handleSave}>
+          <Button disabled={saving} onClick={form.handleSubmit(onSubmit)}>
             {saving ? 'Guardando...' : 'Crear asignación'}
           </Button>
         </div>
       }
     >
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Asigná un barbero a esta sucursal en días fijos de la semana. Sin componente horario.
-        </p>
-        <div className="space-y-2">
-          <Label>Barbero</Label>
-          <Select value={barberoId} onValueChange={setBarberoId}>
-            <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
-            <SelectContent>
-              {barberos.map(b => (
-                <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Días de la semana</Label>
-          <WeekdayPicker value={dias} onChange={setDias} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Desde (opcional)</Label>
-            <Input type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} />
+      <Form {...form}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Asigná un barbero a esta sucursal en días fijos de la semana. Sin componente horario.
+          </p>
+          <FormField
+            control={form.control}
+            name="barberoId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Barbero</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Elegí un barbero" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {barberos.length === 0 ? (
+                      <SelectItem value="__empty__" disabled>Sin barberos disponibles</SelectItem>
+                    ) : (
+                      barberos.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.nombre} {b.apellido}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dias"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Días de la semana</FormLabel>
+                <WeekdayPicker value={field.value} onChange={field.onChange} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="fechaInicio"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Desde (opcional)</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fechaFin"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs text-muted-foreground">Hasta (opcional)</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} min={fechaInicioWatch || undefined} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Hasta (opcional)</Label>
-            <Input type="date" value={fechaFin} min={fechaInicio || undefined} onChange={(e) => setFechaFin(e.target.value)} />
-          </div>
         </div>
-      </div>
+      </Form>
     </DrawerForm>
   );
 }

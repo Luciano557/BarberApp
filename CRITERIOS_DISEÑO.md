@@ -2607,3 +2607,598 @@ no se lea como un olvido):
 Con esto, Finanzas queda al mismo nivel de conformidad que Configuración
 (Fase 4, Tanda 1 y Tanda 2 Parte 1). Próximo cluster: a definir con el
 usuario.
+
+---
+
+## Fase 4 - Tanda 2 - Parte 3: Mi Negocio + Clientes (auditoría 2026-07-24)
+
+> Relevamiento puro contra los criterios ya cerrados (sombras/z-index/Inter/
+> timing, RHF+Zod, errores campo→inline/servidor→toast, "(opcional)" en no
+> obligatorios sin asterisco en obligatorios, selects vacíos con
+> mensaje+CTA, maxLength 80/120/240/1500, `DrawerForm` único canon salvo
+> Cobrar/BackfillWizard/PinConfigSection/ProductoPickerDialog, guard de
+> doble submit, confirmación al cerrar vía `isDirty`, confirmaciones puras
+> que quedan como Dialog). Sin implementación. Método: lectura completa de
+> 15 archivos (no de auditorías viejas) el 2026-07-24, dividida en 3
+> clusters: Mi Negocio + Sucursales, Equipo/Staff, Clientes. Última tanda
+> de la Tanda 2.
+
+### 1. Tabla por formulario
+
+#### 1a. Mi Negocio + Sucursales
+
+| Formulario | Contenedor actual → destino | Validación actual | maxLength | Obligatorio | Guard doble submit | Selects vacíos | `isDirty`→DrawerForm |
+|---|---|---|---|---|---|---|---|
+| Nueva sucursal — alta (`MiNegocioPanel.tsx:523`) | **Dialog** centrado → DrawerForm | `useState` + ifs manuales, sin RHF/Zod | Nombre 80 ✅, Dirección 120 ✅, Teléfono sin límite propio (delegado a `PhoneInput`) | Sin asterisco (correcto) en los 3 campos; Dirección/Teléfono opcionales **sin** "(opcional)" | ✅ `disabled={isSaving \|\| !nombre.trim()}`, manual | N/A — sin selects | N/A (es Dialog) |
+| Editar información — edición (`SucursalTabContent.tsx:414`) | **DrawerForm** (contenedor ya correcto) | `useState` + ifs manuales, sin RHF/Zod | Nombre 80 ✅, Dirección 120 ✅, Teléfono `maxLength={20}` en `Input` plano (⚠️ ver hallazgo #3) | Igual que alta: sin asterisco, sin "(opcional)" en opcionales | ✅ `disabled={isSavingInfo \|\| !nombre.trim()}`, manual | N/A | ❌ el componente calcula `isDirty` localmente (línea 205-208) pero **no lo pasa** al `DrawerForm` — gap barato de cerrar |
+| [código muerto] Nueva/Editar sucursal (`SucursalesConfig.tsx:424`) | DrawerForm, pero **archivo sin ningún import consumidor en todo el repo** | `useState` + ifs manuales | ❌ Nombre y Dirección sin `maxLength` (a diferencia de las 2 versiones live) | Igual, sin asterisco/sin "(opcional)" | ✅ manual | ver fila siguiente | ❌ mismo gap, `isDirty` no pasado |
+| [código muerto] Equipo — asignación de usuarios (`SucursalesConfig.tsx:469`) | Dialog centrado con scroll interno (`max-h-[85vh] overflow-y-auto`) — **también huérfano** | Sin schema — cada acción (asignar rol/barbero) persiste directo, sin "submit" único | N/A | N/A | Por acción, no hay guard único | Select "Barbero" vinculado: si vacío, queda con una sola opción fija "Sin vincular", sin mensaje. Bloque "Agregar al equipo": si no hay usuarios sin asignar, **la sección entera desaparece sin explicación** | N/A (es Dialog) |
+| Regenerar contraseña (Cuenta de sucursal) (`RegenerarPasswordDialog.tsx:54`) | Dialog — **confirmación pura, sin campos editables por el usuario**, fuera del canon de contenedor | N/A | N/A | N/A | ✅ `disabled={loading}` | N/A | N/A — guardeado contra cierre mientras `loading` (correcto para su tipo) |
+| Desactivar/Reactivar sucursal (`SucursalTabContent.tsx:372`, y su gemelo muerto en `SucursalesConfig.tsx:593`) | AlertDialog — confirmación pura, fuera del canon | N/A | N/A | N/A | ✅ guardeado mientras procesa | N/A | N/A |
+| Eliminar sucursal inactiva (`SucursalesInactivasCollapsible.tsx:134`) | AlertDialog — confirmación pura, fuera del canon | N/A | N/A | N/A | ✅ `disabled={target.submitting}` | N/A | N/A |
+| `CuentasSucursalConfig.tsx` / `CuentaSucursalBlock.tsx` | Cards con `Switch`/toggle de persistencia inmediata (patrón `PinConfigSection`) — no son formularios de alta/edición, no aplica el canon de contenedor | N/A | N/A | N/A | N/A | N/A | N/A |
+
+#### 1b. Equipo / Staff
+
+| Formulario | Contenedor actual → destino | Validación actual | maxLength | Obligatorio | Guard doble submit | Selects vacíos | `isDirty`→DrawerForm |
+|---|---|---|---|---|---|---|---|
+| Alta/edición integrante — `StaffForm` (`EquipoUnificado.tsx:1264`) | DrawerForm (contenedor ya correcto) | `useState` + ifs manuales, **mayormente silenciosos** (return sin feedback); única excepción: comisión con mensaje inline | ❌ Nombre/Apellido/DNI/Dirección sin `maxLength`. Motivo de "Finalizar actividad" (línea 1392) sí tiene 240 ✅ con contador visible | **Asterisco** en Nombre/Apellido/Tipo de compensación/Comisión/Sueldo fijo/Día de cobro (convención incorrecta); "(opcional)" correcto en DNI/Dirección | ✅ `submittingRef` + `isSubmitting`, manual, robusto | Select "Sucursal principal" (alta general): sin fallback si el array viene vacío, queda mudo | ❌ no pasado |
+| Asignación temporal (`EquipoSucursalPanel.tsx:718`) | DrawerForm (correcto) | `useState` + `canSave` booleano manual, sin mensajes de por qué está deshabilitado | N/A (Select + fechas, sin texto libre) | Sin asterisco, correcto (ambos obligatorios) | ✅ `saving` manual | Select "Barbero": si el array viene vacío, queda mudo (`SelectContent` vacío) | ❌ no pasado |
+| Asignación recurrente (`EquipoSucursalPanel.tsx:811`) | DrawerForm (correcto) | Igual, `canSave` manual | N/A | Sin asterisco en obligatorios; "(opcional)" correcto en Desde/Hasta | ✅ `saving` manual | Mismo Select "Barbero" mudo si vacío | ❌ no pasado |
+| Sucursal secundaria recurrente (`BarberSucursalesGeneralSection.tsx:312`) | DrawerForm (correcto) | `canSave` manual | N/A | Sin asterisco; "(opcional)" correcto en Desde/Hasta | ✅ `saving` manual | Select "Sucursal" **dentro del drawer** queda mudo si vacío — pero el Select "Sucursal principal" **inline en la card, 200 líneas antes en el mismo archivo**, sí maneja el caso vacío con `SelectItem disabled` + texto ("Sin sucursales configuradas") — el patrón correcto ya existe en el propio archivo, no está generalizado | ❌ no pasado |
+| Invitar usuario (`InviteUserDialog.tsx:194`) | DrawerForm (correcto) | **Zod schema completo (`inviteSchema`, líneas 15-19) ya escrito**, pero invocado a mano vía `safeParse` — no conectado a `useForm`/`zodResolver` | Solo vía Zod (email `max(255)`, nombre `min(2)/max(100)`) — sin atributo HTML `maxLength`, el límite no se ve mientras se tipea | **Sin asterisco** en ningún campo — el único formulario de todo el cluster ya alineado a la convención correcta | ✅ `isLoading` manual | Campo "Sucursal asignada" (rol manager): si `sucursales.length === 0`, **el campo desaparece del DOM**, pero `handleSubmit` lo sigue exigiendo → usuario bloqueado sin ver por qué (bug funcional, no solo de convención) | ❌ no pasado |
+| Configurar/cambiar PIN (`StaffPinDialog.tsx:135`) | DrawerForm (correcto) — confirmado que **no** es análogo a la excepción `PinConfigSection` (esa es pantalla completa; este es un drawer chico sobre una fila de listado, caso canónico) | `useState` + ifs, mezcla toast + un mensaje inline reactivo ("Los PINs no coinciden") | ✅ `maxLength={6}` en los 3 campos + sanitización a dígitos, doble enforcement | Sin marca, correcto (los 3 son obligatorios) | ✅ `isSaving`/`isDeleting` manual | N/A | ❌ no pasado |
+
+#### 1c. Clientes
+
+| Formulario | Contenedor actual → destino | Validación actual | maxLength | Obligatorio | Guard doble submit | Selects vacíos | `isDirty`/guard cierre |
+|---|---|---|---|---|---|---|---|
+| Alta cliente (`NuevoClienteDialog.tsx:119`) | Dialog centrado → DrawerForm | `useState` + ifs manuales, reimplementa a mano las mismas reglas que `clienteModeSchema.ts` ya resuelve | ❌ Ninguno (ni HTML ni Zod conectado) pese a que `ClienteFormFields.tsx` ya define 80/80/120 | **Asterisco** en Nombre/Sucursal (incorrecto); resto de opcionales sin "(opcional)" | ✅ `saving` manual | Select "Sucursal": mensaje sin CTA si vacío | Ninguno — cierre directo sin aviso |
+| Edición contacto (dentro de `ClienteDetailDialog.tsx:335`) | Edición in-place dentro del mismo Dialog de detalle (no un contenedor propio) — **patrón nuevo, no contemplado por el canon actual** (ver hallazgo #8) | `useState` + ifs manuales, misma lógica duplicada del alta | ❌ Ninguno | Asterisco "Nombre *" (incorrecto) | ✅ `saving` compartido vía `EditableSectionHeader` | N/A | Botón "Cancelar" de la sección revierte bien; cerrar el Dialog completo con una sección en edición no tiene guard |
+| Edición redes (`ClienteDetailDialog.tsx:402`) | Ídem | Sin validación (ni Zod ni ifs) | ❌ Ninguno | Sin marcas | ✅ `saving` compartido | N/A | Ídem |
+| Edición personal (`ClienteDetailDialog.tsx:454`) | Ídem | Sin validación | ❌ Ninguno | Sin marcas | ✅ `saving` compartido | N/A | Ídem |
+| Nota interna (`ClienteDetailDialog.tsx:610`) | Ídem, pero con un **cuarto patrón de edit-toggle hecho a mano** (no reusa `EditableSectionHeader`) | Sin validación | ❌ Ninguno | Sin marcas | ✅ `saving` compartido | N/A | Ídem |
+| Bloquear cliente (`ClienteDetailDialog.tsx:694`) | Dialog anidado — **confirmación pura (motivo + sí/no + PIN)**, encaja en el criterio ya cerrado de "Anular gasto"/`VoidClosureDialog`, no entra al canon | Botón deshabilitado si motivo vacío + doble-chequeo manual | ❌ Ninguno | "Motivo *" (asterisco, pero es el único campo y es obligatorio — menor severidad) | ✅ `actionBusy` + guard de PIN | N/A | ✅ guardeado mientras `actionBusy` — el único sub-form de `ClienteDetailDialog` con guard de cierre real |
+| Importar clientes (`ImportClientesDialog.tsx:193`) | Dialog centrado, wizard de 4 pasos — **¿análogo a la excepción BackfillWizard (que es Sheet) o migra? abierto, ver hallazgo #10** | Manual por paso; validación real de filas delegada a los parsers | N/A (sin texto libre propio) | N/A | ✅ `parsing`/`importing` manual | Select de sucursal: mensaje sin CTA si vacío | Guard de cierre solo mientras `importing`; no cubre "archivo ya parseado, preview sin confirmar" |
+
+**Patrón sano a preservar en todo el cluster:** `ClienteFormFields.tsx` +
+`clienteModeSchema.ts` — componente y schema compartidos, ya usados
+correctamente en Agenda (`NewAppointmentDialog.tsx`) con RHF+Zod,
+`maxLength` 80/80/120 vía Zod, sin asterisco, "(opcional)" en email,
+`FormMessage` inline y `EmptySelectHint` con CTA en el Select de
+sucursal. Es la referencia exacta de a dónde debería converger
+`NuevoClienteDialog.tsx`, y ninguno de los dos archivos de Clientes lo
+reusa hoy.
+
+### 2. Resolución de la contradicción "Nueva sucursal"
+
+**Resuelta.** Las dos auditorías previas no se contradicen por error de
+lectura — describen dos implementaciones **distintas que coexisten en el
+repo**:
+
+- La UI que el usuario **realmente ve** hoy usa `MiNegocioPanel.tsx` (alta,
+  `Dialog` centrado, línea 523) + `SucursalTabContent.tsx` (edición,
+  `DrawerForm`, línea 414). Alta y edición **nunca compartieron
+  contenedor** — son dos componentes de archivos distintos.
+- `SucursalesConfig.tsx` tiene su **propia** implementación completa de
+  alta+edición de sucursal en `DrawerForm` (línea 424, con título dinámico
+  "Nueva sucursal"/"Editar sucursal" — ahí sí comparten contenedor), más un
+  modal de asignación de equipo. Confirmado por grep global: **este
+  archivo no tiene ningún import consumidor en todo el repo** — es código
+  muerto, inalcanzable desde la app.
+
+La auditoría vieja que decía "Dialog" leyó la implementación live
+(`MiNegocioPanel`/`SucursalTabContent`); la que decía "DrawerForm" leyó
+`SucursalesConfig.tsx` sin verificar que nadie lo importa. Ninguna de las
+dos estaba "mal" — describían archivos distintos.
+
+**No lo resuelvo yo**, pero señalo la decisión pendiente: `SucursalesConfig.tsx`
+debería eliminarse (es la opción más simple: la funcionalidad que le
+falta — asignación de equipo por sucursal — ya vive resuelta en
+`EquipoSucursalPanel.tsx`) o, si tenía un propósito activo que se perdió,
+resucitarse como fuente de verdad reemplazando a `MiNegocioPanel`/
+`SucursalTabContent`. Mantenerlo vivo sin decidir esto generó exactamente
+la confusión que esta auditoría tuvo que destrabar.
+
+### 3. Hallazgos nuevos que no encajan en criterios ya cerrados
+
+1. **Alta y edición de sucursal (live) usan hoy contenedores distintos**
+   para la misma entidad (Dialog vs DrawerForm) — más allá del código
+   muerto del punto 2, es un hallazgo real: nunca hubo un único contenedor
+   para "sucursal" en producción.
+2. **Campo Teléfono con tratamiento inconsistente entre alta y edición de
+   sucursal**: el alta usa `PhoneInput` con canonicalización E.164 y
+   validación de formato (`MiNegocioPanel.tsx:539-546`); la edición usa un
+   `Input` de texto plano con solo `maxLength={20}`, sin `PhoneInput` ni
+   validación (`SucursalTabContent.tsx:498`). Mismo campo, misma entidad,
+   dos implementaciones — se pueden guardar teléfonos con formato inválido
+   desde la edición que el alta rechazaría.
+3. **7 usos reales de `DrawerForm` en este cluster sin `isDirty` conectado**
+   (`SucursalTabContent`, `EquipoUnificado`, `EquipoSucursalPanel` x2,
+   `BarberSucursalesGeneralSection`, `InviteUserDialog`, `StaffPinDialog`;
+   +1 más si se cuenta el `SucursalesConfig.tsx` muerto) — coincide con el
+   "pendiente conocido" ya documentado (13 consumidores de `DrawerForm` sin
+   RHF/`isDirty` en toda la app). Esta auditoría identifica cuáles son
+   concretamente dentro de Mi Negocio + Clientes. El caso más barato de
+   arreglar es `SucursalTabContent.tsx`: el dato `isDirty` **ya está
+   calculado localmente** (línea 205-208) pero no se pasa a la prop.
+4. **`InviteUserDialog.tsx` ya tiene un schema Zod completo** (`inviteSchema`,
+   líneas 15-19) pero sin conectar a `useForm`/`zodResolver` — es el
+   candidato más simple de todo el cluster para una migración real a RHF,
+   el trabajo de reglas ya está hecho.
+5. **Bug funcional en `InviteUserDialog.tsx`** (no solo de convención): el
+   campo "Sucursal asignada" (rol manager) desaparece del DOM si no hay
+   sucursales disponibles (`sucursales.length === 0`), pero `handleSubmit`
+   lo sigue exigiendo y setea un error que nunca se puede ver porque el
+   campo asociado no está montado — el usuario queda bloqueado sin
+   explicación.
+6. **Selects sin manejo de estado vacío repetidos en varios archivos**
+   ("Sucursal principal" en alta general de `EquipoUnificado`; "Barbero" en
+   ambos sheets de `EquipoSucursalPanel`; "Sucursal" dentro de
+   `AgregarRecurrenteSheet`) — y en el caso de
+   `BarberSucursalesGeneralSection.tsx` el patrón correcto (`SelectItem
+   disabled` + texto explicativo) **ya existe en el mismo archivo**, 200
+   líneas antes, para un Select equivalente fuera del drawer. Generalizar
+   ese patrón resuelve varios hallazgos a la vez.
+7. **`ClienteDetailDialog.tsx` mezcla 5 formularios de edición dentro de un
+   único Dialog de detalle** (contacto, redes, personal, nota interna,
+   bloquear), activados por toggles de sección en vez de contenedores
+   propios. Ninguno de los 4 primeros encaja limpio en "DrawerForm único
+   para alta/edición de entidades" tal como está redactado el canon,
+   porque no son formularios de alta/edición de una entidad nueva sino
+   edición de subconjuntos de campos de una entidad ya abierta en modo
+   detalle — es un patrón que ninguna fase anterior contempló. **No lo
+   resuelvo**, lo marco como la decisión de arquitectura más grande de
+   todo este relevamiento: ¿el detalle completo migra a `DrawerForm`
+   (Sheet) y las secciones se quedan como edición in-place adentro?
+   ¿cada sección se abre en su propio drawer secundario? ¿otra cosa?
+8. **`NuevoClienteDialog.tsx` y `ClienteDetailDialog.tsx` no reusan
+   `ClienteFormFields.tsx`/`clienteModeSchema.ts`**, pese a que ambos ya
+   resuelven correctamente (y están en uso en Agenda) exactamente las
+   mismas reglas que estos dos archivos reimplementan a mano — incluida
+   una regex de email idéntica duplicada en 3 lugares distintos
+   (`clienteModeSchema.ts`, `NuevoClienteDialog.tsx:83`,
+   `ClienteDetailDialog.tsx:198`) sin importar la constante compartida.
+9. **`ImportClientesDialog.tsx` es un wizard de 4 pasos dentro de un Dialog
+   centrado**, estructuralmente análogo a `BackfillWizard` (excepción ya
+   reconocida al canon) pero implementado con un contenedor distinto
+   (Dialog en vez de Sheet). **No lo resuelvo**: ¿es una segunda instancia
+   legítima de la excepción "wizard" (y entonces debería migrar a Sheet
+   para ser consistente con `BackfillWizard`), o un caso nuevo que necesita
+   su propia decisión?
+10. **Confirmado, no es un hallazgo pero cierra una duda abierta en el
+    pedido**: `StaffPinDialog.tsx` **no** es análogo a la excepción
+    `PinConfigSection` — es un drawer chico invocado sobre una fila de
+    listado (caso canónico de `DrawerForm`), no una pantalla completa que
+    ES el formulario.
+11. **Patrones sanos a preservar** (además de `ClienteFormFields`/
+    `clienteModeSchema` ya mencionado arriba): el guard
+    `submittingRef`+`isSubmitting`+`onSubmittingChange` de `StaffForm`
+    (`EquipoUnificado.tsx`) para sincronizar el estado de guardado con los
+    botones del footer del `DrawerForm` padre; el motivo de "Finalizar
+    actividad" (`EquipoUnificado.tsx:1392`) con `maxLength={240}` y
+    contador visible, mismo patrón sano que "Anular gasto" en Finanzas; el
+    manejo de teléfono con `canonicalizePhone`/`phoneErrorMessage` del alta
+    de sucursal; y `EditableSectionHeader.tsx`, ya compartido entre 3 de
+    las 4 secciones de edición de `ClienteDetailDialog` (todas salvo "Nota
+    interna", que lo reimplementa a mano — inconsistencia menor dentro del
+    propio archivo).
+
+### 4. Estimación de archivos y builds
+
+**10 archivos núcleo** tocarían contenedor y/o validación:
+`MiNegocioPanel.tsx`, `SucursalTabContent.tsx`, `EquipoUnificado.tsx`,
+`EquipoSucursalPanel.tsx`, `BarberSucursalesGeneralSection.tsx`,
+`InviteUserDialog.tsx`, `StaffPinDialog.tsx`, `NuevoClienteDialog.tsx`,
+`ClienteDetailDialog.tsx`, `ImportClientesDialog.tsx`. Más
+`SucursalesConfig.tsx` como un archivo aparte a **eliminar** (o resucitar,
+según lo que se decida) — no cuenta como build normal de migración.
+`ClienteFormFields.tsx`/`clienteModeSchema.ts` no se tocan, solo se
+importan desde Clientes.
+
+Es más del doble de los 4 archivos de Finanzas. **Conviene partir en al
+menos 3 builds**, con acoplamiento real (no por tamaño) como criterio de
+corte, igual que en Finanzas:
+
+- **Build A — Mi Negocio + Sucursales** (`MiNegocioPanel.tsx` +
+  `SucursalTabContent.tsx`, decisión sobre `SucursalesConfig.tsx`):
+  unificar alta+edición de sucursal en un único `DrawerForm`+RHF, resolver
+  la inconsistencia de Teléfono (hallazgo #2), cerrar el gap de `isDirty`
+  que ya tiene el dato calculado. Es el build más chico y más autocontenido
+  de los tres.
+- **Build B — Equipo/Staff** (`EquipoUnificado.tsx`, `EquipoSucursalPanel.tsx`,
+  `BarberSucursalesGeneralSection.tsx`, `InviteUserDialog.tsx`,
+  `StaffPinDialog.tsx`): los 5 ya están en `DrawerForm`, así que el
+  trabajo es RHF+Zod, `isDirty`, y generalizar el patrón de Select vacío
+  que ya existe en el propio cluster. Cohesivos porque comparten los
+  mismos Selects de sucursal/barbero con el mismo bug (hallazgo #6), y
+  porque `InviteUserDialog` ya trae el schema Zod más adelantado de los 5.
+- **Build C — Clientes** (`NuevoClienteDialog.tsx`, `ClienteDetailDialog.tsx`,
+  `ImportClientesDialog.tsx`): **bloqueado hasta decidir** la arquitectura
+  de contenedor de `ClienteDetailDialog.tsx` (hallazgo #7) y si
+  `ImportClientesDialog` se trata como excepción wizard tipo
+  `BackfillWizard` (hallazgo #9) — son las dos preguntas de diseño más
+  grandes de todo este relevamiento y conviene resolverlas antes de
+  planificar el build, no durante.
+
+---
+
+## Fase 4 - Tanda 2 - Parte 3 - Build A (Mi Negocio + Sucursales) — 2026-07-28
+
+Primero de los 3 builds de esta parte. Alcance: unificar alta y edición de
+sucursal en un único `DrawerForm`+RHF+Zod, cerrar la inconsistencia de
+Teléfono, conectar `isDirty`, y decidir el destino de `SucursalesConfig.tsx`.
+
+### Decisión de esta sesión: `SucursalesConfig.tsx` eliminado
+
+Antes de borrar se corrió `grep -r "SucursalesConfig" src/` — el único
+archivo que matcheaba era el propio `SucursalesConfig.tsx` (ningún import
+consumidor en todo `src/`). Confirmado el hallazgo de la auditoría, se
+eliminó el archivo completo. Su única función real — asignación de
+usuarios/roles por sucursal — ya vive resuelta en `EquipoSucursalPanel.tsx`
+(Build B), así que no hace falta portar nada de su contenido.
+
+### Cambios
+
+**`src/components/sucursalFormSchema.ts` (nuevo)** — schema Zod compartido
+entre alta y edición: `nombre` (`min(1)`/`max(80)`), `direccion`
+(`max(120)`, opcional), `telefono` (`PhoneInputChange | null`, con
+`refine` que solo exige `isValid` cuando hay valor — vacío es válido
+porque el campo es opcional). Incluye `emptySucursalDefaults()` y
+`sucursalDefaultsFromExisting()` para hidratar el form en alta/edición
+respectivamente. Este es el archivo que evita que alta y edición vuelvan
+a divergir, como pasó con Teléfono.
+
+**`MiNegocioPanel.tsx`** — alta de sucursal migrada de `Dialog` centrado a
+`DrawerForm` (`size="sm"`) + `useForm`/`zodResolver` con el schema
+compartido. Teléfono ahora vía `PhoneInput` conectado a RHF (ya lo tenía,
+pero manual — ahora es `field.value`/`field.onChange`). `isDirty` conectado
+a `sucursalForm.formState.isDirty`. Se eliminaron `formData`, `phoneOut`,
+`isSaving` (state manual) — reemplazados por el form y
+`formState.isSubmitting`. El botón "Nueva sucursal" del estado vacío
+("No tenés sucursales todavía") ahora llama a `handleOpenCreate` en vez de
+`setShowDialog(true)` directo, para que también resetee el form (pequeño
+fix de paso, mismo archivo).
+
+**`SucursalTabContent.tsx`** — edición de sucursal ("Editar información",
+ya estaba en `DrawerForm`) migrada de `useState` manual a
+`useForm`/`zodResolver` con el mismo schema compartido. El campo Teléfono
+pasa de `Input` de texto plano (`maxLength={20}`, sin validación) a
+`PhoneInput` — mismo componente, misma canonicalización E.164 y mismo
+`mode="any"` que usa el alta. `isDirty` que ya se calculaba localmente
+(y no se usaba) ahora es `infoForm.formState.isDirty`, conectado tanto al
+prop `isDirty` de `DrawerForm` (gap que la auditoría marcó como el más
+barato del cluster) como al botón Desactivar/Reactivar (que ya lo usaba
+para bloquearse mientras hay cambios sin guardar). Cancelar y cerrar con
+la X ahora resetean vía `infoForm.reset(sucursalDefaultsFromExisting(...))`
+en vez de reconstruir el objeto a mano en cada call site.
+
+**`SucursalesConfig.tsx`** — eliminado.
+
+### Qué no se tocó (fuera de alcance de este build)
+
+`CuentasSucursalConfig.tsx`/`CuentaSucursalBlock.tsx` (toggles de
+persistencia inmediata, no aplica el canon), `RegenerarPasswordDialog.tsx`
+y los `AlertDialog` de desactivar/reactivar/eliminar sucursal
+(confirmaciones puras, ya conformes) — ninguno de estos archivos se editó.
+Tampoco se tocó nada de Equipo/Staff (Build B) ni de Clientes (Build C).
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+---
+
+## Fase 4 - Tanda 2 - Parte 3 - Build B (Equipo/Staff) — 2026-07-28
+
+Segundo de los 3 builds de esta parte. Los 5 archivos ya estaban en
+`DrawerForm` — alcance: migrar validación a RHF+Zod, conectar `isDirty`,
+generalizar el patrón de Select vacío ya existente en el cluster, y
+corregir el bug funcional de `InviteUserDialog.tsx`.
+
+### Cambios por archivo
+
+**`InviteUserDialog.tsx`** — el más simple de los 5: `inviteSchema` ya
+tenía las reglas escritas, solo faltaba conectarlas a
+`useForm`/`zodResolver` en vez de invocar `safeParse` a mano. El schema
+pasó a ser `buildInviteSchema(hasSucursales)` (función, no constante)
+porque la validación del campo "Sucursal asignada" depende de un dato
+externo al form (cuántas sucursales hay disponibles), no solo de los
+valores tipeados. **Bug corregido**: cuando `sucursales.length === 0` y el
+rol es "Encargado de Sucursal", el campo ya no exige una sucursal que no
+se le puede mostrar al usuario — en su lugar se ve un `EmptySelectHint`
+(mensaje + botón "Cómo resolverlo" que explica cómo destrabarlo, mismo
+patrón ya usado en `HorariosTrabajoSection.tsx` cuando no hay a dónde
+navegar en un click). `isDirty` conectado, pero desactivado mientras se
+muestran las credenciales generadas (no hay nada que "descartar" ahí). Se
+preservaron intactos el toggle mostrar/ocultar contraseña y el ícono de
+"copiado" temporal — no eran parte de este build y no había que tocarlos.
+
+**`StaffPinDialog.tsx`** — migrado a RHF+Zod (`buildPinSchema(hasPin)`,
+misma razón funcional que `InviteUserDialog`: la regla "PIN actual
+obligatorio" depende de si ya existe un PIN, un dato externo). El mensaje
+inline reactivo "Los PINs no coinciden" se preservó tal cual pedido — vive
+fuera de `FormMessage`, calculado por `form.watch` en cada tecla, no solo
+al enviar. `maxLength={6}` + sanitización a dígitos intactos. `isDirty`
+conectado.
+
+**`EquipoUnificado.tsx` (`StaffForm`)** — migrado a RHF+Zod
+(`staffFormSchema`). El guard `submittingRef` se preservó sin tocar,
+solo ahora envuelve `form.handleSubmit(onSubmit)` en vez de la validación
+manual. maxLength agregado: Nombre 80, Apellido 80, Dirección 120, DNI 20
+(no hay bucket 80/120/240/1500 que le quede bien a un DNI — se usó un
+límite práctico, no uno de los 4 estándar). Sacados los asteriscos de
+Nombre/Apellido/Tipo de compensación/Comisión/Sueldo fijo/Día de cobro —
+ningún campo obligatorio lleva marca en el resto de la app. El teléfono
+pasó del patrón "string plano + `phoneOut` paralelo" al mismo patrón que
+Sucursal/Cliente (`PhoneInputChange` completo en el campo RHF, aplanado a
+`e164` recién al llamar `onSave`) — `StaffFormData` (el tipo que consume
+el resto del archivo) no cambió, solo el tipo interno del form. Como el
+`isDirty` vive en el `useForm` de `StaffForm` pero el `DrawerForm` que lo
+consume está en el componente padre, se agregó un `onDirtyChange` al lado
+del `onSubmittingChange` ya existente — mismo puente, mismo patrón, para
+no duplicar la lógica de sincronización. El Select "Sucursal principal"
+del alta general (fuera de `StaffForm`, vive en el padre) ahora muestra
+`<SelectItem disabled>Sin sucursales configuradas</SelectItem>` cuando la
+lista viene vacía, en vez de quedar mudo.
+
+**`EquipoSucursalPanel.tsx`** (`TemporalSheet` + `RecurrenteSheet`) —
+ambos sheets migrados a RHF+Zod (`temporalSchema`/`recurrenteSchema`), con
+mensajes reales por campo (`FormMessage`) en vez de solo deshabilitar el
+botón sin explicar por qué. El Select "Barbero" de ambos ahora muestra
+`Sin barberos disponibles` cuando la lista viene vacía. `isDirty`
+conectado en los dos.
+
+**`BarberSucursalesGeneralSection.tsx`** (`AgregarRecurrenteSheet`) —
+mismo tratamiento que los sheets de `EquipoSucursalPanel.tsx`
+(`agregarRecurrenteSchema`). El Select "Sucursal" **del drawer** ahora
+usa el mismo patrón `SelectItem disabled` que ya vivía 200 líneas antes en
+el Select inline "Sucursal principal" de este mismo archivo — ese inline
+no se tocó, ya estaba bien. `isDirty` conectado.
+
+### Selects vacíos — patrón generalizado, no un componente nuevo
+
+Se usó el patrón que ya vivía en el cluster (`<SelectItem value="__empty__"
+disabled>texto explicativo</SelectItem>` dentro de `SelectContent`), no
+`EmptySelectHint` — con una excepción: `InviteUserDialog.tsx`, donde el
+campo entero desaparecía (no había Select mudo que arreglar) y sí
+correspondía `EmptySelectHint` con su CTA, como pide el punto 2 del pedido.
+
+### isDirty — los 5 conectados
+
+Ninguno de los 5 lo tenía conectado antes de este build. Ahora los 5 pasan
+`isDirty` a su `DrawerForm`: directo desde `form.formState.isDirty` en
+4 de ellos, y vía el puente `onDirtyChange` en `EquipoUnificado.tsx` por
+la separación entre `StaffForm` (dueño del form) y el padre (dueño del
+`DrawerForm`).
+
+### Qué no se tocó (fuera de alcance de este build)
+
+Nada de Mi Negocio/Sucursales (Build A, ya cerrado) ni de Clientes
+(Build C, bloqueado). El drawer de info de barbero en
+`EquipoSucursalPanel.tsx` (el que abren los `MoreVertical` de cada card)
+no se tocó — no tiene campos editables, no le aplica RHF ni `isDirty`.
+El Select inline "Sucursal principal" de `BarberSucursalesGeneralSection.tsx`
+no se tocó — ya estaba bien.
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+## Fase 4 - Tanda 2 - Parte 3 - Build C1 (Alta de cliente + Importador) — 2026-07-28
+
+Primero de los 2 builds de Clientes. Alcance: `NuevoClienteDialog.tsx` e
+`ImportClientesDialog.tsx`. `ClienteDetailDialog.tsx` queda para el Build
+C2, aparte.
+
+### `NuevoClienteDialog.tsx` — Dialog → `DrawerForm`, reusa Agenda
+
+Contenedor migrado a `DrawerForm` (`size="md"`). La validación manual
+(`useState` + `if`s encadenados) se reemplazó por RHF+Zod, reusando
+directo `ClienteFormFields.tsx` + `clienteModeFieldsSchema` de Agenda para
+Nombre/Apellido/Teléfono/Email — ninguno de los dos archivos se tocó, solo
+se importan. Esto resuelve de una los 3 síntomas que traía el pedido: sin
+asterisco en Nombre (el schema no los usa), `maxLength` 80/80/120 ya
+incluido, y el regex de email ya no vive duplicado a mano (ver más abajo).
+
+No se reusó `validateClienteMode` (la función de validación cruzada de
+`clienteModeSchema.ts`): esa función exige Apellido y Teléfono
+obligatorios porque está pensada para el alta rápida dentro de un turno
+(`NewAppointmentDialog`). El alta standalone tiene una regla de negocio
+distinta y ya existente — Apellido opcional, Teléfono **o** Email (al
+menos uno) — así que `NuevoClienteDialog` define su propio
+`superRefine` en `buildNuevoClienteSchema(needsSucursalPicker)`, mismo
+patrón de "schema como función" que `buildInviteSchema`/`buildPinSchema`
+del Build B, porque la sucursal obligatoria depende de un dato externo
+(`isAllMode`/`currentSucursal`). Para el regex de email no se duplicó un
+literal nuevo: `clienteModeSchema.ts` no exporta el suyo, así que se reusa
+`isValidEmail` de `clientes/import/lib/normalize.ts` (mismo patrón exacto,
+ya exportado, ya usado por el importador) — un import ya existente en vez
+de una tercera copia del mismo regex.
+
+Los campos que no vive en el sub-formulario compartido (fecha de
+nacimiento, Instagram/TikTok/otra red social, alergias, acepta marketing)
+se mantuvieron, ahora como `FormField` del mismo `useForm` — necesario
+para que `isDirty` reaccione a cualquier campo del formulario, no solo a
+los 4 compartidos. `maxLength` agregado donde no había: redes sociales 80
+(bucket nombres/títulos), alergias 240 (bucket descripciones/motivos).
+Select "Sucursal": sin asterisco, `EmptySelectHint` con CTA "Cómo
+resolverlo" en vez del párrafo mudo que tenía antes (mismo texto/patrón
+que `InviteUserDialog.tsx`, Build B). `isDirty={form.formState.isDirty}`
+conectado. `saving`/`checking` manuales eliminados del submit principal —
+ahora es `form.formState.isSubmitting` (doble submit resuelto de fábrica).
+
+**Hallazgo en el camino, no pedido**: el archivo tenía, al momento de
+escribir este build, un flujo de detección de duplicados por teléfono
+(`findClienteByPhone` + `AlertDialog` "Ya existe un cliente con ese
+teléfono" con opciones vincular/crear igual/cancelar) que no estaba en el
+alcance original de este build ni en la lectura inicial del archivo — se
+preservó intacto, adaptado a leer del form (`form.getValues()`) en vez de
+estado plano, con su propio `saving` local porque se dispara fuera del
+ciclo de `form.handleSubmit` (mismo patrón que el `isSaving` manual de
+`BackfillWizard` conviviendo con RHF).
+
+### `ImportClientesDialog.tsx` — Dialog → `Sheet`, mismo estatus que `BackfillWizard`
+
+Wizard de 4 pasos (`method`/`sucursal`/`preview`/`summary`): contenedor
+migrado de `Dialog` centrado a `Sheet` propio (`sm:max-w-3xl`), con
+header/body/footer armados a mano igual que `BackfillWizard.tsx` — no es
+un consumidor de `DrawerForm`, mismo motivo que ese wizard (multi-paso, no
+es alta/edición plana de una entidad). Ninguno de los 4 pasos ni la lógica
+de parseo/preview se tocó.
+
+**Guard de cierre extendido**: antes solo bloqueaba el cierre en
+silencio mientras `importing` estaba en curso (sin diálogo, sin feedback).
+Ahora también protege el caso "hay un archivo parseado con preview sin
+confirmar" (`rows.length > 0 && step !== 'summary'`) — cerrar en ese
+estado perdería el trabajo de corregir/resolver duplicados antes de
+importar. Mismo mecanismo que `DrawerForm` (`AlertDialog` "¿Descartar
+cambios?" / "Seguir editando" / "Descartar cambios"), pero armado a mano
+en el propio componente porque acá no hay un `isDirty` de RHF que pasarle
+a nada — es un wizard de pasos, no un form. Igual que el criterio de
+`DrawerForm`, la protección aplica solo a X/Escape/click afuera
+(`handleSheetOpenChange`); los botones explícitos del footer (Cerrar/
+Cancelar/Listo) siguen bypaseando y cerrando directo, sin preguntar.
+
+Select "Sucursal de destino" (paso `sucursal`): el mensaje mudo dentro de
+`SelectContent` para el caso sin sucursales accesibles se reemplazó por
+`EmptySelectHint` con CTA, mismo patrón que el resto del cluster.
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+## Fase 4 - Tanda 2 - Parte 3 - Build C2 (ClienteDetailDialog) — CIERRE de la Tanda 2
+
+Segundo y último build de Clientes. Un solo archivo:
+`clientes/ClienteDetailDialog.tsx`. Referencia exacta a copiar (según
+pedido de esta sesión): `agenda/AppointmentDetailDialog.tsx` — no se tocó,
+solo se leyó.
+
+### Contenedor: Dialog → `DrawerForm`
+
+`size="lg"` (el `Dialog` original era `sm:max-w-2xl`, el bucket más
+cercano en la escala de `DrawerForm`). Título compuesto: nombre completo +
+badge "Bloqueado" condicional, mismo patrón que `AppointmentDetailDialog`
+(avatar/nombre/pill). El botón "WhatsApp" (placeholder, `toast('Próximamente')`)
+vivía dentro del `DialogTitle` original en un layout `justify-between` —
+se movió al tope del body en vez de forzarlo dentro del slot `title` de
+`DrawerForm`: ese slot es un `SheetPrimitive.Title` sin `flex-1`, así que
+un hijo con "empujar a la derecha" ahí no se estira contra el botón de
+cerrar sin tocar `drawer-form.tsx` (fuera de alcance de este build). No es
+una regresión — el botón sigue existiendo, mismo comportamiento, solo
+cambió de fila.
+
+### Las 4 secciones editables — todas a RHF+Zod, todas con `EditableSectionHeader`
+
+**Contacto**: reusa `ClienteFormFields.tsx` + `clienteModeFieldsSchema`
+(mismo componente que `NuevoClienteDialog`, Build C1 — sin tocarlo, solo
+import) con un `superRefine` propio, mismo motivo que en C1: la regla acá
+es Apellido opcional + Teléfono *o* Email, no la de
+`validateClienteMode` (pensada para el turno). Efecto colateral bueno:
+al usar `PhoneInputChange` completo en el campo (en vez del string plano +
+"¿el usuario tocó el teléfono?" que tenía el código viejo), el caso
+"usuario no toca el teléfono" ahora simplemente no ensucia el campo — RHF
+ya sabe no incluir cambios si `isDirty` es falso, se cayó la rama especial
+`editedPhone` que existía antes.
+
+**Redes** y **Personal**: sin validación real antes (`useState` +
+`persist` directo, sin ningún chequeo). Ahora tienen su propio
+`useForm`/schema — sin reglas obligatorias (son todas opcionales), pero
+con `maxLength` real por primera vez.
+
+**Nota interna**: reimplementaba su propio toggle editar/guardar/cancelar
+a mano (`editingNota` + botones con `Pencil`/`Save`/`X`/`Loader2`
+sueltos). Ahora usa `EditableSectionHeader`, igual que las otras 3 — ya no
+queda una sección afuera del patrón. Efecto colateral importante, no
+cosmético: antes `editingNota` era un estado aparte de `editing`
+(`EditingSection`), así que editar la Nota **no bloqueaba** las otras 3
+secciones — un hueco real en la exclusión mutua. Se resolvió extendiendo
+el propio `EditingSection` (`null | 'contacto' | 'redes' | 'personal' |
+'nota'`), no agregando un boolean más — las 4 secciones comparten un único
+estado mutuamente excluyente, mismo mecanismo que ya usaban 3 de las 4.
+
+**maxLength aplicado**: Nombre/Apellido 80 y Email 120 (vía
+`clienteModeFieldsSchema`, sin duplicar); Alergias y Nota interna 240
+(bucket descripciones/motivos); Instagram/TikTok/otra red social **120**
+según el pedido explícito de esta sesión ("120 para redes sociales/
+dirección"). **Nota de inconsistencia, no se corrigió**: en
+`NuevoClienteDialog.tsx` (Build C1) esos mismos 3 campos quedaron en 80
+(bucket nombres/títulos, el criterio vigente en ese momento) — el candado
+de alcance de este build prohíbe tocar ese archivo, así que el mismo
+campo lógico hoy tiene dos `maxLength` distintos según por dónde se cargue
+el cliente (alta vs. edición). No es un bug de este build, es una decisión
+de sesión que quedó grabada en dos lugares distintos — que un build futuro
+decida cuál de los dos criterios es el correcto y unifique.
+
+**Regex de email**: mismo criterio que C1 — no se duplicó un literal
+nuevo, se reusó `isValidEmail` de `clientes/import/lib/normalize.ts`.
+
+**Asteriscos sacados**: "Nombre *" (Contacto, automático al migrar a
+`ClienteFormFields`) y "Motivo *" (modal Bloquear cliente, corregido
+aparte — ver abajo).
+
+### Exclusión mutua — confirmada y extendida a las 4
+
+Ya existía para Contacto/Redes/Personal vía el `EditingSection` único con
+`disabled={editing !== null}` en cada `EditableSectionHeader` (el mismo
+prop deshabilita el botón "Editar" de las demás; la sección activa ignora
+`disabled` porque mientras `isEditing` es true muestra Guardar/Cancelar,
+no el botón "Editar"). Nota interna se sumó al mismo union en vez de
+quedar con su propio boolean — con 4 secciones (vs. las 2 de
+`AppointmentDetailDialog`), un único estado compartido es más simple que
+4 booleans cruzados a mano.
+
+### `isDirty` — unión de las 4 secciones activas
+
+Mismo patrón que `AppointmentDetailDialog` con `clienteForm`/`turnoForm`:
+`(editing === 'contacto' && contactoForm.formState.isDirty) || (...redes)
+|| (...personal) || (...nota)`. Antes no había ningún guard de cierre — cerrar
+el `Dialog` con cambios sin guardar en cualquier sección no avisaba nada
+(solo el botón "Cancelar" de cada sección revertía bien). Ahora
+`DrawerForm` pregunta "¿Descartar cambios?" si cerrás por X/Escape/click
+afuera con una sección dirty.
+
+### Qué no se tocó (fuera de alcance de este build)
+
+La sección "Bloquear cliente" (modal `Dialog` con motivo + botón, guard
+`actionBusy`) y sus dos hermanas de confirmación pura (`Desbloquear`,
+`Eliminar`, ambas en `AlertDialog`) — no se migraron a RHF, ya estaban
+conformes. Único cambio ahí: se sacó el asterisco de "Motivo *" → "Motivo"
+(el campo ya era obligatorio de forma funcional, vía el botón deshabilitado
+hasta que se completa — no necesitaba la marca). `NuevoClienteDialog.tsx`
+e `ImportClientesDialog.tsx` (Build C1) no se tocaron.
+
+### Validación
+
+`npx tsc --noEmit` — **0 errores**.
+
+## Cierre de la Parte 3 (Fase 4, Tanda 2): Mi Negocio + Clientes
+
+Tres builds — Build A (Mi Negocio + Sucursales), Build B (Equipo/Staff),
+Build C1+C2 (Clientes) — migraron el cluster completo a `DrawerForm` +
+RHF+Zod, con `isDirty` conectado y el patrón de Select vacío
+(`SelectItem disabled` o `EmptySelectHint`, según si el campo entero
+desaparece) generalizado en todo el cluster. `ClienteDetailDialog.tsx`
+suma un patrón nuevo al canon: edición-en-el-lugar por sección con
+`EditableSectionHeader` + exclusión mutua vía un único estado compartido
+(`AppointmentDetailDialog` ya lo probó con 2 secciones; acá se confirmó
+que escala a 4). Pendiente conocido, no bloqueante: el `maxLength` de
+redes sociales quedó en 80 en C1 y en 120 en C2 (ver nota en Build C2) —
+a resolver en un build futuro, no en un hotfix de esta sesión.
+
+## Cierre de la Tanda 2 (Fase 4): Configuración + Finanzas + Mi Negocio/Clientes
+
+Con este build se cierran las 3 partes de la Tanda 2:
+**Configuración** (18 formularios), **Finanzas** (Sueldos/Gastos/
+Inversiones/Deudas) y **Mi Negocio/Clientes** (Sucursales/Equipo/
+Clientes) migraron a `DrawerForm` + RHF+Zod como contenedor y stack
+únicos, con las excepciones ya documentadas y vigentes (`Cobrar` stepper
+propio, `BackfillWizard`/`ImportClientesDialog` como wizards en `Sheet`,
+`PinConfigSection`/`ProductoPickerDialog` fuera del canon por diseño).
+`isDirty` conectado en todos los consumidores editables del cluster.
+Alcance ya migrado a este sistema, actualizado: Sidebar, Agenda, Cobrar,
+Caja, Configuración completa, Finanzas completa, Mi Negocio + Clientes
+completos. Todavía sin migrar: el portal público de reservas (fuera del
+sistema de diseño unificado por decisión ya tomada, ver
+`vittro-ui-patterns`).

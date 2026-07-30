@@ -23,6 +23,12 @@ export interface OnboardingStep {
   hideOnMobile?: boolean;
   /** Ocultar este paso en desktop */
   hideOnDesktop?: boolean;
+  /** Id de una sección colapsable que debe abrirse antes de mostrar el paso */
+  requiresOpen?: string;
+  /** Condición de auto-avance evaluada al montar el paso */
+  autoAdvanceIf?: 'on-sucursal-tab';
+  /** Si el target no existe en el DOM, saltar el paso en silencio */
+  optionalTarget?: boolean;
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
@@ -41,15 +47,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     requiredTab: 'mi-negocio',
   },
   {
-    id: 's2_cuenta_intro',
-    targetId: 'cuentas-sucursal-section',
-    title: '¿Para qué sirve la cuenta de sucursal?',
-    description: 'La cuenta de sucursal está pensada para el trabajo diario de la barbería, sin necesidad de utilizar cuentas personales.',
-    requiredTab: 'mi-negocio',
-    miNegocioSubTab: 'general',
-    hideOnMobile: true,
-  },
-  {
     id: 's2b_general_tab',
     targetId: 'general-tab',
     title: 'Configuración General',
@@ -58,15 +55,30 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     miNegocioSubTab: 'general',
   },
   {
-    id: 's3_cuenta_bullets',
-    targetId: 'cuentas-sucursal-bullets',
-    title: '¿Para qué sirve la cuenta de sucursal?',
-    description: 'Tres ideas clave para tener en cuenta:',
+    id: 's3_equipo_general',
+    targetId: 'equipo-general-section',
+    title: 'Agregá a tu equipo',
+    description: 'Acá das de alta a los miembros de tu equipo: barberos, encargados y cajeros. Desde esta sección los creás, les asignás sucursales y les enviás la invitación de acceso.',
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'general',
+    optionalTarget: true,
   },
   {
-    id: 's4_select_sucursal',
+    id: 's4_cuenta_sucursal',
+    targetId: 'cuentas-sucursal-section',
+    title: '¿Para qué sirve la cuenta de sucursal?',
+    description: 'Es un acceso operativo que Vittro genera automáticamente para cada sucursal, pensado para el trabajo diario sin usar cuentas personales del equipo.',
+    bullets: [
+      'Cada sucursal tiene su propia cuenta, generada automáticamente.',
+      'Sirve para operar el día a día desde caja o recepción.',
+      'No accede a configuración, estadísticas, comisiones ni gestión del negocio.',
+    ],
+    requiredTab: 'mi-negocio',
+    miNegocioSubTab: 'general',
+    requiresOpen: 'cuentas-sucursal',
+  },
+  {
+    id: 's5_select_sucursal',
     targetId: 'sucursal-tab',
     title: 'Accede a tu sucursal principal',
     description: 'Hacé clic en la pestaña de tu sucursal para continuar configurándola.',
@@ -74,20 +86,13 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     miNegocioSubTab: 'general',
     advanceOnEvent: 'mi-negocio:sucursal-selected',
     hideContinueButton: true,
+    autoAdvanceIf: 'on-sucursal-tab',
   },
   {
-    id: 's5_info',
+    id: 's6_info',
     targetId: 'info-sucursal-card',
     title: 'Información de la sucursal',
-    description: 'Acá podés configurar y gestionar toda la información principal de esta sucursal.',
-    requiredTab: 'mi-negocio',
-    miNegocioSubTab: 'first-sucursal',
-  },
-  {
-    id: 's6_equipo',
-    targetId: 'equipo-section',
-    title: 'Gestioná tu equipo',
-    description: 'Acá podés agregar barberos, encargados, cajeros y miembros del equipo.',
+    description: 'Acá configurás y gestionás la información principal de esta sucursal. Desde el botón "Cuenta de sucursal", arriba a la derecha de esta tarjeta, accedés a las credenciales reales de este local: email, contraseña temporal y la opción de regenerarla.',
     requiredTab: 'mi-negocio',
     miNegocioSubTab: 'first-sucursal',
   },
