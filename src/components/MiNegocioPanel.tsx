@@ -271,6 +271,17 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
     return () => onb.registerSubTabSetter(null);
   }, [onb, handleTabChange, showGeneralTab, visibleSucursales]);
 
+  // Probe para el onboarding: ¿la sub-tab activa es una sucursal válida (no General)?
+  // Permite que el paso de "elegí tu sucursal" se auto-avance si el usuario ya está parado ahí.
+  useEffect(() => {
+    onb.registerSubTabProbe(() =>
+      activeTab !== GENERAL_TAB && visibleSucursalesActivas.some(s => s.id === activeTab)
+    );
+    return () => onb.registerSubTabProbe(null);
+  }, [onb, activeTab, visibleSucursalesActivas]);
+
+
+
   const generalIsReady = activeTab === GENERAL_TAB;
 
   // --- Barber CRUD ---
