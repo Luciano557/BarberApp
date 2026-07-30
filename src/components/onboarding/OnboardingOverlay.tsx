@@ -1,13 +1,14 @@
 import { useOnboarding } from './OnboardingProvider';
 
 export function OnboardingOverlay() {
-  const { isActive, currentStep, targetRect, targetMissing } = useOnboarding();
+  const { isActive, currentStep, targetRect, targetMissing, tooltipFits } = useOnboarding();
   if (!isActive) return null;
   // El paso de bienvenida usa Dialog con su propio backdrop
   if (currentStep?.isWelcome) return null;
 
   const pad = 8;
-  const r = targetRect && !targetMissing
+  // En modo diálogo centrado no hay spotlight: evitaría recortes sobre el diálogo.
+  const r = targetRect && !targetMissing && tooltipFits
     ? {
         top: Math.max(0, targetRect.top - pad),
         left: Math.max(0, targetRect.left - pad),
