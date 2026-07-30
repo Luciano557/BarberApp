@@ -79,6 +79,15 @@ export function MiNegocioGeneralTabContent({
   const [cuentasOpen, setCuentasOpen] = useState(false);
   const [serviciosTab, setServiciosTab] = useState<'services' | 'lines' | 'extras'>('services');
 
+  // El onboarding necesita poder abrir esta sección antes de mostrar su paso.
+  const { registerSectionOpener } = useOnboarding();
+  useEffect(() => {
+    registerSectionOpener('cuentas-sucursal', () => setCuentasOpen(true));
+    return () => registerSectionOpener('cuentas-sucursal', null);
+  }, [registerSectionOpener]);
+
+
+
   const guarded = useCallback(<TArgs extends unknown[], TReturn>(fn: (...args: TArgs) => TReturn) => {
     return (...args: TArgs): TReturn | undefined => {
       if (!isReady) {
