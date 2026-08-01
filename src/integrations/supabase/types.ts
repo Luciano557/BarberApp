@@ -3022,6 +3022,7 @@ export type Database = {
       resumenes_mensuales_estado: {
         Row: {
           created_at: string
+          dismissed_at: string | null
           id: string
           organization_id: string
           postponed_at: string | null
@@ -3031,6 +3032,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dismissed_at?: string | null
           id?: string
           organization_id: string
           postponed_at?: string | null
@@ -3040,6 +3042,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dismissed_at?: string | null
           id?: string
           organization_id?: string
           postponed_at?: string | null
