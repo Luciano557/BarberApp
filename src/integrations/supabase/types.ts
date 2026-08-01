@@ -839,6 +839,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_job_errors: {
+        Row: {
+          contexto: Json
+          created_at: string
+          error_detail: string | null
+          error_message: string
+          id: string
+          job_name: string
+        }
+        Insert: {
+          contexto?: Json
+          created_at?: string
+          error_detail?: string | null
+          error_message: string
+          id?: string
+          job_name: string
+        }
+        Update: {
+          contexto?: Json
+          created_at?: string
+          error_detail?: string | null
+          error_message?: string
+          id?: string
+          job_name?: string
+        }
+        Relationships: []
+      }
       descuentos: {
         Row: {
           activo: boolean
@@ -4697,6 +4724,10 @@ export type Database = {
       generar_resumenes_mensuales: {
         Args: { target_mes?: string }
         Returns: number
+      }
+      generar_resumenes_mensuales_job: {
+        Args: { target_mes?: string }
+        Returns: undefined
       }
       get_mp_connection_status: {
         Args: { _org_id: string }
