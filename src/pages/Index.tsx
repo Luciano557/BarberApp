@@ -26,6 +26,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 import { OnboardingOverlay } from '@/components/onboarding/OnboardingOverlay';
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
+import { ResumenMensualStory } from '@/components/resumenMensual/ResumenMensualStory';
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -195,6 +196,7 @@ const Index = () => {
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       <OnboardingOverlay />
       <OnboardingTooltip />
+      <ResumenMensualStory />
 
       <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
         <div className={cn("mx-auto px-4 py-6 sm:px-6 md:px-8", activeTab === 'turnos-agenda' ? "max-w-none px-4 md:px-4" : "max-w-7xl")}>

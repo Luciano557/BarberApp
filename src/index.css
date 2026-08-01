@@ -379,6 +379,83 @@
   .animate-confirm-card-out {
     animation: confirm-card-out 220ms var(--ease-in-quint) forwards;
   }
+
+  /* Barras del comparativo de 3 meses del resumen mensual. Crecen desde la
+     línea de base (o desde el cero hacia abajo, si el valor es negativo). El
+     estado final es el natural: si la animación no corre, la barra ya está
+     completa. */
+  @keyframes resumen-bar-in {
+    from { transform: scaleY(0); }
+    to   { transform: scaleY(1); }
+  }
+
+  .animate-resumen-bar-in {
+    animation: resumen-bar-in 320ms var(--ease-out-quint) both;
+  }
+}
+
+/*
+ * Contenedor del resumen mensual (pop-up tipo historia).
+ *
+ * Es el único overlay no-formulario de la app con doble presentación: sheet
+ * inferior en mobile, modal centrado de 560px en escritorio/tablet — que es el
+ * contexto de uso real (el local). El centrado usa `inset: 0 + margin: auto`
+ * en vez de `translate(-50%, -50%)` justamente para dejar `transform` libre
+ * para la animación de entrada/salida.
+ */
+@layer components {
+  .resumen-sheet {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 50;
+    max-height: 92dvh;
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .resumen-sheet {
+      inset: 0;
+      margin: auto;
+      width: min(560px, calc(100vw - 3rem));
+      height: fit-content;
+      max-height: min(88dvh, 780px);
+      border-radius: 0.75rem;
+    }
+  }
+
+  .resumen-sheet[data-state='open'] {
+    animation: resumen-sheet-in 200ms var(--ease-out-quint);
+  }
+
+  .resumen-sheet[data-state='closed'] {
+    animation: resumen-sheet-out 150ms var(--ease-in-quint);
+  }
+
+  /* Mobile: sube desde abajo, como cualquier sheet. */
+  @keyframes resumen-sheet-in {
+    from { opacity: 0; transform: translateY(100%); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes resumen-sheet-out {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(100%); }
+  }
+
+  /* Escritorio: entrada corta y contenida, sin recorrido de pantalla completa. */
+  @media (min-width: 640px) {
+    @keyframes resumen-sheet-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes resumen-sheet-out {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to   { opacity: 0; transform: translateY(6px) scale(0.98); }
+    }
+  }
 }
 
 /* Accesibilidad: anular movimiento si el usuario lo pide. */
