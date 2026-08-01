@@ -46,6 +46,11 @@ export interface VentaRow {
 }
 
 /**
+ * ⚠️ ESPEJO: la lógica de facturación / cantidad de servicios / egresos por tipo_costo
+ * también existe en la función SQL public.generar_resumenes_mensuales()
+ * (migración 20260801030358_c08bb365-6c9c-4c57-8bea-1d4c9e4d7c28.sql).
+ * Si cambiás esta fórmula acá, actualizala también ahí — no hay sincronización automática.
+ *
  * Fetch + agregación mensual de Estadísticas. Extraído tal cual del fetchData
  * original de EstadisticasPanel: mismos filtros, mismo resultado, mismo
  * patrón fetch-completo-y-reduce-en-cliente. No reescribe el fetching.
