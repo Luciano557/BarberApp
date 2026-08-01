@@ -2920,6 +2920,116 @@ export type Database = {
           },
         ]
       }
+      resumenes_mensuales: {
+        Row: {
+          created_at: string
+          facturacion_actual: number
+          facturacion_hace_2_meses: number | null
+          facturacion_mes_anterior: number | null
+          generado_at: string
+          id: string
+          mes: string
+          metodos_cobro: Json
+          organization_id: string
+          rentabilidad_hace_2_meses_pct: number | null
+          rentabilidad_mes_anterior_pct: number | null
+          rentabilidad_pct: number | null
+          servicios_actual: number
+          servicios_hace_2_meses: number | null
+          servicios_mes_anterior: number | null
+          sucursal_id: string
+        }
+        Insert: {
+          created_at?: string
+          facturacion_actual: number
+          facturacion_hace_2_meses?: number | null
+          facturacion_mes_anterior?: number | null
+          generado_at?: string
+          id?: string
+          mes: string
+          metodos_cobro?: Json
+          organization_id: string
+          rentabilidad_hace_2_meses_pct?: number | null
+          rentabilidad_mes_anterior_pct?: number | null
+          rentabilidad_pct?: number | null
+          servicios_actual: number
+          servicios_hace_2_meses?: number | null
+          servicios_mes_anterior?: number | null
+          sucursal_id: string
+        }
+        Update: {
+          created_at?: string
+          facturacion_actual?: number
+          facturacion_hace_2_meses?: number | null
+          facturacion_mes_anterior?: number | null
+          generado_at?: string
+          id?: string
+          mes?: string
+          metodos_cobro?: Json
+          organization_id?: string
+          rentabilidad_hace_2_meses_pct?: number | null
+          rentabilidad_mes_anterior_pct?: number | null
+          rentabilidad_pct?: number | null
+          servicios_actual?: number
+          servicios_hace_2_meses?: number | null
+          servicios_mes_anterior?: number | null
+          sucursal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumenes_mensuales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resumenes_mensuales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resumenes_mensuales_estado: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          postponed_at: string | null
+          read_at: string | null
+          resumen_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          postponed_at?: string | null
+          read_at?: string | null
+          resumen_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          postponed_at?: string | null
+          read_at?: string | null
+          resumen_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumenes_mensuales_estado_resumen_id_fkey"
+            columns: ["resumen_id"]
+            isOneToOne: false
+            referencedRelation: "resumenes_mensuales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servicios: {
         Row: {
           activo: boolean
