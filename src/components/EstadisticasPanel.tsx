@@ -137,6 +137,10 @@ export function EstadisticasPanel() {
   };
 
   // Derive per-month metrics with variation
+  // ⚠️ ESPEJO: la fórmula de rentabilidad ((facturacion - totalEgresos) / facturacion * 100)
+  // también existe en la función SQL public.generar_resumenes_mensuales()
+  // (migración 20260801030358_c08bb365-6c9c-4c57-8bea-1d4c9e4d7c28.sql).
+  // Si cambiás esta fórmula acá, actualizala también ahí — no hay sincronización automática.
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
     const today = new Date();
     const currentMonthStr = format(today, 'yyyy-MM');

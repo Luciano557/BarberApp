@@ -16,6 +16,11 @@ function emptyMontos(): MontoPorMetodo {
 }
 
 /**
+ * ⚠️ ESPEJO: el desglose por método de pago (con el fallback venta_pagos → venta) también
+ * existe en la función SQL public.generar_resumenes_mensuales()
+ * (migración 20260801030358_c08bb365-6c9c-4c57-8bea-1d4c9e4d7c28.sql).
+ * Si cambiás esta fórmula acá, actualizala también ahí — no hay sincronización automática.
+ *
  * Composición de cobros por método de pago — mes actual vs. mes anterior, para el
  * donut "Cómo se cobra" y su línea de tendencia ("Digital +X% vs. mes anterior").
  * Independiente del selector de período del panel: siempre compara el mes
