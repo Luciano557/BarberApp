@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public._test_cron_error_capture();
