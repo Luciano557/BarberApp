@@ -4649,7 +4649,6 @@ export type Database = {
         }
         Returns: string
       }
-      _test_cron_error_capture: { Args: never; Returns: undefined }
       barberos_pin_status: {
         Args: { _ids: string[] }
         Returns: {
