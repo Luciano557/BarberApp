@@ -4694,6 +4694,10 @@ export type Database = {
           telefono: string
         }[]
       }
+      generar_resumenes_mensuales: {
+        Args: { target_mes?: string }
+        Returns: number
+      }
       get_mp_connection_status: {
         Args: { _org_id: string }
         Returns: {
