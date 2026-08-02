@@ -1,51 +1,32 @@
-# Cierre del reporte del job `generar-resumenes-mensuales`
+# Portal público: restringir al manager
 
-Dos de los tres puntos ya están verificados por consulta directa a la base. El tercero (prueba de fallo controlado) escribe y borra una fila, así que necesita aprobación antes de ejecutarse.
+El rol **manager** deja de ver y de poder editar la configuración del Portal público. Mantiene intacto su acceso a "Configuración de reservas" (horarios, disponibilidad, bloqueos) y a la Agenda.
 
-## 1. Comando exacto dentro del `cron.schedule` — verificado
+## Qué cambia para el usuario
 
-Consulta a `cron.job`:
+- Un manager que entra a Turnos → Configuración ve únicamente "Configuración de reservas". La pestaña "Portal público" desaparece.
+- Owner y encargado general siguen viendo ambas pestañas, sin cambios.
+- La restricción también se aplica en la base de datos: aunque un manager intente editar el portal fuera de la interfaz, el sistema lo rechaza.
 
-```text
-jobname:  generar-resumenes-mensuales
-schedule: 0 5 5 * *
-command:  SELECT public.generar_resumenes_mensuales_job();
-active:   true
-```
+## Cambio de interfaz
 
-El job llama al **envoltorio** `generar_resumenes_mensuales_job()`, no a `generar_resumenes_mensuales()` directamente. Eso es lo que garantiza el logueo de errores.
+En `src/components/config/AgendaManagement.tsx`:
 
-## 2. Comentario sobre la limitación de zona horaria — no existe
+- Agregar una constante local `canManagePortalPublico = isOwner || isGeneralManager` (mismo patrón que `showGeneralTab` en `MiNegocioPanel.tsx:102`; no se crea un flag nuevo en AuthContext).
+- Renderizar el `TabsTrigger` y el `TabsContent` de `portal` solo cuando esa constante sea true.
+- El `defaultValue` del `Tabs` pasa a ser `portal` cuando puede verlo y `reservas` cuando no, para que el manager no caiga en una pestaña inexistente.
+- Cuando solo queda una pestaña visible, ocultar el `TabsList` (mismo criterio que ya usa `TurnosAgendaPanel` con las sucursales) y renderizar directamente el contenido de reservas.
 
-Revisé los `COMMENT ON` de ambas funciones y los comentarios de espejo en los tres archivos de origen. **No hay ningún comentario documentando una limitación de zona horaria.** Lo único que existe hoy es:
+Sin cambios en `PortalPublicoSection.tsx` ni en `usePortalConfig.ts`.
 
-`COMMENT ON FUNCTION public.generar_resumenes_mensuales_job(date)`:
+## Cambio en la base de datos
 
-```text
-Envoltorio de generar_resumenes_mensuales() usado por el job pg_cron generar-resumenes-mensuales. Captura cualquier error y lo registra en public.cron_job_errors para evitar fallos silenciosos.
-```
+Una migración que quita `manager` de las políticas de escritura del portal, dejando owner y general_manager:
 
-`COMMENT ON FUNCTION public.generar_resumenes_mensuales(date)`: **NULL** (sin comentario).
+- `portal_config`: recrear `portal_config_insert_admins` y `portal_config_update_admins` sin `has_role(..., 'manager')`. `portal_config_delete_admins` ya está limitado a owner/general_manager. La política de lectura `portal_config_select_org_members` se deja como está: la necesitan el portal público y las previsualizaciones.
+- Storage, bucket `portal-logos`: recrear `portal_logos_admins_insert`, `portal_logos_admins_update` y `portal_logos_admins_delete` sin `manager`, conservando el resto de las condiciones actuales (carpeta por organización y extensiones permitidas).
 
-Comentarios de espejo existentes (ninguno menciona zona horaria):
+## Verificación
 
-- `src/components/estadisticas/useEstadisticasData.ts:49` — facturación / cantidad de servicios / egresos por `tipo_costo`.
-- `src/components/estadisticas/usePagoMetodoData.ts:19` — desglose por método de pago con fallback `venta_pagos → venta`.
-- `src/components/EstadisticasPanel.tsx:140` — fórmula de rentabilidad.
-
-La limitación en sí sí existe en el código SQL: la función resuelve la ventana de cada mes con `COALESCE(NULLIF(s.timezone,''), NULLIF(o.timezone,''), 'America/Argentina/Buenos_Aires')`, es decir, cae a la zona de Buenos Aires cuando la sucursal y la organización no tienen zona horaria cargada. Está implementado pero no documentado.
-
-## 3. Prueba de fallo controlado — pendiente de aprobación
-
-Plan de ejecución:
-
-1. Invocar `public.generar_resumenes_mensuales_job('not-a-date-safe-trigger')` no sirve (el tipo `date` valida antes de entrar). En su lugar, forzar el fallo desde dentro: ejecutar el envoltorio con un `target_mes` extremo (`'0001-01-01'`) y verificar si rompe; si no rompe, provocar el error renombrando temporalmente nada — en su lugar se usa una llamada directa que dispare la excepción capturada.
-2. Método definitivo, sin tocar objetos existentes: ejecutar `SELECT public.generar_resumenes_mensuales_job('0001-01-01');` y luego revisar `cron_job_errors`. Si no genera error, se crea una función temporal de prueba con el mismo patrón de captura para validar que el `INSERT` en `cron_job_errors` funciona, y se la borra al terminar.
-3. Consultar la fila resultante en `public.cron_job_errors` y reportar `job_name`, `error_message`, `error_detail` y `contexto` textuales.
-4. Borrar la fila de prueba y confirmar que la tabla queda como estaba.
-
-Riesgo: `generar_resumenes_mensuales('0001-01-01')` podría insertar filas reales en `resumenes_mensuales` para ese mes ficticio si no falla. En ese caso también se borran esas filas en la limpieza.
-
-## Opcional (fuera del alcance actual)
-
-Si querés, en una build aparte agrego el `COMMENT ON FUNCTION public.generar_resumenes_mensuales(date)` documentando la limitación de zona horaria (fallback a Buenos Aires cuando sucursal y organización no la tienen cargada) y el corte mensual en hora local.
+- Confirmar con una consulta a `pg_policies` que ninguna política de `portal_config` ni del bucket `portal-logos` menciona `manager`, salvo la de lectura.
+- Revisar en el preview que owner ve las dos pestañas y que con rol manager solo aparece "Configuración de reservas", con el contenido de reservas cargando correctamente.
