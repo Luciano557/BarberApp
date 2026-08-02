@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Image as ImageIcon, Palette, Type, Settings2, ChevronDown } from 'lucide-react';
+import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, ChevronDown } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -28,7 +27,7 @@ import { cn } from '@/lib/utils';
 const URL_RE = /^https?:\/\//i;
 
 export function PortalPublicoSection() {
-  const { organization } = useOrganization();
+  const { organization, updateOrganization } = useOrganization();
   const orgId = organization?.id;
   const {
     config, loading, saving, save,
@@ -36,6 +35,8 @@ export function PortalPublicoSection() {
     uploadCover, removeCover,
   } = usePortalConfig(orgId);
 
+  const [orgNameDraft, setOrgNameDraft] = useState('');
+  const [savingAll, setSavingAll] = useState(false);
   const [description, setDescription] = useState('');
   const [primaryColor, setPrimaryColor] = useState('');
   const [links, setLinks] = useState<PortalLink[]>([]);
@@ -64,6 +65,12 @@ export function PortalPublicoSection() {
     }
   }, [config]);
 
+  // El borrador del nombre se re-sincroniza con la organización guardada:
+  // al cargar y también después de un guardado exitoso.
+  useEffect(() => {
+    setOrgNameDraft(organization?.name ?? '');
+  }, [organization?.name]);
+
   const publicUrl = useMemo(() => {
     if (!organization?.slug) return '';
     return `${window.location.origin}/${organization.slug}/reservar`;
@@ -85,6 +92,10 @@ export function PortalPublicoSection() {
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
   }), [logoUrl, coverUrl, coverPosX, coverPosY, coverZoom, organization?.logo_url, description, primaryColor, links]);
+
+  const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const handleCopy = async () => {
     if (!publicUrl) return;
@@ -161,6 +172,10 @@ export function PortalPublicoSection() {
   };
 
   const handleSave = async () => {
+    // 1. Validación en cliente — nada se escribe hasta que todo esté bien.
+    const trimmedName = orgNameDraft.trim();
+    if (!trimmedName) return toast.error('El nombre del negocio no puede quedar vacío');
+    if (trimmedName.length > 80) return toast.error('El nombre del negocio supera los 80 caracteres');
     if (description.length > 240) return toast.error('La descripción supera 240 caracteres');
     if (primaryColor && !isValidHex(primaryColor)) return toast.error('El color debe tener formato #RRGGBB');
     if (links.length > 4) return toast.error('Máximo 4 links');
@@ -177,24 +192,51 @@ export function PortalPublicoSection() {
       sort_order: i,
       icon: isValidIconKey(l.icon) ? l.icon : null,
     }));
+
+    setSavingAll(true);
+
+    // 2. organizations.name — solo si cambió. Si falla, abortamos sin tocar
+    //    portal_config para no dejar los datos a medio guardar.
+    const nameChanged = trimmedName !== (organization?.name ?? '');
+    if (nameChanged) {
+      const { error: orgError } = await updateOrganization({ name: trimmedName });
+      if (orgError) {
+        setSavingAll(false);
+        return toast.error(`No se pudo actualizar el nombre del negocio: ${orgError.message}`);
+      }
+    }
+
+    // 3. portal_config — el nombre ya quedó guardado, así que un fallo acá
+    //    no puede reportarse como "no se guardó nada".
     const { error } = await save({
       description: description.trim() || null,
       primary_color: primaryColor || null,
       links: normalized,
     });
-    if (error) toast.error(`No se pudo guardar: ${error.message}`);
-    else toast.success('Cambios guardados');
+    setSavingAll(false);
+
+    if (error) {
+      toast.error(
+        nameChanged
+          ? `El nombre del negocio se guardó, pero no se pudo guardar el resto: ${error.message}`
+          : `No se pudo guardar: ${error.message}`,
+      );
+      return;
+    }
+    toast.success('Cambios guardados');
   };
 
   if (!orgId) return null;
 
-  const orgName = organization?.name || 'Mi Barbería';
+  // La preview sigue el borrador en vivo; si el campo queda vacío mientras se
+  // edita, cae al nombre ya guardado en vez de mostrar el placeholder genérico.
+  const orgName = orgNameDraft.trim() || organization?.name || 'Mi Barbería';
   const descPlaceholder = `Bienvenido al portal de reservas de ${orgName}. Reservá tu turno o gestioná tu cita de forma simple.`;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
       {/* === Columna config === */}
-      <div className="space-y-6 min-w-0">
+      <div className="min-w-0">
         {/* A — Link público */}
         <Card>
           <CardHeader className="pb-3">
@@ -225,211 +267,232 @@ export function PortalPublicoSection() {
           </CardContent>
         </Card>
 
-        {/* B — Configuración avanzada */}
-        <Card>
-          <CardContent className="pt-4">
-            <Accordion type="single" collapsible>
-              <AccordionItem value="advanced" className="border-none">
-                <AccordionTrigger className="py-2 hover:no-underline">
-                  <span className="flex items-center gap-2 text-sm font-medium">
-                    <Settings2 className="h-4 w-4" /> Configuración avanzada
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 space-y-8">
-                  {/* 1. QR de reserva */}
-                  <section className="space-y-3">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <QrCode className="h-4 w-4" /> QR de reserva
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
-                      </p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-4 items-start">
-                      <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
-                        {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
-                      </div>
-                      <Button variant="outline" size="sm" onClick={handleDownloadQR}>
-                        <Download className="h-4 w-4 mr-1" /> Descargar QR
-                      </Button>
-                    </div>
-                  </section>
+        {/* Barra de accesos — solo desktop */}
+        <nav className="hidden md:block sticky top-0 z-10 mt-6 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            <button
+              onClick={() => scrollTo('portal-identidad')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Identidad
+            </button>
+            <button
+              onClick={() => scrollTo('portal-contenido')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Contenido
+            </button>
+            <button
+              onClick={() => scrollTo('portal-extra')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Extra
+            </button>
+          </div>
+        </nav>
 
-                  {/* 2. Identidad visual */}
-                  <section className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4" /> Identidad visual
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Foto de portada, logo y nombre del negocio.
-                      </p>
-                    </div>
+        {/* 1 — Identidad visual */}
+        <section id="portal-identidad" className="mt-6 scroll-mt-16">
+          <h3 className="text-base font-medium text-foreground mb-4">Identidad visual</h3>
 
-                    {/* Cover */}
-                    <div className="space-y-2">
-                      <Label className="text-xs">Foto de portada</Label>
-                      <PortalCoverUploader
-                        coverUrl={coverUrl}
-                        coverPositionX={coverPosX}
-                        coverPositionY={coverPosY}
-                        coverZoom={coverZoom}
-                        uploading={uploadingCover}
-                        disabled={saving}
-                        onUpload={handleCoverFile}
-                        onRemove={handleRemoveCover}
-                        onAdjust={() => setAdjustOpen(true)}
-                      />
-                    </div>
+          <div className="space-y-4">
+            {/* Cover */}
+            <div className="space-y-2">
+              <Label className="text-xs">Foto de portada</Label>
+              <PortalCoverUploader
+                coverUrl={coverUrl}
+                coverPositionX={coverPosX}
+                coverPositionY={coverPosY}
+                coverZoom={coverZoom}
+                uploading={uploadingCover}
+                disabled={saving}
+                onUpload={handleCoverFile}
+                onRemove={handleRemoveCover}
+                onAdjust={() => setAdjustOpen(true)}
+              />
+            </div>
 
-                    {/* Logo */}
-                    <div className="space-y-2">
-                      <Label className="text-xs">Logo</Label>
-                      <div className="flex items-center gap-3">
-                        <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
-                          {logoUrl ? (
-                            <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-sm font-semibold text-muted-foreground">
-                              {orgName.slice(0, 1).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <input
-                            ref={fileRef}
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              e.target.value = '';
-                              if (f) handleLogoFile(f);
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileRef.current?.click()}
-                            disabled={uploadingLogo || saving}
-                          >
-                            <Upload className="h-4 w-4 mr-1" />
-                            {uploadingLogo ? 'Subiendo...' : logoPath ? 'Cambiar logo' : 'Subir logo'}
-                          </Button>
-                          {logoPath && (
-                            <Button variant="outline" size="sm" onClick={handleRemoveLogo} disabled={saving}>
-                              <Trash2 className="h-4 w-4 mr-1" /> Quitar
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
-                    </div>
-
-                    {/* Nombre */}
-                    <div className="space-y-2">
-                      <Label className="text-xs">Nombre del negocio</Label>
-                      <Input value={orgName} readOnly className="bg-muted/40" />
-                      <p className="text-xs text-muted-foreground">
-                        Editalo desde la configuración del negocio.
-                      </p>
-                    </div>
-                  </section>
-
-                  {/* 3. Color principal */}
-                  <section className="space-y-3">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Palette className="h-4 w-4" /> Color principal
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Se aplica a botones y elementos destacados del portal.
-                      </p>
-                    </div>
-
-                    <PortalColorPalette value={primaryColor} onChange={handleColorPreset} />
-
-                    <Collapsible open={customColorOpen} onOpenChange={setCustomColorOpen}>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm" className="px-2 h-8 text-xs text-muted-foreground hover:text-foreground">
-                          <ChevronDown className={cn('h-3.5 w-3.5 mr-1 transition-transform', customColorOpen && 'rotate-180')} />
-                          Usar color personalizado
-                        </Button>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="pt-3 space-y-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <input
-                            type="color"
-                            value={isValidHex(primaryColor) ? primaryColor : '#000000'}
-                            onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
-                            className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
-                          />
-                          <Input
-                            value={primaryColor}
-                            onChange={(e) => setPrimaryColor(e.target.value)}
-                            placeholder="#000000"
-                            maxLength={7}
-                            className="font-mono w-32"
-                          />
-                          {primaryColor && (
-                            <Button variant="ghost" size="sm" onClick={() => setPrimaryColor('')}>
-                              Quitar
-                            </Button>
-                          )}
-                        </div>
-                        {primaryColor && !isValidHex(primaryColor) && (
-                          <p className="text-xs text-destructive">Formato inválido. Usá #RRGGBB.</p>
-                        )}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </section>
-
-                  {/* 4. Descripción corta */}
-                  <section className="space-y-2">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <Type className="h-4 w-4" /> Descripción corta
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Si la dejás vacía, mostramos un mensaje de bienvenida automático.
-                      </p>
-                    </div>
-                    <Textarea
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      maxLength={240}
-                      rows={3}
-                      placeholder={descPlaceholder}
-                    />
-                    <p className="text-xs text-muted-foreground text-right">{description.length}/240</p>
-                  </section>
-
-                  {/* 5. Links personalizados */}
-                  <section className="space-y-3">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center gap-2">
-                        <LinkIcon className="h-4 w-4" /> Links personalizados
-                      </h4>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
-                      </p>
-                    </div>
-                    <PortalLinksEditor links={links} onChange={setLinks} />
-                  </section>
-
-                  {/* 6. Guardar */}
-                  <div className="flex justify-end pt-2 border-t border-border">
-                    <Button onClick={handleSave} disabled={saving || loading} size="lg">
-                      <Save className="h-4 w-4 mr-1" />
-                      {saving ? 'Guardando...' : 'Guardar cambios'}
+            {/* Logo */}
+            <div className="space-y-2">
+              <Label className="text-xs">Logo</Label>
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {orgName.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (f) handleLogoFile(f);
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploadingLogo || saving}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {uploadingLogo ? 'Subiendo...' : logoPath ? 'Cambiar logo' : 'Subir logo'}
+                  </Button>
+                  {logoPath && (
+                    <Button variant="outline" size="sm" onClick={handleRemoveLogo} disabled={saving}>
+                      <Trash2 className="h-4 w-4 mr-1" /> Quitar
                     </Button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+            </div>
+
+            {/* Nombre */}
+            <div className="space-y-2">
+              <Label htmlFor="portal-org-name" className="text-xs">Nombre del negocio</Label>
+              <Input
+                id="portal-org-name"
+                value={orgNameDraft}
+                onChange={(e) => setOrgNameDraft(e.target.value)}
+                maxLength={80}
+                placeholder="Mi Barbería"
+                disabled={savingAll}
+              />
+              <p className="text-xs text-muted-foreground">
+                Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
+              </p>
+            </div>
+
+            {/* Color principal */}
+            <div className="space-y-3 pt-2">
+              <div>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <Palette className="h-4 w-4" /> Color principal
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se aplica a botones y elementos destacados del portal.
+                </p>
+              </div>
+
+              <PortalColorPalette value={primaryColor} onChange={handleColorPreset} />
+
+              <Collapsible open={customColorOpen} onOpenChange={setCustomColorOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="px-2 h-8 text-xs text-muted-foreground hover:text-foreground">
+                    <ChevronDown className={cn('h-3.5 w-3.5 mr-1 transition-transform', customColorOpen && 'rotate-180')} />
+                    Usar color personalizado
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="color"
+                      value={isValidHex(primaryColor) ? primaryColor : '#000000'}
+                      onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+                      className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
+                    />
+                    <Input
+                      value={primaryColor}
+                      onChange={(e) => setPrimaryColor(e.target.value)}
+                      placeholder="#000000"
+                      maxLength={7}
+                      className="font-mono w-32"
+                    />
+                    {primaryColor && (
+                      <Button variant="ghost" size="sm" onClick={() => setPrimaryColor('')}>
+                        Quitar
+                      </Button>
+                    )}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </CardContent>
-        </Card>
+                  {primaryColor && !isValidHex(primaryColor) && (
+                    <p className="text-xs text-destructive">Formato inválido. Usá #RRGGBB.</p>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
+          </div>
+        </section>
+
+        {/* 2 — Contenido del portal */}
+        <section id="portal-contenido" className="border-t pt-6 mt-6 scroll-mt-16">
+          <h3 className="text-base font-medium text-foreground mb-4">Contenido del portal</h3>
+
+          <div className="space-y-6">
+            {/* Descripción corta */}
+            <div className="space-y-2">
+              <div>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <Type className="h-4 w-4" /> Descripción corta
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Si la dejás vacía, mostramos un mensaje de bienvenida automático.
+                </p>
+              </div>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={240}
+                rows={3}
+                placeholder={descPlaceholder}
+              />
+              <p className="text-xs text-muted-foreground text-right">{description.length}/240</p>
+            </div>
+
+            {/* Links personalizados */}
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <LinkIcon className="h-4 w-4" /> Links personalizados
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
+                </p>
+              </div>
+              <PortalLinksEditor links={links} onChange={setLinks} />
+            </div>
+          </div>
+        </section>
+
+        {/* 3 — Extra */}
+        <section id="portal-extra" className="border-t pt-6 mt-6 scroll-mt-16">
+          <h3 className="text-base font-medium text-foreground mb-4">Extra</h3>
+
+          <div className="space-y-3">
+            <div>
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <QrCode className="h-4 w-4" /> QR de reserva
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
+              <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
+                {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadQR}>
+                <Download className="h-4 w-4 mr-1" /> Descargar QR
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Guardado */}
+        <div className="flex justify-end border-t pt-6 mt-6">
+          <Button onClick={handleSave} disabled={savingAll || saving || loading} size="lg">
+            <Save className="h-4 w-4 mr-1" />
+            {savingAll ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        </div>
       </div>
 
       {/* === Columna preview === */}
