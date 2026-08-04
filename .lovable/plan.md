@@ -2,30 +2,26 @@
 
 Reubicación 100% de UI y navegación. No se toca la base de datos, ni RLS, ni edge functions, ni la lógica de resolución horario base/override.
 
-## Punto de fricción a confirmar antes de avanzar
+## Punto de fricción resuelto
 
-**No existe hoy una "ficha individual" navegable por barbero.** En Mi Negocio → ficha de sucursal → Equipo (`EquipoSucursalPanel.tsx`), cada barbero es una tarjeta-resumen expandible; el botón de tres puntos abre un drawer lateral de disponibilidad (asignaciones recurrentes/temporales, activar/desactivar). En Mi Negocio → General → Equipo hay otro drawer ("Editar integrante") con cargo, acceso y PIN. Ninguno de los dos es una página de detalle.
-
-Según lo que definiste, el horario por barbero va **en Equipo por sucursal**, o sea dentro del drawer de disponibilidad que ya existe. Eso significa: el editor de horarios va a vivir dentro de un panel lateral de 520 px de ancho, no en una página. Es viable, pero es el punto a validar: si preferís una ficha de barbero de pantalla completa, eso es un trabajo aparte y más grande, y conviene decidirlo antes de empezar.
+No existe hoy una ficha individual navegable por barbero (en Equipo por sucursal cada barbero es una tarjeta con un drawer de disponibilidad). Por eso se descarta meter horarios ahí: `EquipoSucursalPanel.tsx` no se toca. Todo el horario, sucursal y barberos, vive en una sección propia de la ficha de sucursal.
 
 ## Qué ve el usuario al terminar
 
-**Mi Negocio → ficha de Sucursal**
-Una tarjeta nueva "Horario de atención", ubicada después de "Información" y antes de "Equipo", con:
-- Resumen legible del horario base, agrupando días con el mismo rango: "Lun a Vie 09:00 a 18:00", "Sáb 09:00 a 13:00", "Dom cerrado". Días sin horario aparecen como "cerrado" en una línea gris al final.
-- Si no hay ningún horario cargado: estado vacío con texto "Todavía no cargaste el horario de atención" y el mismo botón como acción principal.
-- Botón "Editar horario" que abre un panel lateral con el editor completo actual (aplicar a varios días + edición día por día), sin cambios de comportamiento.
+**Mi Negocio → ficha de Sucursal → nueva sección "Horarios de atención"**
+Una card más de la ficha, al mismo nivel que las otras, con la descripción: "Horario de atención de la sucursal y de cada barbero del equipo." Adentro, dos pestañas:
 
-**Mi Negocio → ficha de Sucursal → Equipo → drawer de un barbero**
-Un bloque "Horario" dentro del drawer, con:
-- Si el barbero no tiene horario propio: pill neutro "Usa el horario de la sucursal" + el resumen del horario de sucursal en gris + botón "Crear horario propio" (misma acción que hoy: copia el horario de sucursal).
-- Si tiene horario propio: pill "Horario propio" + resumen en el mismo formato + botón "Editar horario" y acción secundaria "Volver al horario de la sucursal".
+- **Sucursal**: resumen legible del horario base agrupando días con el mismo rango: "Lun a Vie 09:00 a 18:00", "Sáb 09:00 a 13:00", "Dom cerrado". Botón "Editar horario" que abre el panel lateral con el editor completo actual. Si no hay nada cargado: "Todavía no cargaste el horario de atención" con el mismo botón como acción principal.
+- **Barberos**: selector de barbero activo con su pill de estado ("Horario propio" / "Usa sucursal"), igual que hoy. Elegido un barbero:
+  - Sin horario propio: pill neutro, resumen del horario de sucursal en gris y botón "Crear horario propio" (misma acción actual: copia el horario de sucursal).
+  - Con horario propio: pill "Horario propio", resumen en el mismo formato, botón "Editar horario" y acción secundaria "Volver al horario de la sucursal".
 
 **Turnos → Configuración → Configuración de reservas**
-Donde hoy está la tarjeta grande, queda una fila compacta: ícono de reloj, título "Horarios de trabajo", texto "Ahora se configuran desde Mi Negocio, en la ficha de cada sucursal y de cada barbero" y un botón "Ir a horarios" que lleva a Mi Negocio, abre la pestaña de la sucursal activa y hace scroll con resalte a la tarjeta de horario. Reglas de reserva y Ausencias y cierres quedan igual, arriba y abajo de ese bloque.
+Donde hoy está la tarjeta grande, queda una fila compacta: ícono de reloj, título "Horarios de trabajo", texto "Ahora se configuran desde Mi Negocio, en la ficha de cada sucursal" y un botón "Ir a horarios" que lleva a Mi Negocio, abre la pestaña de la sucursal activa y hace scroll con resalte a la sección "Horarios de atención". Reglas de reserva y Ausencias y cierres quedan igual, arriba y abajo de ese bloque.
 
 **Aviso roto**
-El aviso "No hay barberos activos" pasa a estar en el nuevo contexto de Mi Negocio, donde el equipo ya está a la vista, así que el botón que hoy solo tira un toast desaparece o se convierte en un scroll real a la sección Equipo de la misma ficha.
+El aviso "No hay barberos activos" pasa a estar en Mi Negocio, donde el equipo ya está en la misma ficha, así que el botón que hoy solo tira un toast se convierte en un scroll real a la sección Equipo de esa ficha.
+
 
 ## Detalle técnico
 
