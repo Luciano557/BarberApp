@@ -1,71 +1,95 @@
-# Mover Horarios de trabajo a Mi Negocio
+# Subir el tamaño de letra de los campos base a 16px (evitar el auto-zoom de iOS)
 
-Reubicación 100% de UI y navegación. No se toca la base de datos, ni RLS, ni edge functions, ni la lógica de resolución horario base/override.
+Safari en iPhone hace zoom automático cuando el usuario toca un campo cuya letra mide menos de 16px. Hoy los tres componentes base de formulario de Vittro usan 14px. Esta etapa los lleva a 16px en mobile, sin tocar nada más.
 
-## Punto de fricción resuelto
+## Alcance
 
-No existe hoy una ficha individual navegable por barbero (en Equipo por sucursal cada barbero es una tarjeta con un drawer de disponibilidad). Por eso se descarta meter horarios ahí: `EquipoSucursalPanel.tsx` no se toca. Todo el horario, sucursal y barberos, vive en una sección propia de la ficha de sucursal.
+Solo tres archivos:
 
-## Qué ve el usuario al terminar
+- `src/components/ui/input.tsx`
+- `src/components/ui/textarea.tsx`
+- `src/components/ui/select.tsx` (únicamente `SelectTrigger`)
 
-**Mi Negocio → ficha de Sucursal → nueva sección "Horarios de atención"**
-Una card más de la ficha, al mismo nivel que las otras, con la descripción: "Horario de atención de la sucursal y de cada barbero del equipo." Adentro, dos pestañas:
+No se tocan: `Login.tsx`, los overrides a `text-xs` de Configuración y Notificaciones, los inputs nativos sueltos (`phone-input.tsx`, `ClienteSearchPicker.tsx`, `PortalPublicoSection.tsx`), ni `SelectItem`. Ninguna lógica, validación ni dato.
 
-- **Sucursal**: resumen legible del horario base agrupando días con el mismo rango: "Lun a Vie 09:00 a 18:00", "Sáb 09:00 a 13:00", "Dom cerrado". Botón "Editar horario" que abre el panel lateral con el editor completo actual. Si no hay nada cargado: "Todavía no cargaste el horario de atención" con el mismo botón como acción principal.
-- **Barberos**: selector de barbero activo con su pill de estado ("Horario propio" / "Usa sucursal"), igual que hoy. Elegido un barbero:
-  - Sin horario propio: pill neutro, resumen del horario de sucursal en gris y botón "Crear horario propio" (misma acción actual: copia el horario de sucursal).
-  - Con horario propio: pill "Horario propio", resumen en el mismo formato, botón "Editar horario" y acción secundaria "Volver al horario de la sucursal".
+---
 
-**Turnos → Configuración → Configuración de reservas**
-Donde hoy está la tarjeta grande, queda una fila compacta: ícono de reloj, título "Horarios de trabajo", texto "Ahora se configuran desde Mi Negocio, en la ficha de cada sucursal" y un botón "Ir a horarios" que lleva a Mi Negocio, abre la pestaña de la sucursal activa y hace scroll con resalte a la sección "Horarios de atención". Reglas de reserva y Ausencias y cierres quedan igual, arriba y abajo de ese bloque.
+## 1. Enfoque recomendado: clase Tailwind responsive, no token nuevo
 
-**Aviso roto**
-El aviso "No hay barberos activos" pasa a estar en Mi Negocio, donde el equipo ya está en la misma ficha, así que el botón que hoy solo tira un toast se convierte en un scroll real a la sección Equipo de esa ficha.
+**Propuesta: reemplazar `text-sm` por `text-base md:text-sm` en los tres componentes.**
 
+Qué significa: en pantallas chicas (mobile, que es donde existe el problema) la letra pasa a 16px y el zoom desaparece. En desktop se mantiene en 14px, o sea que la app interna se ve exactamente igual que hoy en una laptop y no cambia la densidad visual de ninguna pantalla operativa.
+
+Por qué no un token `--input-font-size`:
+
+- Un token CSS no puede expresar por sí solo el corte por breakpoint; habría que crear dos tokens y un media query a mano, más código para el mismo resultado.
+- El proyecto usa tokens semánticos para color, no para tipografía: `tailwind.config.ts` no extiende `fontSize`. Introducir un token tipográfico suelto para un solo caso rompe la convención en vez de reforzarla.
+- `text-base md:text-sm` es exactamente el patrón que shadcn/ui adoptó como default en sus versiones nuevas por este mismo motivo, así que queda alineado con el upstream y cualquiera que lea el archivo lo entiende.
+
+Documentación: un comentario de una línea arriba de cada clase explicando que los 16px en mobile son deliberados (evitan el auto-zoom de iOS) y que no deben bajarse. Con eso queda registrado en el sistema sin inventar infraestructura nueva.
+
+Alternativa descartada: `text-base` a secas. Engordaría todas las pantallas internas en desktop, donde la densidad media-alta es intencional en Vittro.
+
+## 2. Riesgo de layout
+
+El riesgo es bajo y acotado, porque el cambio aplica solo por debajo del breakpoint `md`.
+
+- **Alto del campo:** no cambia. `Input` y `SelectTrigger` tienen `h-10` (40px) fijo, y `Textarea` tiene `min-h-[80px]`. El alto está definido por la clase, no por el texto, así que 16px entra sin empujar nada. El padding vertical `py-2` tampoco se altera.
+- **Íconos dentro del campo:** los que están posicionados en absoluto quedan igual, porque se anclan al alto del contenedor y no al texto. El caso a mirar es el `$` del `CurrencyInput`, que se centra con `top-1/2 -translate-y-1/2` sobre el contenedor: sigue centrado. El chevron del `SelectTrigger` está en un flex con `items-center`: sin cambios.
+- **Placeholders largos:** este es el punto real a revisar. Con 16px, un placeholder que hoy entra justo puede quedar cortado en pantallas de 375px. Los casos concretos que revisaría en el checkeo visual son el buscador de clientes en Cobrar, el placeholder "Buscar por nombre, apellido, telefono o email" (ese es input nativo, no cambia en esta etapa) y los campos de motivo/descripción de Finanzas.
+- **Campos con alto reducido a mano:** hay usos con `h-9` (Tareas, Recurrentes, MpDevices) y `h-7` (NotificationsBell). Los de `h-7` ya traen `text-xs` propio, así que ganan por especificidad y no cambian en esta etapa. Los de `h-9` (36px) sí pasarían a 16px: entra bien, pero se ve más apretado. Lo dejo señalado para verificar visualmente, no anticipo rotura.
+- **Campos numéricos angostos:** los selects de código de país con ancho fijo (`w-[100px]`, `w-[110px]`) están en el portal público y ya tienen `text-base` propio, salvo `DatosClienteStep.tsx:154` que quedó en `text-sm` — no se toca en esta etapa, queda anotado como inconsistencia pendiente.
+
+## 3. SelectTrigger y texto largo
+
+Sí hay riesgo de truncamiento, pero ya está contemplado por el componente: `SelectTrigger` trae `[&>span]:line-clamp-1`, es decir que el valor seleccionado se corta con puntos suspensivos en una sola línea en vez de romper el layout.
+
+Dónde se nota más al subir a 16px: los selects con ancho fijo `w-[180px]` y `w-[200px]` (Historial de caja, Anulaciones, Gestión de usuarios, filtros de Tareas). Con nombres de barbero largos o sucursales de nombre extenso, hoy ya se truncan; a 16px se truncan un poco antes. No se rompe nada, pero el valor visible es más corto.
+
+Si eso molesta, la corrección natural es cambiar esos anchos fijos por `w-full sm:w-[180px]` en mobile — pero eso queda **fuera de esta etapa**, lo menciono solo para que sepas que existe la salida.
+
+## 4. Antes / después del campo
+
+El único cambio perceptible es la letra. El contorno del campo no se mueve.
+
+```text
+ANTES (mobile)                        DESPUES (mobile)
+┌──────────────────────────┐          ┌──────────────────────────┐
+│  Juan Perez              │ 40px     │  Juan Perez              │ 40px
+└──────────────────────────┘          └──────────────────────────┘
+   letra 14px                            letra 16px
+   padding 12px lateral                  padding 12px lateral
+   alto 40px  ← igual                    alto 40px  ← igual
+   al tocar: la pantalla                 al tocar: no pasa nada,
+   hace zoom y hay que                   el teclado sube y el
+   volver a alejarla a mano              formulario queda en su lugar
+```
+
+- Alto del input: **40px antes y después**.
+- Padding: **sin cambios** (`px-3 py-2`).
+- Textarea: **mínimo 80px antes y después**.
+- Desktop: **idéntico a hoy**, letra 14px.
 
 ## Detalle técnico
 
-### Archivos nuevos
-- `src/components/config/horarios/ScheduleSummary.tsx` — resumen en modo lectura, puro presentacional. Props: `horarios: HorarioRow[]`, `emptyLabel?: string`. Agrupa por rango idéntico y devuelve líneas "Lun a Vie 09:00 a 18:00". Sin fetch propio.
-- `src/components/config/horarios/useHorariosTrabajo.ts` — hook con el fetch actual de `horarios_trabajo` por `sucursal_id` (misma query, mismo orden), más los derivados que hoy están inline: `sucursalHorarios`, `horariosDeBarbero(id)`, `barbersWithOverride`, `createOverride`, `removeOverride`, `refetch`. Se extrae tal cual del root actual, sin cambiar ninguna consulta.
-- `src/components/config/horarios/HorariosAtencionCard.tsx` — la nueva sección de la ficha de sucursal: card con título "Horarios de atención", su descripción, y las dos pestañas ("Sucursal" / "Barberos"). Cada pestaña muestra el resumen en lectura y abre el `DrawerForm` con `ScheduleEditor` (`barberoId = null` o el id del barbero).
-- `src/components/config/HorariosAccesoDirectoCard.tsx` — bloque compacto de acceso directo en Turnos.
+Un solo reemplazo de clase por archivo, más un comentario explicativo:
 
-### Archivos que se editan
-- `src/components/config/HorariosTrabajoSection.tsx` — se le extraen `ScheduleEditor`, `QuickApplyCard` y helpers a `src/components/config/horarios/ScheduleEditor.tsx` (movimiento literal, sin reescribir la lógica de guardado, borrado, validación de solapamiento ni `QuickApplyCard`). El componente root con las dos pestañas se elimina una vez que ya no lo usa nadie.
-- `src/components/config/AgendaManagement.tsx` — reemplaza `<HorariosTrabajoSection ... />` por `<HorariosAccesoDirectoCard ... />`. `AgendaConfigSection` y `BloqueosSection` quedan intactos en el mismo orden.
-- `src/components/SucursalTabContent.tsx` — monta `HorariosAtencionCard` con `sucursalId`, `organizationId` y los barberos de la sucursal, con un `id` para el scroll, y suma la entrada "Horarios" al nav de anclas de desktop.
-- `src/pages/Index.tsx` — nueva función `navigateToMiNegocioHorarios(sucursalId)`, copiando el patrón exacto de `navigateToMiNegocioEquipo`: si ya está en Mi Negocio usa el handle imperativo del panel; si no, deja la clave de sucursal activa y una clave `vittro:miNegocio:highlightHorarios:{orgId}` en localStorage y cambia de pestaña.
-- `src/components/MiNegocioPanel.tsx` — agrega `navigateToSucursalHorarios(sucursalId)` al handle imperativo, junto al de Equipo.
-- `src/components/config/TurnosAgendaPanel.tsx` — pasa hacia abajo el callback de navegación para que el acceso directo lo pueda disparar.
+| Archivo | Línea | De | A |
+|---|---|---|---|
+| `src/components/ui/input.tsx` | 11 | `text-sm` | `text-base md:text-sm` |
+| `src/components/ui/textarea.tsx` | 11 | `text-sm` | `text-base md:text-sm` |
+| `src/components/ui/select.tsx` | 20 (`SelectTrigger`) | `text-sm` | `text-base md:text-sm` |
 
-### Reutilización, no duplicación
-`ScheduleEditor` se **mueve** sin modificar su firma (`horarios`, `sucursalId`, `organizationId`, `barberoId`, `onRefresh`). Ya está parametrizado por `barberoId`, así que sirve igual para sucursal y para barbero. Lo único que cambia es quién lo monta y dentro de qué contenedor. El fetch, que hoy vive en el root con las pestañas, pasa al hook para que los dos puntos de montaje compartan la misma consulta y las mismas reglas de override.
+En `input.tsx` se conserva `file:text-sm` tal cual: es el botón de archivo, no el texto editable.
 
-### Permisos
-El gate actual del horario es el de "Configuración" de Turnos (owner, gerente general, encargado). En Mi Negocio, la ficha de sucursal es visible a más gente, así que el bloque de horarios se envuelve en la misma condición de rol para que nadie gane acceso que hoy no tiene. Es una condición de UI: **no se toca RLS**.
+Los 15 campos con override propio a `text-xs` en Configuración y Notificaciones **van a seguir haciendo zoom** después de este cambio, porque su clase gana por especificidad. Se resuelven en la etapa siguiente.
 
-## Validación manual después del build
+## Validación después del build
 
-1. Portal público de reservas: elegir sucursal y servicio, verificar que los días y horarios disponibles son los mismos que antes del cambio.
-2. Un barbero con horario propio: confirmar que en el portal sigue mostrando su horario y no el de la sucursal.
-3. Quitar y volver a crear un override desde la pestaña "Barberos", y verificar el efecto en la disponibilidad del portal.
-4. Agenda interna: la grilla arranca y termina en las mismas horas.
-5. Estadísticas → ocupación: el porcentaje de ocupación del mes en curso no cambia respecto de antes del build.
-6. Turnos → Configuración de reservas: el acceso directo abre Mi Negocio en la sucursal correcta y resalta el bloque de horario.
-7. Ausencias y cierres y reglas de reserva siguen funcionando desde Turnos.
-8. Mobile 393 px: el resumen se lee bien y el editor dentro del panel lateral scrollea sin cortar el footer.
+En preview mobile (393px, que es el viewport actual):
 
-## Candado de alcance
-
-No se tocan:
-- `BloqueosSection.tsx` ni `AgendaConfigSection.tsx`.
-- `EquipoSucursalPanel.tsx` ni el drawer de disponibilidad de cada barbero.
-- Ninguna edge function (`get-availability`, `get-available-dates`, `validate-turno`, `update-turno-internal`).
-- La tabla `horarios_trabajo`: sin columnas nuevas, sin migraciones, sin cambios de RLS.
-- La lógica de resolución override/base ni las consultas de `useAgendaData.ts`, `useOcupacionData.ts`, `useOcupacionResumen.ts`.
-- El comportamiento interno del editor: validaciones, solapamientos, guardado y "aplicar a varios días" se mueven tal cual.
-
-## Criterios visuales del resumen
-
-Tokens semánticos (`muted-foreground`, `border`, `primary`), sin colores directos. Ícono de reloj de lucide, monocromo, sin emojis. Días abreviados en español rioplatense y horas en formato 24 h. Pestañas con el mismo estilo underline que ya usan otras secciones. Sin card anidada dentro de card: la sección es una card al mismo nivel que las demás de la ficha, y adentro el resumen es una lista simple separada por bordes suaves. El botón de edición es secundario (`outline`), no primario.
+1. Abrir un `DrawerForm` de alta (por ejemplo un gasto en Finanzas) y tocar un campo: no debe hacer zoom.
+2. Abrir un select de filtro en Tareas: verificar que el valor no quede cortado de forma molesta.
+3. Cobrar: verificar el `CurrencyInput` — el `$` debe seguir alineado con el número.
+4. Un textarea de notas: verificar que el contador de caracteres siga en su lugar.
+5. En desktop: confirmar que ninguna pantalla cambió de aspecto.
