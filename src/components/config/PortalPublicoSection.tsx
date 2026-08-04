@@ -253,7 +253,7 @@ export function PortalPublicoSection() {
               {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
               <div
                 title={publicUrl}
-                className="rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
+                className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
               >
                 {publicUrl}
               </div>
