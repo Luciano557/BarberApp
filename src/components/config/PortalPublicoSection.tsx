@@ -249,8 +249,14 @@ export function PortalPublicoSection() {
             </p>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input value={publicUrl} readOnly className="font-mono text-xs" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
+              <div
+                title={publicUrl}
+                className="rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
+              >
+                {publicUrl}
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={handleCopy}>
                   <Copy className="h-4 w-4 mr-1" /> Copiar

@@ -410,7 +410,8 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
                           <Input
                             type="number"
                             className={cn(
-                              "w-16 h-7 text-xs text-right",
+                              // 16px en mobile para evitar el auto-zoom de Safari/iOS
+                              "w-16 h-9 md:h-7 text-base md:text-xs text-right",
                               rowError && "border-destructive focus-visible:ring-destructive",
                             )}
                             defaultValue={regla.porcentaje}
@@ -478,7 +479,8 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
                           <FormControl>
                             <Input
                               type="number"
-                              className="w-16 h-8 text-xs text-right"
+                              // 16px en mobile para evitar el auto-zoom de Safari/iOS
+                              className="w-16 h-9 md:h-8 text-base md:text-xs text-right"
                               placeholder="%"
                               min={0.01}
                               max={100}

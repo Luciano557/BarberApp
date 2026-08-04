@@ -289,7 +289,8 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
             onChange={handleInputChange}
             onPaste={handlePaste}
             onBlur={handleBlur}
-            className="flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed min-w-0"
+            // text-base en mobile: evita el auto-zoom de Safari/iOS al enfocar
+            className="flex-1 bg-transparent px-3 text-base md:text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed min-w-0"
           />
         </div>
         {errorMsg ? (
