@@ -28,15 +28,13 @@ El aviso "No hay barberos activos" pasa a estar en Mi Negocio, donde el equipo y
 ### Archivos nuevos
 - `src/components/config/horarios/ScheduleSummary.tsx` — resumen en modo lectura, puro presentacional. Props: `horarios: HorarioRow[]`, `emptyLabel?: string`. Agrupa por rango idéntico y devuelve líneas "Lun a Vie 09:00 a 18:00". Sin fetch propio.
 - `src/components/config/horarios/useHorariosTrabajo.ts` — hook con el fetch actual de `horarios_trabajo` por `sucursal_id` (misma query, mismo orden), más los derivados que hoy están inline: `sucursalHorarios`, `horariosDeBarbero(id)`, `barbersWithOverride`, `createOverride`, `removeOverride`, `refetch`. Se extrae tal cual del root actual, sin cambiar ninguna consulta.
-- `src/components/config/horarios/HorarioSucursalCard.tsx` — tarjeta de la ficha de sucursal: resumen + botón que abre el `DrawerForm` con `ScheduleEditor` (`barberoId = null`).
-- `src/components/config/horarios/HorarioBarberoBlock.tsx` — bloque para el drawer de barbero: estado override/base, botones crear/quitar override y apertura del editor (`barberoId = <id>`).
+- `src/components/config/horarios/HorariosAtencionCard.tsx` — la nueva sección de la ficha de sucursal: card con título "Horarios de atención", su descripción, y las dos pestañas ("Sucursal" / "Barberos"). Cada pestaña muestra el resumen en lectura y abre el `DrawerForm` con `ScheduleEditor` (`barberoId = null` o el id del barbero).
 - `src/components/config/HorariosAccesoDirectoCard.tsx` — bloque compacto de acceso directo en Turnos.
 
 ### Archivos que se editan
-- `src/components/config/HorariosTrabajoSection.tsx` — se conserva el archivo y se le extraen `ScheduleEditor`, `QuickApplyCard` y helpers a `src/components/config/horarios/ScheduleEditor.tsx` (movimiento literal, sin reescribir la lógica de guardado, borrado, validación de solapamiento ni `QuickApplyCard`). El componente root con las dos pestañas se elimina una vez que ya no lo usa nadie.
+- `src/components/config/HorariosTrabajoSection.tsx` — se le extraen `ScheduleEditor`, `QuickApplyCard` y helpers a `src/components/config/horarios/ScheduleEditor.tsx` (movimiento literal, sin reescribir la lógica de guardado, borrado, validación de solapamiento ni `QuickApplyCard`). El componente root con las dos pestañas se elimina una vez que ya no lo usa nadie.
 - `src/components/config/AgendaManagement.tsx` — reemplaza `<HorariosTrabajoSection ... />` por `<HorariosAccesoDirectoCard ... />`. `AgendaConfigSection` y `BloqueosSection` quedan intactos en el mismo orden.
-- `src/components/config/SucursalTabContent.tsx` — monta `HorarioSucursalCard` con `sucursalId` y `organizationId`, con `id`/`data-onboarding-id="horarios-section"` para el scroll, y suma la entrada "Horario" al nav de anclas de desktop.
-- `src/components/config/EquipoSucursalPanel.tsx` — monta `HorarioBarberoBlock` dentro del drawer del barbero.
+- `src/components/SucursalTabContent.tsx` — monta `HorariosAtencionCard` con `sucursalId`, `organizationId` y los barberos de la sucursal, con un `id` para el scroll, y suma la entrada "Horarios" al nav de anclas de desktop.
 - `src/pages/Index.tsx` — nueva función `navigateToMiNegocioHorarios(sucursalId)`, copiando el patrón exacto de `navigateToMiNegocioEquipo`: si ya está en Mi Negocio usa el handle imperativo del panel; si no, deja la clave de sucursal activa y una clave `vittro:miNegocio:highlightHorarios:{orgId}` en localStorage y cambia de pestaña.
 - `src/components/MiNegocioPanel.tsx` — agrega `navigateToSucursalHorarios(sucursalId)` al handle imperativo, junto al de Equipo.
 - `src/components/config/TurnosAgendaPanel.tsx` — pasa hacia abajo el callback de navegación para que el acceso directo lo pueda disparar.
