@@ -478,7 +478,7 @@ export function ComisionEquipoConfig({ barberId, organizationId, sucursalId, all
                         <div className="flex items-center gap-1">
                           <FormControl>
                             <Input
-                              // 16px en mobile para evitar el auto-zoom de Safari/iOS
+                              type="number"
                               className="w-16 h-9 md:h-8 text-base md:text-xs text-right"
                               placeholder="%"
                               min={0.01}
