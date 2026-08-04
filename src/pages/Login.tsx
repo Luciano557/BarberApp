@@ -186,11 +186,16 @@ export default function Login() {
           padding: 0 14px;
           border: 1px solid #e2e8f0;
           border-radius: 10px;
-          font-size: 14px;
+          font-size: 16px; /* evita el auto-zoom de Safari/iOS en mobile */
           color: #0f172a;
           background: #fff;
           transition: border-color 0.15s, box-shadow 0.15s;
           outline: none;
+        }
+        @media (min-width: 768px) {
+          .input-field {
+            font-size: 14px; /* desktop igual que hoy */
+          }
         }
         .input-field:focus {
           border-color: hsl(var(--primary));
