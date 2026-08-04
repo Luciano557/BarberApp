@@ -60,6 +60,7 @@ El gate actual del horario es el de "Configuración" de Turnos (owner, gerente g
 
 No se tocan:
 - `BloqueosSection.tsx` ni `AgendaConfigSection.tsx`.
+- `EquipoSucursalPanel.tsx` ni el drawer de disponibilidad de cada barbero.
 - Ninguna edge function (`get-availability`, `get-available-dates`, `validate-turno`, `update-turno-internal`).
 - La tabla `horarios_trabajo`: sin columnas nuevas, sin migraciones, sin cambios de RLS.
 - La lógica de resolución override/base ni las consultas de `useAgendaData.ts`, `useOcupacionData.ts`, `useOcupacionResumen.ts`.
@@ -67,4 +68,4 @@ No se tocan:
 
 ## Criterios visuales del resumen
 
-Tokens semánticos (`muted-foreground`, `border`, `primary`), sin colores directos. Ícono de reloj de lucide, monocromo, sin emojis. Días abreviados en español rioplatense y horas en formato 24 h. Sin card anidada dentro de card: en la ficha de sucursal es una card al mismo nivel que las demás; en el drawer del barbero es un bloque separado por borde, no una card. El botón de edición es secundario (`outline`), no primario.
+Tokens semánticos (`muted-foreground`, `border`, `primary`), sin colores directos. Ícono de reloj de lucide, monocromo, sin emojis. Días abreviados en español rioplatense y horas en formato 24 h. Pestañas con el mismo estilo underline que ya usan otras secciones. Sin card anidada dentro de card: la sección es una card al mismo nivel que las demás de la ficha, y adentro el resumen es una lista simple separada por bordes suaves. El botón de edición es secundario (`outline`), no primario.
