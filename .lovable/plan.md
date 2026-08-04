@@ -2,45 +2,39 @@
 
 Reubicación 100% de UI y navegación. No se toca la base de datos, ni RLS, ni edge functions, ni la lógica de resolución horario base/override.
 
-## Punto de fricción a confirmar antes de avanzar
+## Punto de fricción resuelto
 
-**No existe hoy una "ficha individual" navegable por barbero.** En Mi Negocio → ficha de sucursal → Equipo (`EquipoSucursalPanel.tsx`), cada barbero es una tarjeta-resumen expandible; el botón de tres puntos abre un drawer lateral de disponibilidad (asignaciones recurrentes/temporales, activar/desactivar). En Mi Negocio → General → Equipo hay otro drawer ("Editar integrante") con cargo, acceso y PIN. Ninguno de los dos es una página de detalle.
-
-Según lo que definiste, el horario por barbero va **en Equipo por sucursal**, o sea dentro del drawer de disponibilidad que ya existe. Eso significa: el editor de horarios va a vivir dentro de un panel lateral de 520 px de ancho, no en una página. Es viable, pero es el punto a validar: si preferís una ficha de barbero de pantalla completa, eso es un trabajo aparte y más grande, y conviene decidirlo antes de empezar.
+No existe hoy una ficha individual navegable por barbero (en Equipo por sucursal cada barbero es una tarjeta con un drawer de disponibilidad). Por eso se descarta meter horarios ahí: `EquipoSucursalPanel.tsx` no se toca. Todo el horario, sucursal y barberos, vive en una sección propia de la ficha de sucursal.
 
 ## Qué ve el usuario al terminar
 
-**Mi Negocio → ficha de Sucursal**
-Una tarjeta nueva "Horario de atención", ubicada después de "Información" y antes de "Equipo", con:
-- Resumen legible del horario base, agrupando días con el mismo rango: "Lun a Vie 09:00 a 18:00", "Sáb 09:00 a 13:00", "Dom cerrado". Días sin horario aparecen como "cerrado" en una línea gris al final.
-- Si no hay ningún horario cargado: estado vacío con texto "Todavía no cargaste el horario de atención" y el mismo botón como acción principal.
-- Botón "Editar horario" que abre un panel lateral con el editor completo actual (aplicar a varios días + edición día por día), sin cambios de comportamiento.
+**Mi Negocio → ficha de Sucursal → nueva sección "Horarios de atención"**
+Una card más de la ficha, al mismo nivel que las otras, con la descripción: "Horario de atención de la sucursal y de cada barbero del equipo." Adentro, dos pestañas:
 
-**Mi Negocio → ficha de Sucursal → Equipo → drawer de un barbero**
-Un bloque "Horario" dentro del drawer, con:
-- Si el barbero no tiene horario propio: pill neutro "Usa el horario de la sucursal" + el resumen del horario de sucursal en gris + botón "Crear horario propio" (misma acción que hoy: copia el horario de sucursal).
-- Si tiene horario propio: pill "Horario propio" + resumen en el mismo formato + botón "Editar horario" y acción secundaria "Volver al horario de la sucursal".
+- **Sucursal**: resumen legible del horario base agrupando días con el mismo rango: "Lun a Vie 09:00 a 18:00", "Sáb 09:00 a 13:00", "Dom cerrado". Botón "Editar horario" que abre el panel lateral con el editor completo actual. Si no hay nada cargado: "Todavía no cargaste el horario de atención" con el mismo botón como acción principal.
+- **Barberos**: selector de barbero activo con su pill de estado ("Horario propio" / "Usa sucursal"), igual que hoy. Elegido un barbero:
+  - Sin horario propio: pill neutro, resumen del horario de sucursal en gris y botón "Crear horario propio" (misma acción actual: copia el horario de sucursal).
+  - Con horario propio: pill "Horario propio", resumen en el mismo formato, botón "Editar horario" y acción secundaria "Volver al horario de la sucursal".
 
 **Turnos → Configuración → Configuración de reservas**
-Donde hoy está la tarjeta grande, queda una fila compacta: ícono de reloj, título "Horarios de trabajo", texto "Ahora se configuran desde Mi Negocio, en la ficha de cada sucursal y de cada barbero" y un botón "Ir a horarios" que lleva a Mi Negocio, abre la pestaña de la sucursal activa y hace scroll con resalte a la tarjeta de horario. Reglas de reserva y Ausencias y cierres quedan igual, arriba y abajo de ese bloque.
+Donde hoy está la tarjeta grande, queda una fila compacta: ícono de reloj, título "Horarios de trabajo", texto "Ahora se configuran desde Mi Negocio, en la ficha de cada sucursal" y un botón "Ir a horarios" que lleva a Mi Negocio, abre la pestaña de la sucursal activa y hace scroll con resalte a la sección "Horarios de atención". Reglas de reserva y Ausencias y cierres quedan igual, arriba y abajo de ese bloque.
 
 **Aviso roto**
-El aviso "No hay barberos activos" pasa a estar en el nuevo contexto de Mi Negocio, donde el equipo ya está a la vista, así que el botón que hoy solo tira un toast desaparece o se convierte en un scroll real a la sección Equipo de la misma ficha.
+El aviso "No hay barberos activos" pasa a estar en Mi Negocio, donde el equipo ya está en la misma ficha, así que el botón que hoy solo tira un toast se convierte en un scroll real a la sección Equipo de esa ficha.
+
 
 ## Detalle técnico
 
 ### Archivos nuevos
 - `src/components/config/horarios/ScheduleSummary.tsx` — resumen en modo lectura, puro presentacional. Props: `horarios: HorarioRow[]`, `emptyLabel?: string`. Agrupa por rango idéntico y devuelve líneas "Lun a Vie 09:00 a 18:00". Sin fetch propio.
 - `src/components/config/horarios/useHorariosTrabajo.ts` — hook con el fetch actual de `horarios_trabajo` por `sucursal_id` (misma query, mismo orden), más los derivados que hoy están inline: `sucursalHorarios`, `horariosDeBarbero(id)`, `barbersWithOverride`, `createOverride`, `removeOverride`, `refetch`. Se extrae tal cual del root actual, sin cambiar ninguna consulta.
-- `src/components/config/horarios/HorarioSucursalCard.tsx` — tarjeta de la ficha de sucursal: resumen + botón que abre el `DrawerForm` con `ScheduleEditor` (`barberoId = null`).
-- `src/components/config/horarios/HorarioBarberoBlock.tsx` — bloque para el drawer de barbero: estado override/base, botones crear/quitar override y apertura del editor (`barberoId = <id>`).
+- `src/components/config/horarios/HorariosAtencionCard.tsx` — la nueva sección de la ficha de sucursal: card con título "Horarios de atención", su descripción, y las dos pestañas ("Sucursal" / "Barberos"). Cada pestaña muestra el resumen en lectura y abre el `DrawerForm` con `ScheduleEditor` (`barberoId = null` o el id del barbero).
 - `src/components/config/HorariosAccesoDirectoCard.tsx` — bloque compacto de acceso directo en Turnos.
 
 ### Archivos que se editan
-- `src/components/config/HorariosTrabajoSection.tsx` — se conserva el archivo y se le extraen `ScheduleEditor`, `QuickApplyCard` y helpers a `src/components/config/horarios/ScheduleEditor.tsx` (movimiento literal, sin reescribir la lógica de guardado, borrado, validación de solapamiento ni `QuickApplyCard`). El componente root con las dos pestañas se elimina una vez que ya no lo usa nadie.
+- `src/components/config/HorariosTrabajoSection.tsx` — se le extraen `ScheduleEditor`, `QuickApplyCard` y helpers a `src/components/config/horarios/ScheduleEditor.tsx` (movimiento literal, sin reescribir la lógica de guardado, borrado, validación de solapamiento ni `QuickApplyCard`). El componente root con las dos pestañas se elimina una vez que ya no lo usa nadie.
 - `src/components/config/AgendaManagement.tsx` — reemplaza `<HorariosTrabajoSection ... />` por `<HorariosAccesoDirectoCard ... />`. `AgendaConfigSection` y `BloqueosSection` quedan intactos en el mismo orden.
-- `src/components/config/SucursalTabContent.tsx` — monta `HorarioSucursalCard` con `sucursalId` y `organizationId`, con `id`/`data-onboarding-id="horarios-section"` para el scroll, y suma la entrada "Horario" al nav de anclas de desktop.
-- `src/components/config/EquipoSucursalPanel.tsx` — monta `HorarioBarberoBlock` dentro del drawer del barbero.
+- `src/components/SucursalTabContent.tsx` — monta `HorariosAtencionCard` con `sucursalId`, `organizationId` y los barberos de la sucursal, con un `id` para el scroll, y suma la entrada "Horarios" al nav de anclas de desktop.
 - `src/pages/Index.tsx` — nueva función `navigateToMiNegocioHorarios(sucursalId)`, copiando el patrón exacto de `navigateToMiNegocioEquipo`: si ya está en Mi Negocio usa el handle imperativo del panel; si no, deja la clave de sucursal activa y una clave `vittro:miNegocio:highlightHorarios:{orgId}` en localStorage y cambia de pestaña.
 - `src/components/MiNegocioPanel.tsx` — agrega `navigateToSucursalHorarios(sucursalId)` al handle imperativo, junto al de Equipo.
 - `src/components/config/TurnosAgendaPanel.tsx` — pasa hacia abajo el callback de navegación para que el acceso directo lo pueda disparar.
@@ -55,7 +49,7 @@ El gate actual del horario es el de "Configuración" de Turnos (owner, gerente g
 
 1. Portal público de reservas: elegir sucursal y servicio, verificar que los días y horarios disponibles son los mismos que antes del cambio.
 2. Un barbero con horario propio: confirmar que en el portal sigue mostrando su horario y no el de la sucursal.
-3. Quitar y volver a crear un override desde el drawer del barbero, y verificar el efecto en la disponibilidad del portal.
+3. Quitar y volver a crear un override desde la pestaña "Barberos", y verificar el efecto en la disponibilidad del portal.
 4. Agenda interna: la grilla arranca y termina en las mismas horas.
 5. Estadísticas → ocupación: el porcentaje de ocupación del mes en curso no cambia respecto de antes del build.
 6. Turnos → Configuración de reservas: el acceso directo abre Mi Negocio en la sucursal correcta y resalta el bloque de horario.
@@ -66,6 +60,7 @@ El gate actual del horario es el de "Configuración" de Turnos (owner, gerente g
 
 No se tocan:
 - `BloqueosSection.tsx` ni `AgendaConfigSection.tsx`.
+- `EquipoSucursalPanel.tsx` ni el drawer de disponibilidad de cada barbero.
 - Ninguna edge function (`get-availability`, `get-available-dates`, `validate-turno`, `update-turno-internal`).
 - La tabla `horarios_trabajo`: sin columnas nuevas, sin migraciones, sin cambios de RLS.
 - La lógica de resolución override/base ni las consultas de `useAgendaData.ts`, `useOcupacionData.ts`, `useOcupacionResumen.ts`.
@@ -73,4 +68,4 @@ No se tocan:
 
 ## Criterios visuales del resumen
 
-Tokens semánticos (`muted-foreground`, `border`, `primary`), sin colores directos. Ícono de reloj de lucide, monocromo, sin emojis. Días abreviados en español rioplatense y horas en formato 24 h. Sin card anidada dentro de card: en la ficha de sucursal es una card al mismo nivel que las demás; en el drawer del barbero es un bloque separado por borde, no una card. El botón de edición es secundario (`outline`), no primario.
+Tokens semánticos (`muted-foreground`, `border`, `primary`), sin colores directos. Ícono de reloj de lucide, monocromo, sin emojis. Días abreviados en español rioplatense y horas en formato 24 h. Pestañas con el mismo estilo underline que ya usan otras secciones. Sin card anidada dentro de card: la sección es una card al mismo nivel que las demás de la ficha, y adentro el resumen es una lista simple separada por bordes suaves. El botón de edición es secundario (`outline`), no primario.
