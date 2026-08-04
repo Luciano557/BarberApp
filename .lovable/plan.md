@@ -49,7 +49,7 @@ El gate actual del horario es el de "Configuración" de Turnos (owner, gerente g
 
 1. Portal público de reservas: elegir sucursal y servicio, verificar que los días y horarios disponibles son los mismos que antes del cambio.
 2. Un barbero con horario propio: confirmar que en el portal sigue mostrando su horario y no el de la sucursal.
-3. Quitar y volver a crear un override desde el drawer del barbero, y verificar el efecto en la disponibilidad del portal.
+3. Quitar y volver a crear un override desde la pestaña "Barberos", y verificar el efecto en la disponibilidad del portal.
 4. Agenda interna: la grilla arranca y termina en las mismas horas.
 5. Estadísticas → ocupación: el porcentaje de ocupación del mes en curso no cambia respecto de antes del build.
 6. Turnos → Configuración de reservas: el acceso directo abre Mi Negocio en la sucursal correcta y resalta el bloque de horario.
