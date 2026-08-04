@@ -167,7 +167,10 @@ export function ProductoPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col [animation-duration:180ms] [animation-timing-function:var(--ease-out-quint)]">
+      <DialogContent
+        className="sm:max-w-2xl max-h-[85vh] flex flex-col [animation-duration:180ms] [animation-timing-function:var(--ease-out-quint)]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" /> Agregar productos
@@ -182,7 +185,6 @@ export function ProductoPickerDialog({
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
             maxLength={80}
-            autoFocus
           />
         </div>
 
