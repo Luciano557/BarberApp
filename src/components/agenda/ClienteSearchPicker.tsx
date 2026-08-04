@@ -60,7 +60,6 @@ export function ClienteSearchPicker({
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder="Buscar por nombre, apellido, telefono o email"
-              // text-base en mobile: evita el auto-zoom de Safari/iOS al enfocar
               className="flex h-10 w-full bg-transparent py-2 text-base md:text-sm outline-none placeholder:text-muted-foreground"
               maxLength={80}
             />
