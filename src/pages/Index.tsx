@@ -11,7 +11,7 @@ import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
-import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
+import { LoadingScreen, RecoverableErrorScreen, useLoadingScreenMounted } from '@/components/LoadingScreen';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -187,10 +187,12 @@ const Index = () => {
   }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
+  const showLoadingScreen = useLoadingScreenMounted(isLoading);
 
-  if (isLoading) {
+  if (showLoadingScreen) {
     return (
       <LoadingScreen
+        loading={isLoading}
         message="Cargando datos..."
         onRetry={refetchData}
       />

@@ -39,7 +39,7 @@ export function PortalColorPalette({ value, onChange }: Props) {
             aria-label={c.name}
             className={cn(
               'relative h-9 w-9 rounded-full border border-border/60 transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-              selected && 'ring-2 ring-ring ring-offset-2'
+              selected && 'ring-2 ring-foreground ring-offset-2'
             )}
             style={{ backgroundColor: c.hex }}
           >

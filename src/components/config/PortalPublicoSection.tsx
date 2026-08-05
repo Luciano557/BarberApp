@@ -2,14 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, ChevronDown } from 'lucide-react';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -20,6 +19,7 @@ import {
   getCoverPublicUrl,
   type PortalLink,
 } from '@/hooks/usePortalConfig';
+import { usePortalHasServices } from '@/hooks/usePortalHasServices';
 import { PortalLinksEditor } from './PortalLinksEditor';
 import { PortalPreview } from './PortalPreview';
 import { PortalColorPalette } from './PortalColorPalette';
@@ -92,6 +92,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     uploadLogo, removeLogo,
     uploadCover, removeCover,
   } = usePortalConfig(orgId);
+  const hasServices = usePortalHasServices(orgId);
 
   const [savingAll, setSavingAll] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -306,6 +307,22 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
   if (!orgId) return null;
 
+  if (orgLoading || loading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6 min-w-0">
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-56 w-full rounded-lg" />
+          <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-[420px] w-full rounded-[2rem] mx-auto max-w-[340px]" />
+        </div>
+      </div>
+    );
+  }
+
   // La preview sigue el borrador en vivo; si el campo queda vacío mientras se
   // edita, cae al nombre ya guardado en vez de mostrar el placeholder genérico.
   const orgName = watchedOrgName.trim() || organization?.name || 'Mi Barbería';
@@ -319,45 +336,8 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         {/* === Columna config === */}
         <form onSubmit={handleSubmit(onSubmit)} className="min-w-0">
-          {/* A — Link público */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <LinkIcon className="h-4 w-4" />
-                Link público del portal
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Compartilo con tus clientes para que reserven o gestionen su cita.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
-                <div
-                  title={publicUrl}
-                  className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
-                >
-                  {publicUrl}
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-                    <Copy className="h-4 w-4 mr-1" /> Copiar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Barra de accesos — solo desktop */}
-          <nav className="hidden md:block sticky top-0 z-10 mt-6 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
+          <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
             <div className="flex items-center gap-1 overflow-x-auto">
               <button
                 type="button"
@@ -375,22 +355,29 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               </button>
               <button
                 type="button"
-                onClick={() => scrollTo('portal-extra')}
+                onClick={() => scrollTo('portal-compartir')}
                 className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
-                Extra
+                Compartir
               </button>
             </div>
           </nav>
 
           {/* 1 — Identidad visual */}
           <section id="portal-identidad" className="mt-6 scroll-mt-16">
-            <h3 className="text-base font-medium text-foreground mb-4">Identidad visual</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Palette className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="text-sm font-semibold">Identidad visual</h2>
+            </div>
 
             <div className="space-y-4">
               {/* Cover */}
               <div className="space-y-2">
-                <Label className="text-xs">Foto de portada</Label>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" /> Foto de portada (opcional)
+                </h4>
                 <PortalCoverUploader
                   coverUrl={coverUrl}
                   coverPositionX={watchedCoverPosX}
@@ -406,7 +393,9 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
               {/* Logo */}
               <div className="space-y-2">
-                <Label className="text-xs">Logo</Label>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <UserRound className="h-4 w-4" /> Logo (opcional)
+                </h4>
                 <div className="flex items-center gap-3">
                   <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
                     {logoUrl ? (
@@ -450,34 +439,40 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               </div>
 
               {/* Nombre */}
-              <FormField
-                control={control}
-                name="orgName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel htmlFor="portal-org-name" className="text-xs">Nombre del negocio</FormLabel>
-                    <FormControl>
-                      <Input
-                        id="portal-org-name"
-                        {...field}
-                        maxLength={80}
-                        placeholder="Mi Barbería"
-                        disabled={savingAll}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">
-                      Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2 pt-2">
+                <div>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Globe className="h-4 w-4" /> Nombre del negocio
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
+                  </p>
+                </div>
+                <FormField
+                  control={control}
+                  name="orgName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          id="portal-org-name"
+                          {...field}
+                          maxLength={80}
+                          placeholder="Mi Barbería"
+                          disabled={savingAll}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               {/* Color principal */}
               <div className="space-y-3 pt-2">
                 <div>
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Palette className="h-4 w-4" /> Color principal
+                    <Palette className="h-4 w-4" /> Color principal (opcional)
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     Se aplica a botones y elementos destacados del portal.
@@ -530,14 +525,19 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
           {/* 2 — Contenido del portal */}
           <section id="portal-contenido" className="border-t pt-6 mt-6 scroll-mt-16">
-            <h3 className="text-base font-medium text-foreground mb-4">Contenido del portal</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Type className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="text-sm font-semibold">Contenido del portal</h2>
+            </div>
 
             <div className="space-y-6">
               {/* Descripción corta */}
               <div className="space-y-2">
                 <div>
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Type className="h-4 w-4" /> Descripción corta
+                    <Type className="h-4 w-4" /> Descripción corta (opcional)
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     Si la dejás vacía, mostramos un mensaje de bienvenida automático.
@@ -562,7 +562,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               <div className="space-y-3">
                 <div>
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" /> Links personalizados
+                    <LinkIcon className="h-4 w-4" /> Links personalizados (opcional)
                   </h4>
                   <p className="text-xs text-muted-foreground mt-1">
                     Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
@@ -582,26 +582,68 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
             </div>
           </section>
 
-          {/* 3 — Extra */}
-          <section id="portal-extra" className="border-t pt-6 mt-6 scroll-mt-16">
-            <h3 className="text-base font-medium text-foreground mb-4">Extra</h3>
-
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium flex items-center gap-2">
-                  <QrCode className="h-4 w-4" /> QR de reserva
-                </h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
-                </p>
+          {/* 3 — Compartir tu portal */}
+          <section id="portal-compartir" className="border-t pt-6 mt-6 scroll-mt-16">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <Globe className="h-4 w-4 text-primary" />
               </div>
-              <div className="flex flex-col sm:flex-row gap-4 items-start">
-                <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
-                  {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
+              <h2 className="text-sm font-semibold">Compartir tu portal</h2>
+            </div>
+
+            <div className="space-y-6">
+              {/* Link público */}
+              <div className="space-y-2">
+                <div>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" /> Link público del portal
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Compartilo con tus clientes para que reserven o gestionen su cita.
+                  </p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
-                  <Download className="h-4 w-4 mr-1" /> Descargar QR
-                </Button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
+                  <div
+                    title={publicUrl}
+                    className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
+                  >
+                    {publicUrl}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+                      <Copy className="h-4 w-4 mr-1" /> Copiar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR */}
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <QrCode className="h-4 w-4" /> QR de reserva
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
+                    {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
+                    <Download className="h-4 w-4 mr-1" /> Descargar QR
+                  </Button>
+                </div>
               </div>
             </div>
           </section>
@@ -618,11 +660,12 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
         {/* === Columna preview === */}
         <div className="lg:sticky lg:top-20 lg:self-start">
           <div className="space-y-3">
-            <h3 className="text-sm font-medium text-foreground">Vista previa</h3>
+            <h3 className="text-sm font-semibold text-foreground">Vista previa</h3>
             <PortalPreview
               orgName={orgName}
               fallbackLogo={organization?.logo_url || null}
               portal={previewPortal}
+              emptyMessage={hasServices ? undefined : 'No hay servicios disponibles para reservar en este momento.'}
             />
             <p className="text-xs text-muted-foreground text-center">
               Se actualiza en vivo. Los cambios se aplican al portal público al guardar.
