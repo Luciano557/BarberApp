@@ -1,32 +1,62 @@
-# Portal público: restringir al manager
+# Etapa 2 — Zoom iOS: campos restantes + URL pública
 
-El rol **manager** deja de ver y de poder editar la configuración del Portal público. Mantiene intacto su acceso a "Configuración de reservas" (horarios, disponibilidad, bloqueos) y a la Agenda.
+Un solo build. Cambios puramente de presentación.
 
-## Qué cambia para el usuario
+## Parte A — 6 campos a 16px en mobile
 
-- Un manager que entra a Turnos → Configuración ve únicamente "Configuración de reservas". La pestaña "Portal público" desaparece.
-- Owner y encargado general siguen viendo ambas pestañas, sin cambios.
-- La restricción también se aplica en la base de datos: aunque un manager intente editar el portal fuera de la interfaz, el sistema lo rechaza.
+Patrón igual que Etapa 1: `text-base md:text-<tamaño actual>`. Desktop queda idéntico.
 
-## Cambio de interfaz
+### 1. ComisionEquipoConfig.tsx:413 (input % en fila de regla)
+- Hoy: `w-16 h-7 text-xs text-right`.
+- Propuesto: `w-16 h-9 md:h-7 text-base md:text-xs text-right`.
+- Motivo del alto: 28px con texto de 16px deja ~6px de aire total; el número queda ahogado y el área táctil es menor al mínimo cómodo. En mobile sube a 36px; en desktop se preserva 28px.
+- El ancho `w-16` (64px) sigue alcanzando: el valor máximo es "100" más el spinner numérico, y el texto está alineado a la derecha.
 
-En `src/components/config/AgendaManagement.tsx`:
+### 2. ComisionEquipoConfig.tsx:481 (input % del formulario de alta)
+- Hoy: `w-16 h-8 text-xs text-right`.
+- Propuesto: `w-16 h-9 md:h-8 text-base md:text-xs text-right`.
+- Sube 4px solo en mobile; desktop intacto.
+- El ícono `Percent` al lado (`h-3 w-3 shrink-0`) no cambia: el contenedor es `flex items-center`, se recentra solo.
 
-- Agregar una constante local `canManagePortalPublico = isOwner || isGeneralManager` (mismo patrón que `showGeneralTab` en `MiNegocioPanel.tsx:102`; no se crea un flag nuevo en AuthContext).
-- Renderizar el `TabsTrigger` y el `TabsContent` de `portal` solo cuando esa constante sea true.
-- El `defaultValue` del `Tabs` pasa a ser `portal` cuando puede verlo y `reservas` cuando no, para que el manager no caiga en una pestaña inexistente.
-- Cuando solo queda una pestaña visible, ocultar el `TabsList` (mismo criterio que ya usa `TurnosAgendaPanel` con las sucursales) y renderizar directamente el contenido de reservas.
+### 3. ClienteSearchPicker.tsx:58 (buscador dentro del popover)
+- Hoy: `h-10 ... text-sm`.
+- Propuesto: `text-base md:text-sm`. El alto `h-10` (40px) ya es suficiente para 16px, no se toca.
 
-Sin cambios en `PortalPublicoSection.tsx` ni en `usePortalConfig.ts`.
+### 4. phone-input.tsx:291 (input de teléfono)
+- Hoy: `px-3 text-sm`.
+- Propuesto: `text-base md:text-sm`.
+- El contenedor tiene alto fijo `h-10` y el input es `flex-1` con `min-w-0`: no se toca el alto ni el layout.
 
-## Cambio en la base de datos
+### 5. phone-input.tsx (~224, botón selector de país)
+- Hoy: `px-3 text-sm`.
+- Propuesto: `text-base md:text-sm`, para que el prefijo (`+54`) quede parejo con el número en mobile.
+- No dispara zoom (es `<button>`), el cambio es solo de coherencia visual.
+- Riesgo menor: el bloque de bandera + dial + chevron gana unos px de ancho en mobile, reduciendo el espacio del input. Mitigado porque el input es `flex-1 min-w-0` y el contenedor tiene `overflow-hidden`. Si el prefijo quedara demasiado ancho en pantallas chicas, se compensa bajando el padding a `px-2.5 md:px-3` en ese botón.
 
-Una migración que quita `manager` de las políticas de escritura del portal, dejando owner y general_manager:
+## Parte B — URL pública sin input
 
-- `portal_config`: recrear `portal_config_insert_admins` y `portal_config_update_admins` sin `has_role(..., 'manager')`. `portal_config_delete_admins` ya está limitado a owner/general_manager. La política de lectura `portal_config_select_org_members` se deja como está: la necesitan el portal público y las previsualizaciones.
-- Storage, bucket `portal-logos`: recrear `portal_logos_admins_insert`, `portal_logos_admins_update` y `portal_logos_admins_delete` sin `manager`, conservando el resto de las condiciones actuales (carpeta por organización y extensiones permitidas).
+`<Input readOnly>` (línea 253) pasa a un elemento no interactivo.
 
-## Verificación
+- **Elemento recomendado: `<div>`.** Es contenido de datos, no un párrafo de prosa; y como la URL puede ocupar dos líneas, un `div` evita márgenes tipográficos implícitos y permite alinear verticalmente con los botones sin sorpresas. `<span>` queda descartado por ser inline (no toma el alto ni el ancho del contenedor de forma predecible).
+- **Estilo:** replicar el look del Input — `rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs` — más `min-h-10` para conservar el alto visual actual cuando la URL entra en una sola línea.
+- **Selección manual:** sin `user-select-none`. Se añade `select-all` para que un tap/click seleccione la URL completa, y el botón "Copiar" sigue siendo el camino principal.
+- **Wrap sin truncar:** `break-all whitespace-normal`. `break-all` es lo correcto para una URL sin espacios; `break-words` no rompería una cadena continua larga. Nada de `truncate` ni `overflow-x`.
+- **Accesibilidad:** el `div` se marca con `title={publicUrl}` y sigue siendo texto plano seleccionable. No entra en el orden de tabulación, que es justamente el objetivo (iOS ya no le hace foco → no hay zoom).
+- **Sin tocar:** `publicUrl` (74-77), `handleCopy` (100-104), ni los botones "Copiar" / "Ver portal".
 
-- Confirmar con una consulta a `pg_policies` que ninguna política de `portal_config` ni del bucket `portal-logos` menciona `manager`, salvo la de lectura.
-- Revisar en el preview que owner ve las dos pestañas y que con rol manager solo aparece "Configuración de reservas", con el contenido de reservas cargando correctamente.
+### Balance del layout de la tarjeta
+El contenedor es `flex flex-col sm:flex-row gap-2`:
+- **Mobile:** la URL va arriba en su propio bloque y los botones abajo. Si la URL rompe a dos líneas, el bloque crece hacia abajo sin desplazar ni comprimir los botones. Para que no se vea desbalanceado se agrega `flex-1 min-w-0` al div.
+- **Desktop:** en fila, el div toma el ancho restante con `flex-1 min-w-0` y los botones conservan su tamaño. Se agrega `items-start sm:items-center` para que, en el caso raro de dos líneas en desktop, los botones queden centrados respecto del bloque y no estirados.
+
+## Riesgos no contemplados antes
+- **Spinners numéricos:** los dos inputs `type="number"` de ComisionEquipoConfig muestran flechas nativas en desktop; al subir el alto solo en mobile, el look de desktop no cambia. Sin riesgo, pero conviene mirar la fila una vez aplicada porque `w-16` con 16px es el punto más ajustado del build.
+- **Densidad de la fila de reglas:** subir a `h-9` en mobile aumenta el alto de cada fila unos 8px. Con muchas reglas la lista se alarga; es el costo esperado de eliminar el zoom.
+- **Cambio de alto de la tarjeta del link:** con orgSlug largos la URL pasará a dos líneas en mobile, donde hoy se truncaba dentro del input. La tarjeta crece unos 18px. Es el comportamiento pedido.
+- **Tests/selectores:** si algún test apunta al input de la URL por rol `textbox`, dejará de encontrarlo. Se verifica durante el build.
+
+## Viabilidad de un solo build
+Sí. Los cinco archivos son independientes entre sí y ninguno comparte componente base con los ya resueltos en Etapa 1. Parte A es cambio de clases; Parte B es reemplazo de un nodo aislado. No hay conflicto.
+
+## Candado
+No se tocan Login.tsx, ningún Select/SelectTrigger, input.tsx, textarea.tsx, select.tsx, ni las líneas 329/397 de PortalPublicoSection.tsx. Sin cambios de lógica de negocio ni de validaciones.
