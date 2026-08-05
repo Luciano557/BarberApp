@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Calendar, Settings, Globe, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Calendar, Settings, Globe, SlidersHorizontal } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { AgendaConfigSection } from './AgendaConfigSection';
 import { BloqueosSection } from './BloqueosSection';
 import { HorariosAccesoDirectoCard } from './HorariosAccesoDirectoCard';
@@ -50,9 +60,42 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
 
   const [tabActiva, setTabActiva] = useState<AgendaTab>(() => readStoredTab<AgendaTab>(agendaTabKey, 'agenda'));
   const [configTab, setConfigTab] = useState<ConfigTab>(() => {
-    const stored = readStoredTab<ConfigTab>(configTabKey, 'portal');
+    const stored = readStoredTab<ConfigTab>(configTabKey, 'reservas');
     return stored === 'portal' && !canManagePortal ? 'reservas' : stored;
   });
+
+  const agendaTriggerRef = useRef<HTMLButtonElement>(null);
+  // Al volver con la flecha, el botón se desmonta en el mismo click y el foco
+  // se perdería: lo devolvemos al trigger "Agenda", que es donde quedó parado
+  // el usuario. Solo cuando el cambio vino de la flecha, no de un click al tab.
+  const focusAgendaTrigger = useRef(false);
+
+  const goToTab = (next: AgendaTab) => {
+    setTabActiva(next);
+    writeStoredTab(agendaTabKey, next);
+  };
+
+  // PortalPublicoSection reporta si tiene cambios sin guardar. Cualquier
+  // navegación que la desmonte (sub-tabs de Configuración, tabs de nivel
+  // superior, o la flecha "Volver a Agenda") pasa por este guard — si hay
+  // cambios pendientes, pide confirmación antes de perderlos.
+  const [portalDirty, setPortalDirty] = useState(false);
+  const [pendingLeavePortal, setPendingLeavePortal] = useState<(() => void) | null>(null);
+
+  const guardLeavePortal = (action: () => void) => {
+    if (configTab === 'portal' && portalDirty) {
+      setPendingLeavePortal(() => action);
+      return;
+    }
+    action();
+  };
+
+  useEffect(() => {
+    if (tabActiva === 'agenda' && focusAgendaTrigger.current) {
+      focusAgendaTrigger.current = false;
+      agendaTriggerRef.current?.focus();
+    }
+  }, [tabActiva]);
 
   // Los roles pueden resolverse después del primer render: si para entonces
   // el usuario no puede ver el portal, lo devolvemos a reservas. No se
@@ -86,26 +129,42 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
     </>
   );
 
+  // La flecha vive fuera del TabsList a propósito: el List es role="tablist"
+  // con roving focus de Radix, y un botón que no es tab ahí adentro rompe la
+  // navegación con flechas del teclado.
+  const volverAAgenda = (
+    <button
+      type="button"
+      onClick={() => guardLeavePortal(() => {
+        focusAgendaTrigger.current = true;
+        goToTab('agenda');
+      })}
+      aria-label="Volver a Agenda"
+      title="Volver a Agenda"
+      className="shrink-0 px-1 pb-3 text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <ArrowLeft className="h-4 w-4" />
+    </button>
+  );
+
   return (
     <div className="w-full mt-2 space-y-4">
-      <Tabs
-        value={tabActiva}
-        onValueChange={(v) => {
-          const next = v as AgendaTab;
-          setTabActiva(next);
-          writeStoredTab(agendaTabKey, next);
-        }}
-      >
-        <TabsList variant="underline" className="w-auto">
-          <TabsTrigger value="agenda" variant="underline" className="text-[13px]">
-            <Calendar className="h-4 w-4" />
-            Agenda
-          </TabsTrigger>
-          <TabsTrigger value="config" variant="underline" className="text-[13px]">
-            <Settings className="h-4 w-4" />
-            Configuración
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={tabActiva} onValueChange={(v) => guardLeavePortal(() => goToTab(v as AgendaTab))}>
+        {/* Una sola fila de navegación: en Agenda son los dos tabs de nivel
+            superior; dentro de Configuración la reemplaza la fila de la sección
+            (flecha para volver + sub-tabs). */}
+        {tabActiva === 'agenda' && (
+          <TabsList variant="underline" className="w-auto">
+            <TabsTrigger ref={agendaTriggerRef} value="agenda" variant="underline" className="text-[13px]">
+              <Calendar className="h-4 w-4" />
+              Agenda
+            </TabsTrigger>
+            <TabsTrigger value="config" variant="underline" className="text-[13px]">
+              <Settings className="h-4 w-4" />
+              Configuración
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         <TabsContent value="agenda" className="mt-3">
           <AgendaPanel
@@ -116,42 +175,80 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
           />
         </TabsContent>
 
-        <TabsContent value="config" className="mt-3">
+        {/* mt-0: la fila de Configuración tiene que caer en la misma altura que
+            la de Agenda, si no la barra salta al navegar entre las dos. */}
+        <TabsContent value="config" className="mt-0">
           {canManagePortal ? (
             <Tabs
               value={configTab}
               onValueChange={(v) => {
                 const next = v as ConfigTab;
-                setConfigTab(next);
-                writeStoredTab(configTabKey, next);
+                guardLeavePortal(() => {
+                  setConfigTab(next);
+                  writeStoredTab(configTabKey, next);
+                });
               }}
             >
-              <TabsList variant="underline" className="w-auto">
-                <TabsTrigger value="portal" variant="underline" className="text-[13px]">
-                  <Globe className="h-4 w-4" />
-                  Portal público
-                </TabsTrigger>
-                <TabsTrigger value="reservas" variant="underline" className="text-[13px]">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Configuración de reservas
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="portal" className="mt-3">
-                <PortalPublicoSection />
-              </TabsContent>
+              {/* La hairline sube al wrapper para que corra continua bajo la
+                  flecha y bajo los tabs; w-fit conserva el ancho ajustado al
+                  contenido que ya tenía el TabsList. */}
+              <div className="flex w-fit items-end gap-4 border-b border-border">
+                {volverAAgenda}
+                <TabsList variant="underline" className="w-auto border-b-0">
+                  <TabsTrigger value="reservas" variant="underline" className="text-[13px]">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Configuración de reservas
+                  </TabsTrigger>
+                  <TabsTrigger value="portal" variant="underline" className="text-[13px]">
+                    <Globe className="h-4 w-4" />
+                    Portal público
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="reservas" className="mt-3 space-y-6">
                 {reservasContent}
               </TabsContent>
+
+              <TabsContent value="portal" className="mt-3">
+                <PortalPublicoSection onDirtyChange={setPortalDirty} />
+              </TabsContent>
             </Tabs>
           ) : (
-            /* Sin acceso al portal queda una sola sección: se muestra directa,
-               sin una barra de tabs de un solo ítem. */
-            <div className="space-y-6">{reservasContent}</div>
+            /* Sin acceso al portal queda una sola sección: la flecha se mantiene
+               en la misma posición, sin una barra de tabs de un solo ítem. Va
+               sin hairline porque el riel es el subrayado de los tabs y acá no
+               hay tabs — una línea de 24px bajo la flecha leería como un error. */
+            <>
+              <div className="flex w-fit items-end">{volverAAgenda}</div>
+              <div className="mt-3 space-y-6">{reservasContent}</div>
+            </>
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!pendingLeavePortal} onOpenChange={(open) => { if (!open) setPendingLeavePortal(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tenés cambios sin guardar en este formulario. Si cerrás ahora, se van a perder.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                pendingLeavePortal?.();
+                setPendingLeavePortal(null);
+              }}
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

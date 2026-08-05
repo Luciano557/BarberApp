@@ -466,13 +466,12 @@ overridea el timing del Dialog (180ms + quint vs 200ms default).
    (Estadísticas/Sueldos/Gastos). Mitad y mitad.
 2. **Listas de catálogo**: `LinesConfig` y `ExtrasConfig` no tienen
    `animate-item-in`; sus 5 hermanos de catálogo sí.
-3. **`Collapsible` es instantáneo** (`ui/collapsible.tsx` re-exporta Radix sin
-   animación) en los 8 archivos que lo usan (NuevoClienteDialog,
-   EstadisticasPanel, CuentasSucursalConfig, MiNegocioGeneralTabContent,
-   NotificationsBell, PortalPublicoSection, SucursalesInactivasCollapsible,
-   SueldosPanel) — solo rota el chevron (`transition-transform 200ms`).
-   Mientras tanto `Accordion` (mismo gesto, `PortalPublicoSection:231`) sí
-   anima la altura. Misma interacción, dos comportamientos.
+3. **`Collapsible` vs `Accordion`** — CORREGIDO (auditoría 2026-08-05): el
+   Accordion desapareció del archivo — hoy son 3 `<section>` planas. El
+   Collapsible base se arregló en un build posterior y ya anima igual que
+   Accordion (`collapsible.tsx:17`). El único Collapsible que queda en la
+   pantalla es "Usar color personalizado" (`PortalPublicoSection.tsx:394`).
+   Hallazgo cerrado, sin gesto divergente.
 4. **Pasos del portal público**: cambian instantáneo
    (`BookingStepper.tsx:221+`, render condicional sin clases de animación);
    solo la pantalla de confirmación anima (`:159` y `RescheduleFlow:94`, con
@@ -504,7 +503,7 @@ turnos en Agenda (posiciona por `transform` sin transición).
 | 3 | `BookingSummary.tsx:160` — resumen chip↔full del portal | `height` animada por JS | Media: en cada paso del booking mobile |
 | 4 | `OnboardingOverlay.tsx:24,38` — spotlight que persigue al target | `top/left/width/height` vía `transition-all` 300ms + `backdrop-blur` | Baja (solo onboarding) |
 | 5 | `EquipoSucursalPanel.tsx:243` — highlight de card | `transition-shadow` **700ms** (paint + duración fuera de rango) | Baja |
-| 6 | `accordion.tsx:43` + `tailwind.config.ts:113` | `height` | Baja (solo PortalPublicoSection) |
+| 6 | ~~`accordion.tsx:43` + `tailwind.config.ts:113`~~ — CORREGIDO (auditoría 2026-08-05): el Accordion desapareció del archivo, hoy son 3 `<section>` planas. El Collapsible base se arregló en un build posterior y ya anima igual que Accordion (`collapsible.tsx:17`). El único Collapsible que queda en la pantalla es "Usar color personalizado" (`PortalPublicoSection.tsx:394`). Hallazgo cerrado, sin gesto divergente. | `height` | — |
 | 7 | `EstadisticasPanel.tsx:711,959,1026` — hover de cards de métricas | `transition-shadow` (paint, área chica) | Media (hover) |
 
 **Riesgo latente:** `transition-all` en ~10 sitios más (`progress.tsx:16`,
@@ -609,7 +608,7 @@ explícito (`animation: none`), y `SelectableCard:32,35` usa `motion-reduce:`.
 | 12 | `animation-delay` no anulado en reduced-motion (staggers residuales) |
 | 13 | `scrollIntoView smooth` ×7 sin respetar reduced-motion |
 | 14 | Hover instantáneo en kebab/menú items — probablemente correcto (uso frecuente) pero sin criterio escrito |
-| 15 | `accordion-down/up` anima `height` (uso acotado a PortalPublicoSection) |
+| 15 | ~~`accordion-down/up` anima `height` (uso acotado a PortalPublicoSection)~~ — CORREGIDO (auditoría 2026-08-05): el Accordion desapareció del archivo, hoy son 3 `<section>` planas. El Collapsible base se arregló en un build posterior y ya anima igual que Accordion (`collapsible.tsx:17`). El único Collapsible que queda en la pantalla es "Usar color personalizado" (`PortalPublicoSection.tsx:394`). Hallazgo cerrado, sin gesto divergente. |
 
 **Totales Fase 2:** 7 transiciones caras concretas + 1 clase de riesgo latente
 (`transition-all`) · 15 inconsistencias (3 P1 / 6 P2 / 6 P3) · 3 excepciones de

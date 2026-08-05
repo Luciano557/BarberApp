@@ -62,6 +62,7 @@ export function PortalCoverUploader({
       />
       <div className="flex flex-wrap gap-2">
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={() => ref.current?.click()}
@@ -71,12 +72,12 @@ export function PortalCoverUploader({
           {uploading ? 'Subiendo...' : coverUrl ? 'Cambiar portada' : 'Subir portada'}
         </Button>
         {coverUrl && onAdjust && (
-          <Button variant="outline" size="sm" onClick={onAdjust} disabled={disabled}>
+          <Button type="button" variant="outline" size="sm" onClick={onAdjust} disabled={disabled}>
             <Move className="h-4 w-4 mr-1" /> Ajustar portada
           </Button>
         )}
         {coverUrl && (
-          <Button variant="outline" size="sm" onClick={onRemove} disabled={disabled}>
+          <Button type="button" variant="outline" size="sm" onClick={onRemove} disabled={disabled}>
             <Trash2 className="h-4 w-4 mr-1" /> Quitar
           </Button>
         )}
