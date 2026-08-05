@@ -68,6 +68,7 @@ interface MiNegocioPanelProps {
 
 export interface MiNegocioPanelHandle {
   navigateToSucursalEquipo(sucursalId: string, barberoId: string): void;
+  navigateToSucursalHorarios(sucursalId: string): void;
 }
 
 export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelProps>(
@@ -87,6 +88,9 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   } = useSupabaseData();
 
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
+  // "Ya sé qué sucursales hay". Distinto de `allSucursales.length === 0`, que no
+  // distingue "todavía cargando" de "esta organización no tiene ninguna".
+  const [sucursalesLoaded, setSucursalesLoaded] = useState(false);
   const [allBarbers, setAllBarbers] = useState<BarberWithSucursal[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const sucursalForm = useForm<SucursalFieldsValues>({
@@ -96,6 +100,9 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
   const [pendingHighlightBarberoId, setPendingHighlightBarberoId] = useState<string | null>(null);
   const [pendingHighlightSucursalId, setPendingHighlightSucursalId] = useState<string | null>(null);
+  // Nonce: cambia en cada llegada desde Turnos para poder re-disparar el resalte
+  // aunque ya estemos parados en la misma ficha de sucursal.
+  const [pendingHighlightHorarios, setPendingHighlightHorarios] = useState<{ sucursalId: string; nonce: number } | null>(null);
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
   const canCreateSucursal = isOwner || isGeneralManager;
@@ -126,6 +133,8 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
         fecha_desactivacion: (s as any).fecha_desactivacion ?? null,
       } as Sucursal & { fecha_desactivacion: string | null })));
     }
+    // También en error: sin esto la tab se quedaría esperando para siempre.
+    setSucursalesLoaded(true);
   }, [organization?.id]);
 
   const fetchAllBarbers = useCallback(async () => {
@@ -176,6 +185,11 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   useEffect(() => {
     if (!organization?.id) return;
     if (isValidTab(activeTab)) return;
+    // Hasta que la lista llegue, ninguna tab de sucursal puede validarse: elegir
+    // fallback acá degradaría a General y, como General sí es válida, el efecto
+    // no volvería a corregirlo. Esto rompía llegar desde otra pestaña con una
+    // sucursal ya elegida en localStorage.
+    if (!sucursalesLoaded) return;
     // Esperar a saber qué sucursales hay (para manager esperar a tener la lista filtrada)
     if (isManagerOnly && managerSucursalIds.length === 0 && allSucursales.length > 0) {
       // Aún sincronizando permisos del manager
@@ -207,7 +221,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
     }
   }, [
     activeTab, isValidTab, organization?.id, storageKey, showGeneralTab,
-    isManagerOnly, managerSucursalIds.length, allSucursales.length,
+    isManagerOnly, managerSucursalIds.length, allSucursales.length, sucursalesLoaded,
     visibleSucursales, currentSucursal,
   ]);
 
@@ -217,6 +231,9 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
   useEffect(() => {
     if (!activeTab) return;
     if (isValidTab(activeTab)) return;
+    // Misma razón que arriba: mientras la lista no llegó, "inválida" solo
+    // significa "todavía no la puedo validar".
+    if (!sucursalesLoaded) return;
     if (visibleSucursales[0]) {
       setActiveTab(visibleSucursales[0].id);
     } else if (showGeneralTab) {
@@ -224,7 +241,17 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
     } else {
       setActiveTab('');
     }
-  }, [activeTab, isValidTab, visibleSucursales, showGeneralTab]);
+  }, [activeTab, isValidTab, visibleSucursales, showGeneralTab, sucursalesLoaded]);
+
+  // Al llegar desde otra pestaña la tab se restaura de localStorage sin pasar por
+  // handleTabChange, así que currentSucursal quedaría apuntando a otra sucursal y
+  // las secciones que dependen de ella (Servicios, Productos) se verían vacías.
+  useEffect(() => {
+    if (!activeTab || activeTab === GENERAL_TAB) return;
+    if (!isValidTab(activeTab)) return;
+    if (currentSucursal?.id === activeTab) return;
+    setCurrentSucursal(activeTab);
+  }, [activeTab, isValidTab, currentSucursal?.id, setCurrentSucursal]);
 
   // Handler único: cambia tab + persiste localStorage. NO escribe null en currentSucursal al entrar a General.
   const onb = useOnboarding();
@@ -247,6 +274,10 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       handleTabChange(sucursalId);
       setPendingHighlightBarberoId(barberoId);
       setPendingHighlightSucursalId(sucursalId);
+    },
+    navigateToSucursalHorarios(sucursalId: string) {
+      handleTabChange(sucursalId);
+      setPendingHighlightHorarios(prev => ({ sucursalId, nonce: (prev?.nonce ?? 0) + 1 }));
     },
   }), [handleTabChange]);
 
@@ -496,6 +527,7 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
                   onSucursalUpdated={() => { fetchAllSucursales(); refreshSucursales(); }}
                   onGoToGeneralConfig={onGoToGeneralConfig}
                   highlightBarberoId={pendingHighlightSucursalId === s.id ? pendingHighlightBarberoId ?? undefined : undefined}
+                  highlightHorariosNonce={pendingHighlightHorarios?.sucursalId === s.id ? pendingHighlightHorarios.nonce : undefined}
                 />
               </div>
             </TabsContent>

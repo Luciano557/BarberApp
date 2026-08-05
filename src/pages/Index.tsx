@@ -160,6 +160,22 @@ const Index = () => {
     }
   }, [activeTab, organization?.id]);
 
+  const navigateToMiNegocioHorarios = useCallback((sucursalId: string) => {
+    if (activeTab === 'mi-negocio') {
+      miNegocioPanelRef.current?.navigateToSucursalHorarios(sucursalId);
+    } else {
+      if (organization?.id) {
+        try {
+          localStorage.setItem(`vittro:miNegocio:activeTab:${organization.id}`, sucursalId);
+          localStorage.setItem(`vittro:miNegocio:highlightHorarios:${organization.id}`, sucursalId);
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+      setActiveTab('mi-negocio');
+    }
+  }, [activeTab, organization?.id]);
+
   // Refresca datos solo cuando se entra a Cobrar desde otra pestaña.
   useEffect(() => {
     const prevTab = prevActiveTabRef.current;
@@ -282,7 +298,7 @@ const Index = () => {
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
             planAllowsFeature(effectivePlan, 'appointments') ? (
-              <TurnosAgendaPanel />
+              <TurnosAgendaPanel onNavigateToHorarios={canViewMiNegocio ? navigateToMiNegocioHorarios : undefined} />
             ) : (
               <PlanLockedFeature
                 title="Turnos requiere plan Profesional"

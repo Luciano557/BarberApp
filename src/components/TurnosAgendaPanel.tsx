@@ -27,7 +27,12 @@ function dbToBarber(row: any): Barber {
   };
 }
 
-export function TurnosAgendaPanel() {
+interface TurnosAgendaPanelProps {
+  /** Lleva a Mi Negocio › ficha de sucursal › Horarios de atención. */
+  onNavigateToHorarios?: (sucursalId: string) => void;
+}
+
+export function TurnosAgendaPanel({ onNavigateToHorarios }: TurnosAgendaPanelProps) {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, isBarber, user } = useAuth();
@@ -148,6 +153,7 @@ export function TurnosAgendaPanel() {
                 if (b.sucursalId !== activeSucursal.id) return false;
                 return (b.rolesEquipo ?? []).includes('barber');
               })}
+              onNavigateToHorarios={onNavigateToHorarios}
             />
           )}
         </div>

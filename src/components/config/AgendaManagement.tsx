@@ -3,7 +3,7 @@ import { Calendar, Settings, Globe, SlidersHorizontal } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgendaConfigSection } from './AgendaConfigSection';
 import { BloqueosSection } from './BloqueosSection';
-import { HorariosTrabajoSection } from './HorariosTrabajoSection';
+import { HorariosAccesoDirectoCard } from './HorariosAccesoDirectoCard';
 import { PortalPublicoSection } from './PortalPublicoSection';
 import { AgendaPanel } from '@/components/agenda/AgendaPanel';
 import { Barber } from '@/types/barbershop';
@@ -14,6 +14,8 @@ interface AgendaManagementProps {
   sucursalId: string;
   organizationId: string;
   barbers: Barber[];
+  /** Lleva a Mi Negocio › ficha de sucursal › Horarios de atención. */
+  onNavigateToHorarios?: (sucursalId: string) => void;
 }
 
 type AgendaTab = 'agenda' | 'config';
@@ -35,7 +37,7 @@ function writeStoredTab(key: string, value: string) {
   }
 }
 
-export function AgendaManagement({ sucursalId, organizationId, barbers }: AgendaManagementProps) {
+export function AgendaManagement({ sucursalId, organizationId, barbers, onNavigateToHorarios }: AgendaManagementProps) {
   const { sucursales } = useSucursal();
   const sucursal = sucursales.find(s => s.id === sucursalId);
   const { isOwner, isGeneralManager, isManager } = useAuth();
@@ -77,7 +79,9 @@ export function AgendaManagement({ sucursalId, organizationId, barbers }: Agenda
   const reservasContent = (
     <>
       <AgendaConfigSection sucursalId={sucursalId} organizationId={organizationId} />
-      <HorariosTrabajoSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
+      <HorariosAccesoDirectoCard
+        onGoToHorarios={onNavigateToHorarios ? () => onNavigateToHorarios(sucursalId) : undefined}
+      />
       <BloqueosSection sucursalId={sucursalId} organizationId={organizationId} barbers={barbers} />
     </>
   );

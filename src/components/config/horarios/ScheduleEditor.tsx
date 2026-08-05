@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,50 +8,22 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Clock, Plus, Trash2, ArrowLeft, Pencil, Eraser, Check } from 'lucide-react';
+import { Plus, Trash2, Pencil, Eraser, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Barber } from '@/types/barbershop';
 import { cn } from '@/lib/utils';
-import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
-
-interface HorariosTrabajoSectionProps {
-  sucursalId: string;
-  organizationId: string;
-  barbers: Barber[];
-}
-
-interface HorarioRow {
-  id: string;
-  dia_semana: number;
-  hora_inicio: string;
-  hora_fin: string;
-  activo: boolean;
-  barbero_id: string | null;
-}
+import { DIAS, fmt, type HorarioRow } from './types';
 
 interface PendingRange {
   hora_inicio: string;
   hora_fin: string;
 }
-
-const DIAS = [
-  { num: 1, short: 'L', label: 'Lun', full: 'Lunes' },
-  { num: 2, short: 'M', label: 'Mar', full: 'Martes' },
-  { num: 3, short: 'M', label: 'Mié', full: 'Miércoles' },
-  { num: 4, short: 'J', label: 'Jue', full: 'Jueves' },
-  { num: 5, short: 'V', label: 'Vie', full: 'Viernes' },
-  { num: 6, short: 'S', label: 'Sáb', full: 'Sábado' },
-  { num: 7, short: 'D', label: 'Dom', full: 'Domingo' },
-];
 
 function hasOverlap(ranges: { hora_inicio: string; hora_fin: string }[]): boolean {
   const sorted = [...ranges].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
@@ -60,8 +32,6 @@ function hasOverlap(ranges: { hora_inicio: string; hora_fin: string }[]): boolea
   }
   return false;
 }
-
-const fmt = (t: string) => t.slice(0, 5);
 
 // ============================================================
 // Bloque rápido: aplicar horario a múltiples días
@@ -467,7 +437,7 @@ function DayCardsGrid({
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {DIAS.map(d => {
           const ranges = (byDay.get(d.num) || []).slice().sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
           const open = ranges.some(r => r.activo);
@@ -545,7 +515,7 @@ function DayCardsGrid({
 // ============================================================
 // Editor combinado
 // ============================================================
-function ScheduleEditor({
+export function ScheduleEditor({
   horarios, sucursalId, organizationId, barberoId, onRefresh,
 }: {
   horarios: HorarioRow[];
@@ -570,199 +540,5 @@ function ScheduleEditor({
         onRefresh={onRefresh}
       />
     </div>
-  );
-}
-
-// ============================================================
-// Section root
-// ============================================================
-export function HorariosTrabajoSection({ sucursalId, organizationId, barbers }: HorariosTrabajoSectionProps) {
-  const [allHorarios, setAllHorarios] = useState<HorarioRow[]>([]);
-  const [selectedBarberId, setSelectedBarberId] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-
-  const fetchHorarios = useCallback(async () => {
-    const { data } = await supabase
-      .from('horarios_trabajo')
-      .select('*')
-      .eq('sucursal_id', sucursalId)
-      .order('dia_semana')
-      .order('hora_inicio');
-    if (data) {
-      setAllHorarios(data.map(h => ({
-        id: h.id,
-        dia_semana: h.dia_semana,
-        hora_inicio: h.hora_inicio,
-        hora_fin: h.hora_fin,
-        activo: h.activo,
-        barbero_id: h.barbero_id,
-      })));
-    }
-    setLoading(false);
-  }, [sucursalId]);
-
-  useEffect(() => { fetchHorarios(); }, [fetchHorarios]);
-
-  const activeBarbers = barbers.filter(b => b.active);
-  const sucursalHorarios = allHorarios.filter(h => h.barbero_id === null);
-  const selectedBarberHorarios = selectedBarberId
-    ? allHorarios.filter(h => h.barbero_id === selectedBarberId)
-    : [];
-  const barberHasOverride = selectedBarberId
-    ? allHorarios.some(h => h.barbero_id === selectedBarberId)
-    : false;
-
-  const createOverride = async () => {
-    if (!selectedBarberId) return;
-    const base = sucursalHorarios.filter(h => h.activo);
-    if (base.length === 0) {
-      const inserts = [1, 2, 3, 4, 5].map(dia => ({
-        sucursal_id: sucursalId,
-        organization_id: organizationId,
-        barbero_id: selectedBarberId,
-        dia_semana: dia,
-        hora_inicio: '09:00',
-        hora_fin: '18:00',
-        activo: true,
-      }));
-      await supabase.from('horarios_trabajo').insert(inserts);
-    } else {
-      const inserts = base.map(h => ({
-        sucursal_id: sucursalId,
-        organization_id: organizationId,
-        barbero_id: selectedBarberId,
-        dia_semana: h.dia_semana,
-        hora_inicio: h.hora_inicio,
-        hora_fin: h.hora_fin,
-        activo: h.activo,
-      }));
-      await supabase.from('horarios_trabajo').insert(inserts);
-    }
-    toast.success('Horario propio creado');
-    fetchHorarios();
-  };
-
-  const removeOverride = async () => {
-    if (!selectedBarberId) return;
-    const { error } = await supabase
-      .from('horarios_trabajo')
-      .delete()
-      .eq('sucursal_id', sucursalId)
-      .eq('barbero_id', selectedBarberId);
-    if (error) { toast.error('Error al eliminar horario'); return; }
-    toast.success('Barbero volvió al horario de sucursal');
-    fetchHorarios();
-  };
-
-  const barbersWithOverride = new Set(
-    allHorarios.filter(h => h.barbero_id !== null).map(h => h.barbero_id!)
-  );
-
-  if (loading) return <div className="text-sm text-muted-foreground py-4">Cargando horarios...</div>;
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Clock className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <CardTitle className="text-sm">Horarios de trabajo</CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Aplicá un mismo horario a varios días o ajustá cada día por separado.
-            </p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="sucursal" className="w-full">
-          <TabsList className="h-9 bg-muted p-1 rounded-lg mb-4">
-            <TabsTrigger value="sucursal" className="text-xs px-4">Horario sucursal</TabsTrigger>
-            <TabsTrigger value="barberos" className="text-xs px-4">Por barbero</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="sucursal">
-            <p className="text-xs text-muted-foreground mb-3">
-              Horario base de la sucursal. Los barberos sin horario propio usarán este.
-            </p>
-            <ScheduleEditor
-              horarios={sucursalHorarios}
-              sucursalId={sucursalId}
-              organizationId={organizationId}
-              barberoId={null}
-              onRefresh={fetchHorarios}
-            />
-          </TabsContent>
-
-          <TabsContent value="barberos">
-            <div className="space-y-4">
-              {activeBarbers.length === 0 ? (
-                <EmptySelectHint
-                  message="No hay barberos activos en esta sucursal."
-                  ctaLabel="Añadir miembro del equipo"
-                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
-                />
-              ) : (
-                <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Seleccionar barbero" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeBarbers.map(b => (
-                      <SelectItem key={b.id} value={b.id}>
-                        <div className="flex items-center gap-2">
-                          <span>{b.firstName} {b.lastName}</span>
-                          {barbersWithOverride.has(b.id) ? (
-                            <StatusPill status="success" label="Horario propio" />
-                          ) : (
-                            <StatusPill status="neutral" label="Usa sucursal" />
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {selectedBarberId && !barberHasOverride && (
-                <div className="text-center py-6 border rounded-lg bg-muted/30">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Este barbero usa el horario de la sucursal
-                  </p>
-                  <Button size="sm" variant="outline" onClick={createOverride}>
-                    <Plus className="h-4 w-4 mr-1" /> Crear horario propio
-                  </Button>
-                </div>
-              )}
-
-              {selectedBarberId && barberHasOverride && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="default" className="text-xs">Horario personalizado</Badge>
-                    <Button size="sm" variant="ghost" className="text-xs h-7 text-destructive" onClick={removeOverride}>
-                      <ArrowLeft className="h-3 w-3 mr-1" /> Volver a horario de sucursal
-                    </Button>
-                  </div>
-                  <ScheduleEditor
-                    horarios={selectedBarberHorarios}
-                    sucursalId={sucursalId}
-                    organizationId={organizationId}
-                    barberoId={selectedBarberId}
-                    onRefresh={fetchHorarios}
-                  />
-                </div>
-              )}
-
-              {!selectedBarberId && (
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  Seleccioná un barbero para ver o editar su horario
-                </p>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
   );
 }
