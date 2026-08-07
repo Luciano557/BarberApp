@@ -21,6 +21,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+
 
 
 type ViewMode = 'day' | '3days' | 'week';
