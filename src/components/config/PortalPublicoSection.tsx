@@ -252,12 +252,14 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const onSubmit = async (values: PortalFormSchemaValues) => {
     setSavingAll(true);
 
-    const normalizedLinks = values.links.map((l, i) => ({
+    const normalizedLinks: PortalLink[] = values.links.map((l, i) => ({
       ...l,
       label: l.label.trim(),
+      url: l.url ?? '',
+      active: l.active ?? true,
       sort_order: i,
       icon: isValidIconKey(l.icon) ? l.icon : null,
-    }));
+    })) as PortalLink[];
 
     // 1. organizations.name — solo si cambió. Si falla, abortamos sin tocar
     //    portal_config para no dejar los datos a medio guardar.
