@@ -8,6 +8,8 @@ import { format, addDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+
 
 interface Turno {
   id: string;
