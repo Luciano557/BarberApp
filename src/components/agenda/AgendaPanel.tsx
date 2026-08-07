@@ -77,6 +77,31 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
     sucursalId, organizationId, fromDate, toDate,
   );
 
+  // Realtime: refetch silencioso ante cambios en turnos de esta sucursal.
+  // Salvaguarda: si hay un movimiento en curso (drag confirmado / diálogo de
+  // conflicto abierto), el refetch queda pendiente y se aplica al cerrar.
+  const isBusy = !!moveDialog || !!moveConflict || movingLoading;
+  const pendingRefetchRef = useRef(false);
+
+  const handleRealtimeChange = useCallback(() => {
+    if (!!moveDialog || !!moveConflict || movingLoading) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    refetch();
+  }, [moveDialog, moveConflict, movingLoading, refetch]);
+
+  useEffect(() => {
+    if (!isBusy && pendingRefetchRef.current) {
+      pendingRefetchRef.current = false;
+      refetch();
+    }
+  }, [isBusy, refetch]);
+
+  useTurnosRealtime({ sucursalId, onChange: handleRealtimeChange });
+
+
+
   const handlePrev = () => {
     if (view === 'day') setDate(d => addDays(d, -1));
     else if (view === '3days') setDate(d => addDays(d, -3));
