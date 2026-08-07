@@ -122,11 +122,47 @@ export function NewAppointmentDialog({
 
   const ensureRelacion = clienteSearch.ensureRelacion;
 
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictTurno[]>([]);
+  const [pendingValues, setPendingValues] = useState<NewAppointmentFormValues | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
   const onSubmit = async (values: NewAppointmentFormValues) => {
     const servicio = servicios.find((s) => s.id === values.servicioId);
     if (!servicio) return;
 
+    // Pre-chequeo de solapamiento (mismo criterio que findConflictingTurnos:
+    // org + sucursal + barbero + fecha, estados activos, sin buffers en el
+    // flujo interno). No se validan horarios de atención ni bloqueos: eso es
+    // exclusivo del portal público.
+    const horaFinCheck = minutesToTime(timeToMinutes(values.horaInicio) + servicio.duracion_min);
+    const { data: conflictRows, error: conflictErr } = await supabase
+      .from('turnos')
+      .select('id, hora_inicio, hora_fin, cliente_nombre')
+      .eq('organization_id', organizationId)
+      .eq('sucursal_id', sucursalId)
+      .eq('barbero_id', values.barberoId)
+      .eq('fecha', values.fecha)
+      .in('estado', ['pendiente', 'confirmado', 'en_curso'])
+      .lt('hora_inicio', horaFinCheck)
+      .gt('hora_fin', values.horaInicio);
+
+    if (!conflictErr && conflictRows && conflictRows.length > 0) {
+      setConflicts(conflictRows as ConflictTurno[]);
+      setPendingValues(values);
+      setConflictOpen(true);
+      return;
+    }
+
+    await createTurno(values, false);
+  };
+
+  const createTurno = async (values: NewAppointmentFormValues, overlapAutorizado: boolean) => {
+    const servicio = servicios.find((s) => s.id === values.servicioId);
+    if (!servicio) return;
+
     try {
+
       let clienteId: string | null = null;
       let snapNombre = '';
       let snapTelefono: string | null = null;
