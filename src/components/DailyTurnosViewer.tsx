@@ -91,6 +91,10 @@ export function DailyTurnosViewer() {
   useEffect(() => { fetchBarberos(); fetchServicios(); }, [fetchBarberos, fetchServicios]);
   useEffect(() => { fetchTurnos(); }, [fetchTurnos]);
 
+  // Realtime: refetch silencioso de los turnos del día para esta sucursal.
+  useTurnosRealtime({ sucursalId: currentSucursal?.id, onChange: fetchTurnos });
+
+
   if (!currentSucursal) return null;
 
   return (
