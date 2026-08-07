@@ -570,7 +570,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                     Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
                   </p>
                 </div>
-                <PortalLinksEditor links={watchedLinks} onChange={handleLinksChange} />
+                <PortalLinksEditor links={(watchedLinks ?? []) as PortalLink[]} onChange={handleLinksChange} />
                 {linksArrayMessage && (
                   <p className="text-xs text-destructive">{linksArrayMessage}</p>
                 )}
