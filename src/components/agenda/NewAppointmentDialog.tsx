@@ -21,6 +21,8 @@ import { ClienteSearchPicker } from './ClienteSearchPicker';
 import { ClienteFormFields } from './ClienteFormFields';
 import { EmptySelectHint } from './EmptySelectHint';
 import { clienteModeFieldsSchema, validateClienteMode } from './clienteModeSchema';
+import { TurnoConflictDialog } from './TurnoConflictDialog';
+import type { ConflictTurno } from './lib/updateTurnoInternal';
 
 interface NewAppointmentDialogProps {
   open: boolean;
