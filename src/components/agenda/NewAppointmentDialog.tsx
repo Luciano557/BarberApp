@@ -319,6 +319,7 @@ export function NewAppointmentDialog({
   };
 
   return (
+    <>
     <DrawerForm
       open={open}
       onOpenChange={onOpenChange}
