@@ -239,6 +239,8 @@ Deno.serve(async (req) => {
     const { data: conflicts } = await supabase
       .from("turnos")
       .select("id")
+      .eq("organization_id", organization_id)
+      .eq("sucursal_id", sucursal_id)
       .eq("barbero_id", barbero_id)
       .eq("fecha", fecha)
       .in("estado", ["pendiente", "confirmado", "en_curso"])
