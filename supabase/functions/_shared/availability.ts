@@ -215,6 +215,8 @@ export interface ConflictingTurno {
 export async function findConflictingTurnos(
   supabase: any,
   params: {
+    organizationId: string;
+    sucursalId: string;
     barberoId: string;
     fecha: string;
     hora_inicio: string;
@@ -230,6 +232,8 @@ export async function findConflictingTurnos(
   let q = supabase
     .from("turnos")
     .select("id, hora_inicio, hora_fin, cliente_nombre")
+    .eq("organization_id", params.organizationId)
+    .eq("sucursal_id", params.sucursalId)
     .eq("barbero_id", params.barberoId)
     .eq("fecha", params.fecha)
     .in("estado", ["pendiente", "confirmado", "en_curso"])
