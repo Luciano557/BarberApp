@@ -454,5 +454,19 @@ export function NewAppointmentDialog({
         </form>
       </Form>
     </DrawerForm>
+    <TurnoConflictDialog
+      open={conflictOpen}
+      onOpenChange={(o) => {
+        setConflictOpen(o);
+        if (!o) setPendingValues(null);
+      }}
+      kind="choque_de_horario"
+      conflicts={conflicts}
+      onConfirm={handleConfirmOverlap}
+      loading={confirming}
+      descriptionOverride={conflictDescription}
+      confirmLabel="Confirmar de todas formas"
+    />
+    </>
   );
 }
