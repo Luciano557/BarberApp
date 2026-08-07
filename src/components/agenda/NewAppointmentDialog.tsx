@@ -221,20 +221,22 @@ export function NewAppointmentDialog({
         estado: 'pendiente',
         notas: values.notas?.trim().slice(0, 1500) || null,
         eligio_barbero: true,
-      });
+        overlap_autorizado: overlapAutorizado,
+      } as any);
       if (turnoErr) throw turnoErr;
 
       toast.success('Turno creado');
       clienteSearch.reset();
       form.reset(defaultValues());
+      setConflictOpen(false);
+      setPendingValues(null);
+      setConflicts([]);
       onOpenChange(false);
       onCreated();
     } catch (e: any) {
       console.error('Crear turno error:', e);
-      // El insert directo no tiene pre-chequeo de choque de horario (a diferencia de
-      // update-turno-internal, que sí lo hace); el exclusion constraint de Postgres
-      // es la única red de seguridad. Se traduce a un mensaje claro antes de que el
-      // texto crudo del constraint llegue al usuario.
+      // Red de seguridad: si el pre-chequeo no vio el conflicto (carrera con otro
+      // usuario), el exclusion constraint de Postgres lo rechaza igual.
       const isOverlapConstraint = e?.code === '23P01' || (typeof e?.message === 'string' && e.message.includes('no_overlap_turnos'));
       if (isOverlapConstraint) {
         toast.error('Ese horario ya está ocupado. Elegí otro horario o profesional.');
@@ -243,6 +245,24 @@ export function NewAppointmentDialog({
       }
     }
   };
+
+  const handleConfirmOverlap = async () => {
+    if (!pendingValues) return;
+    setConfirming(true);
+    try {
+      await createTurno(pendingValues, true);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const conflictDescription = (() => {
+    if (conflicts.length === 1) {
+      return `Ese horario está ocupado por ${conflicts[0].cliente_nombre || 'otro turno'}. ¿Confirmás de todas formas?`;
+    }
+    return `Ese horario está ocupado por ${conflicts.length} turnos. ¿Confirmás de todas formas?`;
+  })();
+
 
   const renderClienteBlock = () => {
     if (mode === 'existing') {
