@@ -1,62 +1,43 @@
-# Etapa 2 — Zoom iOS: campos restantes + URL pública
+# Turnos en tiempo real (Agenda interna + Cobrar)
 
-Un solo build. Cambios puramente de presentación.
+Que los turnos se actualicen solos cuando otra persona crea, edita, mueve o cancela un turno, sin tener que refrescar la pantalla.
 
-## Parte A — 6 campos a 16px en mobile
+## Alcance
 
-Patrón igual que Etapa 1: `text-base md:text-<tamaño actual>`. Desktop queda idéntico.
+- Agenda interna (`AgendaPanel`, dentro de Turnos).
+- Vista de turnos del día dentro de Cobrar (`DailyTurnosViewer`).
+- Comportamiento: al detectar un cambio, la vista vuelve a pedir los datos del rango visible y se actualiza sola, sin avisos ni banners.
 
-### 1. ComisionEquipoConfig.tsx:413 (input % en fila de regla)
-- Hoy: `w-16 h-7 text-xs text-right`.
-- Propuesto: `w-16 h-9 md:h-7 text-base md:text-xs text-right`.
-- Motivo del alto: 28px con texto de 16px deja ~6px de aire total; el número queda ahogado y el área táctil es menor al mínimo cómodo. En mobile sube a 36px; en desktop se preserva 28px.
-- El ancho `w-16` (64px) sigue alcanzando: el valor máximo es "100" más el spinner numérico, y el texto está alineado a la derecha.
+Fuera de alcance: bloqueos de agenda, servicios, horarios, notificaciones y cualquier cambio de lógica de negocio o de permisos.
 
-### 2. ComisionEquipoConfig.tsx:481 (input % del formulario de alta)
-- Hoy: `w-16 h-8 text-xs text-right`.
-- Propuesto: `w-16 h-9 md:h-8 text-base md:text-xs text-right`.
-- Sube 4px solo en mobile; desktop intacto.
-- El ícono `Percent` al lado (`h-3 w-3 shrink-0`) no cambia: el contenedor es `flex items-center`, se recentra solo.
+## Cambios
 
-### 3. ClienteSearchPicker.tsx:58 (buscador dentro del popover)
-- Hoy: `h-10 ... text-sm`.
-- Propuesto: `text-base md:text-sm`. El alto `h-10` (40px) ya es suficiente para 16px, no se toca.
+### 1. Base de datos (una migración)
 
-### 4. phone-input.tsx:291 (input de teléfono)
-- Hoy: `px-3 text-sm`.
-- Propuesto: `text-base md:text-sm`.
-- El contenedor tiene alto fijo `h-10` y el input es `flex-1` con `min-w-0`: no se toca el alto ni el layout.
+- Agregar `turnos` a la publicación de Realtime.
+- Pasar `turnos` a REPLICA IDENTITY FULL, para que los eventos de edición y borrado traigan la fila completa (sucursal, fecha, estado) y no solo el id.
 
-### 5. phone-input.tsx (~224, botón selector de país)
-- Hoy: `px-3 text-sm`.
-- Propuesto: `text-base md:text-sm`, para que el prefijo (`+54`) quede parejo con el número en mobile.
-- No dispara zoom (es `<button>`), el cambio es solo de coherencia visual.
-- Riesgo menor: el bloque de bandera + dial + chevron gana unos px de ancho en mobile, reduciendo el espacio del input. Mitigado porque el input es `flex-1 min-w-0` y el contenedor tiene `overflow-hidden`. Si el prefijo quedara demasiado ancho en pantallas chicas, se compensa bajando el padding a `px-2.5 md:px-3` en ese botón.
+No se tocan las políticas de acceso: Realtime ya las respeta y filtra por organización y sucursal según el rol de cada usuario. No se tocan los triggers existentes.
 
-## Parte B — URL pública sin input
+### 2. Hook de suscripción reutilizable
 
-`<Input readOnly>` (línea 253) pasa a un elemento no interactivo.
+Nuevo `src/hooks/useTurnosRealtime.ts`, calcado del patrón ya usado en `src/hooks/useBarberosSucursalesRealtime.ts`:
 
-- **Elemento recomendado: `<div>`.** Es contenido de datos, no un párrafo de prosa; y como la URL puede ocupar dos líneas, un `div` evita márgenes tipográficos implícitos y permite alinear verticalmente con los botones sin sorpresas. `<span>` queda descartado por ser inline (no toma el alto ni el ancho del contenedor de forma predecible).
-- **Estilo:** replicar el look del Input — `rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs` — más `min-h-10` para conservar el alto visual actual cuando la URL entra en una sola línea.
-- **Selección manual:** sin `user-select-none`. Se añade `select-all` para que un tap/click seleccione la URL completa, y el botón "Copiar" sigue siendo el camino principal.
-- **Wrap sin truncar:** `break-all whitespace-normal`. `break-all` es lo correcto para una URL sin espacios; `break-words` no rompería una cadena continua larga. Nada de `truncate` ni `overflow-x`.
-- **Accesibilidad:** el `div` se marca con `title={publicUrl}` y sigue siendo texto plano seleccionable. No entra en el orden de tabulación, que es justamente el objetivo (iOS ya no le hace foco → no hay zoom).
-- **Sin tocar:** `publicUrl` (74-77), `handleCopy` (100-104), ni los botones "Copiar" / "Ver portal".
+- `useEffect` con guard, nombre de canal único, tres `.on('postgres_changes', ...)` (INSERT / UPDATE / DELETE) sobre `public.turnos`, filtro `sucursal_id=eq.<id>`, y `supabase.removeChannel` en el cleanup.
+- Con REPLICA IDENTITY FULL el DELETE también puede filtrarse por sucursal, así que las tres suscripciones van filtradas.
+- Un único callback `onChange`, con un pequeño debounce (~300 ms) para no disparar varios refetch seguidos cuando llegan cambios en ráfaga.
 
-### Balance del layout de la tarjeta
-El contenedor es `flex flex-col sm:flex-row gap-2`:
-- **Mobile:** la URL va arriba en su propio bloque y los botones abajo. Si la URL rompe a dos líneas, el bloque crece hacia abajo sin desplazar ni comprimir los botones. Para que no se vea desbalanceado se agrega `flex-1 min-w-0` al div.
-- **Desktop:** en fila, el div toma el ancho restante con `flex-1 min-w-0` y los botones conservan su tamaño. Se agrega `items-start sm:items-center` para que, en el caso raro de dos líneas en desktop, los botones queden centrados respecto del bloque y no estirados.
+### 3. Agenda interna
 
-## Riesgos no contemplados antes
-- **Spinners numéricos:** los dos inputs `type="number"` de ComisionEquipoConfig muestran flechas nativas en desktop; al subir el alto solo en mobile, el look de desktop no cambia. Sin riesgo, pero conviene mirar la fila una vez aplicada porque `w-16` con 16px es el punto más ajustado del build.
-- **Densidad de la fila de reglas:** subir a `h-9` en mobile aumenta el alto de cada fila unos 8px. Con muchas reglas la lista se alarga; es el costo esperado de eliminar el zoom.
-- **Cambio de alto de la tarjeta del link:** con orgSlug largos la URL pasará a dos líneas en mobile, donde hoy se truncaba dentro del input. La tarjeta crece unos 18px. Es el comportamiento pedido.
-- **Tests/selectores:** si algún test apunta al input de la URL por rol `textbox`, dejará de encontrarlo. Se verifica durante el build.
+- `useAgendaData` expone ya `refetch`; se conecta el hook nuevo pasándole `sucursalId` y `onChange: refetch` (envuelto en `useCallback`).
+- Salvaguarda: no refrescar mientras hay un turno siendo arrastrado o un diálogo de conflicto abierto; en ese caso el cambio se aplica al cerrar. Evita que la vista se mueva bajo el dedo del usuario.
 
-## Viabilidad de un solo build
-Sí. Los cinco archivos son independientes entre sí y ninguno comparte componente base con los ya resueltos en Etapa 1. Parte A es cambio de clases; Parte B es reemplazo de un nodo aislado. No hay conflicto.
+### 4. Vista dentro de Cobrar
 
-## Candado
-No se tocan Login.tsx, ningún Select/SelectTrigger, input.tsx, textarea.tsx, select.tsx, ni las líneas 329/397 de PortalPublicoSection.tsx. Sin cambios de lógica de negocio ni de validaciones.
+- `DailyTurnosViewer` ya tiene su propio `fetchTurnos`; se le conecta el mismo hook con la sucursal actual y `onChange: fetchTurnos`.
+
+## Detalles técnicos
+
+- Filtro de canal: siempre por `sucursal_id`, porque las dos vistas trabajan sobre una sola sucursal (no existe modo "Todas" en Agenda).
+- El refetch reusa las queries actuales (rango de fechas visible en Agenda, día actual en Cobrar), así que el resultado respeta los filtros ya existentes, incluida la exclusión de turnos cancelados.
+- No se migra nada a React Query: ambos hooks siguen con `useState` + `useCallback`, igual que hoy.

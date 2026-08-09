@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
@@ -21,6 +21,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
+import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+
 
 
 type ViewMode = 'day' | '3days' | 'week';
@@ -74,6 +76,31 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   const { turnos, bloqueos, servicios, horarios, refetch } = useAgendaData(
     sucursalId, organizationId, fromDate, toDate,
   );
+
+  // Realtime: refetch silencioso ante cambios en turnos de esta sucursal.
+  // Salvaguarda: si hay un movimiento en curso (drag confirmado / diálogo de
+  // conflicto abierto), el refetch queda pendiente y se aplica al cerrar.
+  const isBusy = !!moveDialog || !!moveConflict || movingLoading;
+  const pendingRefetchRef = useRef(false);
+
+  const handleRealtimeChange = useCallback(() => {
+    if (!!moveDialog || !!moveConflict || movingLoading) {
+      pendingRefetchRef.current = true;
+      return;
+    }
+    refetch();
+  }, [moveDialog, moveConflict, movingLoading, refetch]);
+
+  useEffect(() => {
+    if (!isBusy && pendingRefetchRef.current) {
+      pendingRefetchRef.current = false;
+      refetch();
+    }
+  }, [isBusy, refetch]);
+
+  useTurnosRealtime({ sucursalId, onChange: handleRealtimeChange });
+
+
 
   const handlePrev = () => {
     if (view === 'day') setDate(d => addDays(d, -1));

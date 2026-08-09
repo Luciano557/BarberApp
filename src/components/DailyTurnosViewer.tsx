@@ -8,6 +8,8 @@ import { format, addDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+
 
 interface Turno {
   id: string;
@@ -88,6 +90,10 @@ export function DailyTurnosViewer() {
 
   useEffect(() => { fetchBarberos(); fetchServicios(); }, [fetchBarberos, fetchServicios]);
   useEffect(() => { fetchTurnos(); }, [fetchTurnos]);
+
+  // Realtime: refetch silencioso de los turnos del día para esta sucursal.
+  useTurnosRealtime({ sucursalId: currentSucursal?.id, onChange: fetchTurnos });
+
 
   if (!currentSucursal) return null;
 
