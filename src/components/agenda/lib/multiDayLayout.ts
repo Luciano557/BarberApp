@@ -5,6 +5,20 @@ export const MULTI_PX_PER_MIN = 1.9;
 export const MULTI_RANGE_START = 8 * 60;
 export const MULTI_RANGE_END = 22 * 60;
 
+export function buildHourRails(rangeStart: number, rangeEnd: number): number[] {
+  const rails: number[] = [];
+  for (let m = rangeStart; m <= rangeEnd; m += 60) rails.push(m);
+  return rails;
+}
+
+export function buildHalfHourRails(rangeStart: number, rangeEnd: number): number[] {
+  const rails: number[] = [];
+  for (let m = rangeStart; m <= rangeEnd; m += 30) {
+    if (m % 60 !== 0) rails.push(m);
+  }
+  return rails;
+}
+
 export function computeLayouts(items: Turno[]) {
   const sorted = [...items].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
   const groups: Turno[][] = [];

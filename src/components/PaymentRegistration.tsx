@@ -1763,7 +1763,7 @@ export function PaymentRegistration({
       {/* Daily Turnos Viewer — solo en el paso inicial */}
       {currentStep === 'barber' && (
         canViewDailyTurnos ? (
-          <DailyTurnosViewer />
+          <DailyTurnosViewer barbers={barbers} />
         ) : (
           <PlanLockedFeature
             title="Turnos requiere plan Profesional"

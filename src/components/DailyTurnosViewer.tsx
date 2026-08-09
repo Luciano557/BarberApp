@@ -1,151 +1,122 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, CalendarIcon, Clock, User } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
 import { format, addDays, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+import { Barber } from '@/types/barbershop';
+import { useAgendaData, Turno } from './agenda/hooks/useAgendaData';
+import { useBarberColors } from './agenda/hooks/useBarberColors';
+import { buildHourRails, buildHalfHourRails, MULTI_PX_PER_MIN, MULTI_RANGE_START, MULTI_RANGE_END } from './agenda/lib/multiDayLayout';
+import { AgendaHourRailScroll } from './agenda/AgendaHourRailScroll';
+import { AgendaMultiDayColumn } from './agenda/AgendaMultiDayColumn';
+import { AppointmentDetailDialog } from './agenda/AppointmentDetailDialog';
 
-
-interface Turno {
-  id: string;
-  fecha: string;
-  hora_inicio: string;
-  hora_fin: string;
-  cliente_nombre: string | null;
-  barbero_id: string;
-  estado: string;
-  servicio_id: string;
+interface DailyTurnosViewerProps {
+  barbers: Barber[];
 }
 
-interface BarberoMap {
-  [id: string]: string;
-}
-
-interface ServicioMap {
-  [id: string]: string;
-}
-
-const estadoBadge: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
-  pendiente: { label: 'Pendiente', variant: 'outline' },
-  confirmado: { label: 'Confirmado', variant: 'default' },
-  completado: { label: 'Completado', variant: 'secondary' },
-};
-
-export function DailyTurnosViewer() {
+export function DailyTurnosViewer({ barbers }: DailyTurnosViewerProps) {
   const { currentSucursal } = useSucursal();
   const { organization } = useOrganization();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [barberos, setBarberos] = useState<BarberoMap>({});
-  const [servicios, setServicios] = useState<ServicioMap>({});
-  const [loading, setLoading] = useState(true);
+  const [detailTurno, setDetailTurno] = useState<Turno | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const dateStr = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
   const isToday = isSameDay(currentDate, new Date());
 
-  const fetchTurnos = useCallback(async () => {
-    if (!currentSucursal) return;
-    setLoading(true);
-    const { data } = await supabase
-      .from('turnos')
-      .select('id, fecha, hora_inicio, hora_fin, cliente_nombre, barbero_id, estado, servicio_id')
-      .eq('sucursal_id', currentSucursal.id)
-      .eq('fecha', dateStr)
-      .neq('estado', 'cancelado')
-      .order('hora_inicio');
-    if (data) setTurnos(data);
-    setLoading(false);
-  }, [currentSucursal, dateStr]);
-
-  const fetchBarberos = useCallback(async () => {
-    if (!organization) return;
-    const { data } = await supabase
-      .from('barberos')
-      .select('id, nombre, apellido')
-      .eq('organization_id', organization.id);
-    if (data) {
-      const map: BarberoMap = {};
-      data.forEach(b => { map[b.id] = `${b.nombre} ${b.apellido}`; });
-      setBarberos(map);
-    }
-  }, [organization]);
-
-  const fetchServicios = useCallback(async () => {
-    if (!organization) return;
-    const { data } = await supabase
-      .from('servicios')
-      .select('id, nombre')
-      .eq('organization_id', organization.id);
-    if (data) {
-      const map: ServicioMap = {};
-      data.forEach(s => { map[s.id] = s.nombre; });
-      setServicios(map);
-    }
-  }, [organization]);
-
-  useEffect(() => { fetchBarberos(); fetchServicios(); }, [fetchBarberos, fetchServicios]);
-  useEffect(() => { fetchTurnos(); }, [fetchTurnos]);
+  const { turnos, bloqueos, servicios, loading, refetch } = useAgendaData(
+    currentSucursal?.id || '',
+    organization?.id || '',
+    currentDate,
+    currentDate,
+  );
 
   // Realtime: refetch silencioso de los turnos del día para esta sucursal.
-  useTurnosRealtime({ sucursalId: currentSucursal?.id, onChange: fetchTurnos });
+  useTurnosRealtime({ sucursalId: currentSucursal?.id, onChange: refetch });
 
+  const colors = useBarberColors(barbers.map(b => b.id));
+
+  const hourRails = useMemo(() => buildHourRails(MULTI_RANGE_START, MULTI_RANGE_END), []);
+  const halfHourRails = useMemo(() => buildHalfHourRails(MULTI_RANGE_START, MULTI_RANGE_END), []);
+
+  const dayOff = bloqueos.find(b =>
+    b.barbero_id === null && b.todo_el_dia && b.fecha_inicio <= dateStr && b.fecha_fin >= dateStr,
+  );
+
+  // Al entrar a "hoy", centrar el scroll en la hora actual en vez de arrancar en las 08:00.
+  useEffect(() => {
+    if (loading || !isToday || !scrollRef.current) return;
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const clamped = Math.min(Math.max(nowMinutes, MULTI_RANGE_START), MULTI_RANGE_END);
+    const targetTop = (clamped - MULTI_RANGE_START) * MULTI_PX_PER_MIN;
+    const container = scrollRef.current;
+    container.scrollTop = Math.max(0, targetTop - container.clientHeight / 2);
+  }, [loading, isToday, dateStr]);
 
   if (!currentSucursal) return null;
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        {/* Header with navigation */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentDate(prev => addDays(prev, -1))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium capitalize">
-              {format(currentDate, "EEEE dd 'de' MMMM", { locale: es })}
-            </span>
-            {isToday && <Badge variant="default" className="text-[10px] h-4 px-1.5">Hoy</Badge>}
+    <>
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          {/* Header with navigation */}
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentDate(prev => addDays(prev, -1))}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium capitalize">
+                {format(currentDate, "EEEE dd 'de' MMMM", { locale: es })}
+              </span>
+              {isToday && <Badge variant="default" className="text-[10px] h-4 px-1.5">Hoy</Badge>}
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentDate(prev => addDays(prev, 1))}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setCurrentDate(prev => addDays(prev, 1))}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
 
-        {/* Turnos list */}
-        {loading ? (
-          <p className="text-xs text-muted-foreground text-center py-4">Cargando turnos...</p>
-        ) : turnos.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4">Sin turnos para este día</p>
-        ) : (
-          <div className="space-y-1.5">
-            {turnos.map(turno => {
-              const badge = estadoBadge[turno.estado] || { label: turno.estado, variant: 'outline' as const };
-              return (
-                <div key={turno.id} className="flex items-center gap-2 text-xs p-2 rounded-lg bg-muted/50 flex-wrap">
-                  <span className="flex items-center gap-1 font-mono text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {turno.hora_inicio.slice(0, 5)} - {turno.hora_fin.slice(0, 5)}
-                  </span>
-                  <span className="text-muted-foreground">{servicios[turno.servicio_id] || 'Servicio'}</span>
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    {barberos[turno.barbero_id] || 'Barbero'}
-                  </span>
-                  <Badge variant={badge.variant} className="text-[10px] h-4 px-1.5 ml-auto">
-                    {badge.label}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {/* Vista de agenda del día */}
+          {loading ? (
+            <p className="text-xs text-muted-foreground text-center py-8">Cargando turnos...</p>
+          ) : (
+            <AgendaHourRailScroll ref={scrollRef} maxHeight="360px">
+              <AgendaMultiDayColumn
+                isToday={isToday}
+                dayTurnos={turnos}
+                dayOff={dayOff}
+                servicios={servicios}
+                barbers={barbers}
+                colors={colors}
+                hourRails={hourRails}
+                halfHourRails={halfHourRails}
+                onTurnoClick={setDetailTurno}
+              />
+            </AgendaHourRailScroll>
+          )}
+        </CardContent>
+      </Card>
+
+      {organization?.id && (
+        <AppointmentDetailDialog
+          open={!!detailTurno}
+          onOpenChange={(v) => { if (!v) setDetailTurno(null); }}
+          turno={detailTurno}
+          organizationId={organization.id}
+          sucursalId={currentSucursal.id}
+          barbers={barbers}
+          servicios={servicios}
+          onChanged={refetch}
+          readOnly
+        />
+      )}
+    </>
   );
 }
