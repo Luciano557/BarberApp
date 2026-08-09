@@ -554,7 +554,7 @@ export function AgendaDayView({
                               height: 14,
                               borderRadius: '50%',
                               backgroundColor: colors[t.barbero_id] ?? 'hsl(var(--primary))',
-                              boxShadow: '0 0 0 2px #fff',
+                              boxShadow: '0 0 0 2px hsl(var(--card))',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/agenda/AgendaMultiDayTurnoCard.tsx"
+        ],
+        "createdAt": "2026-08-09T16:42:58.525Z",
+        "reason": "Color-coding de turnos preexistente"
+      }
+    ]
+  }
+}
