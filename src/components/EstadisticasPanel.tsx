@@ -72,7 +72,7 @@ export function EstadisticasPanel() {
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
-  const { monthlyData, isLoading, ventasData, ingresosRaw } = useEstadisticasData(
+  const { monthlyData, isLoading, ventasData, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
@@ -85,15 +85,24 @@ export function EstadisticasPanel() {
 
   const {
     montosMesActual, montosMesAnterior, isLoading: isLoadingPagoMetodo,
+    datosIncompletos: incompletoPagoMetodo,
   } = usePagoMetodoData(organization?.id, currentSucursal);
 
   const {
     rankingActual, productosRanking, historialPorBarbero, isLoading: isLoadingEquipo,
+    datosIncompletos: incompletoEquipo,
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
     monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+    datosIncompletos: incompletoServiciosClientes,
   } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
+
+  // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
+  // avisamos en vez de mostrar números parciales como si fueran reales.
+  const datosIncompletos =
+    incompletoEstadisticas || incompletoPagoMetodo || incompletoEquipo || incompletoServiciosClientes;
+
 
   const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
     metric: MetricCardDef;
