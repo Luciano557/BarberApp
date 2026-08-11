@@ -36,7 +36,9 @@ export function usePagoMetodoData(
 ) {
   const [montosMesActual, setMontosMesActual] = useState<MontoPorMetodo>(emptyMontos());
   const [montosMesAnterior, setMontosMesAnterior] = useState<MontoPorMetodo>(emptyMontos());
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
 
   useEffect(() => {
     if (organizationId) {
