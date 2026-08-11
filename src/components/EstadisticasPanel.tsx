@@ -646,7 +646,7 @@ export function EstadisticasPanel() {
     ventas: { label: "Ventas promedio", color: "hsl(var(--primary))" },
   };
 
-  const behaviorSection = (ingresosRaw.length > 0 || ventasData.length > 0) ? (
+  const behaviorSection = (ingresosRaw.length > 0 || ventasAgregadas.length > 0) ? (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-foreground">👥 Comportamiento del Cliente</h2>
