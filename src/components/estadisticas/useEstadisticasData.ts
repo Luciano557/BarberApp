@@ -143,7 +143,16 @@ export function useEstadisticasData(
       if (egresosRes.error) throw egresosRes.error;
       if (barberosRes.error) throw barberosRes.error;
 
+      // Salvaguarda de truncado: mientras este hook siga leyendo filas crudas, avisamos
+      // cuando alguna consulta llega al tope de filas en vez de mostrar un parcial.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(ingresosRes.data) ||
+        alcanzoLimiteFilas(egresosRes.data) ||
+        alcanzoLimiteFilas(ventasRes.data),
+      );
+
       const ingresos = ingresosRes.data || [];
+
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
       setVentasData((ventasRes.data || []).map((v) => ({
