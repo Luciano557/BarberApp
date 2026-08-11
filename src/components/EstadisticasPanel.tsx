@@ -27,6 +27,8 @@ import { useOcupacionResumen } from './estadisticas/useOcupacionResumen';
 import { usePagoMetodoData } from './estadisticas/usePagoMetodoData';
 import { useEquipoData, BarberoMonthStats } from './estadisticas/useEquipoData';
 import { useServiciosClientesData } from './estadisticas/useServiciosClientesData';
+import { DATOS_INCOMPLETOS_MSG } from './estadisticas/rowLimit';
+
 import { calcVariation } from './estadisticas/dateHelpers';
 import { DerivedMonthlyMetrics, MetricCardDef } from './estadisticas/types';
 
