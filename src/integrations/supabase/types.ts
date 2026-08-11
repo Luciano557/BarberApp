@@ -4556,6 +4556,35 @@ export type Database = {
           },
         ]
       }
+      v_estadisticas_mensuales: {
+        Row: {
+          barberos_del_mes: number | null
+          comision_productos: number | null
+          costos_fijos: number | null
+          costos_semivariables: number | null
+          costos_variables: number | null
+          efectivo: number | null
+          facturacion: number | null
+          mes: string | null
+          mp: number | null
+          organization_id: string | null
+          parcial_barberos_del_mes: number | null
+          parcial_costos_fijos: number | null
+          parcial_efectivo: number | null
+          parcial_facturacion: number | null
+          parcial_mp: number | null
+          parcial_perdida: number | null
+          parcial_recargos_total: number | null
+          parcial_servicios: number | null
+          perdida: number | null
+          recargos_total: number | null
+          servicios: number | null
+          sucursal_id: string | null
+          sueldo_total: number | null
+          total_egresos: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _assert_can_write_sucursal_catalog: {
@@ -4711,6 +4740,101 @@ export type Database = {
       ensure_organization_subscription: {
         Args: { _org_id: string }
         Returns: string
+      }
+      estadisticas_mensuales: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          barberos_del_mes: number
+          comision_productos: number
+          costo_fijo_por_servicio: number
+          costo_laboral_pct: number
+          costo_variable_por_servicio: number
+          costos_fijos: number
+          costos_semivariables: number
+          costos_variables: number
+          efectivo: number
+          facturacion: number
+          ganancia_por_servicio: number
+          mes: string
+          mp: number
+          parcial_barberos_del_mes: number
+          parcial_costos_fijos: number
+          parcial_efectivo: number
+          parcial_facturacion: number
+          parcial_mp: number
+          parcial_perdida: number
+          parcial_recargos_total: number
+          parcial_servicios: number
+          perdida: number
+          punto_equilibrio: number
+          recargos_total: number
+          rentabilidad_pct: number
+          servicios: number
+          sueldo_total: number
+          ticket_promedio: number
+          total_egresos: number
+        }[]
+      }
+      estadisticas_ventas_agregadas: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          extras_cantidad: number
+          extras_ingreso: number
+          mes: string
+          mix: Json
+          por_dia_hora: Json
+          por_hora: Json
+          tasa_attach_extras: number
+          tickets: number
+        }[]
+      }
+      fin_costo_fijo_por_servicio: {
+        Args: { _costos_fijos: number; _servicios: number }
+        Returns: number
+      }
+      fin_costo_laboral_pct: {
+        Args: {
+          _comision_productos: number
+          _facturacion: number
+          _sueldos: number
+        }
+        Returns: number
+      }
+      fin_costo_variable_por_servicio: {
+        Args: { _costos_variables: number; _servicios: number }
+        Returns: number
+      }
+      fin_ganancia_por_servicio: {
+        Args: {
+          _costos_totales: number
+          _facturacion: number
+          _servicios: number
+        }
+        Returns: number
+      }
+      fin_punto_equilibrio: {
+        Args: { _costos_fijos: number; _ganancia_por_servicio: number }
+        Returns: number
+      }
+      fin_rentabilidad_pct: {
+        Args: { _egresos: number; _facturacion: number }
+        Returns: number
+      }
+      fin_ticket_promedio: {
+        Args: { _facturacion: number; _servicios: number }
+        Returns: number
+      }
+      fin_variacion_pct: {
+        Args: { _actual: number; _anterior: number }
+        Returns: number
       }
       find_cliente_by_phone_in_org: {
         Args: { _organization_id: string; _telefono: string }

@@ -74,7 +74,7 @@ export function EstadisticasPanel() {
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
-  const { monthlyData, isLoading, ventasData, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
+  const { monthlyData, isLoading, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
@@ -96,9 +96,10 @@ export function EstadisticasPanel() {
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
-    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+    monthlyStats: serviciosClientesData, ventasAgregadas,
+    isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
     datosIncompletos: incompletoServiciosClientes,
-  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses);
 
   // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
   // avisamos en vez de mostrar números parciales como si fueran reales.
@@ -147,11 +148,11 @@ export function EstadisticasPanel() {
     return `$${value.toFixed(0)}`;
   };
 
-  // Derive per-month metrics with variation
-  // ⚠️ ESPEJO: la fórmula de rentabilidad ((facturacion - totalEgresos) / facturacion * 100)
-  // también existe en la función SQL public.generar_resumenes_mensuales()
-  // (migración 20260801030358_c08bb365-6c9c-4c57-8bea-1d4c9e4d7c28.sql).
-  // Si cambiás esta fórmula acá, actualizala también ahí — no hay sincronización automática.
+  // Derive per-month metrics with variation.
+  // Las fórmulas financieras (rentabilidad, ticket promedio, costo por servicio, punto de
+  // equilibrio, costo laboral) NO se calculan acá: vienen resueltas de las funciones SQL
+  // `fin_*` a través de la RPC `estadisticas_mensuales`. Es la única fuente de verdad —
+  // no reintroducir cálculos espejo en el frontend.
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
     const today = new Date();
     const currentMonthStr = format(today, 'yyyy-MM');
@@ -160,25 +161,12 @@ export function EstadisticasPanel() {
     const serviciosClientesByMonth = new Map(serviciosClientesData.map(s => [s.month, s]));
 
     const raw = monthlyData.map(m => {
-      const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
-      const gananciaNeta = m.facturacion - m.totalEgresos;
-      const rentabilidad = m.facturacion > 0 ? (gananciaNeta / m.facturacion) * 100 : 0;
-      const costoFijoPorServicio = m.servicios > 0 ? m.costosFijos / m.servicios : 0;
-      const costoVariablePorServicio = m.servicios > 0 ? m.costosVariables / m.servicios : 0;
-      const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
-      const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
-
       // Ocupación: horas de servicio vendidas (estimadas con la duración promedio del catálogo
       // activo) ÷ (barberos activos con rol barbero × horario general de la sucursal ese día).
       // No mira horario individual ni bloqueos puntuales. Ver useOcupacionResumen.ts.
       const horasVendidas = (m.servicios * avgDuracionMin) / 60;
       const horasDisponibles = ocupacionByMonth.get(m.month)?.horasDisponibles ?? 0;
       const tasaOcupacion = horasDisponibles > 0 ? (horasVendidas / horasDisponibles) * 100 : 0;
-
-      // Costo laboral % de facturación: sueldo devengado + comisión por productos, sobre
-      // facturación del mes. Se calcula acá una sola vez — la card de tendencia y el texto
-      // debajo del donut "Costos del mes" leen el mismo valor (latest.costoLaboralPct).
-      const costoLaboralPct = m.facturacion > 0 ? ((m.sueldoTotal + m.comisionProductos) / m.facturacion) * 100 : 0;
 
       const sc = serviciosClientesByMonth.get(m.month);
 
@@ -189,16 +177,16 @@ export function EstadisticasPanel() {
         efectivo: m.efectivo,
         mp: m.mp,
         costosFijos: m.costosFijos,
-        rentabilidad,
-        ticketPromedio,
-        costoFijoPorServicio,
-        costoVariablePorServicio,
-        gananciaPorServicio,
-        puntoEquilibrio,
+        rentabilidad: m.rentabilidad,
+        ticketPromedio: m.ticketPromedio,
+        costoFijoPorServicio: m.costoFijoPorServicio,
+        costoVariablePorServicio: m.costoVariablePorServicio,
+        gananciaPorServicio: m.gananciaPorServicio,
+        puntoEquilibrio: m.puntoEquilibrio,
         tasaOcupacion,
         recargos: m.recargosTotal,
         descuentos: m.perdida,
-        costoLaboralPct,
+        costoLaboralPct: m.costoLaboralPct,
         // Solo tiene sentido por-barbero (Sección Equipo) — a nivel organización queda en 0.
         comisionDevengada: 0,
         tasaAttachExtras: sc?.tasaAttachExtras ?? 0,
@@ -480,17 +468,12 @@ export function EstadisticasPanel() {
 
   // ---- Sección 4: Servicios y clientes ----
   // Donut "Mix de Servicios": top 5 servicios por facturación (venta.total_final) del mes
-  // actual + "Otros" agrupando el resto, sobre la misma `ventasData` que ya trae
-  // useEstadisticasData (extendida en Build 4 con servicio_nombre/total_final) — sin query nueva.
+  // actual + "Otros" agrupando el resto. El mix viene ya agregado por la RPC
+  // `estadisticas_ventas_agregadas` (corte de mes con el huso de la sucursal), así que acá
+  // no se recorren filas de venta ni hay riesgo de truncado.
   const currentMonthStrMix = format(new Date(), 'yyyy-MM');
-  const facturacionPorServicio = new Map<string, number>();
-  ventasData
-    .filter((v) => format(new Date(v.fecha_hora), 'yyyy-MM') === currentMonthStrMix)
-    .forEach((v) => {
-      const nombre = v.servicio_nombre || 'Sin especificar';
-      facturacionPorServicio.set(nombre, (facturacionPorServicio.get(nombre) || 0) + v.total_final);
-    });
-  const serviciosOrdenados = Array.from(facturacionPorServicio.entries()).sort((a, b) => b[1] - a[1]);
+  const mixMesActual = ventasAgregadas.find((v) => v.month === currentMonthStrMix)?.mix ?? [];
+  const serviciosOrdenados: [string, number][] = mixMesActual.map((m) => [m.servicio, m.facturacion]);
   const top5Servicios = serviciosOrdenados.slice(0, 5);
   const restoServiciosTotal = serviciosOrdenados.slice(5).reduce((sum, [, v]) => sum + v, 0);
   // Colores reusados de Sección 2 (no hay tokens dedicados a servicios). "Otros" usa
@@ -588,10 +571,9 @@ export function EstadisticasPanel() {
 
   const behaviorData = useMemo(() => {
     const hasIngresos = ingresosRaw.length > 0;
-    const hasVentas = ventasData.length > 0;
+    const hasVentas = ventasAgregadas.length > 0;
     if (!hasIngresos && !hasVentas) return { byDay: [], byHour: [], peakSlots: [] };
 
-    const tz = organization?.timezone || 'America/Argentina/Buenos_Aires';
     const meses = parseInt(periodoMeses);
     const endDateRaw = endOfMonth(new Date());
     const startDate = startOfMonth(subMonths(new Date(), meses - 1));
@@ -629,20 +611,19 @@ export function EstadisticasPanel() {
       ventas: actualOccurrences[d] > 0 ? Math.round((dayCounts[d] / actualOccurrences[d]) * 10) / 10 : 0,
     }));
 
-    // === Ventas por hora: usar VENTA (tickets con hora exacta) ===
+    // === Ventas por hora y franjas pico: ya agregadas en la base con el huso de la sucursal
+    // (antes se convertía cada fila de venta con toLocaleString en el navegador).
     const hourCounts: number[] = Array(24).fill(0);
     const dayHourCounts: Record<string, number> = {};
 
-    ventasData.forEach(v => {
-      try {
-        const localStr = new Date(v.fecha_hora).toLocaleString('en-US', { timeZone: tz });
-        const local = new Date(localStr);
-        const hour = local.getHours();
-        hourCounts[hour]++;
-        const day = local.getDay();
-        const key = `${day}-${hour}`;
-        dayHourCounts[key] = (dayHourCounts[key] || 0) + 1;
-      } catch {}
+    ventasAgregadas.forEach(mes => {
+      mes.porHora.forEach(h => {
+        if (h.hora >= 0 && h.hora < 24) hourCounts[h.hora] += h.tickets;
+      });
+      mes.porDiaHora.forEach(dh => {
+        const key = `${dh.dia}-${dh.hora}`;
+        dayHourCounts[key] = (dayHourCounts[key] || 0) + dh.tickets;
+      });
     });
 
     const byHour = hourCounts
@@ -659,13 +640,13 @@ export function EstadisticasPanel() {
       });
 
     return { byDay, byHour, peakSlots };
-  }, [ventasData, ingresosRaw, organization?.timezone, periodoMeses]);
+  }, [ventasAgregadas, ingresosRaw, periodoMeses]);
 
   const behaviorChartConfig = {
     ventas: { label: "Ventas promedio", color: "hsl(var(--primary))" },
   };
 
-  const behaviorSection = (ingresosRaw.length > 0 || ventasData.length > 0) ? (
+  const behaviorSection = (ingresosRaw.length > 0 || ventasAgregadas.length > 0) ? (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-foreground">👥 Comportamiento del Cliente</h2>
