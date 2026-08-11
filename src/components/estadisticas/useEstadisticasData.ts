@@ -68,6 +68,8 @@ export function useEstadisticasData(
   const [isLoading, setIsLoading] = useState(true);
   const [ventasData, setVentasData] = useState<VentaRow[]>([]);
   const [ingresosRaw, setIngresosRaw] = useState<IngresoRawRow[]>([]);
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
+
 
   useEffect(() => {
     if (organizationId) {
