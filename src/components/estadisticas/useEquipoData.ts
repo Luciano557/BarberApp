@@ -45,7 +45,9 @@ export function useEquipoData(
   const [rankingActual, setRankingActual] = useState<BarberoRankingRow[]>([]);
   const [productosRanking, setProductosRanking] = useState<ProductoRankingRow[]>([]);
   const [historialPorBarbero, setHistorialPorBarbero] = useState<Map<string, BarberoMonthStats[]>>(new Map());
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
 
   useEffect(() => {
     if (organizationId) {
