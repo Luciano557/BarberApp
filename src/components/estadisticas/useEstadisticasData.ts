@@ -4,6 +4,8 @@ import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parse
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { getWorkDaysUpTo } from './dateHelpers';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface MonthlyData {
   month: string;

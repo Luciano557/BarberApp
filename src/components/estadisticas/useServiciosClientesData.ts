@@ -210,5 +210,5 @@ export function useServiciosClientesData(
     }
   };
 
-  return { monthlyStats, isLoading, error };
+  return { monthlyStats, isLoading, error, datosIncompletos };
 }
