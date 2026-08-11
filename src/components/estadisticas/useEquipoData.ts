@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface BarberoMonthStats {
   month: string;
@@ -43,7 +45,9 @@ export function useEquipoData(
   const [rankingActual, setRankingActual] = useState<BarberoRankingRow[]>([]);
   const [productosRanking, setProductosRanking] = useState<ProductoRankingRow[]>([]);
   const [historialPorBarbero, setHistorialPorBarbero] = useState<Map<string, BarberoMonthStats[]>>(new Map());
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
 
   useEffect(() => {
     if (organizationId) {
@@ -97,6 +101,12 @@ export function useEquipoData(
       if (barberosRes.error) throw barberosRes.error;
       if (ingresosRes.error) throw ingresosRes.error;
       if (ventaProductoRes.error) throw ventaProductoRes.error;
+
+      // Salvaguarda de truncado: este hook sigue leyendo filas crudas y agregando en cliente.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(ingresosRes.data) || alcanzoLimiteFilas(ventaProductoRes.data),
+      );
+
 
       const barberosBarber = (barberosRes.data || []).filter(
         (b) => Array.isArray(b.roles_equipo) && (b.roles_equipo as string[]).includes('barber'),
@@ -179,5 +189,5 @@ export function useEquipoData(
     }
   };
 
-  return { rankingActual, productosRanking, historialPorBarbero, isLoading };
+  return { rankingActual, productosRanking, historialPorBarbero, isLoading, datosIncompletos };
 }

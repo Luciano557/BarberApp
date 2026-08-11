@@ -27,6 +27,8 @@ import { useOcupacionResumen } from './estadisticas/useOcupacionResumen';
 import { usePagoMetodoData } from './estadisticas/usePagoMetodoData';
 import { useEquipoData, BarberoMonthStats } from './estadisticas/useEquipoData';
 import { useServiciosClientesData } from './estadisticas/useServiciosClientesData';
+import { DATOS_INCOMPLETOS_MSG } from './estadisticas/rowLimit';
+
 import { calcVariation } from './estadisticas/dateHelpers';
 import { DerivedMonthlyMetrics, MetricCardDef } from './estadisticas/types';
 
@@ -72,7 +74,7 @@ export function EstadisticasPanel() {
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
-  const { monthlyData, isLoading, ventasData, ingresosRaw } = useEstadisticasData(
+  const { monthlyData, isLoading, ventasData, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
@@ -85,15 +87,24 @@ export function EstadisticasPanel() {
 
   const {
     montosMesActual, montosMesAnterior, isLoading: isLoadingPagoMetodo,
+    datosIncompletos: incompletoPagoMetodo,
   } = usePagoMetodoData(organization?.id, currentSucursal);
 
   const {
     rankingActual, productosRanking, historialPorBarbero, isLoading: isLoadingEquipo,
+    datosIncompletos: incompletoEquipo,
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
     monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+    datosIncompletos: incompletoServiciosClientes,
   } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
+
+  // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
+  // avisamos en vez de mostrar números parciales como si fueran reales.
+  const datosIncompletos =
+    incompletoEstadisticas || incompletoPagoMetodo || incompletoEquipo || incompletoServiciosClientes;
+
 
   const [selectedBarberoDetail, setSelectedBarberoDetail] = useState<{
     metric: MetricCardDef;
@@ -781,6 +792,15 @@ export function EstadisticasPanel() {
           </SelectContent>
         </Select>
       </div>
+
+      {datosIncompletos && (
+        <div className="flex items-start gap-1.5 rounded-md border border-status-warning bg-status-warning-bg px-2.5 py-2 text-xs text-status-warning-foreground">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{DATOS_INCOMPLETOS_MSG}</span>
+        </div>
+      )}
+
+
 
       {/* Sección 1: Resumen */}
       <div className="space-y-4">

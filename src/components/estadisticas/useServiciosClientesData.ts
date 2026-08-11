@@ -4,6 +4,8 @@ import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parse
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import type { MonthlyData } from './useEstadisticasData';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface MonthlyServiciosClientesData {
   month: string;
@@ -38,6 +40,8 @@ export function useServiciosClientesData(
   const [monthlyStats, setMonthlyStats] = useState<MonthlyServiciosClientesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
+
 
   useEffect(() => {
     if (organizationId) {
@@ -123,7 +127,15 @@ export function useServiciosClientesData(
       if (turnosRes.error) throw turnosRes.error;
       if (extrasRes.error) throw extrasRes.error;
 
+      // Salvaguarda de truncado: consultas que todavía leen filas crudas.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(clientesRes.data) ||
+        alcanzoLimiteFilas(turnosRes.data) ||
+        alcanzoLimiteFilas(extrasRes.data),
+      );
+
       const extrasData: ExtraRow[] = extrasRes.data ?? [];
+
       const clientes = clientesRes.data || [];
       const turnos = turnosRes.data || [];
 
@@ -198,5 +210,5 @@ export function useServiciosClientesData(
     }
   };
 
-  return { monthlyStats, isLoading, error };
+  return { monthlyStats, isLoading, error, datosIncompletos };
 }

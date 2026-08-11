@@ -4,6 +4,8 @@ import { format, subMonths, startOfMonth, endOfMonth, eachMonthOfInterval, parse
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { getWorkDaysUpTo } from './dateHelpers';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface MonthlyData {
   month: string;
@@ -66,6 +68,8 @@ export function useEstadisticasData(
   const [isLoading, setIsLoading] = useState(true);
   const [ventasData, setVentasData] = useState<VentaRow[]>([]);
   const [ingresosRaw, setIngresosRaw] = useState<IngresoRawRow[]>([]);
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
+
 
   useEffect(() => {
     if (organizationId) {
@@ -139,7 +143,16 @@ export function useEstadisticasData(
       if (egresosRes.error) throw egresosRes.error;
       if (barberosRes.error) throw barberosRes.error;
 
+      // Salvaguarda de truncado: mientras este hook siga leyendo filas crudas, avisamos
+      // cuando alguna consulta llega al tope de filas en vez de mostrar un parcial.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(ingresosRes.data) ||
+        alcanzoLimiteFilas(egresosRes.data) ||
+        alcanzoLimiteFilas(ventasRes.data),
+      );
+
       const ingresos = ingresosRes.data || [];
+
       const egresos = egresosRes.data || [];
       setBarberosActivos((barberosRes.data || []).length);
       setVentasData((ventasRes.data || []).map((v) => ({
@@ -257,5 +270,5 @@ export function useEstadisticasData(
     }
   };
 
-  return { monthlyData, barberosActivos, isLoading, ventasData, ingresosRaw };
+  return { monthlyData, barberosActivos, isLoading, ventasData, ingresosRaw, datosIncompletos };
 }
