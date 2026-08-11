@@ -571,10 +571,9 @@ export function EstadisticasPanel() {
 
   const behaviorData = useMemo(() => {
     const hasIngresos = ingresosRaw.length > 0;
-    const hasVentas = ventasData.length > 0;
+    const hasVentas = ventasAgregadas.length > 0;
     if (!hasIngresos && !hasVentas) return { byDay: [], byHour: [], peakSlots: [] };
 
-    const tz = organization?.timezone || 'America/Argentina/Buenos_Aires';
     const meses = parseInt(periodoMeses);
     const endDateRaw = endOfMonth(new Date());
     const startDate = startOfMonth(subMonths(new Date(), meses - 1));
@@ -612,20 +611,19 @@ export function EstadisticasPanel() {
       ventas: actualOccurrences[d] > 0 ? Math.round((dayCounts[d] / actualOccurrences[d]) * 10) / 10 : 0,
     }));
 
-    // === Ventas por hora: usar VENTA (tickets con hora exacta) ===
+    // === Ventas por hora y franjas pico: ya agregadas en la base con el huso de la sucursal
+    // (antes se convertía cada fila de venta con toLocaleString en el navegador).
     const hourCounts: number[] = Array(24).fill(0);
     const dayHourCounts: Record<string, number> = {};
 
-    ventasData.forEach(v => {
-      try {
-        const localStr = new Date(v.fecha_hora).toLocaleString('en-US', { timeZone: tz });
-        const local = new Date(localStr);
-        const hour = local.getHours();
-        hourCounts[hour]++;
-        const day = local.getDay();
-        const key = `${day}-${hour}`;
-        dayHourCounts[key] = (dayHourCounts[key] || 0) + 1;
-      } catch {}
+    ventasAgregadas.forEach(mes => {
+      mes.porHora.forEach(h => {
+        if (h.hora >= 0 && h.hora < 24) hourCounts[h.hora] += h.tickets;
+      });
+      mes.porDiaHora.forEach(dh => {
+        const key = `${dh.dia}-${dh.hora}`;
+        dayHourCounts[key] = (dayHourCounts[key] || 0) + dh.tickets;
+      });
     });
 
     const byHour = hourCounts
@@ -642,7 +640,7 @@ export function EstadisticasPanel() {
       });
 
     return { byDay, byHour, peakSlots };
-  }, [ventasData, ingresosRaw, organization?.timezone, periodoMeses]);
+  }, [ventasAgregadas, ingresosRaw, periodoMeses]);
 
   const behaviorChartConfig = {
     ventas: { label: "Ventas promedio", color: "hsl(var(--primary))" },
