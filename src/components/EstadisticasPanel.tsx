@@ -791,6 +791,15 @@ export function EstadisticasPanel() {
         </Select>
       </div>
 
+      {datosIncompletos && (
+        <div className="flex items-start gap-1.5 rounded-md border border-status-warning bg-status-warning-bg px-2.5 py-2 text-xs text-status-warning-foreground">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{DATOS_INCOMPLETOS_MSG}</span>
+        </div>
+      )}
+
+
+
       {/* Sección 1: Resumen */}
       <div className="space-y-4">
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resumen</h2>
