@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface BarberoMonthStats {
   month: string;

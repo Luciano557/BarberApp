@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import type { Sucursal } from '@/contexts/SucursalContext';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface MontoPorMetodo {
   efectivo: number;
@@ -93,7 +95,13 @@ export function usePagoMetodoData(
       if (ventasRes.error) throw ventasRes.error;
       if (pagosRes.error) throw pagosRes.error;
 
+      // Salvaguarda de truncado: estas dos consultas siguen leyendo filas crudas.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(ventasRes.data) || alcanzoLimiteFilas(pagosRes.data),
+      );
+
       const ventas = ventasRes.data || [];
+
       const pagos = (pagosRes.data || []).map((p) => ({
         venta_id: p.venta_id,
         metodo_pago: p.metodo_pago,
@@ -136,5 +144,5 @@ export function usePagoMetodoData(
     }
   };
 
-  return { montosMesActual, montosMesAnterior, isLoading };
+  return { montosMesActual, montosMesAnterior, isLoading, datosIncompletos };
 }
