@@ -102,6 +102,12 @@ export function useEquipoData(
       if (ingresosRes.error) throw ingresosRes.error;
       if (ventaProductoRes.error) throw ventaProductoRes.error;
 
+      // Salvaguarda de truncado: este hook sigue leyendo filas crudas y agregando en cliente.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(ingresosRes.data) || alcanzoLimiteFilas(ventaProductoRes.data),
+      );
+
+
       const barberosBarber = (barberosRes.data || []).filter(
         (b) => Array.isArray(b.roles_equipo) && (b.roles_equipo as string[]).includes('barber'),
       );
