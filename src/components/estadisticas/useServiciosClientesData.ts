@@ -40,6 +40,8 @@ export function useServiciosClientesData(
   const [monthlyStats, setMonthlyStats] = useState<MonthlyServiciosClientesData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
+
 
   useEffect(() => {
     if (organizationId) {
