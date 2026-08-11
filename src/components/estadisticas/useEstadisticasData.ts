@@ -270,5 +270,5 @@ export function useEstadisticasData(
     }
   };
 
-  return { monthlyData, barberosActivos, isLoading, ventasData, ingresosRaw };
+  return { monthlyData, barberosActivos, isLoading, ventasData, ingresosRaw, datosIncompletos };
 }
