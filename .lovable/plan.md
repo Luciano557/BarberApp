@@ -1,43 +1,66 @@
-# Turnos en tiempo real (Agenda interna + Cobrar)
+# Estadísticas: una sola fuente de verdad para los números
 
-Que los turnos se actualicen solos cuando otra persona crea, edita, mueve o cancela un turno, sin tener que refrescar la pantalla.
+Objetivo: que los datos de Finanzas › Estadísticas dejen de calcularse en el navegador con filas crudas y pasen a calcularse en la base, con el huso horario correcto y sin truncado silencioso. No se toca el diseño visual ni los permisos.
 
-## Alcance
+## Hallazgo nuevo que cambia el enfoque de un punto
 
-- Agenda interna (`AgendaPanel`, dentro de Turnos).
-- Vista de turnos del día dentro de Cobrar (`DailyTurnosViewer`).
-- Comportamiento: al detectar un cambio, la vista vuelve a pedir los datos del rango visible y se actualiza sola, sin avisos ni banners.
+`ingresos.dia` **no es una fecha de negocio**. Es una columna de texto que guarda el nombre del día de la semana ("sábado", "viernes", incluso con mayúsculas inconsistentes: "Martes", "Viernes"). No está vacía — está poblada al 100% — pero no sirve como fecha operativa. Verificado con consultas a la base.
 
-Fuera de alcance: bloqueos de agenda, servicios, horarios, notificaciones y cualquier cambio de lógica de negocio o de permisos.
+Consecuencia: el punto 5 de la auditoría se reformula. No se puede "empezar a usar `dia`". Las opciones son:
 
-## Cambios
+- **Recomendada:** seguir usando `created_at`, pero convertido al huso horario de la sucursal del lado del servidor (`created_at AT TIME ZONE tz`). Es exactamente lo que ya hace `generar_resumenes_mensuales()` y produce el corte de mes correcto sin columnas nuevas.
+- Alternativa descartada por ahora: agregar una columna `fecha_negocio date` poblada por trigger. Sirve si en el futuro el "día de negocio" deja de coincidir con el día calendario (cierres después de medianoche), pero hoy agrega una migración de datos histórica sin beneficio inmediato.
 
-### 1. Base de datos (una migración)
+## A. Cambios en base de datos
 
-- Agregar `turnos` a la publicación de Realtime.
-- Pasar `turnos` a REPLICA IDENTITY FULL, para que los eventos de edición y borrado traigan la fila completa (sucursal, fecha, estado) y no solo el id.
+Nada de lo existente se rompe: `generar_resumenes_mensuales()` y la tabla `resumenes_mensuales` quedan intactas (las usa el cron y el Resumen Mensual).
 
-No se tocan las políticas de acceso: Realtime ya las respeta y filtra por organización y sucursal según el rol de cada usuario. No se tocan los triggers existentes.
+Se agregan **dos funciones nuevas de lectura**, en vez de estirar la función del cron (que devuelve solo 3 meses fijos y escribe en tabla):
 
-### 2. Hook de suscripción reutilizable
+1. `estadisticas_mensuales(org, sucursal, meses)` — devuelve una fila por mes con: facturación, servicios, efectivo, MP, recargos, pérdida, sueldo, comisión de productos, costos fijos/variables/semivariables, barberos del mes. Reemplaza el `reduce` de `useEstadisticasData`. Reusa la misma lógica de corte por huso que la función del cron.
+2. `estadisticas_ventas_agregadas(org, sucursal, meses)` — devuelve los agregados que hoy salen de traer `venta` fila por fila: mix de servicios (monto y cantidad por servicio y mes), tasa de attach de extras y distribución por hora del día. Esto elimina el truncado de raíz.
 
-Nuevo `src/hooks/useTurnosRealtime.ts`, calcado del patrón ya usado en `src/hooks/useBarberosSucursalesRealtime.ts`:
+Ambas: `SECURITY INVOKER` (respetan RLS tal cual) o `SECURITY DEFINER` con validación explícita de pertenencia a la organización más chequeo de sucursal asignada. Se decide en el build según cómo resuelvan las políticas actuales; la opción por defecto es INVOKER para no crear una vía de acceso nueva.
 
-- `useEffect` con guard, nombre de canal único, tres `.on('postgres_changes', ...)` (INSERT / UPDATE / DELETE) sobre `public.turnos`, filtro `sucursal_id=eq.<id>`, y `supabase.removeChannel` en el cleanup.
-- Con REPLICA IDENTITY FULL el DELETE también puede filtrarse por sucursal, así que las tres suscripciones van filtradas.
-- Un único callback `onChange`, con un pequeño debounce (~300 ms) para no disparar varios refetch seguidos cuando llegan cambios en ráfaga.
+Corte de fecha unificado en ambas: `>= inicio_mes` y `< inicio_mes_siguiente`, con `AT TIME ZONE` de la sucursal (o de la organización como respaldo). Esto cierra los puntos 2 y 3 en un solo lugar.
 
-### 3. Agenda interna
+## B. Truncado de `venta`: opciones y recomendación
 
-- `useAgendaData` expone ya `refetch`; se conecta el hook nuevo pasándole `sucursalId` y `onChange: refetch` (envuelto en `useCallback`).
-- Salvaguarda: no refrescar mientras hay un turno siendo arrastrado o un diálogo de conflicto abierto; en ese caso el cambio se aplica al cerrar. Evita que la vista se mueva bajo el dedo del usuario.
+| Opción | Pros | Contras |
+|---|---|---|
+| (a) Paginar con `.range()` | Cambio chico, sin migración | Sigue bajando decenas de miles de filas al navegador; en 12 meses de una organización grande son varias vueltas de red y un cálculo pesado en el teléfono. No escala |
+| (b) Agregar en SQL (función nueva) | Devuelve decenas de filas en vez de miles; una sola fuente de verdad; el huso se resuelve en el servidor | Requiere migración y reescribir el hook |
+| (c) Vista materializada | Muy rápida | Necesita refresco programado y agrega desfasaje de datos; innecesario a este volumen |
 
-### 4. Vista dentro de Cobrar
+**Recomendación: (b)**, agregación en SQL. Es la única que además arregla huso y bordes en el mismo movimiento. La opción (a) queda solo como red de seguridad temporal (ver punto F).
 
-- `DailyTurnosViewer` ya tiene su propio `fetchTurnos`; se le conecta el mismo hook con la sucursal actual y `onChange: fetchTurnos`.
+## C. `ingresos.dia`
 
-## Detalles técnicos
+Ya respondido arriba: no es una fecha, es el nombre del día de la semana. El plan **no** hace que el frontend dependa de esa columna. Se usa `created_at` convertido al huso de la sucursal del lado del servidor. No se modifica ni se limpia la columna en esta tarea (la usan otras pantallas fuera del alcance).
 
-- Filtro de canal: siempre por `sucursal_id`, porque las dos vistas trabajan sobre una sola sucursal (no existe modo "Todas" en Agenda).
-- El refetch reusa las queries actuales (rango de fechas visible en Agenda, día actual en Cobrar), así que el resultado respeta los filtros ya existentes, incluida la exclusión de turnos cancelados.
-- No se migra nada a React Query: ambos hooks siguen con `useState` + `useCallback`, igual que hoy.
+## D. Huso horario
+
+Ambos datos ya están disponibles: `sucursales.timezone` (ya expuesto en el contexto de sucursal del frontend) y `organizations.timezone` (ya en el contexto de organización). Se podría resolver en el cliente, pero **conviene resolverlo en el servidor**: es donde ya vive la lógica correcta y evita que el resultado dependa del dispositivo del usuario. Las funciones nuevas resuelven el huso internamente con el mismo respaldo que la función del cron: sucursal → organización → Buenos Aires. El frontend solo pasa cuántos meses quiere.
+
+Para el modo "todas las sucursales" (sin sucursal seleccionada), la función agrega sobre todas las sucursales activas de la organización, cada una con su propio huso, y suma después.
+
+## E. Orden de migración
+
+1. **Paso 1 — Salvaguarda** (ver F): aviso de datos incompletos con el código actual. Sin migración. Riesgo nulo, beneficio inmediato.
+2. **Paso 2 — Migración**: crear las dos funciones nuevas. Nada las consume todavía; se validan comparando sus números contra los actuales para varios meses y sucursales.
+3. **Paso 3 — Ventas**: migrar `useServiciosClientesData` (mix de servicios, attach de extras, horarios pico) a la función agregada. Es donde está el error real hoy.
+4. **Paso 4 — Ingresos y egresos**: migrar `useEstadisticasData` a la función mensual, manteniendo la misma forma de datos que hoy devuelve el hook para no tocar `EstadisticasPanel.tsx`.
+5. **Paso 5 — Limpieza**: eliminar `useOcupacionData.ts` y, si queda sin consumidores, `ocupacionHelpers.ts` (hoy solo lo usa `useOcupacionData`). Quitar la salvaguarda del paso 1 donde ya no aplique.
+
+Archivos tocados: `src/components/estadisticas/useEstadisticasData.ts`, `useServiciosClientesData.ts`, y eliminación de `useOcupacionData.ts` (más `ocupacionHelpers.ts`). `usePagoMetodoData.ts` y `useEquipoData.ts` quedan para una etapa siguiente salvo que la validación del paso 2 muestre que también truncan. `EstadisticasPanel.tsx` y los componentes visuales no se modifican.
+
+## F. Salvaguarda mientras se migra
+
+Mientras un hook siga leyendo filas crudas, se pide un registro más que el límite y se compara el largo del resultado con el límite. Si se alcanza, se marca el conjunto como incompleto y la pantalla muestra un aviso claro arriba de las tarjetas afectadas ("Los datos de este período están incompletos por volumen. Elegí un período más corto."), en vez de mostrar un número parcial sin señalarlo. El aviso desaparece solo cuando el hook correspondiente pasa a la función agregada.
+
+## Candados respetados
+
+- No se tocan roles, permisos ni el acceso a `finance.statistics`.
+- No se modifica la estructura visual de `EstadisticasPanel.tsx`.
+- No se tocan Cobrar, Resumen diario ni Cierres de caja.
+- `generar_resumenes_mensuales()`, la tabla `resumenes_mensuales` y el cron quedan sin cambios.
