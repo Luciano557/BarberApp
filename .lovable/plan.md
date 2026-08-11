@@ -58,6 +58,35 @@ Archivos tocados: `src/components/estadisticas/useEstadisticasData.ts`, `useServ
 
 Mientras un hook siga leyendo filas crudas, se pide un registro más que el límite y se compara el largo del resultado con el límite. Si se alcanza, se marca el conjunto como incompleto y la pantalla muestra un aviso claro arriba de las tarjetas afectadas ("Los datos de este período están incompletos por volumen. Elegí un período más corto."), en vez de mostrar un número parcial sin señalarlo. El aviso desaparece solo cuando el hook correspondiente pasa a la función agregada.
 
+## G. Fórmulas de negocio en un solo lugar
+
+Hoy la misma fórmula vive en dos lados (el frontend y la función del cron) y nada obliga a mantenerlas iguales. La propuesta es separar dos capas y darle a cada una una única sede.
+
+**Capa 1 — Fórmulas puras (funciones SQL chicas e inmutables).** Cada fórmula financiera queda como una función SQL `IMMUTABLE` que recibe números y devuelve un número, sin tocar tablas:
+
+- `fin_rentabilidad_pct(facturacion, egresos)`
+- `fin_ticket_promedio(facturacion, servicios)`
+- `fin_costo_fijo_por_servicio(costos_fijos, servicios)`
+- `fin_costo_variable_por_servicio(costos_variables, servicios)`
+- `fin_ganancia_por_servicio(facturacion, costos_totales, servicios)`
+- `fin_punto_equilibrio(costos_fijos, ganancia_por_servicio)`
+- `fin_variacion_pct(actual, anterior)`
+
+Todas resuelven igual los casos borde (división por cero → cero o nulo, según se defina una vez). Al ser inmutables y sin acceso a tablas son baratas y testeables.
+
+**Capa 2 — Agregados (una vista y funciones que la usan).** Una vista `v_estadisticas_mensuales` concentra "cuánto se facturó, cuántos servicios y cuánto se gastó por organización, sucursal y mes", ya con el corte por huso horario resuelto. Las funciones de la sección A pasan a leer de esa vista y a componer las métricas llamando a las funciones de la capa 1. `generar_resumenes_mensuales()` se actualiza para calcular la rentabilidad con `fin_rentabilidad_pct(...)` en vez de su fórmula escrita a mano — cambio retrocompatible, mismo resultado numérico, verificable comparando los resúmenes ya generados antes y después.
+
+**Por qué ambas cosas.** La vista da la fuente única de los *insumos* (y es consultable directo desde cualquier pantalla o reporte). Las funciones puras dan la fuente única de las *fórmulas*, y sirven también cuando los insumos vienen de otro lado (un cierre de caja, un reporte puntual, una proyección) sin tener que pasar por la vista.
+
+**Fuera de la base.** No hace falta un módulo espejo en TypeScript. El frontend recibe las métricas ya calculadas. La única excepción admitida son cálculos de presentación (formateo de moneda, redondeo visual, estimaciones del mes en curso a partir de días transcurridos), que se quedan en `src/components/estadisticas/` y nunca redefinen una fórmula financiera.
+
+**Convención a documentar** (en `AGENTS.md` y en un comentario en la migración):
+
+1. Toda fórmula financiera nueva se define como función SQL con prefijo `fin_`. No se escribe la fórmula suelta dentro de otra función, vista o componente.
+2. Todo agregado mensual de facturación, servicios o costos sale de `v_estadisticas_mensuales`. No se arma un `SUM` nuevo sobre `ingresos` o `Egresos` para eso.
+3. El frontend no calcula métricas financieras: las consume ya resueltas.
+4. Los comentarios "ESPEJO" que hoy avisan de la duplicación se eliminan cuando deja de haber duplicación — no se agregan comentarios nuevos de ese tipo; si aparece la tentación de escribir uno, es señal de que falta una función `fin_`.
+
 ## Candados respetados
 
 - No se tocan roles, permisos ni el acceso a `finance.statistics`.
