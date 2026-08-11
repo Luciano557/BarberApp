@@ -127,7 +127,15 @@ export function useServiciosClientesData(
       if (turnosRes.error) throw turnosRes.error;
       if (extrasRes.error) throw extrasRes.error;
 
+      // Salvaguarda de truncado: consultas que todavía leen filas crudas.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(clientesRes.data) ||
+        alcanzoLimiteFilas(turnosRes.data) ||
+        alcanzoLimiteFilas(extrasRes.data),
+      );
+
       const extrasData: ExtraRow[] = extrasRes.data ?? [];
+
       const clientes = clientesRes.data || [];
       const turnos = turnosRes.data || [];
 
