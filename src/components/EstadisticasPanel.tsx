@@ -74,7 +74,7 @@ export function EstadisticasPanel() {
   const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
-  const { monthlyData, isLoading, ventasData, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
+  const { monthlyData, isLoading, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
@@ -96,9 +96,10 @@ export function EstadisticasPanel() {
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
-    monthlyStats: serviciosClientesData, isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
+    monthlyStats: serviciosClientesData, ventasAgregadas,
+    isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
     datosIncompletos: incompletoServiciosClientes,
-  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses, monthlyData, isLoading);
+  } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses);
 
   // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
   // avisamos en vez de mostrar números parciales como si fueran reales.
@@ -147,11 +148,11 @@ export function EstadisticasPanel() {
     return `$${value.toFixed(0)}`;
   };
 
-  // Derive per-month metrics with variation
-  // ⚠️ ESPEJO: la fórmula de rentabilidad ((facturacion - totalEgresos) / facturacion * 100)
-  // también existe en la función SQL public.generar_resumenes_mensuales()
-  // (migración 20260801030358_c08bb365-6c9c-4c57-8bea-1d4c9e4d7c28.sql).
-  // Si cambiás esta fórmula acá, actualizala también ahí — no hay sincronización automática.
+  // Derive per-month metrics with variation.
+  // Las fórmulas financieras (rentabilidad, ticket promedio, costo por servicio, punto de
+  // equilibrio, costo laboral) NO se calculan acá: vienen resueltas de las funciones SQL
+  // `fin_*` a través de la RPC `estadisticas_mensuales`. Es la única fuente de verdad —
+  // no reintroducir cálculos espejo en el frontend.
   const derivedMetrics: DerivedMonthlyMetrics[] = (() => {
     const today = new Date();
     const currentMonthStr = format(today, 'yyyy-MM');
@@ -160,25 +161,12 @@ export function EstadisticasPanel() {
     const serviciosClientesByMonth = new Map(serviciosClientesData.map(s => [s.month, s]));
 
     const raw = monthlyData.map(m => {
-      const ticketPromedio = m.servicios > 0 ? m.facturacion / m.servicios : 0;
-      const gananciaNeta = m.facturacion - m.totalEgresos;
-      const rentabilidad = m.facturacion > 0 ? (gananciaNeta / m.facturacion) * 100 : 0;
-      const costoFijoPorServicio = m.servicios > 0 ? m.costosFijos / m.servicios : 0;
-      const costoVariablePorServicio = m.servicios > 0 ? m.costosVariables / m.servicios : 0;
-      const gananciaPorServicio = ticketPromedio - costoFijoPorServicio - costoVariablePorServicio;
-      const puntoEquilibrio = gananciaPorServicio > 0 ? Math.ceil(m.costosFijos / gananciaPorServicio) : 0;
-
       // Ocupación: horas de servicio vendidas (estimadas con la duración promedio del catálogo
       // activo) ÷ (barberos activos con rol barbero × horario general de la sucursal ese día).
       // No mira horario individual ni bloqueos puntuales. Ver useOcupacionResumen.ts.
       const horasVendidas = (m.servicios * avgDuracionMin) / 60;
       const horasDisponibles = ocupacionByMonth.get(m.month)?.horasDisponibles ?? 0;
       const tasaOcupacion = horasDisponibles > 0 ? (horasVendidas / horasDisponibles) * 100 : 0;
-
-      // Costo laboral % de facturación: sueldo devengado + comisión por productos, sobre
-      // facturación del mes. Se calcula acá una sola vez — la card de tendencia y el texto
-      // debajo del donut "Costos del mes" leen el mismo valor (latest.costoLaboralPct).
-      const costoLaboralPct = m.facturacion > 0 ? ((m.sueldoTotal + m.comisionProductos) / m.facturacion) * 100 : 0;
 
       const sc = serviciosClientesByMonth.get(m.month);
 
