@@ -4,6 +4,8 @@ import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parse
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import type { MonthlyData } from './useEstadisticasData';
+import { alcanzoLimiteFilas } from './rowLimit';
+
 
 export interface MonthlyServiciosClientesData {
   month: string;

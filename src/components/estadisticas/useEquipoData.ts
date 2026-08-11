@@ -189,5 +189,5 @@ export function useEquipoData(
     }
   };
 
-  return { rankingActual, productosRanking, historialPorBarbero, isLoading };
+  return { rankingActual, productosRanking, historialPorBarbero, isLoading, datosIncompletos };
 }
