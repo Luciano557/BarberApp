@@ -468,17 +468,12 @@ export function EstadisticasPanel() {
 
   // ---- Sección 4: Servicios y clientes ----
   // Donut "Mix de Servicios": top 5 servicios por facturación (venta.total_final) del mes
-  // actual + "Otros" agrupando el resto, sobre la misma `ventasData` que ya trae
-  // useEstadisticasData (extendida en Build 4 con servicio_nombre/total_final) — sin query nueva.
+  // actual + "Otros" agrupando el resto. El mix viene ya agregado por la RPC
+  // `estadisticas_ventas_agregadas` (corte de mes con el huso de la sucursal), así que acá
+  // no se recorren filas de venta ni hay riesgo de truncado.
   const currentMonthStrMix = format(new Date(), 'yyyy-MM');
-  const facturacionPorServicio = new Map<string, number>();
-  ventasData
-    .filter((v) => format(new Date(v.fecha_hora), 'yyyy-MM') === currentMonthStrMix)
-    .forEach((v) => {
-      const nombre = v.servicio_nombre || 'Sin especificar';
-      facturacionPorServicio.set(nombre, (facturacionPorServicio.get(nombre) || 0) + v.total_final);
-    });
-  const serviciosOrdenados = Array.from(facturacionPorServicio.entries()).sort((a, b) => b[1] - a[1]);
+  const mixMesActual = ventasAgregadas.find((v) => v.month === currentMonthStrMix)?.mix ?? [];
+  const serviciosOrdenados: [string, number][] = mixMesActual.map((m) => [m.servicio, m.facturacion]);
   const top5Servicios = serviciosOrdenados.slice(0, 5);
   const restoServiciosTotal = serviciosOrdenados.slice(5).reduce((sum, [, v]) => sum + v, 0);
   // Colores reusados de Sección 2 (no hay tokens dedicados a servicios). "Otros" usa
