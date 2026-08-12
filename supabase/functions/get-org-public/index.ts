@@ -106,6 +106,9 @@ Deno.serve(async (req) => {
       return Math.max(1, Math.min(3, v));
     };
 
+    const sanitizePixelId = (v: any): string | null =>
+      typeof v === "string" && /^[0-9]{10,20}$/.test(v.trim()) ? v.trim() : null;
+
     let portal: {
       logo_url: string | null;
       cover_url: string | null;
@@ -115,6 +118,7 @@ Deno.serve(async (req) => {
       description: string | null;
       primary_color: string | null;
       links: { label: string; url: string; icon: string | null }[];
+      meta_pixel_id: string | null;
     } | null = null;
 
     const pc: any = portalRes.data;
