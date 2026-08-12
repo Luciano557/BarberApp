@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
         .or("eliminado.is.null,eliminado.eq.false", { foreignTable: "servicios" }),
       supabase
         .from("portal_config")
-        .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
+        .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links, meta_pixel_id")
         .eq("organization_id", org.id)
         .maybeSingle(),
       supabase
