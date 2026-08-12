@@ -154,6 +154,7 @@ Deno.serve(async (req) => {
           ? pc.primary_color
           : null,
         links,
+        meta_pixel_id: sanitizePixelId(pc.meta_pixel_id),
       };
     } else {
       portal = {
@@ -165,6 +166,7 @@ Deno.serve(async (req) => {
         description: null,
         primary_color: null,
         links: [],
+        meta_pixel_id: null,
       };
     }
 
