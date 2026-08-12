@@ -2608,6 +2608,7 @@ export type Database = {
           description: string | null
           links: Json
           logo_path: string | null
+          meta_pixel_id: string | null
           organization_id: string
           primary_color: string | null
           updated_at: string
@@ -2621,6 +2622,7 @@ export type Database = {
           description?: string | null
           links?: Json
           logo_path?: string | null
+          meta_pixel_id?: string | null
           organization_id: string
           primary_color?: string | null
           updated_at?: string
@@ -2634,6 +2636,7 @@ export type Database = {
           description?: string | null
           links?: Json
           logo_path?: string | null
+          meta_pixel_id?: string | null
           organization_id?: string
           primary_color?: string | null
           updated_at?: string
