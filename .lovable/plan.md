@@ -75,5 +75,32 @@ Modificados:
 - **Adblockers**: una parte de las visitas no va a registrar. Es esperable y no se compensa en esta etapa (Conversions API queda fuera de alcance).
 - **Legal**: el banner cubre lo básico; no incluye página de política de cookies. Si se quiere, se suma un link a texto legal más adelante.
 
+## Eventos de conversión
+
+Auditoría previa a esta sección:
+- El registro de una barbería **no está en Homepage**. Está en `src/pages/Login.tsx` (`handleRegister`, ruta `/login?mode=signup`); la Homepage solo linkea ahí. El punto de éxito ocurre en el **cliente**: después de `signUp(...)` de `AuthContext` (que llama a `supabase.auth.signUp`) sin error, justo antes de navegar a `/verify-email` o `/auth/callback`. No hay edge function involucrada.
+- La confirmación de turno está en `src/components/reservar/ConfirmacionStep.tsx` (`handleConfirm`), tras `supabase.functions.invoke("validate-turno")` sin `fnError` ni `data.error`, en el mismo punto donde hoy se muestra el toast de éxito y se llama `onConfirmed()`. Ese componente ya recibe `orgData` como prop, así que tendría el `meta_pixel_id` disponible sin props nuevas; el consentimiento lo lee del hook global `useConsent`.
+
+### Ajuste de alcance: el píxel fijo también carga en `/login`
+Como el registro vive en `/login`, el píxel de Vittro debe montarse en Homepage **y** en Login (misma superficie pública, mismo ID de env). Sin eso el evento se dispararía sin píxel inicializado. El banner de consentimiento se muestra en ambas rutas.
+
+### Eventos
+
+| Evento | Píxel | Archivo y punto exacto |
+|---|---|---|
+| `PageView` | ambos | automático al inicializar (ya contemplado) |
+| `CompleteRegistration` | fijo de Vittro | `src/pages/Login.tsx` › `handleRegister`, tras `signUp` sin error, antes del `navigate` |
+| `Schedule` | de la organización | `src/components/reservar/ConfirmacionStep.tsx` › `handleConfirm`, tras respuesta OK de `validate-turno`, junto al toast de éxito |
+
+### Util adicional en `metaPixel.ts`
+Se agrega `trackMetaEvent(name, params?)`: dispara `fbq('track', name, params)` **solo si** el píxel ya fue inicializado en esta página. Si no lo fue (sin consentimiento o sin ID cargado), es un no-op silencioso. No encola eventos: un evento sin consentimiento simplemente se pierde, que es el comportamiento correcto.
+
+### Timing: sin cambios
+La condición sigue siendo `consentimiento aceptado` **y** `pixel id disponible`. Los dos eventos ocurren siempre después de esas condiciones:
+- `CompleteRegistration` es una acción del usuario en `/login`, muy posterior al montaje del hook; si rechazó cookies, es no-op.
+- `Schedule` es el último paso del stepper, muy posterior al resolve de `get-org-public`; si la organización no tiene `meta_pixel_id` o el visitante rechazó, es no-op.
+
+No hace falta espera ni cola adicional.
+
 ## Fuera de alcance
-Conversions API / server-side, UI de autoservicio del ID, niveles de consentimiento, eventos de conversión más allá de `PageView`.
+Conversions API / server-side, UI de autoservicio del ID, niveles de consentimiento, y cualquier evento más allá de `PageView`, `CompleteRegistration` y `Schedule`.
