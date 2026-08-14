@@ -4704,40 +4704,23 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      create_cliente_with_sucursal:
-        | {
-            Args: {
-              _acepta_marketing?: boolean
-              _alergias?: string
-              _apellido?: string
-              _email?: string
-              _fecha_nacimiento?: string
-              _instagram?: string
-              _nombre: string
-              _otra_red_social?: string
-              _sucursal_id?: string
-              _telefono?: string
-              _tiktok?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              _acepta_marketing?: boolean
-              _alergias?: string
-              _apellido?: string
-              _email?: string
-              _fecha_nacimiento?: string
-              _instagram?: string
-              _nombre: string
-              _otra_red_social?: string
-              _posible_duplicado_de?: string
-              _sucursal_id?: string
-              _telefono?: string
-              _tiktok?: string
-            }
-            Returns: string
-          }
+      create_cliente_with_sucursal: {
+        Args: {
+          _acepta_marketing?: boolean
+          _alergias?: string
+          _apellido?: string
+          _email?: string
+          _fecha_nacimiento?: string
+          _instagram?: string
+          _nombre: string
+          _otra_red_social?: string
+          _posible_duplicado_de?: string
+          _sucursal_id?: string
+          _telefono?: string
+          _tiktok?: string
+        }
+        Returns: string
+      }
       current_user_has_pin: { Args: never; Returns: boolean }
       delete_mp_connection: { Args: { _org_id: string }; Returns: undefined }
       ensure_organization_subscription: {
