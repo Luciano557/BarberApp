@@ -18,6 +18,7 @@ export interface PortalDataView {
   description: string | null;
   primary_color: string | null;
   links: PortalLandingLink[];
+  meta_pixel_id: string | null;
 }
 
 interface Props {

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
-import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound } from 'lucide-react';
+import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound, BarChart3, Info } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -50,6 +50,8 @@ const portalFormSchema = z.object({
   description: z.string().max(240, 'La descripción supera 240 caracteres.').optional().default(''),
   primaryColor: z.string().optional().default('').refine((v) => !v || isValidHex(v), 'El color debe tener formato #RRGGBB'),
   links: z.array(linkSchema).max(4, 'Máximo 4 links'),
+  metaPixelId: z.string().trim().optional().default('')
+    .refine((v) => !v || /^[0-9]{10,20}$/.test(v), 'El ID debe tener solo números, entre 10 y 20 dígitos.'),
 });
 
 type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
@@ -71,6 +73,7 @@ const emptyValues: PortalFormValues = {
   description: '',
   primaryColor: '',
   links: [],
+  metaPixelId: '',
   logoPath: null,
   coverPath: null,
   coverPosX: 50,
@@ -127,6 +130,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: config.description ?? '',
       primaryColor: config.primary_color ?? '',
       links: config.links ?? [],
+      metaPixelId: config.meta_pixel_id ?? '',
       logoPath: config.logo_path,
       coverPath: config.cover_path,
       coverPosX: config.cover_position_x ?? 50,
@@ -279,6 +283,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: values.description.trim() || null,
       primary_color: values.primaryColor || null,
       links: normalizedLinks,
+      meta_pixel_id: values.metaPixelId.trim() || null,
     });
     setSavingAll(false);
 
@@ -299,6 +304,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: values.description,
       primaryColor: values.primaryColor,
       links: normalizedLinks,
+      metaPixelId: values.metaPixelId,
       logoPath: getValues('logoPath'),
       coverPath: getValues('coverPath'),
       coverPosX: getValues('coverPosX'),
@@ -361,6 +367,13 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                 className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 Compartir
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollTo('portal-integraciones')}
+                className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                Integraciones
               </button>
             </div>
           </nav>
@@ -646,6 +659,53 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                     <Download className="h-4 w-4 mr-1" /> Descargar QR
                   </Button>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 4 — Integraciones */}
+          <section id="portal-integraciones" className="border-t pt-6 mt-6 scroll-mt-16">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <BarChart3 className="h-4 w-4 text-primary" />
+              </div>
+              <h2 className="text-sm font-semibold">Integraciones</h2>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-sm font-medium flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" /> ID de píxel de Meta (opcional)
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Medí las conversiones de tus campañas de Instagram y Facebook Ads a partir de las reservas del portal.
+                </p>
+              </div>
+              <FormField
+                control={control}
+                name="metaPixelId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        maxLength={20}
+                        inputMode="numeric"
+                        placeholder="1234567890123456"
+                        className="font-mono"
+                        disabled={savingAll}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                <span>
+                  Para conseguir el ID: entrá a Meta Business Manager → Events Manager → seleccioná tu
+                  píxel (o creá uno nuevo) → copiá el número que aparece como ID del píxel.
+                </span>
               </div>
             </div>
           </section>

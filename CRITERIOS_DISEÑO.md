@@ -195,19 +195,62 @@ Dentro de la app: **23 ocurrencias en 14 archivos**:
 
 ### 2.4 Migración PageHeader incompleta (visible al usuario)
 
-`FinanzasPanel` renderiza `PageHeader "Finanzas"` (`FinanzasPanel.tsx:83,131`) y
-adentro de sus tabs cada sub-panel repite su propio título de página con otro peso:
+**Actualizado 2026-08-16** — el estado descrito originalmente acá (título
+duplicado `text-2xl font-bold` en las 5 pestañas) ya no es el estado real del
+código; quedó desactualizado por builds intermedios no vueltos a auditar. Estado
+verificado en código al 2026-08-16:
 
-- `EstadisticasPanel.tsx:924,943` — `<h1 class="text-2xl font-bold">Estadísticas</h1>`
-- `SueldosPanel.tsx:930` — `<h2 class="text-2xl font-bold">Sueldos</h2>`
-- `GastosPanel.tsx:194` — `<h2 class="text-2xl font-bold">Gastos</h2>`
-
-Resultado: **doble título en la misma vista** (h1 "Finanzas" + h1/h2 del tab),
-mezcla `semibold`/`bold` y mezcla h1/h2. Es el desvío de componentes más visible hoy.
+- **Estadísticas — resuelta** (build 2026-08-16). Migrada a `PageHeader`
+  (`EstadisticasPanel.tsx`, header con `title="Estadísticas"`, `icon={BarChart3}`,
+  `subtitle="Facturación, gastos y rendimiento del negocio."`, y el selector de
+  período movido al slot `actions`). Es el primer caso de `PageHeader` anidado
+  dentro de una pantalla que ya tiene su propio `PageHeader` arriba
+  (`FinanzasPanel` → `PageHeader "Finanzas"` → `Tabs` → `PageHeader
+  "Estadísticas"`); se le pasó `className="pl-0"` para cancelar el `pl-14`
+  mobile de `PageHeader.tsx:15` (pensado para esquivar el botón hamburguesa,
+  que no aplica a un header anidado más abajo en la pantalla).
+- **Sueldos — resuelta** (build 2026-08-16). Migrada a `PageHeader`
+  (`title="Sueldos"`, `icon={Wallet}`, `subtitle="Pagos al equipo, fijos y
+  variables."`, `className="pl-0"`). No tenía título propio (el hallazgo
+  original decía que sí — no era así); el bloque de controles que vivía suelto
+  arriba (presets de período "Todo"/"Este mes", selector de rango personalizado,
+  botón "Registrar Pago") se movió tal cual al slot `actions`, sin cambios de
+  lógica ni estado.
+- **Gastos — resuelta** (build 2026-08-16). Migrada a `PageHeader`
+  (`title="Gastos"`, `icon={Receipt}`, `subtitle="Costos fijos, variables y
+  recurrentes del negocio."`, `className="pl-0"`). El header real de partida
+  no era el `text-2xl font-bold` del hallazgo original: ya era un
+  `<h3 class="text-lg font-semibold text-foreground">` (`GastosPanel.tsx:218`),
+  reemplazado por `PageHeader`; el botón "Registrar gasto" se movió al slot
+  `actions`. El selector de mes del `Card` "Historial" es un control de esa
+  sección, no del header de página — no se tocó.
+- **Inversiones — resuelta** (build 2026-08-16). Mismo caso que Gastos: el
+  `<h3 class="text-lg font-semibold text-foreground">` (`InversionesPanel.tsx:129`)
+  se reemplazó por `PageHeader` (`title="Inversiones"`, `icon={TrendingUp}`,
+  `subtitle="Bienes y equipamiento del negocio."`, `className="pl-0"`); el botón
+  "Nueva" se movió al slot `actions`.
+- **Deudas — resuelta** (build 2026-08-16), caso distinto a los otros 4. Su
+  `<h3 class="text-lg font-semibold text-foreground">Deudas Activas</h3>`
+  no era un título de página genérico: calificaba específicamente a la lista de
+  deudas activas, en contraste con la sección separada "Deudas pagadas (N)" más
+  abajo en el mismo panel. Se migró a `PageHeader` (`title="Deudas"`,
+  `icon={Landmark}`, `subtitle="Compromisos financieros pendientes."`,
+  `className="pl-0"`, botón "Nueva" al slot `actions`) y se conservó la
+  distinción "activas" vs. "pagadas" con un sub-encabezado propio ("Activas",
+  texto `text-sm font-medium text-muted-foreground`) arriba de la lista de
+  deudas activas, al mismo nivel visual que el toggle "Deudas pagadas (N)" que
+  ya existía más abajo.
 
 > **Nota (sesión ícono contextual, 2026-07-13)**: `PageHeader` ahora requiere
 > `icon` (prop obligatoria) — cualquier nuevo call site futuro debe
 > especificar un ícono contextual, no hay default.
+
+> **Criterio a futuro**: el `subtitle` de `PageHeader` no debe referenciar un
+> período específico ("este mes", etc.) si el contenido de la pantalla puede
+> cambiar de rango (selector de período, filtros de fecha) — se desactualiza
+> visualmente apenas el usuario cambia el filtro. Usar copy genérico que
+> describa el contenido sin anclarlo a un período (ver subtítulo de
+> Estadísticas arriba).
 
 ---
 
@@ -288,7 +331,7 @@ z-[100] ghost de drag (fixed)      AgendaDayView.tsx:604
 |---|---|---|---|
 | 1 | Tokens `--chart-*` usados y nunca definidos → colores rotos en Estadísticas | 24 usos, `EstadisticasPanel.tsx` + `tailwind.config.ts:95-101` | Alta: los gráficos del panel financiero no muestran los colores que el código intenta |
 | 2 | Inter importada pero (según análisis estático) no aplicada — la app corre en fuente de sistema y paga la descarga igual | Toda la app (`index.css:1,107,203` + `tailwind.config.ts` sin `fontFamily`) | Alta pero silenciosa: afecta el 100% de la tipografía. Confirmar una vez en navegador |
-| 3 | Doble título de página en Finanzas (PageHeader + h1/h2 `bold` dentro del tab) | `FinanzasPanel` + `EstadisticasPanel:924`, `SueldosPanel:930`, `GastosPanel:194` | Alta: se ve en cada visita a Finanzas |
+| 3 | ~~Doble título de página en Finanzas~~ — **resuelto, las 5 pestañas migradas a `PageHeader`** (build 2026-08-16) — ver detalle en 2.4 | `FinanzasPanel` + las 5 pestañas | Cerrado |
 
 **P2 — Inconsistencias repetidas de sistema**
 

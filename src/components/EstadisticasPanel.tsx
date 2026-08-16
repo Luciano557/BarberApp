@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Users, Scissors, Calendar, Target,
@@ -7,7 +7,6 @@ import {
   ArrowUpRight, ArrowDownRight, CreditCard, Gift, Wallet, ShoppingBag,
   Sparkles, UserPlus, UserCheck,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { format, subMonths, startOfMonth, endOfMonth, differenceInDays, min, addDays } from 'date-fns';
@@ -16,7 +15,8 @@ import {
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { MetricCard } from './estadisticas/MetricCard';
 import { MetricDetailDialog } from './estadisticas/MetricDetailDialog';
@@ -27,6 +27,8 @@ import { useOcupacionResumen } from './estadisticas/useOcupacionResumen';
 import { usePagoMetodoData } from './estadisticas/usePagoMetodoData';
 import { useEquipoData, BarberoMonthStats } from './estadisticas/useEquipoData';
 import { useServiciosClientesData } from './estadisticas/useServiciosClientesData';
+import { useDeudaPendienteData } from './estadisticas/useDeudaPendienteData';
+import { VistazoRapido } from './estadisticas/VistazoRapido';
 import { DATOS_INCOMPLETOS_MSG } from './estadisticas/rowLimit';
 
 import { calcVariation } from './estadisticas/dateHelpers';
@@ -66,23 +68,27 @@ function buildBarberoSeries(stats: BarberoMonthStats[], key: BarberoMetricKey): 
   });
 }
 
-export function EstadisticasPanel() {
+interface EstadisticasPanelProps {
+  /** Deep-link a Mi Negocio → ficha de sucursal → card de Horarios. Sin esta prop, el estado
+   * vacío de Ocupación muestra el mensaje sin botón de acción. */
+  onNavigateToHorarios?: (sucursalId: string) => void;
+}
+
+export function EstadisticasPanel({ onNavigateToHorarios }: EstadisticasPanelProps = {}) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [periodoMeses, setPeriodoMeses] = useState('6');
-  const [capacidadDiaria, setCapacidadDiaria] = useState(18);
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
   const { monthlyData, isLoading, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
-    capacidadDiaria,
   );
 
   const {
-    ocupacionPorMes, avgDuracionMin, coberturaIncompleta, isLoading: isLoadingOcupacion,
+    ocupacionPorMes, isLoading: isLoadingOcupacion,
   } = useOcupacionResumen(organization?.id, currentSucursal, periodoMeses);
 
   const {
@@ -101,6 +107,10 @@ export function EstadisticasPanel() {
     datosIncompletos: incompletoServiciosClientes,
   } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses);
 
+  const {
+    saldoPendiente, proximaCuota, isLoading: isLoadingDeuda,
+  } = useDeudaPendienteData(organization?.id, currentSucursal);
+
   // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
   // avisamos en vez de mostrar números parciales como si fueran reales.
   const datosIncompletos =
@@ -111,33 +121,6 @@ export function EstadisticasPanel() {
     metric: MetricCardDef;
     data: DerivedMonthlyMetrics[];
   } | null>(null);
-
-  // Fetch capacidad_diaria from DB when sucursal changes
-  useEffect(() => {
-    const fetchCapacidad = async () => {
-      if (!currentSucursal?.id || !organization?.id) {
-        setCapacidadDiaria(18);
-        return;
-      }
-      const { data } = await supabase
-        .from('sucursal_settings')
-        .select('capacidad_diaria')
-        .eq('sucursal_id', currentSucursal.id)
-        .maybeSingle();
-      setCapacidadDiaria(data?.capacidad_diaria ?? 18);
-    };
-    fetchCapacidad();
-  }, [currentSucursal?.id, organization?.id]);
-
-  const saveCapacidadDiaria = async (value: number) => {
-    if (!currentSucursal?.id || !organization?.id) return;
-    await supabase
-      .from('sucursal_settings')
-      .upsert(
-        { sucursal_id: currentSucursal.id, organization_id: organization.id, capacidad_diaria: value },
-        { onConflict: 'sucursal_id' }
-      );
-  };
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
@@ -161,12 +144,9 @@ export function EstadisticasPanel() {
     const serviciosClientesByMonth = new Map(serviciosClientesData.map(s => [s.month, s]));
 
     const raw = monthlyData.map(m => {
-      // Ocupación: horas de servicio vendidas (estimadas con la duración promedio del catálogo
-      // activo) ÷ (barberos activos con rol barbero × horario general de la sucursal ese día).
-      // No mira horario individual ni bloqueos puntuales. Ver useOcupacionResumen.ts.
-      const horasVendidas = (m.servicios * avgDuracionMin) / 60;
-      const horasDisponibles = ocupacionByMonth.get(m.month)?.horasDisponibles ?? 0;
-      const tasaOcupacion = horasDisponibles > 0 ? (horasVendidas / horasDisponibles) * 100 : 0;
+      // Ocupación: ya resuelta 100% en base (estadisticas_ocupacion_mensual) — acá solo se lee
+      // por mes, sin ninguna cuenta en JS. null = sin datos suficientes, ver useOcupacionResumen.ts.
+      const tasaOcupacion = ocupacionByMonth.get(m.month)?.tasaOcupacion ?? null;
 
       const sc = serviciosClientesByMonth.get(m.month);
 
@@ -223,16 +203,18 @@ export function EstadisticasPanel() {
       const useSameDayClientes = useSameDayComparison && prevSc?.parcialClientesNuevos !== undefined;
       const prevClientesNuevos = useSameDayClientes ? prevSc!.parcialClientesNuevos! : prev?.clientesNuevos ?? 0;
 
-      // Ocupación parcial del mes anterior (mismos primeros N días), para comparar mes en curso vs
-      // mes anterior en igualdad de condiciones — misma lógica que las demás métricas "parciales".
+      // Ocupación parcial del mes anterior (mismos primeros N días) — ya resuelta en base
+      // (tasaOcupacionParcial de estadisticas_ocupacion_mensual), misma lógica que las demás
+      // métricas "parciales": se usa en vez del mes anterior completo cuando corresponde.
       const prevOcupacionMes = prevM ? ocupacionByMonth.get(prevM.month) : undefined;
-      const prevHorasDisponiblesParciales = prevOcupacionMes?.horasDisponiblesParciales;
-      const prevHorasVendidasParciales = prevM?.parcialServicios !== undefined
-        ? (prevM.parcialServicios * avgDuracionMin) / 60
-        : undefined;
-      const prevTasaOcupacionParcial = (useSameDayComparison && prevHorasDisponiblesParciales !== undefined && prevHorasVendidasParciales !== undefined)
-        ? (prevHorasDisponiblesParciales > 0 ? (prevHorasVendidasParciales / prevHorasDisponiblesParciales) * 100 : 0)
-        : undefined;
+      const prevTasaOcupacionParcial = useSameDayComparison ? prevOcupacionMes?.tasaOcupacionParcial ?? null : undefined;
+      // calcVariation (dateHelpers.ts) no acepta null — la usan todas las demás métricas, no se
+      // toca. Guard local acá: sin dato actual o de comparación, la variación queda en null sin
+      // llamarla.
+      const prevOcupacionParaVar = prevTasaOcupacionParcial !== undefined ? prevTasaOcupacionParcial : prev?.tasaOcupacion ?? null;
+      const tasaOcupacionVar = (prev && curr.tasaOcupacion != null && prevOcupacionParaVar != null)
+        ? calcVariation(curr.tasaOcupacion, prevOcupacionParaVar)
+        : null;
 
       return {
         ...curr,
@@ -252,7 +234,7 @@ export function EstadisticasPanel() {
         costoVariablePorServicioVar: prev ? calcVariation(curr.costoVariablePorServicio, prev.costoVariablePorServicio) : null,
         gananciaPorServicioVar: prev ? calcVariation(curr.gananciaPorServicio, prev.gananciaPorServicio) : null,
         puntoEquilibrioVar: prev ? calcVariation(curr.puntoEquilibrio, prev.puntoEquilibrio) : null,
-        tasaOcupacionVar: prev ? calcVariation(curr.tasaOcupacion, prevTasaOcupacionParcial !== undefined ? prevTasaOcupacionParcial : prev.tasaOcupacion) : null,
+        tasaOcupacionVar,
         costoLaboralPctVar: prev ? calcVariation(curr.costoLaboralPct, prev.costoLaboralPct) : null,
         comisionDevengadaVar: null,
         tasaAttachExtrasVar: prev ? calcVariation(curr.tasaAttachExtras, prev.tasaAttachExtras) : null,
@@ -521,49 +503,61 @@ export function EstadisticasPanel() {
     description: 'De los turnos reservados, qué % eligió un barbero específico en vez de "cualquiera disponible".',
   };
 
-  // ---- Sección 1: Resumen ----
-  const resumenCards: MetricCardDef[] = [
-    {
-      title: 'Facturación',
-      dataKey: 'facturacion',
-      icon: DollarSign,
-      color: 'text-status-success-foreground',
-      chartColor: 'hsl(var(--chart-cash))',
-      formatFn: formatCurrency,
-      shortFormatFn: formatCurrencyShort,
-      description: 'Cuánto dinero entró al negocio cada mes.',
-    },
-    {
-      title: 'Ticket Promedio',
-      dataKey: 'ticketPromedio',
-      icon: Receipt,
-      color: 'text-status-info-foreground',
-      chartColor: 'hsl(var(--chart-mp))',
-      formatFn: formatCurrency,
-      shortFormatFn: formatCurrencyShort,
-      description: 'Cuánto gasta cada cliente en promedio por visita.',
-    },
-    {
-      title: 'Rentabilidad',
-      dataKey: 'rentabilidad',
-      icon: Percent,
-      color: latest && latest.rentabilidad >= 0 ? 'text-status-success-foreground' : 'text-status-error-foreground',
-      chartColor: 'hsl(var(--chart-cash))',
-      formatFn: (v) => `${v.toFixed(1)}%`,
-      shortFormatFn: (v) => `${v.toFixed(0)}%`,
-      description: 'Porcentaje de lo facturado que queda como ganancia real.',
-    },
-    {
-      title: 'Punto de Equilibrio',
-      dataKey: 'puntoEquilibrio',
-      icon: Target,
-      color: 'text-status-purple-foreground',
-      chartColor: 'hsl(var(--chart-purple))',
-      formatFn: (v) => `${v} clientes`,
-      shortFormatFn: (v) => `${v}`,
-      description: 'Clientes necesarios para cubrir todos los costos fijos.',
-    },
-  ];
+  // ---- Sección "Vistazo rápido" (reemplaza a "Resumen") ----
+  // Facturación deja de tener MetricCardDef propia: pasa a mostrarse solo en la frase narrativa
+  // y en la referencia arriba de GastosGananciaBar, ya no como card clickeable independiente.
+  const ticketPromedioCard: MetricCardDef = {
+    title: 'Ticket Promedio',
+    dataKey: 'ticketPromedio',
+    icon: Receipt,
+    color: 'text-status-info-foreground',
+    chartColor: 'hsl(var(--chart-mp))',
+    formatFn: formatCurrency,
+    shortFormatFn: formatCurrencyShort,
+    description: 'Cuánto gasta cada cliente en promedio por visita.',
+  };
+
+  // Rentabilidad y Punto de Equilibrio se retiran de la vista principal — viven en el detalle
+  // de GastosGananciaBar (misma relación facturación/gastos que la barra visualiza).
+  const rentabilidadCard: MetricCardDef = {
+    title: 'Rentabilidad',
+    dataKey: 'rentabilidad',
+    icon: Percent,
+    color: latest && latest.rentabilidad >= 0 ? 'text-status-success-foreground' : 'text-status-error-foreground',
+    chartColor: 'hsl(var(--chart-cash))',
+    formatFn: (v) => `${v.toFixed(1)}%`,
+    shortFormatFn: (v) => `${v.toFixed(0)}%`,
+    description: 'Porcentaje de lo facturado que queda como ganancia real.',
+  };
+
+  const puntoEquilibrioCard: MetricCardDef = {
+    title: 'Punto de Equilibrio',
+    dataKey: 'puntoEquilibrio',
+    icon: Target,
+    color: 'text-status-purple-foreground',
+    chartColor: 'hsl(var(--chart-purple))',
+    formatFn: (v) => `${v} clientes`,
+    shortFormatFn: (v) => `${v}`,
+    description: 'Clientes necesarios para cubrir todos los costos fijos.',
+  };
+
+  // Gastos/Ganancia del mes: mismos datos que ya calcula v_estadisticas_mensuales (facturación
+  // de `ingresos`, egresos de `Egresos`) — sin fórmula nueva. totalEgresos se lee directo de
+  // monthlyData (no de derivedMetrics), mismo patrón que costosSlices ya usa más abajo.
+  // Nota de precisión: para el mes en curso, gastos no tiene recorte "mismos primeros N días"
+  // como facturación (v_estadisticas_mensuales solo expone parcial_costos_fijos, no de
+  // variables/semivariables) — la variación compara ganancia acumulada del mes en curso contra
+  // la ganancia del mes anterior COMPLETO, no recortada. Mismo criterio que ya usan las métricas
+  // no acumulativas del panel (Rentabilidad, Ticket Promedio, etc.).
+  const gastosMesActual = monthlyData[monthlyData.length - 1]?.totalEgresos ?? 0;
+  const facturacionMesActual = latest?.facturacion ?? 0;
+  const gananciaMesActual = facturacionMesActual - gastosMesActual;
+
+  const monthlyDataAnterior = monthlyData.length > 1 ? monthlyData[monthlyData.length - 2] : null;
+  const gananciaMesAnterior = monthlyDataAnterior
+    ? monthlyDataAnterior.facturacion - monthlyDataAnterior.totalEgresos
+    : null;
+  const gananciaVar = monthlyDataAnterior ? calcVariation(gananciaMesActual, gananciaMesAnterior!) : null;
 
   // ---- Comportamiento del Cliente ----
   const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -743,7 +737,16 @@ export function EstadisticasPanel() {
     description: 'Horas de servicio vendidas sobre horas-silla disponibles del local (estimado).',
   };
 
-  if (isLoading || isLoadingOcupacion || isLoadingPagoMetodo || isLoadingEquipo || isLoadingServiciosClientes) {
+  // Estado vacío honesto: tasaOcupacion llega en null desde estadisticas_ocupacion_mensual
+  // cuando no hay dato confiable (nunca 0 forzado). coberturaIncompleta distingue el motivo más
+  // accionable (falta cargar el horario general) del resto (sin barberos con rol barbero, o sin
+  // ventas con servicio matcheado ese mes) para no invitar a "configurar el horario" cuando ya
+  // está configurado.
+  const latestOcupacionMes = ocupacionPorMes.length > 0 ? ocupacionPorMes[ocupacionPorMes.length - 1] : null;
+  const ocupacionSinDatos = !latest || latest.tasaOcupacion == null;
+  const ocupacionCoberturaIncompleta = latestOcupacionMes?.coberturaIncompleta ?? false;
+
+  if (isLoading || isLoadingOcupacion || isLoadingPagoMetodo || isLoadingEquipo || isLoadingServiciosClientes || isLoadingDeuda) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -760,19 +763,27 @@ export function EstadisticasPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2 justify-end">
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-        <Select value={periodoMeses} onValueChange={setPeriodoMeses}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="3">Últimos 3 meses</SelectItem>
-            <SelectItem value="6">Últimos 6 meses</SelectItem>
-            <SelectItem value="12">Último año</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <PageHeader
+        title="Estadísticas"
+        icon={BarChart3}
+        subtitle="Facturación, gastos y rendimiento del negocio."
+        className="pl-0"
+        actions={(
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Select value={periodoMeses} onValueChange={setPeriodoMeses}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Últimos 3 meses</SelectItem>
+                <SelectItem value="6">Últimos 6 meses</SelectItem>
+                <SelectItem value="12">Último año</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      />
 
       {datosIncompletos && (
         <div className="flex items-start gap-1.5 rounded-md border border-status-warning bg-status-warning-bg px-2.5 py-2 text-xs text-status-warning-foreground">
@@ -783,58 +794,66 @@ export function EstadisticasPanel() {
 
 
 
-      {/* Sección 1: Resumen */}
-      <div className="space-y-4">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resumen</h2>
+      {/* Vistazo rápido (reemplaza a "Resumen") */}
+      <VistazoRapido
+        facturacion={facturacionMesActual}
+        gastos={gastosMesActual}
+        ganancia={gananciaMesActual}
+        gananciaVar={gananciaVar}
+        latest={latest}
+        serviciosCard={serviciosCard}
+        ticketPromedioCard={ticketPromedioCard}
+        rentabilidadCard={rentabilidadCard}
+        puntoEquilibrioCard={puntoEquilibrioCard}
+        onSelectMetric={setSelectedMetric}
+        metodoPagoSlices={metodoPagoSlices}
+        digitalTrendText={digitalTrendText}
+        formatCurrency={formatCurrency}
+        saldoPendiente={saldoPendiente}
+        proximaCuota={proximaCuota}
+      />
 
-        {/* Servicios - full width first */}
-        <MetricCard
-          metric={serviciosCard}
-          data={derivedMetrics}
-          latest={latest}
-          onSelect={setSelectedMetric}
-          className="md:col-span-2"
-          chartSize="lg"
-        />
+      {/* Ocupación — reubicada desde "Resumen", sub-sección propia. Lógica sin cambios (ver
+          useOcupacionResumen.ts), solo cambió dónde vive en el layout. */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ocupación</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {resumenCards.map((metric) => (
-            <MetricCard key={metric.dataKey} metric={metric} data={derivedMetrics} latest={latest} onSelect={setSelectedMetric} />
-          ))}
-
-          <MetricCard
-            metric={ocupacionMetricDef}
-            data={derivedMetrics}
-            latest={latest}
-            onSelect={setSelectedMetric}
-            banner={coberturaIncompleta ? (
-              <div
-                className="mb-3 flex items-start gap-1.5 rounded-md border border-status-warning bg-status-warning-bg px-2.5 py-2 text-xs text-status-warning-foreground"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>El horario general de la sucursal no está configurado — el número puede no ser preciso.</span>
-              </div>
-            ) : undefined}
-          >
-            <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Capacidad diaria:</span>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={100}
-                value={capacidadDiaria}
-                onChange={(e) => setCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
-                onBlur={(e) => saveCapacidadDiaria(Math.max(1, parseInt(e.target.value) || 1))}
-                className="h-7 w-16 text-xs"
-              />
-              <span className="text-xs text-muted-foreground">cortes/barbero</span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground/70" onClick={(e) => e.stopPropagation()}>
-              Ya no se usa para calcular la ocupación — pendiente de revisar.
-            </p>
-          </MetricCard>
+          {ocupacionSinDatos ? (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-sm font-medium">{ocupacionMetricDef.title}</CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">{ocupacionMetricDef.description}</p>
+                </div>
+                <Users className="h-4 w-4 text-status-indigo-foreground shrink-0" />
+              </CardHeader>
+              <CardContent>
+                <span className="text-2xl font-bold text-muted-foreground">—</span>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {ocupacionCoberturaIncompleta
+                    ? 'Sin datos suficientes — configurá el horario general de la sucursal para ver este número.'
+                    : 'Sin datos suficientes para calcular la ocupación este mes.'}
+                </p>
+                {ocupacionCoberturaIncompleta && currentSucursal && onNavigateToHorarios && (
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 mt-1 text-xs"
+                    onClick={() => onNavigateToHorarios(currentSucursal.id)}
+                  >
+                    Configurar horario de {currentSucursal.nombre}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <MetricCard
+              metric={ocupacionMetricDef}
+              data={derivedMetrics}
+              latest={latest}
+              onSelect={setSelectedMetric}
+            />
+          )}
         </div>
       </div>
 
@@ -842,22 +861,14 @@ export function EstadisticasPanel() {
       <div className="space-y-4">
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plata real</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <DonutCard
-            title="Cómo se cobra"
-            description="Composición de los cobros de este mes."
-            data={metodoPagoSlices}
-            formatValue={formatCurrency}
-            footer={<p className="mt-3 text-xs">{digitalTrendText}</p>}
-          />
-          <DonutCard
-            title="Costos del mes"
-            description="Fijo, variable y semivariable."
-            data={costosSlices}
-            formatValue={formatCurrency}
-            footer={<p className="mt-3 text-xs text-muted-foreground">{costoLaboralText}</p>}
-          />
-        </div>
+        {/* "Cómo se cobra" se reubicó a Vistazo rápido — "Costos del mes" queda sola acá. */}
+        <DonutCard
+          title="Costos del mes"
+          description="Fijo, variable y semivariable."
+          data={costosSlices}
+          formatValue={formatCurrency}
+          footer={<p className="mt-3 text-xs text-muted-foreground">{costoLaboralText}</p>}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {plataRealCards.map((metric) => (

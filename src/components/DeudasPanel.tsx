@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { format } from 'date-fns';
 
 function formatARS(n: number): string {
@@ -123,12 +124,17 @@ export function DeudasPanel() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">Deudas Activas</h3>
-        <Button size="sm" onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nueva
-        </Button>
-      </div>
+      <PageHeader
+        title="Deudas"
+        icon={Landmark}
+        subtitle="Compromisos financieros pendientes."
+        className="pl-0"
+        actions={(
+          <Button size="sm" onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva
+          </Button>
+        )}
+      />
 
       <DrawerForm
         open={isFormOpen}
@@ -241,20 +247,23 @@ export function DeudasPanel() {
         </Form>
       </DrawerForm>
 
-      {isLoading ? (
-        <p className="text-muted-foreground text-sm">Cargando...</p>
-      ) : deudasActivas.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            <Landmark className="h-10 w-10 mx-auto mb-2 opacity-50" />
-            <p>No hay deudas activas</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {deudasActivas.map(renderDeudaCard)}
-        </div>
-      )}
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">Activas</p>
+        {isLoading ? (
+          <p className="text-muted-foreground text-sm">Cargando...</p>
+        ) : deudasActivas.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              <Landmark className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p>No hay deudas activas</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {deudasActivas.map(renderDeudaCard)}
+          </div>
+        )}
+      </div>
 
       {deudasPagadas.length > 0 && (
         <div className="space-y-3">

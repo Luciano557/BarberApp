@@ -252,6 +252,7 @@ const Index = () => {
               barbers={barbers}
               currentPlan={effectivePlan}
               onNavigateToBilling={goToBilling}
+              onNavigateToHorarios={canViewMiNegocio ? navigateToMiNegocioHorarios : undefined}
             />
           )}
 

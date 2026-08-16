@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
@@ -20,6 +20,20 @@ import Reservar from "./pages/Reservar";
 
 const queryClient = new QueryClient();
 
+// Sonner es un singleton global (un solo store de toasts compartido por
+// cualquier <Sonner/> montado) — nunca montar una segunda instancia, eso
+// duplicaría cada toast. En vez de eso, un único Toaster cuya posición
+// reacciona a la ruta: top-center en las páginas públicas (Homepage, Login,
+// Reservar) para no taparse con el banner de cookies fijo abajo; bottom-right
+// (el default de siempre) en el resto, incluida la app interna /app/:orgSlug.
+const PUBLIC_TOP_CENTER_ROUTES = [/^\/$/, /^\/login$/, /^\/[^/]+\/reservar$/];
+
+function AppToaster() {
+  const { pathname } = useLocation();
+  const isPublicPage = PUBLIC_TOP_CENTER_ROUTES.some((re) => re.test(pathname));
+  return <Sonner position={isPublicPage ? "top-center" : "bottom-right"} />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,8 +43,8 @@ const App = () => (
             <ActionPinGateProvider>
               <OnboardingProvider>
               <Toaster />
-              <Sonner />
               <BrowserRouter>
+                <AppToaster />
                 <Routes>
                   <Route path="/" element={<Homepage />} />
                   <Route path="/login" element={<Login />} />

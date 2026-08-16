@@ -2854,13 +2854,13 @@ export type Database = {
       ReportesMensuales: {
         Row: {
           ComisionesTotales: number | null
-          ComisiónPromedioPorBarbero: number | null
-          ComisiónPromedioPorCorte: number | null
-          ComisiónPromedioPorCortePorcentual: number | null
+          ComisiÃ³nPromedioPorBarbero: number | null
+          ComisiÃ³nPromedioPorCorte: number | null
+          ComisiÃ³nPromedioPorCortePorcentual: number | null
           CostoMedioPorServicio: number | null
           CostoPorServicio: number | null
           created_at: string
-          CrecimientoEnFacturación: number | null
+          CrecimientoEnFacturaciÃ³n: number | null
           CrecimientoEnServicios: number | null
           FacturacionTotal: number | null
           GananciaNeta: number | null
@@ -2876,18 +2876,18 @@ export type Database = {
           ServiciosPorBarbero: number | null
           ServiciosTotales: number | null
           sucursal_id: string | null
-          TasaDeOcupación: number | null
+          TasaDeOcupaciÃ³n: number | null
           TicketPromedio: number | null
         }
         Insert: {
           ComisionesTotales?: number | null
-          ComisiónPromedioPorBarbero?: number | null
-          ComisiónPromedioPorCorte?: number | null
-          ComisiónPromedioPorCortePorcentual?: number | null
+          ComisiÃ³nPromedioPorBarbero?: number | null
+          ComisiÃ³nPromedioPorCorte?: number | null
+          ComisiÃ³nPromedioPorCortePorcentual?: number | null
           CostoMedioPorServicio?: number | null
           CostoPorServicio?: number | null
           created_at?: string
-          CrecimientoEnFacturación?: number | null
+          CrecimientoEnFacturaciÃ³n?: number | null
           CrecimientoEnServicios?: number | null
           FacturacionTotal?: number | null
           GananciaNeta?: number | null
@@ -2903,18 +2903,18 @@ export type Database = {
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
           sucursal_id?: string | null
-          TasaDeOcupación?: number | null
+          TasaDeOcupaciÃ³n?: number | null
           TicketPromedio?: number | null
         }
         Update: {
           ComisionesTotales?: number | null
-          ComisiónPromedioPorBarbero?: number | null
-          ComisiónPromedioPorCorte?: number | null
-          ComisiónPromedioPorCortePorcentual?: number | null
+          ComisiÃ³nPromedioPorBarbero?: number | null
+          ComisiÃ³nPromedioPorCorte?: number | null
+          ComisiÃ³nPromedioPorCortePorcentual?: number | null
           CostoMedioPorServicio?: number | null
           CostoPorServicio?: number | null
           created_at?: string
-          CrecimientoEnFacturación?: number | null
+          CrecimientoEnFacturaciÃ³n?: number | null
           CrecimientoEnServicios?: number | null
           FacturacionTotal?: number | null
           GananciaNeta?: number | null
@@ -2930,7 +2930,7 @@ export type Database = {
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
           sucursal_id?: string | null
-          TasaDeOcupación?: number | null
+          TasaDeOcupaciÃ³n?: number | null
           TicketPromedio?: number | null
         }
         Relationships: [
@@ -4765,6 +4765,20 @@ export type Database = {
           total_egresos: number
         }[]
       }
+      estadisticas_ocupacion_mensual: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          cobertura_incompleta: boolean
+          duracion_promedio_ponderada: number
+          mes: string
+          tasa_ocupacion: number
+          tasa_ocupacion_parcial: number
+        }[]
+      }
       estadisticas_ventas_agregadas: {
         Args: {
           _meses?: number
@@ -4772,6 +4786,7 @@ export type Database = {
           _sucursal_id?: string
         }
         Returns: {
+          duracion_promedio_ponderada: number
           extras_cantidad: number
           extras_ingreso: number
           mes: string

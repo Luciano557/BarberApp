@@ -6,6 +6,8 @@ import {
   CreditCard, Banknote, Star, Zap
 } from 'lucide-react';
 import logoVittro from '../assets/MagotipoBlanco.png';
+import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
+import { useMetaPixel } from '@/hooks/useMetaPixel';
 // ─── Scroll reveal hook ───────────────────────────────────────────────────────
 function useReveal() {
   const ref = useRef<HTMLDivElement>(null);
@@ -319,6 +321,8 @@ function AppWindow({ activeScreen }: { activeScreen: ScreenKey }) {
 export default function Homepage() {
   const [heroTab, setHeroTab] = useState<ScreenKey>('caja');
   const [featTab, setFeatTab] = useState<ScreenKey>('caja');
+
+  useMetaPixel(import.meta.env.VITE_META_PIXEL_ID);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
@@ -733,6 +737,7 @@ export default function Homepage() {
         </div>
       </footer>
 
+      <CookieConsentBanner />
     </div>
   );
 }

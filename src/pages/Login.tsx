@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Scissors, Store, Globe, ArrowRight, ArrowLeft, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { perfEvent } from '@/lib/perfLog';
+import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
+import { useMetaPixel } from '@/hooks/useMetaPixel';
+import { trackMetaEvent } from '@/lib/analytics/metaPixel';
 
 const PLANS = [
   { id: 'basico',      label: 'Básico',      price: '$30.000'  },
@@ -42,6 +45,8 @@ export default function Login() {
   const [businessName, setBusinessName] = useState('');
   const [country, setCountry] = useState('AR');
   const [plan, setPlan] = useState<PlanId>('basico');
+
+  useMetaPixel(import.meta.env.VITE_META_PIXEL_ID);
 
   // Watcher post-login: cuando la org carga, navegamos. Si hay error de auth/org,
   // mostramos toast y soltamos el botón. Si pasa el timeout local de seguridad,
@@ -143,6 +148,8 @@ export default function Login() {
       setIsLoading(false);
       return;
     }
+
+    trackMetaEvent(import.meta.env.VITE_META_PIXEL_ID, 'CompleteRegistration');
 
     // Si Supabase devolvió sesión inmediata (verificación deshabilitada), pasar por el callback
     const { data: { session } } = await supabase.auth.getSession();
@@ -555,6 +562,8 @@ export default function Login() {
 
         </div>
       </div>
+
+      <CookieConsentBanner />
     </div>
   );
 }

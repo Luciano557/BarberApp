@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
-import { getWorkDaysUpTo } from './dateHelpers';
 import { alcanzoLimiteFilas } from './rowLimit';
 
 export interface MonthlyData {
@@ -36,7 +35,6 @@ export interface MonthlyData {
   parcialEfectivo?: number;
   parcialMp?: number;
   parcialCostosFijos?: number;
-  parcialTasaOcupacion?: number;
   parcialRecargosTotal?: number;
   parcialPerdida?: number;
 }
@@ -62,10 +60,8 @@ export function useEstadisticasData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
-  capacidadDiaria: number,
 ) {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [barberosActivos, setBarberosActivos] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [ingresosRaw, setIngresosRaw] = useState<IngresoRawRow[]>([]);
   const [datosIncompletos, setDatosIncompletos] = useState(false);
@@ -104,29 +100,17 @@ export function useEstadisticasData(
         ingresosQuery = ingresosQuery.eq('sucursal_id', currentSucursal.id);
       }
 
-      let barberosQuery = supabase
-        .from('barberos')
-        .select('id')
-        .eq('organization_id', organizationId)
-        .eq('activo', true);
-      if (currentSucursal) {
-        barberosQuery = barberosQuery.eq('sucursal_id', currentSucursal.id);
-      }
-
-      const [mensualesRes, ingresosRes, barberosRes] = await Promise.all([
-        mensualesRpc, ingresosQuery, barberosQuery,
+      const [mensualesRes, ingresosRes] = await Promise.all([
+        mensualesRpc, ingresosQuery,
       ]);
 
       if (mensualesRes.error) throw mensualesRes.error;
       if (ingresosRes.error) throw ingresosRes.error;
-      if (barberosRes.error) throw barberosRes.error;
 
       // Salvaguarda de truncado: los totales ya no dependen de filas crudas; la única lectura
       // cruda que queda es la de `ingresos` para el gráfico por día de semana.
       setDatosIncompletos(alcanzoLimiteFilas(ingresosRes.data));
 
-      const barberosCount = (barberosRes.data || []).length;
-      setBarberosActivos(barberosCount);
       setIngresosRaw((ingresosRes.data || []).map((i) => ({
         created_at: i.created_at,
         cantidad_de_servicios: Number(i.cantidad_de_servicios) || 0,
@@ -145,17 +129,6 @@ export function useEstadisticasData(
         // "mismos primeros N días" para la comparación en igualdad de condiciones.
         const nextMonthStr = idx < rows.length - 1 ? String(rows[idx + 1].mes).slice(0, 7) : null;
         const needsPartial = nextMonthStr === currentMonthStr;
-
-        let parcialTasaOcupacion: number | undefined;
-        if (needsPartial) {
-          const [py, pmo] = monthStr.split('-').map(Number);
-          const partialWorkDays = getWorkDaysUpTo(py, pmo - 1, diaActual);
-          const partialBarberos = Number(r.parcial_barberos_del_mes) || 0;
-          const partialCap = capacidadDiaria * (partialBarberos || barberosCount || 1) * partialWorkDays;
-          parcialTasaOcupacion = partialCap > 0
-            ? ((Number(r.parcial_servicios) || 0) / partialCap) * 100
-            : 0;
-        }
 
         return {
           month: monthStr,
@@ -185,7 +158,6 @@ export function useEstadisticasData(
           parcialEfectivo: needsPartial ? Number(r.parcial_efectivo) || 0 : undefined,
           parcialMp: needsPartial ? Number(r.parcial_mp) || 0 : undefined,
           parcialCostosFijos: needsPartial ? Number(r.parcial_costos_fijos) || 0 : undefined,
-          parcialTasaOcupacion,
           parcialRecargosTotal: needsPartial ? Number(r.parcial_recargos_total) || 0 : undefined,
           parcialPerdida: needsPartial ? Number(r.parcial_perdida) || 0 : undefined,
         };
@@ -199,5 +171,5 @@ export function useEstadisticasData(
     }
   };
 
-  return { monthlyData, barberosActivos, isLoading, ingresosRaw, datosIncompletos };
+  return { monthlyData, isLoading, ingresosRaw, datosIncompletos };
 }
