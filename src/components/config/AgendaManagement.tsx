@@ -26,9 +26,13 @@ interface AgendaManagementProps {
   barbers: Barber[];
   /** Lleva a Mi Negocio › ficha de sucursal › Horarios de atención. */
   onNavigateToHorarios?: (sucursalId: string) => void;
+  /** Refleja tabActiva hacia TurnosAgendaPanel.tsx: el título del PageHeader
+      superior ("Turnos" / "Configuración") lo sigue sin necesidad de levantar
+      el estado acá — mismo protocolo que onDirtyChange más abajo. */
+  onTabChange?: (tab: AgendaTab) => void;
 }
 
-type AgendaTab = 'agenda' | 'config';
+export type AgendaTab = 'agenda' | 'config';
 type ConfigTab = 'portal' | 'reservas';
 
 function readStoredTab<T extends string>(key: string, fallback: T): T {
@@ -47,7 +51,7 @@ function writeStoredTab(key: string, value: string) {
   }
 }
 
-export function AgendaManagement({ sucursalId, organizationId, barbers, onNavigateToHorarios }: AgendaManagementProps) {
+export function AgendaManagement({ sucursalId, organizationId, barbers, onNavigateToHorarios, onTabChange }: AgendaManagementProps) {
   const { sucursales } = useSucursal();
   const sucursal = sucursales.find(s => s.id === sucursalId);
   const { isOwner, isGeneralManager, isManager } = useAuth();
@@ -75,16 +79,19 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
     writeStoredTab(agendaTabKey, next);
   };
 
-  // PortalPublicoSection reporta si tiene cambios sin guardar. Cualquier
-  // navegación que la desmonte (sub-tabs de Configuración, tabs de nivel
-  // superior, o la flecha "Volver a Agenda") pasa por este guard — si hay
-  // cambios pendientes, pide confirmación antes de perderlos.
+  // PortalPublicoSection y AgendaConfigSection reportan si tienen cambios sin
+  // guardar (mismo protocolo onDirtyChange en las dos). Cualquier navegación
+  // que las desmonte (sub-tabs de Configuración, tabs de nivel superior, o la
+  // flecha "Volver a Agenda") pasa por este guard — si hay cambios pendientes
+  // en la sub-tab activa, pide confirmación antes de perderlos.
   const [portalDirty, setPortalDirty] = useState(false);
-  const [pendingLeavePortal, setPendingLeavePortal] = useState<(() => void) | null>(null);
+  const [reservasDirty, setReservasDirty] = useState(false);
+  const [pendingLeaveConfig, setPendingLeaveConfig] = useState<(() => void) | null>(null);
 
-  const guardLeavePortal = (action: () => void) => {
-    if (configTab === 'portal' && portalDirty) {
-      setPendingLeavePortal(() => action);
+  const guardLeaveConfig = (action: () => void) => {
+    const dirty = (configTab === 'portal' && portalDirty) || (configTab === 'reservas' && reservasDirty);
+    if (dirty) {
+      setPendingLeaveConfig(() => action);
       return;
     }
     action();
@@ -96,6 +103,14 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
       agendaTriggerRef.current?.focus();
     }
   }, [tabActiva]);
+
+  // Se dispara también en el primer render (con el valor leído de
+  // localStorage) y de nuevo cada vez que la sucursal activa remonta este
+  // componente (key={activeSucursal.id} en TurnosAgendaPanel.tsx), para que
+  // el título superior siempre refleje la pestaña de la sucursal vigente.
+  useEffect(() => {
+    onTabChange?.(tabActiva);
+  }, [tabActiva, onTabChange]);
 
   // Los roles pueden resolverse después del primer render: si para entonces
   // el usuario no puede ver el portal, lo devolvemos a reservas. No se
@@ -121,7 +136,11 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
 
   const reservasContent = (
     <>
-      <AgendaConfigSection sucursalId={sucursalId} organizationId={organizationId} />
+      <AgendaConfigSection
+        sucursalId={sucursalId}
+        organizationId={organizationId}
+        onDirtyChange={setReservasDirty}
+      />
       <HorariosAccesoDirectoCard
         onGoToHorarios={onNavigateToHorarios ? () => onNavigateToHorarios(sucursalId) : undefined}
       />
@@ -135,7 +154,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
   const volverAAgenda = (
     <button
       type="button"
-      onClick={() => guardLeavePortal(() => {
+      onClick={() => guardLeaveConfig(() => {
         focusAgendaTrigger.current = true;
         goToTab('agenda');
       })}
@@ -149,7 +168,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
 
   return (
     <div className="w-full mt-2 space-y-4">
-      <Tabs value={tabActiva} onValueChange={(v) => guardLeavePortal(() => goToTab(v as AgendaTab))}>
+      <Tabs value={tabActiva} onValueChange={(v) => guardLeaveConfig(() => goToTab(v as AgendaTab))}>
         {/* Una sola fila de navegación: en Agenda son los dos tabs de nivel
             superior; dentro de Configuración la reemplaza la fila de la sección
             (flecha para volver + sub-tabs). */}
@@ -183,7 +202,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
               value={configTab}
               onValueChange={(v) => {
                 const next = v as ConfigTab;
-                guardLeavePortal(() => {
+                guardLeaveConfig(() => {
                   setConfigTab(next);
                   writeStoredTab(configTabKey, next);
                 });
@@ -227,7 +246,7 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
         </TabsContent>
       </Tabs>
 
-      <AlertDialog open={!!pendingLeavePortal} onOpenChange={(open) => { if (!open) setPendingLeavePortal(null); }}>
+      <AlertDialog open={!!pendingLeaveConfig} onOpenChange={(open) => { if (!open) setPendingLeaveConfig(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
@@ -240,8 +259,8 @@ export function AgendaManagement({ sucursalId, organizationId, barbers, onNaviga
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
-                pendingLeavePortal?.();
-                setPendingLeavePortal(null);
+                pendingLeaveConfig?.();
+                setPendingLeaveConfig(null);
               }}
             >
               Descartar cambios

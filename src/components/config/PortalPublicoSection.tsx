@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
+import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
+import { EditableSectionHeader } from '@/components/ui/EditableSectionHeader';
 import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound, BarChart3, Info } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
@@ -50,11 +51,19 @@ const portalFormSchema = z.object({
   description: z.string().max(240, 'La descripción supera 240 caracteres.').optional().default(''),
   primaryColor: z.string().optional().default('').refine((v) => !v || isValidHex(v), 'El color debe tener formato #RRGGBB'),
   links: z.array(linkSchema).max(4, 'Máximo 4 links'),
+});
+
+type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
+
+// Fase 9: Integraciones migró a su propia Card con modo lectura/edición
+// (EditableSectionHeader) — su schema queda separado del form monolítico
+// de arriba, que ahora solo cubre Identidad visual y Contenido del portal.
+const integracionesSchema = z.object({
   metaPixelId: z.string().trim().optional().default('')
     .refine((v) => !v || /^[0-9]{10,20}$/.test(v), 'El ID debe tener solo números, entre 10 y 20 dígitos.'),
 });
 
-type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
+type IntegracionesFormValues = z.infer<typeof integracionesSchema>;
 
 // logoPath/coverPath/cover_* viajan en el mismo useForm para participar de
 // isDirty y de reset(), pero no tienen regla de validación propia — ya la
@@ -73,7 +82,6 @@ const emptyValues: PortalFormValues = {
   description: '',
   primaryColor: '',
   links: [],
-  metaPixelId: '',
   logoPath: null,
   coverPath: null,
   coverPosX: 50,
@@ -81,11 +89,21 @@ const emptyValues: PortalFormValues = {
   coverZoom: 1,
 };
 
+const integracionesEmptyValues: IntegracionesFormValues = {
+  metaPixelId: '',
+};
+
 interface PortalPublicoSectionProps {
   /** Avisa a AgendaManagement.tsx si hay cambios sin guardar, para que pueda
       bloquear el cambio de tab con un aviso de "¿Descartar cambios?". */
   onDirtyChange?: (dirty: boolean) => void;
 }
+
+// Fase 9: solo "Integraciones" migró al patrón de modo lectura/edición.
+// Se agrega un miembro por acá cada vez que una sección nueva migre
+// (Fase 10: 'contenido', Fase 11: 'identidad') — mismo patrón que
+// AgendaConfigSection.tsx y ClienteDetailDialog.tsx.
+type EditingSection = 'integraciones' | null;
 
 export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProps) {
   const { organization, isLoading: orgLoading, updateOrganization } = useOrganization();
@@ -101,7 +119,10 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [removingLogo, setRemovingLogo] = useState(false);
+  const [removingCover, setRemovingCover] = useState(false);
   const [customColorOpen, setCustomColorOpen] = useState(false);
+  const [editing, setEditing] = useState<EditingSection>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const hasSeededRef = useRef(false);
@@ -113,14 +134,21 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const { control, handleSubmit, watch, setValue, getValues, reset, formState } = form;
   const { isDirty, errors } = formState;
 
+  const integracionesForm = useForm<IntegracionesFormValues>({
+    resolver: zodResolver(integracionesSchema),
+    defaultValues: integracionesEmptyValues,
+  });
+  const { isDirty: integracionesDirty } = integracionesForm.formState;
+
   useEffect(() => {
-    onDirtyChange?.(isDirty);
-  }, [isDirty, onDirtyChange]);
+    onDirtyChange?.(isDirty || integracionesDirty);
+  }, [isDirty, integracionesDirty, onDirtyChange]);
 
   // Nombre (organizations) y el resto (portal_config) son dos fetches
   // independientes con timings distintos — el reset inicial espera a que
   // ambos resuelvan, una sola vez, para no pisar texto que el usuario ya
-  // empezó a escribir con un reset tardío.
+  // empezó a escribir con un reset tardío. Mismo gate para integracionesForm:
+  // los dos forms dependen de la misma condición de datos listos.
   useEffect(() => {
     if (hasSeededRef.current) return;
     if (orgLoading || loading || !organization || !config) return;
@@ -130,14 +158,14 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: config.description ?? '',
       primaryColor: config.primary_color ?? '',
       links: config.links ?? [],
-      metaPixelId: config.meta_pixel_id ?? '',
       logoPath: config.logo_path,
       coverPath: config.cover_path,
       coverPosX: config.cover_position_x ?? 50,
       coverPosY: config.cover_position_y ?? 50,
       coverZoom: config.cover_zoom ?? 1,
     });
-  }, [orgLoading, loading, organization, config, reset]);
+    integracionesForm.reset({ metaPixelId: config.meta_pixel_id ?? '' });
+  }, [orgLoading, loading, organization, config, reset, integracionesForm]);
 
   const watchedDescription = watch('description');
   const watchedPrimaryColor = watch('primaryColor');
@@ -193,19 +221,26 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const handleLogoFile = async (file: File) => {
     setUploadingLogo(true);
     const { error, path } = await uploadLogo(file);
-    setUploadingLogo(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      setUploadingLogo(false);
+      return toast.error(error.message);
+    }
     if (path) {
       setValue('logoPath', path, { shouldDirty: false });
       const { error: e } = await save({ logo_path: path });
+      setUploadingLogo(false);
       if (e) toast.error('No se pudo guardar el logo');
       else toast.success('Logo actualizado');
+    } else {
+      setUploadingLogo(false);
     }
   };
 
   const handleRemoveLogo = async () => {
+    setRemovingLogo(true);
     setValue('logoPath', null, { shouldDirty: false });
     const { error } = await removeLogo();
+    setRemovingLogo(false);
     if (error) toast.error('No se pudo quitar el logo');
     else toast.success('Logo quitado');
   };
@@ -213,25 +248,32 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const handleCoverFile = async (file: File) => {
     setUploadingCover(true);
     const { error, path } = await uploadCover(file);
-    setUploadingCover(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      setUploadingCover(false);
+      return toast.error(error.message);
+    }
     if (path) {
       setValue('coverPath', path, { shouldDirty: false });
       setValue('coverPosX', 50, { shouldDirty: false });
       setValue('coverPosY', 50, { shouldDirty: false });
       setValue('coverZoom', 1, { shouldDirty: false });
       const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
+      setUploadingCover(false);
       if (e) toast.error('No se pudo guardar la portada');
       else toast.success('Portada actualizada');
+    } else {
+      setUploadingCover(false);
     }
   };
 
   const handleRemoveCover = async () => {
+    setRemovingCover(true);
     setValue('coverPath', null, { shouldDirty: false });
     setValue('coverPosX', 50, { shouldDirty: false });
     setValue('coverPosY', 50, { shouldDirty: false });
     setValue('coverZoom', 1, { shouldDirty: false });
     const { error } = await removeCover();
+    setRemovingCover(false);
     if (error) toast.error('No se pudo quitar la portada');
     else toast.success('Portada quitada');
   };
@@ -283,7 +325,6 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: values.description.trim() || null,
       primary_color: values.primaryColor || null,
       links: normalizedLinks,
-      meta_pixel_id: values.metaPixelId.trim() || null,
     });
     setSavingAll(false);
 
@@ -304,7 +345,6 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       description: values.description,
       primaryColor: values.primaryColor,
       links: normalizedLinks,
-      metaPixelId: values.metaPixelId,
       logoPath: getValues('logoPath'),
       coverPath: getValues('coverPath'),
       coverPosX: getValues('coverPosX'),
@@ -313,19 +353,54 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     });
   };
 
+  const startEditingIntegraciones = () => {
+    integracionesForm.reset({ metaPixelId: config?.meta_pixel_id ?? '' });
+    setEditing('integraciones');
+  };
+
+  const cancelEditIntegraciones = () => {
+    integracionesForm.reset({ metaPixelId: config?.meta_pixel_id ?? '' });
+    setEditing(null);
+  };
+
+  const onSubmitIntegraciones = async (values: IntegracionesFormValues) => {
+    const { error } = await save({ meta_pixel_id: values.metaPixelId.trim() || null });
+    if (error) {
+      toast.error('No se pudo guardar el ID de píxel');
+      return;
+    }
+    toast.success('Cambios guardados');
+    integracionesForm.reset(values);
+    setEditing(null);
+  };
+
+  const handleSaveIntegraciones = () => {
+    void integracionesForm.handleSubmit(onSubmitIntegraciones)();
+  };
+
   if (!orgId) return null;
 
   if (orgLoading || loading) {
     return (
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6 min-w-0">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        {/* Espeja el bloque superior: Compartir (izquierda) + Vista previa. */}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4 min-w-0">
+            <Skeleton className="h-5 w-44" />
+            <Skeleton className="h-10 w-full" />
+            {/* 166px = QR de 140 + p-3 a cada lado + el borde de la caja. */}
+            <Skeleton className="h-[166px] w-[166px] rounded-lg" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-[420px] w-full rounded-[2rem] mx-auto max-w-[340px]" />
+          </div>
+        </div>
+        {/* Espeja la columna única del formulario. */}
+        <div className="max-w-3xl space-y-6">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-56 w-full rounded-lg" />
           <Skeleton className="h-40 w-full rounded-lg" />
-        </div>
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-[420px] w-full rounded-[2rem] mx-auto max-w-[340px]" />
         </div>
       </div>
     );
@@ -341,43 +416,137 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
   return (
     <Form {...form}>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        {/* === Columna config === */}
-        <form onSubmit={handleSubmit(onSubmit)} className="min-w-0">
-          {/* Barra de accesos — solo desktop */}
-          <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
-            <div className="flex items-center gap-1 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => scrollTo('portal-identidad')}
-                className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                Identidad
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollTo('portal-contenido')}
-                className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                Contenido
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollTo('portal-compartir')}
-                className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                Compartir
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollTo('portal-integraciones')}
-                className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                Integraciones
-              </button>
-            </div>
-          </nav>
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        {/* Barra de accesos — solo desktop */}
+        <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => scrollTo('portal-identidad')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Identidad
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTo('portal-contenido')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Contenido
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTo('portal-integraciones')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Integraciones
+            </button>
+          </div>
+        </nav>
 
+        {/* === Bloque superior — Compartir + Vista previa ===
+            Fuera del <form>: no tiene ningún campo registrado en RHF, solo
+            contenido de solo lectura y acciones (todos los botones son
+            type="button"). El límite del <form> coincide así con el límite
+            real de lo editable. */}
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          {/* Compartir tu portal — min-w-0 evita que la URL con break-all
+              desborde el track de la grilla. */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <h2 className="text-sm font-semibold">Compartir tu portal</h2>
+            </div>
+
+            <div className="space-y-6">
+              {/* Link público */}
+              <div className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" /> Link público del portal
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Compartilo con tus clientes para que reserven o gestionen su cita.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
+                  <div
+                    title={publicUrl}
+                    className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
+                  >
+                    {publicUrl}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+                      <Copy className="h-4 w-4 mr-1" /> Copiar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* QR */}
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <QrCode className="h-4 w-4" /> QR de reserva
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 items-start">
+                  <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
+                    {publicUrl && (
+                      <QRCodeCanvas
+                        value={publicUrl}
+                        size={140}
+                        includeMargin={false}
+                        aria-label={`Código QR del portal de ${orgName}`}
+                      />
+                    )}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
+                    <Download className="h-4 w-4 mr-1" /> Descargar QR
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Vista previa */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground">Vista previa</h3>
+            <PortalPreview
+              orgName={orgName}
+              fallbackLogo={organization?.logo_url || null}
+              portal={previewPortal}
+              emptyMessage={hasServices ? undefined : 'No hay servicios disponibles para reservar en este momento.'}
+            />
+            <p className="text-xs text-muted-foreground text-center">
+              Se actualiza en vivo. Los cambios se aplican al portal público al guardar.
+            </p>
+          </div>
+        </section>
+
+        {/* === Formulario — columna única, alineada con la columna de
+             Compartir de arriba (1152 - 24 de gap - 360 de preview = 768). === */}
+        {/* id="portal-form": el botón "Guardar cambios" vive fuera de este
+            <form> (después de Integraciones, que ya migró a su propia Card
+            con guardado independiente) y lo referencia vía form="portal-form"
+            — evita que Integraciones quede anidada dentro de este <form> sin
+            mover su posición visual ni tocar Identidad/Contenido. */}
+        <form id="portal-form" onSubmit={handleSubmit(onSubmit)} className="min-w-0 max-w-3xl">
           {/* 1 — Identidad visual */}
           <section id="portal-identidad" className="mt-6 scroll-mt-16">
             <div className="flex items-center gap-3 mb-4">
@@ -390,16 +559,17 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
             <div className="space-y-4">
               {/* Cover */}
               <div className="space-y-2">
-                <h4 className="text-sm font-medium flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" /> Foto de portada (opcional)
-                </h4>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4" /> Foto de portada{' '}
+                  <span className="text-muted-foreground font-normal">(opcional)</span>
+                </h3>
                 <PortalCoverUploader
                   coverUrl={coverUrl}
                   coverPositionX={watchedCoverPosX}
                   coverPositionY={watchedCoverPosY}
                   coverZoom={watchedCoverZoom}
                   uploading={uploadingCover}
-                  disabled={saving}
+                  disabled={removingCover || saving}
                   onUpload={handleCoverFile}
                   onRemove={handleRemoveCover}
                   onAdjust={() => setAdjustOpen(true)}
@@ -408,9 +578,10 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
               {/* Logo */}
               <div className="space-y-2">
-                <h4 className="text-sm font-medium flex items-center gap-2">
-                  <UserRound className="h-4 w-4" /> Logo (opcional)
-                </h4>
+                <h3 className="text-sm font-medium flex items-center gap-2">
+                  <UserRound className="h-4 w-4" /> Logo{' '}
+                  <span className="text-muted-foreground font-normal">(opcional)</span>
+                </h3>
                 <div className="flex items-center gap-3">
                   <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
                     {logoUrl ? (
@@ -444,36 +615,45 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                       {uploadingLogo ? 'Subiendo...' : watchedLogoPath ? 'Cambiar logo' : 'Subir logo'}
                     </Button>
                     {watchedLogoPath && (
-                      <Button type="button" variant="outline" size="sm" onClick={handleRemoveLogo} disabled={saving}>
-                        <Trash2 className="h-4 w-4 mr-1" /> Quitar
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRemoveLogo}
+                        disabled={removingLogo || saving}
+                        aria-label="Quitar logo"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> {removingLogo ? 'Quitando...' : 'Quitar'}
                       </Button>
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+                {!watchedLogoPath && (
+                  <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+                )}
               </div>
 
               {/* Nombre */}
-              <div className="space-y-2 pt-2">
-                <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Globe className="h-4 w-4" /> Nombre del negocio
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
-                  </p>
-                </div>
+              <div className="pt-2">
                 <FormField
                   control={control}
                   name="orgName"
                   render={({ field }) => (
                     <FormItem>
+                      <div className="space-y-1">
+                        <FormLabel className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" /> Nombre del negocio
+                        </FormLabel>
+                        <FormDescription className="text-xs">
+                          Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
+                        </FormDescription>
+                      </div>
                       <FormControl>
                         <Input
-                          id="portal-org-name"
                           {...field}
                           maxLength={80}
                           placeholder="Mi Barbería"
+                          className="sm:max-w-sm"
                           disabled={savingAll}
                         />
                       </FormControl>
@@ -486,9 +666,10 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               {/* Color principal */}
               <div className="space-y-3 pt-2">
                 <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Palette className="h-4 w-4" /> Color principal (opcional)
-                  </h4>
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <Palette className="h-4 w-4" /> Color principal{' '}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     Se aplica a botones y elementos destacados del portal.
                   </p>
@@ -503,36 +684,47 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                       Usar color personalizado
                     </Button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-3 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <input
-                        type="color"
-                        value={isValidHex(watchedPrimaryColor) ? watchedPrimaryColor : '#000000'}
-                        onChange={(e) => setValue('primaryColor', e.target.value.toUpperCase(), { shouldDirty: true, shouldValidate: true })}
-                        className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
-                      />
-                      <Input
-                        value={watchedPrimaryColor}
-                        onChange={(e) => setValue('primaryColor', e.target.value, { shouldDirty: true, shouldValidate: true })}
-                        placeholder="#000000"
-                        maxLength={7}
-                        className="font-mono w-32"
-                      />
-                      {watchedPrimaryColor && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setValue('primaryColor', '', { shouldDirty: true, shouldValidate: true })}
-                        >
-                          Quitar
-                        </Button>
-                      )}
-                    </div>
-                    {errors.primaryColor && (
-                      <p className="text-xs text-destructive">{errors.primaryColor.message}</p>
+                  <FormField
+                    control={control}
+                    name="primaryColor"
+                    render={() => (
+                      <FormItem>
+                        <CollapsibleContent className="pt-3 space-y-2">
+                          <FormLabel className="sr-only">Color personalizado en formato hexadecimal</FormLabel>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <input
+                              type="color"
+                              value={isValidHex(watchedPrimaryColor) ? watchedPrimaryColor : '#000000'}
+                              onChange={(e) => setValue('primaryColor', e.target.value.toUpperCase(), { shouldDirty: true, shouldValidate: true })}
+                              className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
+                              aria-label="Elegir color personalizado con el selector"
+                            />
+                            <FormControl>
+                              <Input
+                                value={watchedPrimaryColor}
+                                onChange={(e) => setValue('primaryColor', e.target.value, { shouldDirty: true, shouldValidate: true })}
+                                placeholder="#000000"
+                                maxLength={7}
+                                className="font-mono w-32"
+                              />
+                            </FormControl>
+                            {watchedPrimaryColor && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setValue('primaryColor', '', { shouldDirty: true, shouldValidate: true })}
+                                aria-label="Quitar color personalizado"
+                              >
+                                Quitar
+                              </Button>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </CollapsibleContent>
+                      </FormItem>
                     )}
-                  </CollapsibleContent>
+                  />
                 </Collapsible>
               </div>
             </div>
@@ -549,36 +741,36 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
             <div className="space-y-6">
               {/* Descripción corta */}
-              <div className="space-y-2">
-                <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <Type className="h-4 w-4" /> Descripción corta (opcional)
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Si la dejás vacía, mostramos un mensaje de bienvenida automático.
-                  </p>
-                </div>
-                <FormField
-                  control={control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Textarea {...field} maxLength={240} rows={3} placeholder={descPlaceholder} />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground text-right">{field.value.length}/240</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="space-y-1">
+                      <FormLabel className="flex items-center gap-2">
+                        <Type className="h-4 w-4" /> Descripción corta{' '}
+                        <span className="text-muted-foreground font-normal">(opcional)</span>
+                      </FormLabel>
+                      <FormDescription className="text-xs">
+                        Si la dejás vacía, mostramos un mensaje de bienvenida automático.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Textarea {...field} maxLength={240} rows={3} placeholder={descPlaceholder} />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground text-right">{field.value.length}/240</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Links personalizados */}
               <div className="space-y-3">
                 <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" /> Links personalizados (opcional)
-                  </h4>
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" /> Links personalizados{' '}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
                   </p>
@@ -596,158 +788,105 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               </div>
             </div>
           </section>
-
-          {/* 3 — Compartir tu portal */}
-          <section id="portal-compartir" className="border-t pt-6 mt-6 scroll-mt-16">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Globe className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-sm font-semibold">Compartir tu portal</h2>
-            </div>
-
-            <div className="space-y-6">
-              {/* Link público */}
-              <div className="space-y-2">
-                <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" /> Link público del portal
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Compartilo con tus clientes para que reserven o gestionen su cita.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
-                  <div
-                    title={publicUrl}
-                    className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
-                  >
-                    {publicUrl}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-                      <Copy className="h-4 w-4 mr-1" /> Copiar
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* QR */}
-              <div className="space-y-3">
-                <div>
-                  <h4 className="text-sm font-medium flex items-center gap-2">
-                    <QrCode className="h-4 w-4" /> QR de reserva
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
-                    {publicUrl && <QRCodeCanvas value={publicUrl} size={140} includeMargin={false} />}
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
-                    <Download className="h-4 w-4 mr-1" /> Descargar QR
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* 4 — Integraciones */}
-          <section id="portal-integraciones" className="border-t pt-6 mt-6 scroll-mt-16">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <BarChart3 className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-sm font-semibold">Integraciones</h2>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" /> ID de píxel de Meta (opcional)
-                </h4>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Medí las conversiones de tus campañas de Instagram y Facebook Ads a partir de las reservas del portal.
-                </p>
-              </div>
-              <FormField
-                control={control}
-                name="metaPixelId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        maxLength={20}
-                        inputMode="numeric"
-                        placeholder="1234567890123456"
-                        className="font-mono"
-                        disabled={savingAll}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-                <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                <span>
-                  Para conseguir el ID: entrá a Meta Business Manager → Events Manager → seleccioná tu
-                  píxel (o creá uno nuevo) → copiá el número que aparece como ID del píxel.
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* Guardado */}
-          <div className="flex justify-end border-t pt-6 mt-6">
-            <Button type="submit" disabled={savingAll || saving || loading} size="lg">
-              <Save className="h-4 w-4 mr-1" />
-              {savingAll ? 'Guardando...' : 'Guardar cambios'}
-            </Button>
-          </div>
         </form>
 
-        {/* === Columna preview === */}
-        <div className="lg:sticky lg:top-20 lg:self-start">
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Vista previa</h3>
-            <PortalPreview
-              orgName={orgName}
-              fallbackLogo={organization?.logo_url || null}
-              portal={previewPortal}
-              emptyMessage={hasServices ? undefined : 'No hay servicios disponibles para reservar en este momento.'}
-            />
-            <p className="text-xs text-muted-foreground text-center">
-              Se actualiza en vivo. Los cambios se aplican al portal público al guardar.
-            </p>
-          </div>
-        </div>
+        {/* 3 — Integraciones (Fase 9: Card propia, modo lectura/edición —
+            fuera de #portal-form a propósito, ver comentario en el <form>). */}
+        <section id="portal-integraciones" className="max-w-3xl border-t pt-6 mt-6 scroll-mt-16">
+          <EditableSectionHeader
+            title={
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                </span>
+                <span className="text-sm font-semibold truncate">Integraciones</span>
+              </span>
+            }
+            isEditing={editing === 'integraciones'}
+            saving={saving}
+            disabled={editing !== null}
+            onEdit={startEditingIntegraciones}
+            onCancel={cancelEditIntegraciones}
+            onSave={handleSaveIntegraciones}
+          />
 
-        <PortalCoverPositionDialog
-          open={adjustOpen}
-          onOpenChange={setAdjustOpen}
-          coverUrl={coverUrl}
-          logoUrl={logoUrl || organization?.logo_url || null}
-          orgName={orgName}
-          initialX={watchedCoverPosX}
-          initialY={watchedCoverPosY}
-          initialZoom={watchedCoverZoom}
-          saving={saving}
-          onSave={handleSaveCoverPosition}
-        />
+          <div className="space-y-3">
+            {editing === 'integraciones' ? (
+              <Form {...integracionesForm}>
+                <FormField
+                  control={integracionesForm.control}
+                  name="metaPixelId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="space-y-1">
+                        <FormLabel className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
+                          <span className="text-muted-foreground font-normal">(opcional)</span>
+                        </FormLabel>
+                        <FormDescription className="text-xs">
+                          Medí las conversiones de tus campañas de Instagram y Facebook Ads a partir de las reservas del portal.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          maxLength={20}
+                          inputMode="numeric"
+                          placeholder="1234567890123456"
+                          className="font-mono sm:max-w-xs"
+                          disabled={saving}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </Form>
+            ) : (
+              <div className="space-y-1">
+                <span className="flex items-center gap-2 text-xs font-medium">
+                  <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
+                  <span className="text-muted-foreground font-normal">(opcional)</span>
+                </span>
+                <span className={cn('block font-mono text-sm', config?.meta_pixel_id ? '' : 'text-muted-foreground italic')}>
+                  {config?.meta_pixel_id || '—'}
+                </span>
+              </div>
+            )}
+            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <span>
+                Para conseguir el ID: entrá a Meta Business Manager → Events Manager → seleccioná tu
+                píxel (o creá uno nuevo) → copiá el número que aparece como ID del píxel.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Guardado — Identidad visual + Contenido del portal (Integraciones
+            ya guarda por su cuenta, ver arriba). form="portal-form": el botón
+            vive fuera del <form> físicamente (después de Integraciones) pero
+            sigue enviándolo por id, sin cambiar su comportamiento nativo. */}
+        <div className="max-w-3xl flex justify-end border-t pt-6 mt-6">
+          <Button type="submit" form="portal-form" disabled={savingAll || saving || loading} size="lg">
+            <Save className="h-4 w-4 mr-1" />
+            {savingAll ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        </div>
       </div>
+
+      <PortalCoverPositionDialog
+        open={adjustOpen}
+        onOpenChange={setAdjustOpen}
+        coverUrl={coverUrl}
+        logoUrl={logoUrl || organization?.logo_url || null}
+        orgName={orgName}
+        initialX={watchedCoverPosX}
+        initialY={watchedCoverPosY}
+        initialZoom={watchedCoverZoom}
+        saving={saving}
+        onSave={handleSaveCoverPosition}
+      />
     </Form>
   );
 }

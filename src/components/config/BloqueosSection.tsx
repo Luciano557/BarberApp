@@ -159,8 +159,11 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <ShieldOff className="w-4 h-4 text-destructive" />
+            {/* Chip primary, no destructive: registrar una ausencia es una regla
+                de agenda que se edita acá, no una acción destructiva. Ver la
+                regla de color de chip en CRITERIOS_DISEÑO.md §1.9. */}
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShieldOff className="w-4 h-4 text-primary" />
             </div>
             <div>
               <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
@@ -169,7 +172,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
               </p>
             </div>
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openCreate}>
+          <Button size="sm" variant="outline" className="h-9 shrink-0 text-xs" onClick={openCreate}>
             <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
           </Button>
         </div>

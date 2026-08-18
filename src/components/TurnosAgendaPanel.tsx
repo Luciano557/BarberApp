@@ -7,7 +7,7 @@ import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
-import { AgendaManagement } from './config/AgendaManagement';
+import { AgendaManagement, type AgendaTab } from './config/AgendaManagement';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 function dbToBarber(row: any): Barber {
@@ -41,6 +41,10 @@ export function TurnosAgendaPanel({ onNavigateToHorarios }: TurnosAgendaPanelPro
   const [allBarbers, setAllBarbers] = useState<(Barber & { sucursalId: string | null })[]>([]);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
   const [selectedSucursalId, setSelectedSucursalId] = useState<string | undefined>(undefined);
+  // Refleja la pestaña de nivel superior de AgendaManagement (Agenda /
+  // Configuración) para que el título de acá arriba la siga, sin duplicar un
+  // segundo <h1> más abajo ni levantar el estado completo del hijo.
+  const [topTab, setTopTab] = useState<AgendaTab>('agenda');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
 
@@ -124,7 +128,13 @@ export function TurnosAgendaPanel({ onNavigateToHorarios }: TurnosAgendaPanelPro
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Turnos" icon={CalendarClock} subtitle="Configurá horarios, disponibilidad y bloqueos" />
+      <PageHeader
+        title={topTab === 'config' ? 'Configuración' : 'Turnos'}
+        icon={CalendarClock}
+        subtitle={topTab === 'config'
+          ? 'Ajustá cómo funciona esta sección.'
+          : 'Tu agenda, las reglas de reserva y el portal de tus clientes'}
+      />
 
       {visibleSucursales.length > 0 && (
         <div className="space-y-4 sm:space-y-6">
@@ -154,6 +164,7 @@ export function TurnosAgendaPanel({ onNavigateToHorarios }: TurnosAgendaPanelPro
                 return (b.rolesEquipo ?? []).includes('barber');
               })}
               onNavigateToHorarios={onNavigateToHorarios}
+              onTabChange={setTopTab}
             />
           )}
         </div>

@@ -57,9 +57,9 @@ export function usePortalConfig(organizationId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (opts?: { silent?: boolean }) => {
     if (!organizationId) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     const { data } = await supabase
       .from('portal_config')
       .select('*')
@@ -93,7 +93,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         meta_pixel_id: null,
       });
     }
-    setLoading(false);
+    if (!opts?.silent) setLoading(false);
   }, [organizationId]);
 
   useEffect(() => { fetch(); }, [fetch]);
@@ -123,7 +123,7 @@ export function usePortalConfig(organizationId: string | undefined) {
       .from('portal_config')
       .upsert(payload, { onConflict: 'organization_id' });
     setSaving(false);
-    if (!error) await fetch();
+    if (!error) await fetch({ silent: true });
     return { error };
   }, [organizationId, config, fetch]);
 
