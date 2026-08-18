@@ -134,6 +134,81 @@ Dentro de la app: **23 ocurrencias en 14 archivos**:
 | Alerta stock `amber-500/10 … amber-700` | `ProductoPickerDialog.tsx:294-296` | 3 |
 | Otros: `text-green-600` estado activo (`ProductoListItem.tsx:174`), `text-green-600` (`MercadoPagoConnect.tsx:70`), `text-amber-500` (`TurnoConflictDialog.tsx:40`), `red-*` en close de toast destructivo (`toast.tsx:70`, default shadcn) | — | 4 |
 
+### 1.9 Color del chip de ícono en headers de card — REGLA (declarada 2026-08-18)
+
+Formaliza un patrón que ya existía de facto en la app y no estaba escrito. El
+chip de ícono que acompaña al título de una card comunica **qué podés hacer con
+esa card**, antes de leer el contenido:
+
+| Tratamiento | Significado | Usar cuando |
+|---|---|---|
+| `bg-primary/10` + ícono `text-primary` | **Editable acá.** La card contiene algo que el usuario configura o gestiona sin salir de la pantalla. | Formularios de configuración, listas con alta/edición propia |
+| `bg-muted` + ícono `text-muted-foreground` | **Atajo o información.** La card explica algo o manda a otra pantalla; no se edita en el lugar. | Accesos directos, cards puramente informativas |
+
+**El criterio es "¿se edita acá?", no "¿qué tan importante es?" ni "¿es una
+acción riesgosa?".**
+
+- Usos de referencia de `bg-muted`: `HorariosAccesoDirectoCard.tsx:18` (atajo a
+  Mi Negocio), `CuentasSucursalConfig.tsx:66` (card informativa "Acceso
+  operativo"), `PortalPublicoSection.tsx` ("Compartir tu portal", corregido en
+  el build de accesibilidad 2026-08-18: contiene un link de solo lectura,
+  botones Copiar/Ver portal y un QR — nada se edita ahí — pasó de
+  `bg-primary/10` a `bg-muted`).
+- Usos de referencia de `bg-primary/10`: `AgendaConfigSection.tsx` (Reglas de
+  reserva, Límites y cancelaciones), `BloqueosSection.tsx` (Gestionar ausencias
+  y cierres), `PaymentMethodsConfig.tsx:220`, `ConfigMenu.tsx:92,117`,
+  `PortalPublicoSection.tsx` (Identidad visual, Contenido del portal,
+  Integraciones — sí se editan ahí).
+
+**No existe un tercer tratamiento por peligrosidad.** `bg-destructive/10` **no**
+se usa para chips de header de card: lo destructivo se comunica en el botón de
+la acción concreta (`variant="destructive"`, `text-destructive` en el ícono de
+eliminar), no en el encabezado de la sección entera. Corregido en
+`BloqueosSection.tsx` (build 2026-08-18): registrar una ausencia o un cierre es
+una regla de agenda que se edita en la pantalla, no una acción destructiva —
+pasó de `bg-destructive/10` a `bg-primary/10`.
+
+> **Nota sobre el tamaño**: el chip de header de card es `h-8 w-8 rounded-lg`
+> con ícono `h-4 w-4`. No debe reusarse ese mismo tamaño para un header que
+> sea *padre* de esas cards — si el padre y el hijo comparten chip y tamaño de
+> fuente, la jerarquía se colapsa visualmente (hallazgo de la auditoría
+> 2026-08-18 sobre "Configuración general", que se eliminó por eso).
+
+### 1.10 Título de campo: `FormLabel` vs. heading — REGLA (declarada 2026-08-18)
+
+Un título de campo (`<h4>`/`<h3>` con ícono, encabezando un bloque de
+formulario) cumple dos papeles distintos según cuántos controles hay debajo, y
+solo uno de los dos es correcto en cada caso:
+
+| Situación | Tratamiento |
+|---|---|
+| El bloque tiene **un solo control** (un `Input`, un `Textarea`) | El título **es** el nombre accesible del control: `FormLabel`, no heading. |
+| El bloque tiene **varios controles, o ninguno que nombrar** (uploader con botones, paleta + swatch + hex, editor de links, QR + botón) | El título es un **heading** (`h3` bajo un `h2` de sección); cada control adentro se nombra por su cuenta (`aria-label`, `Label htmlFor`, etc.). |
+
+**Por qué no usar `FormLabel` con `sr-only` en todos los casos** (que evitaría
+elegir): un heading real entra en el índice de navegación por encabezados de
+un lector de pantalla, algo que un campo de formulario no necesita y que un
+`FormLabel` nunca provee — convertir todo a `FormLabel` sr-only borra ese nivel
+de la jerarquía. Y al revés, un heading sobre un solo campo se anuncia dos
+veces con el lector de pantalla en foco (encabezado + luego el nombre del
+campo al enfocarlo) sin aportar nada que el label no diga ya.
+
+**Caso especial — campo RHF editado por más de un control** (ej. un color con
+swatch nativo + input hex, ambos escribiendo el mismo campo): el título sigue
+siendo heading (hay más de un control), pero el campo lleva su propio
+`FormField` con `FormLabel` `sr-only` sobre el control textual/canónico
+(`FormControl`), y el resto se nombra con `aria-label`. Ver
+`AgendaConfigSection.tsx:386-389` (comentario explicando el criterio del
+control "Personalizado") y `PortalPublicoSection.tsx` (bloque "Color
+personalizado", build de accesibilidad 2026-08-18).
+
+- Ejemplo de referencia con `FormLabel` real (un solo control):
+  `PortalPublicoSection.tsx` — Nombre del negocio, Descripción corta, ID de
+  píxel de Meta.
+- Ejemplo de referencia con heading (varios controles): `PortalPublicoSection.tsx`
+  — Foto de portada, Logo, Color principal, Links personalizados, Link público
+  del portal, QR de reserva.
+
 ---
 
 ## 2. Inventario de componentes compartidos
