@@ -1,6 +1,6 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-08-19
+Última actualización: 2026-08-20
 
 ## Turnos / Agenda
 
@@ -20,12 +20,20 @@ con guardado independiente. "Logo y portada" es la única sin modo edición
 — sigue siendo autosave puro, por decisión de producto (no tiene sentido
 forzar un ciclo Editar/Guardar sobre campos que ya persisten al instante).
 
-El `<form id="portal-form">` legacy que orquestaba el submit único de toda
-la pantalla ("Guardar cambios") **se eliminó junto con su botón** — no le
-quedaba ningún campo editable que guardar tras esta fase. Se mantiene solo
-como contenedor reactivo (`useForm`/`watch`/`setValue`) de los 5 campos de
-autosave de Logo y portada; es candidato directo a la Fase 13 (colapsarlo a
-`useState` plano), señalada pero no ejecutada.
+**Fase 13 (limpieza del form legacy) completa.** El `<form id="portal-form">`
+y el `useForm` que sostenían logo/portada como "contenedor reactivo" ya no
+existen — se reemplazaron por un `useState<PortalMedia>` simple. Motivo: el
+schema de ese form estaba vacío (`z.object({})`, con un cast `as unknown as`
+que tapaba el desajuste de tipos) y su `isDirty` era matemáticamente
+imposible de volverse `true` (los 13 `setValue` que lo alimentaban pasaban
+`shouldDirty: false` sin excepción) — un componente RHF completo sosteniendo
+5 campos que nunca se validan ni ensucian. Cero cambio de comportamiento:
+el autosave de logo/portada (subir, quitar, ajustar encuadre) funciona
+idéntico, y `previewPortal` sigue reflejando esos campos en vivo.
+
+**Las 5 secciones de la pantalla usan `<Card>` de forma consistente** —
+"Compartir tu portal" fue la última en migrar (mantiene su chip `bg-muted`,
+sin modo edición, solo cambia el envoltorio visual).
 
 La vista previa en vivo (`previewPortal`) ya combina fuentes condicionales
 por primera vez: mientras Contenido o Nombre y color están en edición, la
@@ -55,9 +63,11 @@ con esta fase la convivencia de los dos modelos quedó más nítida, no
 resuelta: Logo/portada es instantáneo por decisión de producto, las otras 3
 secciones son diferidas por Editar/Guardar; sigue siendo una decisión de
 producto pendiente, no técnica), Fase 6 (cajas nativas al componente
-compartido), Fase 13 (limpieza del `useForm` degenerado). El h2 anidado
-dentro de la vista previa (BookingLanding) sigue sin resolver — requiere
-tocar el componente del portal público real.
+compartido). El h2 anidado dentro de la vista previa (BookingLanding)
+sigue sin resolver — requiere tocar el componente del portal público real.
+Deriva conocida sin resolver: el `<Skeleton>` de carga inicial de Compartir
+tu portal sigue espejando el layout apilado anterior a las pestañas
+Link/QR — ver `MODULOS/turnos-agenda.md`.
 
 **Horarios de trabajo**: reubicados de Turnos a Mi Negocio → ficha de
 Sucursal, sección "Horarios de atención" con pestañas Sucursal/Barberos.

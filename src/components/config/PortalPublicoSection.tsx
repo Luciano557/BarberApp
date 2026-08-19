@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -33,21 +33,12 @@ import { cn } from '@/lib/utils';
 
 const URL_RE = /^https?:\/\//i;
 
-// Fase 10+11: "Logo y portada" no tiene schema propio — sigue siendo
-// autosave puro (Opción C), sin useForm ni modo edición. Los campos que
-// quedan abajo son los únicos que el <form id="portal-form"> legacy sigue
-// gestionando (ver PortalFormValues más abajo).
-const portalFormSchema = z.object({});
-
-type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
-
-// logoPath/coverPath/cover_* viajan en este useForm para participar de
-// isDirty y de reset(), pero no tienen regla de validación propia — ya la
-// aplica usePortalConfig al momento de subir el archivo. Por eso el schema
-// de arriba queda vacío: es puro contenedor reactivo para estos 5 campos,
-// que se autoguardan sin pasar por ningún submit. Candidato a colapsar a
-// useState plano en Fase 13 (no se ejecuta en este build).
-type PortalFormValues = PortalFormSchemaValues & {
+// "Logo y portada" no tiene schema propio — sigue siendo autosave puro
+// (Opción C), sin useForm ni modo edición. logoPath/coverPath/cover_* no
+// tienen regla de validación (ya la aplica usePortalConfig al momento de
+// subir el archivo) ni necesitan isDirty (se autoguardan sin pasar por
+// ningún submit) — por eso viven en un useState simple, no en RHF.
+type PortalMedia = {
   logoPath: string | null;
   coverPath: string | null;
   coverPosX: number;
@@ -55,7 +46,7 @@ type PortalFormValues = PortalFormSchemaValues & {
   coverZoom: number;
 };
 
-const emptyValues: PortalFormValues = {
+const emptyMedia: PortalMedia = {
   logoPath: null,
   coverPath: null,
   coverPosX: 50,
@@ -145,13 +136,8 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const qrRef = useRef<HTMLDivElement>(null);
   const hasSeededRef = useRef(false);
 
-  // Contenedor reactivo de logo/portada — ver comentario en PortalFormValues.
-  const form = useForm<PortalFormValues>({
-    resolver: zodResolver(portalFormSchema) as unknown as Resolver<PortalFormValues>,
-    defaultValues: emptyValues,
-  });
-  const { watch, setValue, reset, formState } = form;
-  const { isDirty } = formState;
+  // Contenedor reactivo de logo/portada — ver comentario en PortalMedia.
+  const [media, setMedia] = useState<PortalMedia>(emptyMedia);
 
   const integracionesForm = useForm<IntegracionesFormValues>({
     resolver: zodResolver(integracionesSchema),
@@ -172,8 +158,8 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const { isDirty: nombreColorDirty, isSubmitting: nombreColorSubmitting } = nombreColorForm.formState;
 
   useEffect(() => {
-    onDirtyChange?.(isDirty || contenidoDirty || nombreColorDirty || integracionesDirty);
-  }, [isDirty, contenidoDirty, nombreColorDirty, integracionesDirty, onDirtyChange]);
+    onDirtyChange?.(contenidoDirty || nombreColorDirty || integracionesDirty);
+  }, [contenidoDirty, nombreColorDirty, integracionesDirty, onDirtyChange]);
 
   // Nombre (organizations) y el resto (portal_config) son dos fetches
   // independientes con timings distintos — el reset inicial espera a que
@@ -184,7 +170,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     if (hasSeededRef.current) return;
     if (orgLoading || loading || !organization || !config) return;
     hasSeededRef.current = true;
-    reset({
+    setMedia({
       logoPath: config.logo_path,
       coverPath: config.cover_path,
       coverPosX: config.cover_position_x ?? 50,
@@ -200,13 +186,13 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       primaryColor: config.primary_color ?? '',
     });
     integracionesForm.reset({ metaPixelId: config.meta_pixel_id ?? '' });
-  }, [orgLoading, loading, organization, config, reset, contenidoForm, nombreColorForm, integracionesForm]);
+  }, [orgLoading, loading, organization, config, contenidoForm, nombreColorForm, integracionesForm]);
 
-  const watchedLogoPath = watch('logoPath');
-  const watchedCoverPath = watch('coverPath');
-  const watchedCoverPosX = watch('coverPosX');
-  const watchedCoverPosY = watch('coverPosY');
-  const watchedCoverZoom = watch('coverZoom');
+  const watchedLogoPath = media.logoPath;
+  const watchedCoverPath = media.coverPath;
+  const watchedCoverPosX = media.coverPosX;
+  const watchedCoverPosY = media.coverPosY;
+  const watchedCoverZoom = media.coverZoom;
 
   // watch() se llama siempre, incondicional (regla de hooks) — la selección
   // de cuál fuente manda (form en edición vs. config guardado) ocurre más
@@ -275,7 +261,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       return toast.error(error.message);
     }
     if (path) {
-      setValue('logoPath', path, { shouldDirty: false });
+      setMedia((m) => ({ ...m, logoPath: path }));
       const { error: e } = await save({ logo_path: path });
       setUploadingLogo(false);
       if (e) toast.error('No se pudo guardar el logo');
@@ -287,7 +273,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
   const handleRemoveLogo = async () => {
     setRemovingLogo(true);
-    setValue('logoPath', null, { shouldDirty: false });
+    setMedia((m) => ({ ...m, logoPath: null }));
     const { error } = await removeLogo();
     setRemovingLogo(false);
     if (error) toast.error('No se pudo quitar el logo');
@@ -302,10 +288,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
       return toast.error(error.message);
     }
     if (path) {
-      setValue('coverPath', path, { shouldDirty: false });
-      setValue('coverPosX', 50, { shouldDirty: false });
-      setValue('coverPosY', 50, { shouldDirty: false });
-      setValue('coverZoom', 1, { shouldDirty: false });
+      setMedia((m) => ({ ...m, coverPath: path, coverPosX: 50, coverPosY: 50, coverZoom: 1 }));
       const { error: e } = await save({ cover_path: path, cover_position_x: 50, cover_position_y: 50, cover_zoom: 1 });
       setUploadingCover(false);
       if (e) toast.error('No se pudo guardar la portada');
@@ -317,10 +300,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
 
   const handleRemoveCover = async () => {
     setRemovingCover(true);
-    setValue('coverPath', null, { shouldDirty: false });
-    setValue('coverPosX', 50, { shouldDirty: false });
-    setValue('coverPosY', 50, { shouldDirty: false });
-    setValue('coverZoom', 1, { shouldDirty: false });
+    setMedia((m) => ({ ...m, coverPath: null, coverPosX: 50, coverPosY: 50, coverZoom: 1 }));
     const { error } = await removeCover();
     setRemovingCover(false);
     if (error) toast.error('No se pudo quitar la portada');
@@ -328,9 +308,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   };
 
   const handleSaveCoverPosition = async (x: number, y: number, zoom: number) => {
-    setValue('coverPosX', x, { shouldDirty: false });
-    setValue('coverPosY', y, { shouldDirty: false });
-    setValue('coverZoom', zoom, { shouldDirty: false });
+    setMedia((m) => ({ ...m, coverPosX: x, coverPosY: y, coverZoom: zoom }));
     const { error } = await save({ cover_position_x: x, cover_position_y: y, cover_zoom: zoom });
     if (error) toast.error('No se pudo guardar el encuadre');
     else toast.success('Encuadre guardado');
@@ -507,7 +485,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const linksArrayMessage = linkErrors && !Array.isArray(linkErrors) ? linkErrors.message : undefined;
 
   return (
-    <Form {...form}>
+    <>
       <div className="mx-auto w-full max-w-6xl space-y-6">
         {/* Barra de accesos — solo desktop */}
         <nav className="hidden md:block sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 py-2 shadow-sm">
@@ -548,17 +526,20 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
             lectura y acciones (todos los botones son type="button"). No se
             toca en esta fase. */}
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-          {/* Compartir tu portal — min-w-0 evita que la URL con break-all
-              desborde el track de la grilla. */}
-          <div className="min-w-0">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                <Globe className="h-4 w-4 text-muted-foreground" />
+          {/* Compartir tu portal — min-w-0 va en la Card (no en un wrapper
+              aparte): evita que la URL con break-all desborde el track de
+              la grilla. */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                  <Globe className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <h2 className="text-sm font-semibold">Compartir tu portal</h2>
               </div>
-              <h2 className="text-sm font-semibold">Compartir tu portal</h2>
-            </div>
+            </CardHeader>
 
-            <div className="space-y-4">
+            <CardContent className="space-y-4">
               <SegmentedControl
                 options={[
                   { value: 'link', label: 'Link público' },
@@ -633,8 +614,8 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                   </div>
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Vista previa */}
           <div className="space-y-3">
@@ -655,111 +636,107 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
              Compartir de arriba (1152 - 24 de gap - 360 de preview = 768). === */}
         <div className="max-w-3xl space-y-6">
           {/* 1 — Logo y portada: SIN modo edición, autosave intacto (Opción
-              C). id="portal-form" se mantiene como contenedor reactivo de
-              estos 5 campos — candidato a colapsar en Fase 13, no se toca
-              acá. Nada dentro depende de la semántica de <form> (no hay
-              type="submit" ni <input type="text"> registrados), pero se
-              conserva la etiqueta tal cual pedía el build. */}
-          <form id="portal-form">
-            <Card id="portal-logo-portada" className="scroll-mt-16">
-              <CardHeader className="pb-0">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                    <ImageIcon className="h-4 w-4 text-primary" />
-                  </span>
-                  <h2 className="text-sm font-semibold">Logo y portada</h2>
+              C). Sus 5 campos viven en el useState<PortalMedia> del padre
+              (media/setMedia) — ya no hay <form>/useForm legacy envolviendo
+              esta Card (Fase 13, cerrada). */}
+          <Card id="portal-logo-portada" className="scroll-mt-16">
+            <CardHeader className="pb-0">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <ImageIcon className="h-4 w-4 text-primary" />
+                </span>
+                <h2 className="text-sm font-semibold">Logo y portada</h2>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SegmentedControl
+                options={[
+                  { value: 'logo', label: 'Logo' },
+                  { value: 'portada', label: 'Portada' },
+                ]}
+                value={mediaTab}
+                onChange={(v) => setMediaTab(v as 'logo' | 'portada')}
+              />
+
+              {mediaTab === 'portada' && (
+                <div role="tabpanel" aria-label="Foto de portada" className="space-y-2">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" /> Foto de portada{' '}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </h3>
+                  <PortalCoverUploader
+                    coverUrl={coverUrl}
+                    coverPositionX={watchedCoverPosX}
+                    coverPositionY={watchedCoverPosY}
+                    coverZoom={watchedCoverZoom}
+                    uploading={uploadingCover}
+                    disabled={removingCover || saving}
+                    onUpload={handleCoverFile}
+                    onRemove={handleRemoveCover}
+                    onAdjust={() => setAdjustOpen(true)}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <SegmentedControl
-                  options={[
-                    { value: 'logo', label: 'Logo' },
-                    { value: 'portada', label: 'Portada' },
-                  ]}
-                  value={mediaTab}
-                  onChange={(v) => setMediaTab(v as 'logo' | 'portada')}
-                />
+              )}
 
-                {mediaTab === 'portada' && (
-                  <div role="tabpanel" aria-label="Foto de portada" className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" /> Foto de portada{' '}
-                      <span className="text-muted-foreground font-normal">(opcional)</span>
-                    </h3>
-                    <PortalCoverUploader
-                      coverUrl={coverUrl}
-                      coverPositionX={watchedCoverPosX}
-                      coverPositionY={watchedCoverPosY}
-                      coverZoom={watchedCoverZoom}
-                      uploading={uploadingCover}
-                      disabled={removingCover || saving}
-                      onUpload={handleCoverFile}
-                      onRemove={handleRemoveCover}
-                      onAdjust={() => setAdjustOpen(true)}
-                    />
-                  </div>
-                )}
-
-                {mediaTab === 'logo' && (
-                  <div role="tabpanel" aria-label="Logo" className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                      <UserRound className="h-4 w-4" /> Logo{' '}
-                      <span className="text-muted-foreground font-normal">(opcional)</span>
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
-                        {logoUrl ? (
-                          <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-sm font-semibold text-muted-foreground">
-                            {orgName.slice(0, 1).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <input
-                          ref={fileRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            e.target.value = '';
-                            if (f) handleLogoFile(f);
-                          }}
-                        />
+              {mediaTab === 'logo' && (
+                <div role="tabpanel" aria-label="Logo" className="space-y-2">
+                  <h3 className="text-sm font-medium flex items-center gap-2">
+                    <UserRound className="h-4 w-4" /> Logo{' '}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </h3>
+                  <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
+                      {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-semibold text-muted-foreground">
+                          {orgName.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (f) handleLogoFile(f);
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={uploadingLogo || saving}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        {uploadingLogo ? 'Subiendo...' : watchedLogoPath ? 'Cambiar logo' : 'Subir logo'}
+                      </Button>
+                      {watchedLogoPath && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => fileRef.current?.click()}
-                          disabled={uploadingLogo || saving}
+                          onClick={handleRemoveLogo}
+                          disabled={removingLogo || saving}
+                          aria-label="Quitar logo"
                         >
-                          <Upload className="h-4 w-4 mr-1" />
-                          {uploadingLogo ? 'Subiendo...' : watchedLogoPath ? 'Cambiar logo' : 'Subir logo'}
+                          <Trash2 className="h-4 w-4 mr-1" /> {removingLogo ? 'Quitando...' : 'Quitar'}
                         </Button>
-                        {watchedLogoPath && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRemoveLogo}
-                            disabled={removingLogo || saving}
-                            aria-label="Quitar logo"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" /> {removingLogo ? 'Quitando...' : 'Quitar'}
-                          </Button>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    {!watchedLogoPath && (
-                      <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
-                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </form>
+                  {!watchedLogoPath && (
+                    <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* 2 — Nombre y color */}
           <Card id="portal-nombre-color" className="scroll-mt-16">
@@ -1112,6 +1089,6 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
         saving={saving}
         onSave={handleSaveCoverPosition}
       />
-    </Form>
+    </>
   );
 }

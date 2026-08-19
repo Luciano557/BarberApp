@@ -30,7 +30,11 @@ también el de la barra de accesos rápidos).
 `AgendaConfigSection.tsx`). Recorrido: Fase 9 (Integraciones, piloto) →
 Fase 9+10+11 (Contenido del portal + Nombre y color + Logo y portada, las 3
 juntas en un solo build a pedido explícito, sin validación intermedia entre
-piezas).
+piezas) → pestañas `SegmentedControl` en Logo/Portada y en Compartir tu
+portal → Fase 13 (limpieza del contenedor reactivo legacy) + "Compartir tu
+portal" a `<Card>` (build B+A conjunto, B primero por ser el cambio visual
+validable a simple vista, A después por ser un refactor sin cambio visual
+esperado).
 
 `type EditingSection = 'integraciones' | 'contenido' | 'nombreColor' | null`
 — 3 `useForm` independientes (`integracionesForm`, `contenidoForm`,
@@ -58,18 +62,48 @@ nunca lleva condicional. El derivado `orgName` (usado en 5 lugares: QR,
 vez a nivel de componente.
 
 **El `<form id="portal-form">` legacy y su botón "Guardar cambios" se
-eliminaron** — tras sacarle Nombre/Color/Descripción/Links, no le quedaba
-ningún campo editable que guardar (dejarlo hubiera sido un botón que no
-guarda nada). El `useForm` legacy y la etiqueta `<form id="portal-form">`
-**se mantienen**, ahora envolviendo solo la Card "Logo y portada" — siguen
-siendo el contenedor reactivo de sus 5 campos (`logoPath`, `coverPath`,
-`coverPosX/Y`, `coverZoom`). Candidato directo a **Fase 13** (colapsar ese
-`useForm` a `useState` plano, retirar el `<form>` que ya no tiene ninguna
-razón semántica para existir) — señalado, no ejecutado en este build.
+eliminaron** en el build que cerró Fase 9+10+11 — tras sacarle
+Nombre/Color/Descripción/Links, no le quedaba ningún campo editable que
+guardar.
 
-Las 4 secciones usan el componente `<Card>` estándar (antes Integraciones
-usaba `<section className="border-t...">`; se retrofiteó para consistencia
-total entre las 4).
+**Fase 13 (limpieza del contenedor reactivo) completa.** El `useForm`
+legacy y la etiqueta `<form id="portal-form">` que envolvían "Logo y
+portada" (para sostener `logoPath`/`coverPath`/`coverPosX/Y`/`coverZoom`)
+se reemplazaron por `type PortalMedia` + `const [media, setMedia] = useState<PortalMedia>(emptyMedia)`.
+Motivo verificado antes de tocar nada: `portalFormSchema` era literalmente
+`z.object({})` — cero validación — sostenido con un cast
+`as unknown as Resolver<PortalFormValues>` que tapaba el desajuste de
+tipos frente al `useForm`; y `formState.isDirty` de ese form era
+matemáticamente `false` siempre, porque los 13 `setValue` que lo tocaban
+pasaban `{ shouldDirty: false }` sin una sola excepción (verificado con
+grep antes del build) — término muerto en el `onDirtyChange` OR, ahora
+retirado (`contenidoDirty || nombreColorDirty || integracionesDirty`).
+
+Migración mecánica de los 5 handlers de autosave: cada `setValue('campo', v, { shouldDirty: false })`
+pasó a `setMedia(m => ({ ...m, campo: v }))`; en los 3 handlers que tocan
+varios campos de portada a la vez (`handleCoverFile`, `handleRemoveCover`,
+`handleSaveCoverPosition`) quedó una sola actualización atómica del objeto
+en vez de 4 llamadas sueltas. El seeding (antes `reset({...})`) pasa a un
+`setMedia({...})` único, bajo el mismo `hasSeededRef`. `previewPortal` y
+los `useMemo` de `logoUrl`/`coverUrl` leen de `media.*` en vez de
+`watch()` — misma reactividad (`useState` re-renderiza igual que una
+suscripción `watch()` de RHF), cero cambio de comportamiento visible. El
+`<Form {...form}>` raíz que envolvía toda la pantalla se reemplazó por un
+fragment (`<>...</>`) — no tenía consumidores propios: los 3 `FormField`
+reales siempre usaron `contenidoForm.control`/`nombreColorForm.control`/
+`integracionesForm.control`, cada uno con su propio `<Form>` anidado.
+`PortalCoverPositionDialog` (portaleado por Radix) es indiferente a este
+cambio de wrapper raíz.
+
+**Las 5 secciones de la pantalla usan `<Card>` de forma consistente** —
+"Compartir tu portal" fue la última en convertir (antes un `<div>` suelto
+con `min-w-0` para que la URL con `break-all` no desbordara el track de la
+grilla; ese `min-w-0` se mudó al propio `<Card>`, sin cambio de
+comportamiento). Mantiene su chip `bg-muted` y su clasificación de
+CRITERIOS_DISEÑO §1.9 (sección sin campos editables) — solo cambió el
+envoltorio visual, no se le agregó `EditableSectionHeader` ni modo edición.
+El layout de dos columnas (Compartir + Vista previa) de la Fase 7 y las
+pestañas Link/QR quedaron intactos.
 
 **"Compartir tu portal" con pestañas** (mismo `SegmentedControl`): antes
 apilaba Link público + QR verticalmente; ahora alterna entre ambos vía
