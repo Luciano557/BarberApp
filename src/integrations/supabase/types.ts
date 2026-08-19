@@ -2854,13 +2854,13 @@ export type Database = {
       ReportesMensuales: {
         Row: {
           ComisionesTotales: number | null
-          ComisiÃ³nPromedioPorBarbero: number | null
-          ComisiÃ³nPromedioPorCorte: number | null
-          ComisiÃ³nPromedioPorCortePorcentual: number | null
+          ComisiónPromedioPorBarbero: number | null
+          ComisiónPromedioPorCorte: number | null
+          ComisiónPromedioPorCortePorcentual: number | null
           CostoMedioPorServicio: number | null
           CostoPorServicio: number | null
           created_at: string
-          CrecimientoEnFacturaciÃ³n: number | null
+          CrecimientoEnFacturación: number | null
           CrecimientoEnServicios: number | null
           FacturacionTotal: number | null
           GananciaNeta: number | null
@@ -2876,18 +2876,18 @@ export type Database = {
           ServiciosPorBarbero: number | null
           ServiciosTotales: number | null
           sucursal_id: string | null
-          TasaDeOcupaciÃ³n: number | null
+          TasaDeOcupación: number | null
           TicketPromedio: number | null
         }
         Insert: {
           ComisionesTotales?: number | null
-          ComisiÃ³nPromedioPorBarbero?: number | null
-          ComisiÃ³nPromedioPorCorte?: number | null
-          ComisiÃ³nPromedioPorCortePorcentual?: number | null
+          ComisiónPromedioPorBarbero?: number | null
+          ComisiónPromedioPorCorte?: number | null
+          ComisiónPromedioPorCortePorcentual?: number | null
           CostoMedioPorServicio?: number | null
           CostoPorServicio?: number | null
           created_at?: string
-          CrecimientoEnFacturaciÃ³n?: number | null
+          CrecimientoEnFacturación?: number | null
           CrecimientoEnServicios?: number | null
           FacturacionTotal?: number | null
           GananciaNeta?: number | null
@@ -2903,18 +2903,18 @@ export type Database = {
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
           sucursal_id?: string | null
-          TasaDeOcupaciÃ³n?: number | null
+          TasaDeOcupación?: number | null
           TicketPromedio?: number | null
         }
         Update: {
           ComisionesTotales?: number | null
-          ComisiÃ³nPromedioPorBarbero?: number | null
-          ComisiÃ³nPromedioPorCorte?: number | null
-          ComisiÃ³nPromedioPorCortePorcentual?: number | null
+          ComisiónPromedioPorBarbero?: number | null
+          ComisiónPromedioPorCorte?: number | null
+          ComisiónPromedioPorCortePorcentual?: number | null
           CostoMedioPorServicio?: number | null
           CostoPorServicio?: number | null
           created_at?: string
-          CrecimientoEnFacturaciÃ³n?: number | null
+          CrecimientoEnFacturación?: number | null
           CrecimientoEnServicios?: number | null
           FacturacionTotal?: number | null
           GananciaNeta?: number | null
@@ -2930,7 +2930,7 @@ export type Database = {
           ServiciosPorBarbero?: number | null
           ServiciosTotales?: number | null
           sucursal_id?: string | null
-          TasaDeOcupaciÃ³n?: number | null
+          TasaDeOcupación?: number | null
           TicketPromedio?: number | null
         }
         Relationships: [
