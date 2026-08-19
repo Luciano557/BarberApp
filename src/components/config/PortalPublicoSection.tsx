@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/components/ui/form';
 import { EditableSectionHeader } from '@/components/ui/EditableSectionHeader';
-import { Copy, ExternalLink, Download, Upload, Trash2, Save, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound, BarChart3, Info } from 'lucide-react';
+import { Copy, ExternalLink, Download, Upload, Trash2, Link as LinkIcon, QrCode, Palette, Type, Globe, ChevronDown, Image as ImageIcon, UserRound, BarChart3, Info } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -31,6 +33,46 @@ import { cn } from '@/lib/utils';
 
 const URL_RE = /^https?:\/\//i;
 
+// Fase 10+11: "Logo y portada" no tiene schema propio — sigue siendo
+// autosave puro (Opción C), sin useForm ni modo edición. Los campos que
+// quedan abajo son los únicos que el <form id="portal-form"> legacy sigue
+// gestionando (ver PortalFormValues más abajo).
+const portalFormSchema = z.object({});
+
+type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
+
+// logoPath/coverPath/cover_* viajan en este useForm para participar de
+// isDirty y de reset(), pero no tienen regla de validación propia — ya la
+// aplica usePortalConfig al momento de subir el archivo. Por eso el schema
+// de arriba queda vacío: es puro contenedor reactivo para estos 5 campos,
+// que se autoguardan sin pasar por ningún submit. Candidato a colapsar a
+// useState plano en Fase 13 (no se ejecuta en este build).
+type PortalFormValues = PortalFormSchemaValues & {
+  logoPath: string | null;
+  coverPath: string | null;
+  coverPosX: number;
+  coverPosY: number;
+  coverZoom: number;
+};
+
+const emptyValues: PortalFormValues = {
+  logoPath: null,
+  coverPath: null,
+  coverPosX: 50,
+  coverPosY: 50,
+  coverZoom: 1,
+};
+
+// Fase 9: Integraciones — primer piloto del patrón de modo lectura/edición.
+const integracionesSchema = z.object({
+  metaPixelId: z.string().trim().optional().default('')
+    .refine((v) => !v || /^[0-9]{10,20}$/.test(v), 'El ID debe tener solo números, entre 10 y 20 dígitos.'),
+});
+type IntegracionesFormValues = z.infer<typeof integracionesSchema>;
+const integracionesEmptyValues: IntegracionesFormValues = { metaPixelId: '' };
+
+// Fase 10: "Contenido del portal" — descripción + links, ambos alimentan
+// previewPortal en vivo mientras esta Card está en edición.
 const linkSchema = z.object({
   label: z.string().trim().min(1, 'La etiqueta no puede quedar vacía.').max(80, 'La etiqueta no puede superar los 80 caracteres.'),
   url: z.string(),
@@ -46,52 +88,23 @@ const linkSchema = z.object({
   }
 });
 
-const portalFormSchema = z.object({
-  orgName: z.string().trim().min(1, 'El nombre del negocio no puede quedar vacío.').max(80, 'El nombre del negocio supera los 80 caracteres.'),
+const contenidoSchema = z.object({
   description: z.string().max(240, 'La descripción supera 240 caracteres.').optional().default(''),
-  primaryColor: z.string().optional().default('').refine((v) => !v || isValidHex(v), 'El color debe tener formato #RRGGBB'),
   links: z.array(linkSchema).max(4, 'Máximo 4 links'),
 });
+type ContenidoFormValues = z.infer<typeof contenidoSchema>;
+const contenidoEmptyValues: ContenidoFormValues = { description: '', links: [] };
 
-type PortalFormSchemaValues = z.infer<typeof portalFormSchema>;
-
-// Fase 9: Integraciones migró a su propia Card con modo lectura/edición
-// (EditableSectionHeader) — su schema queda separado del form monolítico
-// de arriba, que ahora solo cubre Identidad visual y Contenido del portal.
-const integracionesSchema = z.object({
-  metaPixelId: z.string().trim().optional().default('')
-    .refine((v) => !v || /^[0-9]{10,20}$/.test(v), 'El ID debe tener solo números, entre 10 y 20 dígitos.'),
+// Fase 11: "Nombre y color" — mitad de la ex "Identidad visual" que sí
+// requiere guardado explícito (la otra mitad, Logo y portada, es autosave).
+// Guardado cross-tabla: orgName va a organizations, primaryColor a
+// portal_config — mismo manejo de fallo parcial que tenía el form legacy.
+const nombreColorSchema = z.object({
+  orgName: z.string().trim().min(1, 'El nombre del negocio no puede quedar vacío.').max(80, 'El nombre del negocio supera los 80 caracteres.'),
+  primaryColor: z.string().optional().default('').refine((v) => !v || isValidHex(v), 'El color debe tener formato #RRGGBB'),
 });
-
-type IntegracionesFormValues = z.infer<typeof integracionesSchema>;
-
-// logoPath/coverPath/cover_* viajan en el mismo useForm para participar de
-// isDirty y de reset(), pero no tienen regla de validación propia — ya la
-// aplica usePortalConfig al momento de subir el archivo. Por eso quedan
-// fuera de portalFormSchema y se cargan a mano vía setValue.
-type PortalFormValues = PortalFormSchemaValues & {
-  logoPath: string | null;
-  coverPath: string | null;
-  coverPosX: number;
-  coverPosY: number;
-  coverZoom: number;
-};
-
-const emptyValues: PortalFormValues = {
-  orgName: '',
-  description: '',
-  primaryColor: '',
-  links: [],
-  logoPath: null,
-  coverPath: null,
-  coverPosX: 50,
-  coverPosY: 50,
-  coverZoom: 1,
-};
-
-const integracionesEmptyValues: IntegracionesFormValues = {
-  metaPixelId: '',
-};
+type NombreColorFormValues = z.infer<typeof nombreColorSchema>;
+const nombreColorEmptyValues: NombreColorFormValues = { orgName: '', primaryColor: '' };
 
 interface PortalPublicoSectionProps {
   /** Avisa a AgendaManagement.tsx si hay cambios sin guardar, para que pueda
@@ -99,11 +112,11 @@ interface PortalPublicoSectionProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
-// Fase 9: solo "Integraciones" migró al patrón de modo lectura/edición.
-// Se agrega un miembro por acá cada vez que una sección nueva migre
-// (Fase 10: 'contenido', Fase 11: 'identidad') — mismo patrón que
-// AgendaConfigSection.tsx y ClienteDetailDialog.tsx.
-type EditingSection = 'integraciones' | null;
+// Se agrega un miembro por cada Card que migra al patrón de modo
+// lectura/edición. "Logo y portada" nunca entra acá — es autosave puro,
+// sin editing (Opción C). Mismo mecanismo que AgendaConfigSection.tsx y
+// ClienteDetailDialog.tsx (ese último ya lo corre con 4 secciones).
+type EditingSection = 'integraciones' | 'contenido' | 'nombreColor' | null;
 
 export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProps) {
   const { organization, isLoading: orgLoading, updateOrganization } = useOrganization();
@@ -115,7 +128,6 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   } = usePortalConfig(orgId);
   const hasServices = usePortalHasServices(orgId);
 
-  const [savingAll, setSavingAll] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -123,59 +135,86 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const [removingCover, setRemovingCover] = useState(false);
   const [customColorOpen, setCustomColorOpen] = useState(false);
   const [editing, setEditing] = useState<EditingSection>(null);
+  // Pestaña activa dentro de "Logo y portada" — puramente de presentación,
+  // sin relación con editing: esta Card no tiene modo edición (autosave).
+  const [mediaTab, setMediaTab] = useState<'logo' | 'portada'>('logo');
+  // Pestaña activa dentro de "Compartir tu portal" — arranca en el link,
+  // que es la acción más frecuente de la sección.
+  const [shareTab, setShareTab] = useState<'link' | 'qr'>('link');
   const fileRef = useRef<HTMLInputElement>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const hasSeededRef = useRef(false);
 
+  // Contenedor reactivo de logo/portada — ver comentario en PortalFormValues.
   const form = useForm<PortalFormValues>({
     resolver: zodResolver(portalFormSchema) as unknown as Resolver<PortalFormValues>,
     defaultValues: emptyValues,
   });
-  const { control, handleSubmit, watch, setValue, getValues, reset, formState } = form;
-  const { isDirty, errors } = formState;
+  const { watch, setValue, reset, formState } = form;
+  const { isDirty } = formState;
 
   const integracionesForm = useForm<IntegracionesFormValues>({
     resolver: zodResolver(integracionesSchema),
     defaultValues: integracionesEmptyValues,
   });
-  const { isDirty: integracionesDirty } = integracionesForm.formState;
+  const { isDirty: integracionesDirty, isSubmitting: integracionesSubmitting } = integracionesForm.formState;
+
+  const contenidoForm = useForm<ContenidoFormValues>({
+    resolver: zodResolver(contenidoSchema),
+    defaultValues: contenidoEmptyValues,
+  });
+  const { isDirty: contenidoDirty, isSubmitting: contenidoSubmitting } = contenidoForm.formState;
+
+  const nombreColorForm = useForm<NombreColorFormValues>({
+    resolver: zodResolver(nombreColorSchema),
+    defaultValues: nombreColorEmptyValues,
+  });
+  const { isDirty: nombreColorDirty, isSubmitting: nombreColorSubmitting } = nombreColorForm.formState;
 
   useEffect(() => {
-    onDirtyChange?.(isDirty || integracionesDirty);
-  }, [isDirty, integracionesDirty, onDirtyChange]);
+    onDirtyChange?.(isDirty || contenidoDirty || nombreColorDirty || integracionesDirty);
+  }, [isDirty, contenidoDirty, nombreColorDirty, integracionesDirty, onDirtyChange]);
 
   // Nombre (organizations) y el resto (portal_config) son dos fetches
   // independientes con timings distintos — el reset inicial espera a que
   // ambos resuelvan, una sola vez, para no pisar texto que el usuario ya
-  // empezó a escribir con un reset tardío. Mismo gate para integracionesForm:
-  // los dos forms dependen de la misma condición de datos listos.
+  // empezó a escribir con un reset tardío. Mismo gate para los 3 forms de
+  // Card: todos dependen de la misma condición de datos listos.
   useEffect(() => {
     if (hasSeededRef.current) return;
     if (orgLoading || loading || !organization || !config) return;
     hasSeededRef.current = true;
     reset({
-      orgName: organization.name ?? '',
-      description: config.description ?? '',
-      primaryColor: config.primary_color ?? '',
-      links: config.links ?? [],
       logoPath: config.logo_path,
       coverPath: config.cover_path,
       coverPosX: config.cover_position_x ?? 50,
       coverPosY: config.cover_position_y ?? 50,
       coverZoom: config.cover_zoom ?? 1,
     });
+    contenidoForm.reset({
+      description: config.description ?? '',
+      links: config.links ?? [],
+    });
+    nombreColorForm.reset({
+      orgName: organization.name ?? '',
+      primaryColor: config.primary_color ?? '',
+    });
     integracionesForm.reset({ metaPixelId: config.meta_pixel_id ?? '' });
-  }, [orgLoading, loading, organization, config, reset, integracionesForm]);
+  }, [orgLoading, loading, organization, config, reset, contenidoForm, nombreColorForm, integracionesForm]);
 
-  const watchedDescription = watch('description');
-  const watchedPrimaryColor = watch('primaryColor');
-  const watchedLinks = watch('links');
   const watchedLogoPath = watch('logoPath');
   const watchedCoverPath = watch('coverPath');
   const watchedCoverPosX = watch('coverPosX');
   const watchedCoverPosY = watch('coverPosY');
   const watchedCoverZoom = watch('coverZoom');
-  const watchedOrgName = watch('orgName');
+
+  // watch() se llama siempre, incondicional (regla de hooks) — la selección
+  // de cuál fuente manda (form en edición vs. config guardado) ocurre más
+  // abajo, al armar previewPortal y el derivado orgName.
+  const contenidoDescriptionWatch = contenidoForm.watch('description');
+  const contenidoLinksWatch = contenidoForm.watch('links');
+  const nombreColorOrgNameWatch = nombreColorForm.watch('orgName');
+  const nombreColorPrimaryColorWatch = nombreColorForm.watch('primaryColor');
 
   const publicUrl = useMemo(() => {
     if (!organization?.slug) return '';
@@ -185,19 +224,29 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   const logoUrl = useMemo(() => getLogoPublicUrl(watchedLogoPath), [watchedLogoPath]);
   const coverUrl = useMemo(() => getCoverPublicUrl(watchedCoverPath), [watchedCoverPath]);
 
+  // Logo/portada: sin condicional — son autosave, siempre reflejan el valor
+  // más reciente sin ambigüedad de "cuál form manda" (no tienen editing).
+  // Descripción/links/color: mientras su Card está en edición, la preview
+  // sigue el borrador en vivo (watch); si no, refleja lo último guardado
+  // (config). editing es un puntero único — nunca hay dos Cards en edición
+  // a la vez, así que no hay caso ambiguo de "cuál de las dos manda".
+  const previewDescription = editing === 'contenido' ? contenidoDescriptionWatch : (config?.description ?? '');
+  const previewLinks = editing === 'contenido' ? contenidoLinksWatch : (config?.links ?? []);
+  const previewPrimaryColorRaw = editing === 'nombreColor' ? nombreColorPrimaryColorWatch : (config?.primary_color ?? '');
+
   const previewPortal = useMemo(() => ({
     logo_url: logoUrl || organization?.logo_url || null,
     cover_url: coverUrl || null,
     cover_position_x: watchedCoverPosX,
     cover_position_y: watchedCoverPosY,
     cover_zoom: watchedCoverZoom,
-    description: watchedDescription.trim() || null,
-    primary_color: isValidHex(watchedPrimaryColor) ? watchedPrimaryColor : null,
-    links: watchedLinks
+    description: previewDescription.trim() || null,
+    primary_color: isValidHex(previewPrimaryColorRaw) ? previewPrimaryColorRaw : null,
+    links: previewLinks
       .filter((l) => l.active && l.label.trim() && URL_RE.test(l.url))
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((l) => ({ label: l.label, url: l.url, icon: l.icon ?? null })),
-  }), [logoUrl, coverUrl, watchedCoverPosX, watchedCoverPosY, watchedCoverZoom, organization?.logo_url, watchedDescription, watchedPrimaryColor, watchedLinks]);
+  }), [logoUrl, coverUrl, watchedCoverPosX, watchedCoverPosY, watchedCoverZoom, organization?.logo_url, previewDescription, previewPrimaryColorRaw, previewLinks]);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -287,72 +336,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     else toast.success('Encuadre guardado');
   };
 
-  const handleColorPreset = (hex: string) => {
-    setValue('primaryColor', hex, { shouldDirty: true, shouldValidate: true });
-  };
-
-  const handleLinksChange = (next: PortalLink[]) => {
-    setValue('links', next, { shouldDirty: true, shouldValidate: true });
-  };
-
-  const onSubmit = async (values: PortalFormSchemaValues) => {
-    setSavingAll(true);
-
-    const normalizedLinks: PortalLink[] = values.links.map((l, i) => ({
-      ...l,
-      label: l.label.trim(),
-      url: l.url ?? '',
-      active: l.active ?? true,
-      sort_order: i,
-      icon: isValidIconKey(l.icon) ? l.icon : null,
-    })) as PortalLink[];
-
-    // 1. organizations.name — solo si cambió. Si falla, abortamos sin tocar
-    //    portal_config para no dejar los datos a medio guardar.
-    const nameChanged = values.orgName !== (organization?.name ?? '');
-    if (nameChanged) {
-      const { error: orgError } = await updateOrganization({ name: values.orgName });
-      if (orgError) {
-        setSavingAll(false);
-        toast.error(`No se pudo actualizar el nombre del negocio: ${orgError.message}`);
-        return;
-      }
-    }
-
-    // 2. portal_config — el nombre ya quedó guardado, así que un fallo acá
-    //    no puede reportarse como "no se guardó nada".
-    const { error } = await save({
-      description: values.description.trim() || null,
-      primary_color: values.primaryColor || null,
-      links: normalizedLinks,
-    });
-    setSavingAll(false);
-
-    if (error) {
-      toast.error(
-        nameChanged
-          ? `El nombre del negocio se guardó, pero no se pudo guardar el resto: ${error.message}`
-          : `No se pudo guardar: ${error.message}`,
-      );
-      return;
-    }
-
-    toast.success('Cambios guardados');
-    // Limpia isDirty sin pisar logo/portada/encuadre, que no pasaron por
-    // este submit y ya están confirmados en servidor por su cuenta.
-    reset({
-      orgName: values.orgName,
-      description: values.description,
-      primaryColor: values.primaryColor,
-      links: normalizedLinks,
-      logoPath: getValues('logoPath'),
-      coverPath: getValues('coverPath'),
-      coverPosX: getValues('coverPosX'),
-      coverPosY: getValues('coverPosY'),
-      coverZoom: getValues('coverZoom'),
-    });
-  };
-
+  // --- Integraciones (Fase 9) ---
   const startEditingIntegraciones = () => {
     integracionesForm.reset({ metaPixelId: config?.meta_pixel_id ?? '' });
     setEditing('integraciones');
@@ -378,6 +362,108 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     void integracionesForm.handleSubmit(onSubmitIntegraciones)();
   };
 
+  // --- Contenido del portal (Fase 10) ---
+  const startEditingContenido = () => {
+    contenidoForm.reset({
+      description: config?.description ?? '',
+      links: config?.links ?? [],
+    });
+    setEditing('contenido');
+  };
+
+  const cancelEditContenido = () => {
+    contenidoForm.reset({
+      description: config?.description ?? '',
+      links: config?.links ?? [],
+    });
+    setEditing(null);
+  };
+
+  const handleLinksChange = (next: PortalLink[]) => {
+    contenidoForm.setValue('links', next, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const onSubmitContenido = async (values: ContenidoFormValues) => {
+    const normalizedLinks: PortalLink[] = values.links.map((l, i) => ({
+      ...l,
+      label: l.label.trim(),
+      url: l.url ?? '',
+      active: l.active ?? true,
+      sort_order: i,
+      icon: isValidIconKey(l.icon) ? l.icon : null,
+    })) as PortalLink[];
+
+    const { error } = await save({
+      description: values.description.trim() || null,
+      links: normalizedLinks,
+    });
+    if (error) {
+      toast.error(`No se pudo guardar: ${error.message}`);
+      return;
+    }
+    toast.success('Cambios guardados');
+    contenidoForm.reset({ description: values.description, links: normalizedLinks });
+    setEditing(null);
+  };
+
+  const handleSaveContenido = () => {
+    void contenidoForm.handleSubmit(onSubmitContenido)();
+  };
+
+  // --- Nombre y color (Fase 11) ---
+  const startEditingNombreColor = () => {
+    nombreColorForm.reset({
+      orgName: organization?.name ?? '',
+      primaryColor: config?.primary_color ?? '',
+    });
+    setEditing('nombreColor');
+  };
+
+  const cancelEditNombreColor = () => {
+    nombreColorForm.reset({
+      orgName: organization?.name ?? '',
+      primaryColor: config?.primary_color ?? '',
+    });
+    setEditing(null);
+  };
+
+  const handleColorPreset = (hex: string) => {
+    nombreColorForm.setValue('primaryColor', hex, { shouldDirty: true, shouldValidate: true });
+  };
+
+  const onSubmitNombreColor = async (values: NombreColorFormValues) => {
+    // organizations.name — solo si cambió. Si falla, abortamos sin tocar
+    // portal_config para no dejar los datos a medio guardar.
+    const nameChanged = values.orgName !== (organization?.name ?? '');
+    if (nameChanged) {
+      const { error: orgError } = await updateOrganization({ name: values.orgName });
+      if (orgError) {
+        toast.error(`No se pudo actualizar el nombre del negocio: ${orgError.message}`);
+        return;
+      }
+    }
+
+    // portal_config — el nombre ya quedó guardado, así que un fallo acá no
+    // puede reportarse como "no se guardó nada".
+    const { error } = await save({ primary_color: values.primaryColor || null });
+    if (error) {
+      toast.error(
+        nameChanged
+          ? `El nombre del negocio se guardó, pero no se pudo guardar el resto: ${error.message}`
+          : `No se pudo guardar: ${error.message}`,
+      );
+      return;
+    }
+
+    toast.success('Cambios guardados');
+    nombreColorForm.reset(values);
+    setEditing(null);
+  };
+
+  const handleSaveNombreColor = () => {
+    void nombreColorForm.handleSubmit(onSubmitNombreColor)();
+  };
+
   if (!orgId) return null;
 
   if (orgLoading || loading) {
@@ -396,7 +482,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
             <Skeleton className="h-[420px] w-full rounded-[2rem] mx-auto max-w-[340px]" />
           </div>
         </div>
-        {/* Espeja la columna única del formulario. */}
+        {/* Espeja la columna única de Cards. */}
         <div className="max-w-3xl space-y-6">
           <Skeleton className="h-24 w-full rounded-lg" />
           <Skeleton className="h-56 w-full rounded-lg" />
@@ -406,12 +492,18 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
     );
   }
 
-  // La preview sigue el borrador en vivo; si el campo queda vacío mientras se
-  // edita, cae al nombre ya guardado en vez de mostrar el placeholder genérico.
-  const orgName = watchedOrgName.trim() || organization?.name || 'Mi Barbería';
+  // orgName: en lectura, el nombre guardado de la organización. En edición
+  // de "Nombre y color", sigue el borrador en vivo (si queda vacío mientras
+  // se edita, cae al nombre ya guardado, no al placeholder genérico). Se
+  // calcula acá y no adentro de la Card porque lo consumen 5 lugares:
+  // aria-label del QR, PortalPreview, inicial del avatar sin logo,
+  // descPlaceholder del Textarea, y PortalCoverPositionDialog.
+  const orgName = editing === 'nombreColor'
+    ? (nombreColorOrgNameWatch.trim() || organization?.name || 'Mi Barbería')
+    : (organization?.name || 'Mi Barbería');
   const descPlaceholder = `Bienvenido al portal de reservas de ${orgName}. Reservá tu turno o gestioná tu cita de forma simple.`;
 
-  const linkErrors = errors.links;
+  const linkErrors = contenidoForm.formState.errors.links;
   const linksArrayMessage = linkErrors && !Array.isArray(linkErrors) ? linkErrors.message : undefined;
 
   return (
@@ -422,10 +514,17 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
           <div className="flex items-center gap-1 overflow-x-auto">
             <button
               type="button"
-              onClick={() => scrollTo('portal-identidad')}
+              onClick={() => scrollTo('portal-logo-portada')}
               className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              Identidad
+              Logo y portada
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollTo('portal-nombre-color')}
+              className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              Nombre y color
             </button>
             <button
               type="button"
@@ -445,10 +544,9 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
         </nav>
 
         {/* === Bloque superior — Compartir + Vista previa ===
-            Fuera del <form>: no tiene ningún campo registrado en RHF, solo
-            contenido de solo lectura y acciones (todos los botones son
-            type="button"). El límite del <form> coincide así con el límite
-            real de lo editable. */}
+            Sin ningún campo registrado en RHF, solo contenido de solo
+            lectura y acciones (todos los botones son type="button"). No se
+            toca en esta fase. */}
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Compartir tu portal — min-w-0 evita que la URL con break-all
               desborde el track de la grilla. */}
@@ -460,67 +558,81 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
               <h2 className="text-sm font-semibold">Compartir tu portal</h2>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
+              <SegmentedControl
+                options={[
+                  { value: 'link', label: 'Link público' },
+                  { value: 'qr', label: 'QR' },
+                ]}
+                value={shareTab}
+                onChange={(v) => setShareTab(v as 'link' | 'qr')}
+                className="sm:max-w-xs"
+              />
+
               {/* Link público */}
-              <div className="space-y-2">
-                <div>
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" /> Link público del portal
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Compartilo con tus clientes para que reserven o gestionen su cita.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
-                  <div
-                    title={publicUrl}
-                    className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
-                  >
-                    {publicUrl}
+              {shareTab === 'link' && (
+                <div role="tabpanel" aria-label="Link público del portal" className="space-y-2">
+                  <div>
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4" /> Link público del portal
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Compartilo con tus clientes para que reserven o gestionen su cita.
+                    </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
-                      <Copy className="h-4 w-4 mr-1" /> Copiar
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    {/* No es un input: evita el foco y el auto-zoom de iOS, y permite ver la URL completa en 2 lineas */}
+                    <div
+                      title={publicUrl}
+                      className="w-full sm:w-auto rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs min-h-10 flex-1 min-w-0 select-all break-all whitespace-normal"
                     >
-                      <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
-                    </Button>
+                      {publicUrl}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+                        <Copy className="h-4 w-4 mr-1" /> Copiar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => publicUrl && window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" /> Ver portal
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* QR */}
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    <QrCode className="h-4 w-4" /> QR de reserva
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 items-start">
-                  <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
-                    {publicUrl && (
-                      <QRCodeCanvas
-                        value={publicUrl}
-                        size={140}
-                        includeMargin={false}
-                        aria-label={`Código QR del portal de ${orgName}`}
-                      />
-                    )}
+              {shareTab === 'qr' && (
+                <div role="tabpanel" aria-label="QR de reserva" className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <QrCode className="h-4 w-4" /> QR de reserva
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Imprimilo o compartilo digitalmente para que tus clientes accedan al portal.
+                    </p>
                   </div>
-                  <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
-                    <Download className="h-4 w-4 mr-1" /> Descargar QR
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start">
+                    <div ref={qrRef} className="p-3 bg-white rounded-lg border border-border inline-block">
+                      {publicUrl && (
+                        <QRCodeCanvas
+                          value={publicUrl}
+                          size={140}
+                          includeMargin={false}
+                          aria-label={`Código QR del portal de ${orgName}`}
+                        />
+                      )}
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleDownloadQR}>
+                      <Download className="h-4 w-4 mr-1" /> Descargar QR
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -539,339 +651,452 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
           </div>
         </section>
 
-        {/* === Formulario — columna única, alineada con la columna de
+        {/* === Columna única de Cards — alineada con la columna de
              Compartir de arriba (1152 - 24 de gap - 360 de preview = 768). === */}
-        {/* id="portal-form": el botón "Guardar cambios" vive fuera de este
-            <form> (después de Integraciones, que ya migró a su propia Card
-            con guardado independiente) y lo referencia vía form="portal-form"
-            — evita que Integraciones quede anidada dentro de este <form> sin
-            mover su posición visual ni tocar Identidad/Contenido. */}
-        <form id="portal-form" onSubmit={handleSubmit(onSubmit)} className="min-w-0 max-w-3xl">
-          {/* 1 — Identidad visual */}
-          <section id="portal-identidad" className="mt-6 scroll-mt-16">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Palette className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-sm font-semibold">Identidad visual</h2>
-            </div>
-
-            <div className="space-y-4">
-              {/* Cover */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4" /> Foto de portada{' '}
-                  <span className="text-muted-foreground font-normal">(opcional)</span>
-                </h3>
-                <PortalCoverUploader
-                  coverUrl={coverUrl}
-                  coverPositionX={watchedCoverPosX}
-                  coverPositionY={watchedCoverPosY}
-                  coverZoom={watchedCoverZoom}
-                  uploading={uploadingCover}
-                  disabled={removingCover || saving}
-                  onUpload={handleCoverFile}
-                  onRemove={handleRemoveCover}
-                  onAdjust={() => setAdjustOpen(true)}
-                />
-              </div>
-
-              {/* Logo */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium flex items-center gap-2">
-                  <UserRound className="h-4 w-4" /> Logo{' '}
-                  <span className="text-muted-foreground font-normal">(opcional)</span>
-                </h3>
+        <div className="max-w-3xl space-y-6">
+          {/* 1 — Logo y portada: SIN modo edición, autosave intacto (Opción
+              C). id="portal-form" se mantiene como contenedor reactivo de
+              estos 5 campos — candidato a colapsar en Fase 13, no se toca
+              acá. Nada dentro depende de la semántica de <form> (no hay
+              type="submit" ni <input type="text"> registrados), pero se
+              conserva la etiqueta tal cual pedía el build. */}
+          <form id="portal-form">
+            <Card id="portal-logo-portada" className="scroll-mt-16">
+              <CardHeader className="pb-0">
                 <div className="flex items-center gap-3">
-                  <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        {orgName.slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        e.target.value = '';
-                        if (f) handleLogoFile(f);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileRef.current?.click()}
-                      disabled={uploadingLogo || saving}
-                    >
-                      <Upload className="h-4 w-4 mr-1" />
-                      {uploadingLogo ? 'Subiendo...' : watchedLogoPath ? 'Cambiar logo' : 'Subir logo'}
-                    </Button>
-                    {watchedLogoPath && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRemoveLogo}
-                        disabled={removingLogo || saving}
-                        aria-label="Quitar logo"
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" /> {removingLogo ? 'Quitando...' : 'Quitar'}
-                      </Button>
-                    )}
-                  </div>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                    <ImageIcon className="h-4 w-4 text-primary" />
+                  </span>
+                  <h2 className="text-sm font-semibold">Logo y portada</h2>
                 </div>
-                {!watchedLogoPath && (
-                  <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
-                )}
-              </div>
-
-              {/* Nombre */}
-              <div className="pt-2">
-                <FormField
-                  control={control}
-                  name="orgName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="space-y-1">
-                        <FormLabel className="flex items-center gap-2">
-                          <Globe className="h-4 w-4" /> Nombre del negocio
-                        </FormLabel>
-                        <FormDescription className="text-xs">
-                          Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          maxLength={80}
-                          placeholder="Mi Barbería"
-                          className="sm:max-w-sm"
-                          disabled={savingAll}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <SegmentedControl
+                  options={[
+                    { value: 'logo', label: 'Logo' },
+                    { value: 'portada', label: 'Portada' },
+                  ]}
+                  value={mediaTab}
+                  onChange={(v) => setMediaTab(v as 'logo' | 'portada')}
                 />
-              </div>
 
-              {/* Color principal */}
-              <div className="space-y-3 pt-2">
-                <div>
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    <Palette className="h-4 w-4" /> Color principal{' '}
-                    <span className="text-muted-foreground font-normal">(opcional)</span>
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Se aplica a botones y elementos destacados del portal.
-                  </p>
-                </div>
+                {mediaTab === 'portada' && (
+                  <div role="tabpanel" aria-label="Foto de portada" className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" /> Foto de portada{' '}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </h3>
+                    <PortalCoverUploader
+                      coverUrl={coverUrl}
+                      coverPositionX={watchedCoverPosX}
+                      coverPositionY={watchedCoverPosY}
+                      coverZoom={watchedCoverZoom}
+                      uploading={uploadingCover}
+                      disabled={removingCover || saving}
+                      onUpload={handleCoverFile}
+                      onRemove={handleRemoveCover}
+                      onAdjust={() => setAdjustOpen(true)}
+                    />
+                  </div>
+                )}
 
-                <PortalColorPalette value={watchedPrimaryColor} onChange={handleColorPreset} />
+                {mediaTab === 'logo' && (
+                  <div role="tabpanel" aria-label="Logo" className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <UserRound className="h-4 w-4" /> Logo{' '}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border border-border flex items-center justify-center shrink-0">
+                        {logoUrl ? (
+                          <img src={logoUrl} alt="Logo" className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            {orgName.slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = '';
+                            if (f) handleLogoFile(f);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileRef.current?.click()}
+                          disabled={uploadingLogo || saving}
+                        >
+                          <Upload className="h-4 w-4 mr-1" />
+                          {uploadingLogo ? 'Subiendo...' : watchedLogoPath ? 'Cambiar logo' : 'Subir logo'}
+                        </Button>
+                        {watchedLogoPath && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRemoveLogo}
+                            disabled={removingLogo || saving}
+                            aria-label="Quitar logo"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" /> {removingLogo ? 'Quitando...' : 'Quitar'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {!watchedLogoPath && (
+                      <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 1 MB.</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </form>
 
-                <Collapsible open={customColorOpen} onOpenChange={setCustomColorOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button type="button" variant="ghost" size="sm" className="px-2 h-8 text-xs text-muted-foreground hover:text-foreground">
-                      <ChevronDown className={cn('h-3.5 w-3.5 mr-1 transition-transform', customColorOpen && 'rotate-180')} />
-                      Usar color personalizado
-                    </Button>
-                  </CollapsibleTrigger>
-                  <FormField
-                    control={control}
-                    name="primaryColor"
-                    render={() => (
-                      <FormItem>
-                        <CollapsibleContent className="pt-3 space-y-2">
-                          <FormLabel className="sr-only">Color personalizado en formato hexadecimal</FormLabel>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <input
-                              type="color"
-                              value={isValidHex(watchedPrimaryColor) ? watchedPrimaryColor : '#000000'}
-                              onChange={(e) => setValue('primaryColor', e.target.value.toUpperCase(), { shouldDirty: true, shouldValidate: true })}
-                              className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
-                              aria-label="Elegir color personalizado con el selector"
-                            />
-                            <FormControl>
-                              <Input
-                                value={watchedPrimaryColor}
-                                onChange={(e) => setValue('primaryColor', e.target.value, { shouldDirty: true, shouldValidate: true })}
-                                placeholder="#000000"
-                                maxLength={7}
-                                className="font-mono w-32"
-                              />
-                            </FormControl>
-                            {watchedPrimaryColor && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setValue('primaryColor', '', { shouldDirty: true, shouldValidate: true })}
-                                aria-label="Quitar color personalizado"
-                              >
-                                Quitar
-                              </Button>
-                            )}
+          {/* 2 — Nombre y color */}
+          <Card id="portal-nombre-color" className="scroll-mt-16">
+            <CardHeader className="pb-0">
+              <EditableSectionHeader
+                title={
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <Palette className="h-4 w-4 text-primary" />
+                    </span>
+                    <span className="text-sm font-semibold truncate">Nombre y color</span>
+                  </span>
+                }
+                isEditing={editing === 'nombreColor'}
+                saving={nombreColorSubmitting}
+                disabled={editing !== null}
+                onEdit={startEditingNombreColor}
+                onCancel={cancelEditNombreColor}
+                onSave={handleSaveNombreColor}
+              />
+            </CardHeader>
+            <CardContent>
+              {editing === 'nombreColor' ? (
+                <Form {...nombreColorForm}>
+                  <div className="space-y-4">
+                    {/* Nombre */}
+                    <FormField
+                      control={nombreColorForm.control}
+                      name="orgName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="space-y-1">
+                            <FormLabel className="flex items-center gap-2">
+                              <Globe className="h-4 w-4" /> Nombre del negocio
+                            </FormLabel>
+                            <FormDescription className="text-xs">
+                              Este es el nombre de tu negocio en toda la aplicación — no solo en el portal.
+                            </FormDescription>
                           </div>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              maxLength={80}
+                              placeholder="Mi Barbería"
+                              className="sm:max-w-sm"
+                              disabled={nombreColorSubmitting}
+                            />
+                          </FormControl>
                           <FormMessage />
-                        </CollapsibleContent>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Color principal */}
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-sm font-medium flex items-center gap-2">
+                          <Palette className="h-4 w-4" /> Color principal{' '}
+                          <span className="text-muted-foreground font-normal">(opcional)</span>
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Se aplica a botones y elementos destacados del portal.
+                        </p>
+                      </div>
+
+                      <PortalColorPalette value={nombreColorPrimaryColorWatch} onChange={handleColorPreset} />
+
+                      <Collapsible open={customColorOpen} onOpenChange={setCustomColorOpen}>
+                        <CollapsibleTrigger asChild>
+                          <Button type="button" variant="ghost" size="sm" className="px-2 h-8 text-xs text-muted-foreground hover:text-foreground">
+                            <ChevronDown className={cn('h-3.5 w-3.5 mr-1 transition-transform', customColorOpen && 'rotate-180')} />
+                            Usar color personalizado
+                          </Button>
+                        </CollapsibleTrigger>
+                        <FormField
+                          control={nombreColorForm.control}
+                          name="primaryColor"
+                          render={() => (
+                            <FormItem>
+                              <CollapsibleContent className="pt-3 space-y-2">
+                                <FormLabel className="sr-only">Color personalizado en formato hexadecimal</FormLabel>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <input
+                                    type="color"
+                                    value={isValidHex(nombreColorPrimaryColorWatch) ? nombreColorPrimaryColorWatch : '#000000'}
+                                    onChange={(e) => nombreColorForm.setValue('primaryColor', e.target.value.toUpperCase(), { shouldDirty: true, shouldValidate: true })}
+                                    disabled={nombreColorSubmitting}
+                                    className="h-9 w-14 rounded border border-border cursor-pointer bg-transparent"
+                                    aria-label="Elegir color personalizado con el selector"
+                                  />
+                                  <FormControl>
+                                    <Input
+                                      value={nombreColorPrimaryColorWatch}
+                                      onChange={(e) => nombreColorForm.setValue('primaryColor', e.target.value, { shouldDirty: true, shouldValidate: true })}
+                                      placeholder="#000000"
+                                      maxLength={7}
+                                      disabled={nombreColorSubmitting}
+                                      className="font-mono w-32"
+                                    />
+                                  </FormControl>
+                                  {nombreColorPrimaryColorWatch && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => nombreColorForm.setValue('primaryColor', '', { shouldDirty: true, shouldValidate: true })}
+                                      disabled={nombreColorSubmitting}
+                                      aria-label="Quitar color personalizado"
+                                    >
+                                      Quitar
+                                    </Button>
+                                  )}
+                                </div>
+                                <FormMessage />
+                              </CollapsibleContent>
+                            </FormItem>
+                          )}
+                        />
+                      </Collapsible>
+                    </div>
+                  </div>
+                </Form>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <Globe className="h-4 w-4" /> Nombre del negocio
+                    </span>
+                    <span className="block text-sm">{organization?.name || 'Mi Barbería'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <Palette className="h-4 w-4" /> Color principal{' '}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </span>
+                    {config?.primary_color ? (
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-6 w-6 rounded-full border border-border shrink-0"
+                          style={{ backgroundColor: config.primary_color }}
+                        />
+                        <span className="font-mono text-sm">{config.primary_color}</span>
+                      </div>
+                    ) : (
+                      <span className="block text-sm text-muted-foreground italic">—</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 3 — Contenido del portal */}
+          <Card id="portal-contenido" className="scroll-mt-16">
+            <CardHeader className="pb-0">
+              <EditableSectionHeader
+                title={
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <Type className="h-4 w-4 text-primary" />
+                    </span>
+                    <span className="text-sm font-semibold truncate">Contenido del portal</span>
+                  </span>
+                }
+                isEditing={editing === 'contenido'}
+                saving={contenidoSubmitting}
+                disabled={editing !== null}
+                onEdit={startEditingContenido}
+                onCancel={cancelEditContenido}
+                onSave={handleSaveContenido}
+              />
+            </CardHeader>
+            <CardContent>
+              {editing === 'contenido' ? (
+                <Form {...contenidoForm}>
+                  <div className="space-y-6">
+                    {/* Descripción corta */}
+                    <FormField
+                      control={contenidoForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <div className="space-y-1">
+                            <FormLabel className="flex items-center gap-2">
+                              <Type className="h-4 w-4" /> Descripción corta{' '}
+                              <span className="text-muted-foreground font-normal">(opcional)</span>
+                            </FormLabel>
+                            <FormDescription className="text-xs">
+                              Si la dejás vacía, mostramos un mensaje de bienvenida automático.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              maxLength={240}
+                              rows={3}
+                              placeholder={descPlaceholder}
+                              disabled={contenidoSubmitting}
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground text-right">{field.value.length}/240</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Links personalizados */}
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-sm font-medium flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4" /> Links personalizados{' '}
+                          <span className="text-muted-foreground font-normal">(opcional)</span>
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
+                        </p>
+                      </div>
+                      <PortalLinksEditor links={(contenidoLinksWatch ?? []) as PortalLink[]} onChange={handleLinksChange} />
+                      {linksArrayMessage && (
+                        <p className="text-xs text-destructive">{linksArrayMessage}</p>
+                      )}
+                      {Array.isArray(linkErrors) && linkErrors.map((err, idx) => {
+                        const msg = err?.label?.message || err?.url?.message || err?.icon?.message;
+                        return msg ? (
+                          <p key={idx} className="text-xs text-destructive">Link {idx + 1}: {msg}</p>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                </Form>
+              ) : (
+                <div className="space-y-6">
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <Type className="h-4 w-4" /> Descripción corta{' '}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </span>
+                    <span className={cn('block text-sm whitespace-pre-wrap', config?.description ? '' : 'text-muted-foreground italic')}>
+                      {config?.description || '—'}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <LinkIcon className="h-4 w-4" /> Links personalizados{' '}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </span>
+                    {config?.links && config.links.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {[...config.links].sort((a, b) => a.sort_order - b.sort_order).map((l, idx) => (
+                          <li key={idx} className="flex items-center gap-2 text-sm">
+                            <span className={l.active ? '' : 'text-muted-foreground line-through'}>{l.label || '(sin etiqueta)'}</span>
+                            <span className="text-xs text-muted-foreground truncate">{l.url}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="block text-sm text-muted-foreground italic">—</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 4 — Integraciones (Fase 9, retrofit a <Card> para consistencia
+              con las 3 secciones nuevas) */}
+          <Card id="portal-integraciones" className="scroll-mt-16">
+            <CardHeader className="pb-0">
+              <EditableSectionHeader
+                title={
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                    </span>
+                    <span className="text-sm font-semibold truncate">Integraciones</span>
+                  </span>
+                }
+                isEditing={editing === 'integraciones'}
+                saving={integracionesSubmitting}
+                disabled={editing !== null}
+                onEdit={startEditingIntegraciones}
+                onCancel={cancelEditIntegraciones}
+                onSave={handleSaveIntegraciones}
+              />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {editing === 'integraciones' ? (
+                <Form {...integracionesForm}>
+                  <FormField
+                    control={integracionesForm.control}
+                    name="metaPixelId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="space-y-1">
+                          <FormLabel className="flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
+                            <span className="text-muted-foreground font-normal">(opcional)</span>
+                          </FormLabel>
+                          <FormDescription className="text-xs">
+                            Medí las conversiones de tus campañas de Instagram y Facebook Ads a partir de las reservas del portal.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            maxLength={20}
+                            inputMode="numeric"
+                            placeholder="1234567890123456"
+                            className="font-mono sm:max-w-xs"
+                            disabled={integracionesSubmitting}
+                          />
+                        </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                </Collapsible>
-              </div>
-            </div>
-          </section>
-
-          {/* 2 — Contenido del portal */}
-          <section id="portal-contenido" className="border-t pt-6 mt-6 scroll-mt-16">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                <Type className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-sm font-semibold">Contenido del portal</h2>
-            </div>
-
-            <div className="space-y-6">
-              {/* Descripción corta */}
-              <FormField
-                control={control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="space-y-1">
-                      <FormLabel className="flex items-center gap-2">
-                        <Type className="h-4 w-4" /> Descripción corta{' '}
-                        <span className="text-muted-foreground font-normal">(opcional)</span>
-                      </FormLabel>
-                      <FormDescription className="text-xs">
-                        Si la dejás vacía, mostramos un mensaje de bienvenida automático.
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Textarea {...field} maxLength={240} rows={3} placeholder={descPlaceholder} />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground text-right">{field.value.length}/240</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Links personalizados */}
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" /> Links personalizados{' '}
+                </Form>
+              ) : (
+                <div className="space-y-1">
+                  <span className="flex items-center gap-2 text-xs font-medium">
+                    <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
                     <span className="text-muted-foreground font-normal">(opcional)</span>
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Hasta 4 accesos directos (Instagram, WhatsApp, ubicación, etc.).
-                  </p>
+                  </span>
+                  <span className={cn('block font-mono text-sm', config?.meta_pixel_id ? '' : 'text-muted-foreground italic')}>
+                    {config?.meta_pixel_id || '—'}
+                  </span>
                 </div>
-                <PortalLinksEditor links={(watchedLinks ?? []) as PortalLink[]} onChange={handleLinksChange} />
-                {linksArrayMessage && (
-                  <p className="text-xs text-destructive">{linksArrayMessage}</p>
-                )}
-                {Array.isArray(linkErrors) && linkErrors.map((err, idx) => {
-                  const msg = err?.label?.message || err?.url?.message || err?.icon?.message;
-                  return msg ? (
-                    <p key={idx} className="text-xs text-destructive">Link {idx + 1}: {msg}</p>
-                  ) : null;
-                })}
-              </div>
-            </div>
-          </section>
-        </form>
-
-        {/* 3 — Integraciones (Fase 9: Card propia, modo lectura/edición —
-            fuera de #portal-form a propósito, ver comentario en el <form>). */}
-        <section id="portal-integraciones" className="max-w-3xl border-t pt-6 mt-6 scroll-mt-16">
-          <EditableSectionHeader
-            title={
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <BarChart3 className="h-4 w-4 text-primary" />
-                </span>
-                <span className="text-sm font-semibold truncate">Integraciones</span>
-              </span>
-            }
-            isEditing={editing === 'integraciones'}
-            saving={saving}
-            disabled={editing !== null}
-            onEdit={startEditingIntegraciones}
-            onCancel={cancelEditIntegraciones}
-            onSave={handleSaveIntegraciones}
-          />
-
-          <div className="space-y-3">
-            {editing === 'integraciones' ? (
-              <Form {...integracionesForm}>
-                <FormField
-                  control={integracionesForm.control}
-                  name="metaPixelId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="space-y-1">
-                        <FormLabel className="flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
-                          <span className="text-muted-foreground font-normal">(opcional)</span>
-                        </FormLabel>
-                        <FormDescription className="text-xs">
-                          Medí las conversiones de tus campañas de Instagram y Facebook Ads a partir de las reservas del portal.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          maxLength={20}
-                          inputMode="numeric"
-                          placeholder="1234567890123456"
-                          className="font-mono sm:max-w-xs"
-                          disabled={saving}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </Form>
-            ) : (
-              <div className="space-y-1">
-                <span className="flex items-center gap-2 text-xs font-medium">
-                  <BarChart3 className="h-4 w-4" /> ID de píxel de Meta{' '}
-                  <span className="text-muted-foreground font-normal">(opcional)</span>
-                </span>
-                <span className={cn('block font-mono text-sm', config?.meta_pixel_id ? '' : 'text-muted-foreground italic')}>
-                  {config?.meta_pixel_id || '—'}
+              )}
+              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                <span>
+                  Para conseguir el ID: entrá a Meta Business Manager → Events Manager → seleccioná tu
+                  píxel (o creá uno nuevo) → copiá el número que aparece como ID del píxel.
                 </span>
               </div>
-            )}
-            <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-              <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-              <span>
-                Para conseguir el ID: entrá a Meta Business Manager → Events Manager → seleccioná tu
-                píxel (o creá uno nuevo) → copiá el número que aparece como ID del píxel.
-              </span>
-            </div>
-          </div>
-        </section>
-
-        {/* Guardado — Identidad visual + Contenido del portal (Integraciones
-            ya guarda por su cuenta, ver arriba). form="portal-form": el botón
-            vive fuera del <form> físicamente (después de Integraciones) pero
-            sigue enviándolo por id, sin cambiar su comportamiento nativo. */}
-        <div className="max-w-3xl flex justify-end border-t pt-6 mt-6">
-          <Button type="submit" form="portal-form" disabled={savingAll || saving || loading} size="lg">
-            <Save className="h-4 w-4 mr-1" />
-            {savingAll ? 'Guardando...' : 'Guardar cambios'}
-          </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

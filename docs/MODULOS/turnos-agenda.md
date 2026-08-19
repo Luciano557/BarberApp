@@ -22,37 +22,96 @@ Archivos: `PortalPublicoSection.tsx` (orquestador), `PortalLinksEditor.tsx`,
 `PortalCoverPositionDialog.tsx`, `PortalPreview.tsx`, `usePortalConfig.ts`.
 
 Layout actual: bloque superior (Compartir tu portal + Vista previa, no
-sticky) + columna única de 768px debajo (Identidad visual, Contenido del
-portal, Integraciones).
+sticky) + columna única de 768px debajo, 4 `<Card>`: **Logo y portada**,
+**Nombre y color**, **Contenido del portal**, **Integraciones** (ese orden,
+también el de la barra de accesos rápidos).
 
-**Migración en curso al patrón de modo lectura/edición** (mismo canon que
-`AgendaConfigSection.tsx`, ver abajo — pieza a pieza, una sección por fase).
-**Integraciones (Fase 9) ya migró**, piloto de la migración: `useForm`
-propio (`integracionesForm`, schema `integracionesSchema` recortado solo a
-`metaPixelId`), estado `editing: 'integraciones' | null` (union a expandir
-en las próximas fases, sin reescribir el mecanismo), `saving` reusado
-directo del `usePortalConfig()` ya existente (sin estado nuevo — más
-completo que el `saving` manual de `AgendaConfigSection`, porque ya cubre
-cruces con logo/portada/encuadre). Guarda con `save({ meta_pixel_id })`
-independiente del resto de la pantalla. Modo lectura muestra el valor
-guardado o "—" en gris itálica si está vacío (mismo patrón que
-`ClienteDetailDialog.tsx` para campos opcionales).
+**Migración al patrón de modo lectura/edición COMPLETA** (mismo canon que
+`AgendaConfigSection.tsx`). Recorrido: Fase 9 (Integraciones, piloto) →
+Fase 9+10+11 (Contenido del portal + Nombre y color + Logo y portada, las 3
+juntas en un solo build a pedido explícito, sin validación intermedia entre
+piezas).
 
-Detalle técnico no obvio: la sección "Integraciones" quedó **fuera** del
-`<form id="portal-form">` que sigue envolviendo Identidad visual + Contenido
-del portal — un `<form>` no puede anidar otro, y aunque no lo anidara, un
-Enter dentro de su campo igual dispararía el submit del `<form>` que lo
-contenga en el DOM (comportamiento nativo del navegador, ajeno a qué
-`useForm`/`control` de React esté atado el input). El botón "Guardar
-cambios" (que ahora solo cubre Identidad+Contenido) quedó también fuera del
-`<form>`, referenciándolo por `form="portal-form"` — mismo comportamiento
-nativo, sin tocar Identidad/Contenido.
+`type EditingSection = 'integraciones' | 'contenido' | 'nombreColor' | null`
+— 3 `useForm` independientes (`integracionesForm`, `contenidoForm`,
+`nombreColorForm`), cada uno con su Zod schema recortado, comparten este
+único puntero de exclusión mutua. **"Logo y portada" queda deliberadamente
+fuera de `editing`** — no tiene `EditableSectionHeader`, sigue siendo
+autosave puro (decisión de producto ya tomada): es la única sección que
+puede modificarse en simultáneo con cualquiera de las otras 3 en edición.
 
-Pendiente (Fase 10, 11): Contenido del portal e Identidad visual siguen en
-el `useForm` monolítico de siempre, con el guardado único de "Guardar
-cambios". Identidad visual tiene una decisión de producto ya tomada para
-cuando le toque: Logo y portada se separan en su propia Card sin
-Editar/Guardar, mantienen el autosave actual tal cual.
+`saving` de cada `EditableSectionHeader` usa `xForm.formState.isSubmitting`
+(no el `saving` global de `usePortalConfig()`) — evita que un autosave de
+logo/portada haga parpadear el spinner de guardado de una Card ajena que
+esté en edición al mismo tiempo. `PortalCoverPositionDialog` es la única
+excepción: sigue recibiendo el `saving` del hook porque su guardado no pasa
+por ningún `useForm` (y al ser un diálogo modal, no hay otra acción posible
+en simultáneo mientras está abierto).
+
+**`previewPortal` ya combina fuentes condicionales** (primer caso real,
+resuelve también la Fase 12): mientras Contenido o Nombre y color están en
+`editing`, la preview sigue el `watch()` de su form; si no, lee de
+`config`/`organization` (lo último guardado). Logo/portada, sin `editing`,
+nunca lleva condicional. El derivado `orgName` (usado en 5 lugares: QR,
+`PortalPreview`, avatar sin logo, placeholder de descripción, y
+`PortalCoverPositionDialog`) sigue el mismo criterio, calculado una sola
+vez a nivel de componente.
+
+**El `<form id="portal-form">` legacy y su botón "Guardar cambios" se
+eliminaron** — tras sacarle Nombre/Color/Descripción/Links, no le quedaba
+ningún campo editable que guardar (dejarlo hubiera sido un botón que no
+guarda nada). El `useForm` legacy y la etiqueta `<form id="portal-form">`
+**se mantienen**, ahora envolviendo solo la Card "Logo y portada" — siguen
+siendo el contenedor reactivo de sus 5 campos (`logoPath`, `coverPath`,
+`coverPosX/Y`, `coverZoom`). Candidato directo a **Fase 13** (colapsar ese
+`useForm` a `useState` plano, retirar el `<form>` que ya no tiene ninguna
+razón semántica para existir) — señalado, no ejecutado en este build.
+
+Las 4 secciones usan el componente `<Card>` estándar (antes Integraciones
+usaba `<section className="border-t...">`; se retrofiteó para consistencia
+total entre las 4).
+
+**"Compartir tu portal" con pestañas** (mismo `SegmentedControl`): antes
+apilaba Link público + QR verticalmente; ahora alterna entre ambos vía
+`useState<'link' | 'qr'>('link')` — abre en **Link público**, que es la
+acción más frecuente (fue la razón por la que esta sección subió arriba de
+todo en la Fase 7). El botón "Descargar QR" vive **dentro** del panel QR,
+no fuera: eso hace imposible por construcción que `handleDownloadQR` corra
+con `qrRef.current` en `null` (el botón y el `<div ref={qrRef}>` montan y
+desmontan juntos). Si el botón hubiera quedado siempre visible, en la
+pestaña Link el `if (!canvas) return;` cortaría en silencio — un fallo mudo.
+El `SegmentedControl` acá lleva `className="sm:max-w-xs"` (~320px) en vez
+de full-width, porque vive en una columna de grid de ~768px sin Card, y
+estirado a ese ancho se vería desproporcionado. La sección **mantiene su
+chip `bg-muted`** — sigue sin campos editables, la clasificación de
+CRITERIOS_DISEÑO §1.9 no cambia por pasar a pestañas.
+
+**Deriva conocida, sin resolver:** el `<Skeleton>` de carga inicial
+(early return de `PortalPublicoSection.tsx`) sigue espejando el layout
+apilado *anterior* de esta sección — muestra el campo de URL **y** un
+cuadrado de 166px para el QR. Con pestañas, la vista por defecto (Link) no
+renderiza ningún QR, así que el esqueleto promete un bloque que no aparece
+al terminar de cargar. Quedó fuera del candado del build que introdujo las
+pestañas (que solo tocaba el bloque de "Compartir tu portal"); las
+dimensiones del `<Skeleton>` se fijaron en la Fase 7 y no se han
+reajustado desde entonces. Corregirlo es un build aparte.
+
+**"Logo y portada" con pestañas** (`SegmentedControl`, `ui/SegmentedControl.tsx`
+— pill navy deslizante): antes apilaba los 2 uploaders completos uno debajo
+del otro (dropzone de portada ocupando un rectángulo desproporcionado);
+ahora alterna entre panel "Logo" (pestaña por defecto al entrar) y panel
+"Portada" vía `useState<'logo' | 'portada'>('logo')` local a la Card — sin
+relación con `editing` (esta sección sigue sin modo edición). Primer uso de
+`SegmentedControl` en la app para alternar contenido genuinamente distinto
+por pestaña, no para filtrar una lista ya visible (sus otros 10 usos son de
+ese segundo tipo); por eso cada panel se envuelve a mano en
+`<div role="tabpanel" aria-label="...">` del lado de `PortalPublicoSection.tsx`
+— `SegmentedControl.tsx` no se tocó, sigue sin conocer nada de este caso.
+Cada panel conserva su `<h3>` con ícono + "(opcional)" tal cual estaba
+(decisión explícita: no se retira por redundancia con el tab). El autosave
+de logo/portada es indiferente a qué panel está montado — una subida en
+curso sigue hasta el final aunque se cambie de pestaña a mitad de camino
+(el estado `uploading*`/`removing*` vive en el padre, no en el panel).
 
 **Fase 4 (loading local por disparador) completa.** `usePortalConfig.ts`:
 `fetch(opts?: { silent?: boolean })` — el refetch interno de `save()` pasa
