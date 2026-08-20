@@ -3,8 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, CalendarIcon, Plus, CalendarPlus, Ban, CalendarX } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuRadioGroup, DropdownMenuRadioItem,
+} from '@/components/ui/dropdown-menu';
+import { ChevronLeft, ChevronRight, CalendarIcon, Plus, CalendarPlus, Ban, CalendarX, Rows4, Rows3, Rows2, type LucideIcon } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
@@ -19,13 +22,28 @@ import { MoveConfirmDialog } from './MoveConfirmDialog';
 import { TurnoConflictDialog, type TurnoConflictKind } from './TurnoConflictDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { timeToMinutes, minutesToTime } from './lib/timeUtils';
+import { timeToMinutes, minutesToTime, ZOOM_LEVELS, type ZoomLevel } from './lib/timeUtils';
 import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
 import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
 
 
 
 type ViewMode = 'day' | '3days' | 'week';
+
+// Rows4/Rows3/Rows2: más barras = más filas visibles = más compacto. La
+// progresión numérica (4→3→2) mapea directo a compact→normal→wide, y son
+// visualmente distintos entre sí por conteo de barras.
+const ZOOM_ICONS: Record<ZoomLevel, LucideIcon> = {
+  compact: Rows4,
+  normal: Rows3,
+  wide: Rows2,
+};
+
+const ZOOM_LABELS: Record<ZoomLevel, string> = {
+  compact: 'Compacto',
+  normal: 'Normal',
+  wide: 'Amplio',
+};
 
 interface AgendaPanelProps {
   sucursalId: string;
@@ -39,6 +57,16 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
   const [date, setDate] = useState(new Date());
   const [view, setView] = useState<ViewMode>('day');
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Zoom de la vista Día (Build B). El nivel APLICADO vive acá — AgendaPanel
+  // es dueño del ToggleGroup, así que es quien necesita el valor para
+  // renderizarlo. AgendaDayView calcula la sugerencia automática (tiene el
+  // ResizeObserver y generalWorkRanges) y la sube por callback; zoomManualDateRef
+  // recuerda si el usuario ya eligió a mano PARA ESTE DÍA, y en ese caso la
+  // sugerencia entrante se ignora. Se resetea solo al cambiar de fecha —
+  // sobrevive a ir y volver entre Día/3días/Semana en el mismo día.
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('normal');
+  const zoomManualDateRef = useRef<string | null>(null);
 
   const [newApptOpen, setNewApptOpen] = useState(false);
   const [newApptDefaults, setNewApptDefaults] = useState<{ barberId?: string; horaInicio?: string }>({});
@@ -111,6 +139,17 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
     if (view === 'day') setDate(d => addDays(d, 1));
     else if (view === '3days') setDate(d => addDays(d, 3));
     else setDate(d => addDays(d, 7));
+  };
+
+  const handleAutoZoomSuggested = useCallback((level: ZoomLevel) => {
+    const dStr = format(date, 'yyyy-MM-dd');
+    if (zoomManualDateRef.current === dStr) return; // el usuario ya eligió a mano para este día
+    setZoomLevel(level);
+  }, [date]);
+
+  const handleZoomLevelChange = (level: ZoomLevel) => {
+    zoomManualDateRef.current = format(date, 'yyyy-MM-dd');
+    setZoomLevel(level);
   };
 
   const handleSlotClick = (barberoId: string, horaInicio: string) => {
@@ -244,6 +283,32 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
             <ToggleGroupItem value="week" className="text-xs px-3">Semana</ToggleGroupItem>
           </ToggleGroup>
 
+          {view === 'day' && (() => {
+            const ZoomIcon = ZOOM_ICONS[zoomLevel];
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9" title={`Zoom: ${ZOOM_LABELS[zoomLevel]}`}>
+                    <ZoomIcon className="h-4 w-4" />
+                    <span className="sr-only">Zoom: {ZOOM_LABELS[zoomLevel]}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuRadioGroup value={zoomLevel} onValueChange={(v) => handleZoomLevelChange(v as ZoomLevel)}>
+                    {ZOOM_LEVELS.map((level) => {
+                      const Icon = ZOOM_ICONS[level];
+                      return (
+                        <DropdownMenuRadioItem key={level} value={level}>
+                          <Icon className="h-4 w-4 mr-2" /> {ZOOM_LABELS[level]}
+                        </DropdownMenuRadioItem>
+                      );
+                    })}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          })()}
+
           {canManageAgenda && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -283,6 +348,8 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
             onSlotClick={handleSlotClick}
             onMoveTurno={handleMoveTurno}
             canDrag={canDrag}
+            zoomLevel={zoomLevel}
+            onAutoZoomSuggested={handleAutoZoomSuggested}
           />
         </div>
       )}

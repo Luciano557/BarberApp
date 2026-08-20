@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { TURNO_ESTADO_PILL } from '@/lib/turnoEstadoPill';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Phone, Mail, Calendar, User, Scissors, X, UserPlus, Clock, CalendarIcon } from 'lucide-react';
+import { Phone, Mail, Calendar, User, Scissors, UserPlus, Clock, CalendarIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
@@ -61,6 +61,12 @@ const turnoEditSchema = z.object({
 
 type TurnoEditFormValues = z.infer<typeof turnoEditSchema>;
 
+const cancelSchema = z.object({
+  motivo: z.string().max(240).optional().default(''),
+});
+
+type CancelFormValues = z.infer<typeof cancelSchema>;
+
 export function AppointmentDetailDialog({
   open,
   onOpenChange,
@@ -73,8 +79,11 @@ export function AppointmentDetailDialog({
   readOnly = false,
 }: AppointmentDetailDialogProps) {
   const [confirmingCancel, setConfirmingCancel] = useState(false);
-  const [motivo, setMotivo] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const cancelForm = useForm<CancelFormValues>({
+    resolver: zodResolver(cancelSchema),
+    defaultValues: { motivo: '' },
+  });
 
   const [editingCliente, setEditingCliente] = useState(false);
   const [savingCliente, setSavingCliente] = useState(false);
@@ -109,7 +118,7 @@ export function AppointmentDetailDialog({
       setEditingCliente(false);
       resetClienteEditor();
       setConfirmingCancel(false);
-      setMotivo('');
+      cancelForm.reset({ motivo: '' });
       setEditingTurno(false);
       setTurnoConflict(null);
     }
@@ -210,6 +219,7 @@ export function AppointmentDetailDialog({
 
   const handleCancel = async () => {
     setCancelling(true);
+    const motivo = cancelForm.getValues('motivo');
     const { error } = await supabase
       .from('turnos')
       .update({
@@ -225,7 +235,7 @@ export function AppointmentDetailDialog({
     }
     toast.success('Turno cancelado');
     setConfirmingCancel(false);
-    setMotivo('');
+    cancelForm.reset({ motivo: '' });
     onOpenChange(false);
     onChanged();
   };
@@ -317,7 +327,7 @@ export function AppointmentDetailDialog({
         isDirty={
           (editingCliente && clienteForm.formState.isDirty) ||
           (editingTurno && turnoForm.formState.isDirty) ||
-          (confirmingCancel && motivo.trim().length > 0)
+          (confirmingCancel && cancelForm.formState.isDirty)
         }
         footer={
           confirmingCancel ? (
@@ -331,7 +341,7 @@ export function AppointmentDetailDialog({
             canCancel && !editingTurno && !editingCliente && (
               <div className="flex w-full justify-end">
                 <Button variant="destructive" onClick={() => setConfirmingCancel(true)}>
-                  <X className="h-4 w-4" /> Cancelar turno
+                  Cancelar turno
                 </Button>
               </div>
             )
@@ -343,6 +353,7 @@ export function AppointmentDetailDialog({
             {canEditCliente ? (
               <EditableSectionHeader
                 title="Datos de contacto"
+                icon={User}
                 isEditing={editingCliente}
                 saving={savingCliente}
                 disabled={editingTurno || confirmingCancel}
@@ -351,7 +362,15 @@ export function AppointmentDetailDialog({
                 onSave={handleSaveCliente}
               />
             ) : (
-              <h3 className="text-sm font-medium mb-3">Datos de contacto</h3>
+              // Chip bg-muted (no bg-primary/10): esta sección no se puede editar en
+              // este estado del turno, así que no corresponde el tratamiento "se edita
+              // acá" — CRITERIOS_DISEÑO.md §1.9.
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <h3 className="text-sm font-medium">Datos de contacto</h3>
+              </div>
             )}
 
             {editingCliente && canEditCliente ? (
@@ -416,14 +435,20 @@ export function AppointmentDetailDialog({
                 </div>
               </Form>
             ) : (
-              <div className="space-y-2 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  <span>{turno.cliente_telefono || 'Sin teléfono'}</span>
+              <div className="space-y-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{turno.cliente_telefono || 'Sin teléfono'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <span>{turno.cliente_email || 'Sin email'}</span>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{turno.cliente_email || 'Sin email'}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -435,6 +460,7 @@ export function AppointmentDetailDialog({
             {canEditTurno ? (
               <EditableSectionHeader
                 title="Detalle del turno"
+                icon={Scissors}
                 isEditing={editingTurno}
                 saving={savingTurno}
                 disabled={editingCliente || confirmingCancel}
@@ -443,7 +469,12 @@ export function AppointmentDetailDialog({
                 onSave={handleSaveTurno}
               />
             ) : (
-              <h3 className="text-sm font-medium mb-3">Detalle del turno</h3>
+              <div className="mb-3 flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <Scissors className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <h3 className="text-sm font-medium">Detalle del turno</h3>
+              </div>
             )}
 
             {editingTurno && canEditTurno ? (
@@ -474,7 +505,7 @@ export function AppointmentDetailDialog({
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
@@ -504,12 +535,12 @@ export function AppointmentDetailDialog({
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                   )}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
                       control={turnoForm.control}
                       name="fecha"
@@ -534,7 +565,7 @@ export function AppointmentDetailDialog({
                               />
                             </PopoverContent>
                           </Popover>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
@@ -550,7 +581,7 @@ export function AppointmentDetailDialog({
                               <Input type="time" {...field} className="pl-9" />
                             </div>
                           </FormControl>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
@@ -561,31 +592,56 @@ export function AppointmentDetailDialog({
                 </div>
               </Form>
             ) : (
-              <div className="space-y-2 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
+              <div className="space-y-3">
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Fecha y hora</p>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>{turno.fecha} · {formatHHMM(turno.hora_inicio)} - {formatHHMM(turno.hora_fin)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Scissors className="h-4 w-4" />
-                  <span>{servicio?.nombre || 'Servicio'}</span>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Servicio</p>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Scissors className="h-4 w-4 text-muted-foreground" />
+                    <span>{servicio?.nombre || 'Servicio'}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
+                <div className="space-y-0.5">
+                  <p className="text-xs text-muted-foreground">Profesional</p>
+                  <div className="flex items-center gap-2 text-foreground">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span>{barber ? `${barber.firstName} ${barber.lastName}` : '-'}</span>
+                  </div>
                 </div>
                 {turno.notas && (
-                  <div className="text-xs border-l-2 border-border pl-3">{turno.notas}</div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs text-muted-foreground">Notas</p>
+                    <p className="text-sm text-foreground">{turno.notas}</p>
+                  </div>
                 )}
               </div>
             )}
           </section>
 
           {confirmingCancel && (
-            <div className="space-y-2 pt-2 border-t">
-              <p className="text-xs text-muted-foreground">Motivo de cancelacion (opcional)</p>
-              <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={240} rows={2} />
-            </div>
+            <Form {...cancelForm}>
+              <div className="space-y-2 pt-2 border-t">
+                <FormField
+                  control={cancelForm.control}
+                  name="motivo"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Motivo de cancelación (opcional)</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} maxLength={240} rows={2} />
+                      </FormControl>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </Form>
           )}
         </div>
       </DrawerForm>

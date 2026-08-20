@@ -1,10 +1,10 @@
-import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { Barber } from '@/types/barbershop';
 import { Turno, Bloqueo, Servicio, Horario } from './hooks/useAgendaData';
 import { useBarberColors } from './hooks/useBarberColors';
 import { usePointerDragDrop, usePointerTap } from './hooks/usePointerDragDrop';
-import { timeToMinutes, minutesToTime, formatHHMM, PX_PER_MIN } from './lib/timeUtils';
+import { timeToMinutes, minutesToTime, formatHHMM, ZOOM_PX_PER_MIN, pickAutoZoomLevel, type ZoomLevel } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 
 interface AgendaDayViewProps {
@@ -18,6 +18,13 @@ interface AgendaDayViewProps {
   onSlotClick: (barberoId: string, horaInicio: string) => void;
   onMoveTurno: (turno: Turno, newBarberoId: string, newHoraInicio: string, newFecha: string) => void;
   canDrag: boolean;
+  /** Nivel de zoom aplicado — controlado desde AgendaPanel (dueño del
+   *  ToggleGroup). AgendaDayView calcula la sugerencia automática (tiene
+   *  el ResizeObserver y generalWorkRanges) pero no decide si se aplica:
+   *  eso lo resuelve el padre vía onAutoZoomSuggested, respetando un
+   *  override manual del usuario para el día actual. */
+  zoomLevel: ZoomLevel;
+  onAutoZoomSuggested: (level: ZoomLevel) => void;
 }
 
 interface MinuteRange {
@@ -62,6 +69,7 @@ function complementRanges(start: number, end: number, included: MinuteRange[]): 
 export function AgendaDayView({
   date, barbers, turnos, bloqueos, servicios, horarios,
   onTurnoClick, onSlotClick, onMoveTurno, canDrag,
+  zoomLevel, onAutoZoomSuggested,
 }: AgendaDayViewProps) {
   const gridScrollRef = useRef<HTMLDivElement | null>(null);
   const lastAutoContextRef = useRef<string | null>(null);
@@ -72,6 +80,9 @@ export function AgendaDayView({
   const bodyColumnsScrollRef = useRef<HTMLDivElement | null>(null);
   const isSyncingScrollRef = useRef(false);
   const [containerWidth, setContainerWidth] = useState(0);
+
+  const pxPerMin = ZOOM_PX_PER_MIN[zoomLevel];
+  const prevPxPerMinRef = useRef(pxPerMin);
 
   const dateStr = format(date, 'yyyy-MM-dd');
   const dayOfWeek = ((date.getDay() + 6) % 7) + 1; // ISO: 1=Mon..7=Sun
@@ -109,7 +120,7 @@ export function AgendaDayView({
   }, [horarios, dayOfWeek, dayTurnos]);
 
   const totalMins = rangeEnd - rangeStart;
-  const totalHeight = totalMins * PX_PER_MIN;
+  const totalHeight = totalMins * pxPerMin;
   const SLOT_MIN = 15;
 
   const hourRails = useMemo(() => {
@@ -230,6 +241,36 @@ export function AgendaDayView({
     [baseAutoContextKey, rangeStart, rangeEnd, generalWorkRangesSignature],
   );
 
+  // "Rango laboral completo" para el auto-cálculo de zoom: el span entre el
+  // primer y último horario general. Sin horario general explícito, se usa
+  // el rango visible completo del día como referencia (no hay "horario" al
+  // que ajustarse).
+  const workSpanMinutes = useMemo(() => {
+    if (generalWorkRanges.length === 0) return totalMins;
+    const first = generalWorkRanges[0];
+    const last = generalWorkRanges[generalWorkRanges.length - 1];
+    return last.end - first.start;
+  }, [generalWorkRanges, totalMins]);
+
+  const shortestTurnoMin = useMemo(() => {
+    if (dayTurnos.length === 0) return null;
+    return Math.min(...dayTurnos.map((t) => timeToMinutes(t.hora_fin) - timeToMinutes(t.hora_inicio)));
+  }, [dayTurnos]);
+
+  // Auto-sugerencia de zoom: corre al entrar a la vista o cambiar de
+  // contexto (día/rango/horario general — mismo disparador que el resto de
+  // los efectos de auto-posicionamiento de este archivo). Solo SUGIERE vía
+  // callback; quien decide si se aplica (respetando un override manual del
+  // usuario para este día) es AgendaPanel, que es dueño del ToggleGroup y
+  // del valor de zoomLevel aplicado.
+  useLayoutEffect(() => {
+    const el = gridScrollRef.current;
+    if (!el || el.clientHeight <= 0) return;
+    const auto = pickAutoZoomLevel(workSpanMinutes, el.clientHeight, shortestTurnoMin);
+    onAutoZoomSuggested(auto);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseAutoContextKey, workSpanMinutes, shortestTurnoMin]);
+
   const MIN_COL_WIDTH = 160;
   const TIME_RAIL_WIDTH = 56;
 
@@ -265,6 +306,10 @@ export function AgendaDayView({
   }, []);
 
   // Resolve drop target via DOM hit-test on data-col-root columns.
+  // pxPerMin en deps es crítico: sin esto, un drop calcularía la hora con el
+  // zoom vigente al momento en que este callback se memoizó por última vez,
+  // no el zoom actual — un turno se movería a un horario equivocado sin
+  // ningún error visible.
   const resolveDrop = useCallback((x: number, y: number): { barberoId: string; horaInicio: string } | null => {
     if (dayOff) return null;
     const stack = (typeof document !== 'undefined' ? document.elementsFromPoint(x, y) : []) as HTMLElement[];
@@ -274,11 +319,11 @@ export function AgendaDayView({
     if (!barberoId) return null;
     const rect = col.getBoundingClientRect();
     const offY = y - rect.top;
-    const minRaw = offY / PX_PER_MIN + rangeStart;
+    const minRaw = offY / pxPerMin + rangeStart;
     const snapped = Math.round(minRaw / SLOT_MIN) * SLOT_MIN;
     const clamped = Math.max(rangeStart, Math.min(rangeEnd - SLOT_MIN, snapped));
     return { barberoId, horaInicio: minutesToTime(clamped) };
-  }, [dayOff, rangeStart, rangeEnd]);
+  }, [dayOff, rangeStart, rangeEnd, pxPerMin]);
 
   const handleTurnoTap = useCallback((t: Turno) => onTurnoClick(t), [onTurnoClick]);
   const handleTurnoDrop = useCallback((t: Turno, x: number, y: number) => {
@@ -342,7 +387,7 @@ export function AgendaDayView({
       }
     }
 
-    const anchorY = (anchorMinute - rangeStart) * PX_PER_MIN;
+    const anchorY = (anchorMinute - rangeStart) * pxPerMin;
     const desiredScrollTop = anchorY - el.clientHeight / 2;
     const maxScrollTop = Math.max(0, totalHeight - el.clientHeight);
     const finalScrollTop = Math.max(0, Math.min(maxScrollTop, desiredScrollTop));
@@ -358,10 +403,45 @@ export function AgendaDayView({
     generalWorkRanges,
     isToday,
     nowMin,
+    pxPerMin,
     rangeEnd,
     rangeStart,
     totalHeight,
   ]);
+
+  // Reanclaje por cambio de zoom (riesgo #2): preserva el minuto que estaba
+  // centrado en el viewport antes del cambio de nivel, en vez de dejar que
+  // el scroll salte a una hora distinta porque cambió la altura total.
+  //
+  // Se apoya en lastAutoContextRef (seteado arriba, dentro del rAF del
+  // posicionamiento inicial) para saber si el posicionamiento "real" de
+  // este día ya se aplicó de verdad. Mientras no se haya aplicado —incluida
+  // la cascada de montaje, donde la auto-sugerencia de zoom puede cambiar
+  // zoomLevel antes de que el rAF de arriba llegue a correr— este efecto no
+  // toca el scroll, para no pelear con esa posición inicial. Una vez
+  // asentada, cualquier cambio posterior de pxPerMin (override manual, o
+  // una resugerencia automática por cambio de datos en el mismo día) sí
+  // reancla en vez de dejar que salte.
+  //
+  // fullAutoContextKey NO incluye el zoom a propósito: es la identidad de
+  // "qué día/rango estoy mirando", y el zoom es ortogonal a eso — meterlo
+  // ahí haría que cada cambio de zoom se tratara como "día nuevo" y
+  // reactivara el posicionamiento por nowMin/horario en vez del reanclaje
+  // por minuto centrado.
+  useLayoutEffect(() => {
+    const el = gridScrollRef.current;
+    const prevPxPerMin = prevPxPerMinRef.current;
+    prevPxPerMinRef.current = pxPerMin;
+
+    if (!el || prevPxPerMin === pxPerMin) return;
+    if (lastAutoContextRef.current !== fullAutoContextKey) return;
+
+    const centerMinute = (el.scrollTop + el.clientHeight / 2) / prevPxPerMin + rangeStart;
+    const newCenterY = (centerMinute - rangeStart) * pxPerMin;
+    const maxScrollTop = Math.max(0, totalHeight - el.clientHeight);
+    isProgrammaticScrollRef.current = true;
+    el.scrollTop = Math.max(0, Math.min(maxScrollTop, newCenterY - el.clientHeight / 2));
+  }, [pxPerMin, fullAutoContextKey, rangeStart, totalHeight]);
 
   return (
     <div ref={outerRef} className="bg-card overflow-clip">
@@ -398,7 +478,7 @@ export function AgendaDayView({
               <div
                 key={m}
                 className="absolute left-0 right-0 text-[10px] text-muted-foreground px-1 -translate-y-1/2"
-                style={{ top: (m - rangeStart) * PX_PER_MIN }}
+                style={{ top: (m - rangeStart) * pxPerMin }}
               >
                 {minutesToTime(m)}
               </div>
@@ -427,8 +507,8 @@ export function AgendaDayView({
                       key={`outside-${idx}-${r.start}-${r.end}`}
                       className="absolute left-0 right-0 pointer-events-none"
                       style={{
-                        top: (r.start - rangeStart) * PX_PER_MIN,
-                        height: (r.end - r.start) * PX_PER_MIN,
+                        top: (r.start - rangeStart) * pxPerMin,
+                        height: (r.end - r.start) * pxPerMin,
                         backgroundColor: 'hsl(var(--muted) / 0.22)',
                         backgroundImage:
                           'repeating-linear-gradient(135deg, hsl(var(--muted-foreground) / 0.10) 0px, hsl(var(--muted-foreground) / 0.10) 1px, transparent 1px, transparent 7px)',
@@ -441,7 +521,7 @@ export function AgendaDayView({
                     <div
                       key={m}
                       className="absolute left-0 right-0 border-t border-border/55 pointer-events-none"
-                      style={{ top: (m - rangeStart) * PX_PER_MIN }}
+                      style={{ top: (m - rangeStart) * pxPerMin }}
                     />
                   ))}
 
@@ -450,7 +530,7 @@ export function AgendaDayView({
                     <div
                       key={`half-${m}`}
                       className="absolute left-0 right-0 border-t border-border/30 pointer-events-none"
-                      style={{ top: (m - rangeStart) * PX_PER_MIN }}
+                      style={{ top: (m - rangeStart) * pxPerMin }}
                     />
                   ))}
 
@@ -458,12 +538,12 @@ export function AgendaDayView({
                   {works && barberHorarios.map((h) => (
                     <SlotTapArea
                       key={h.id}
-                      top={(timeToMinutes(h.hora_inicio) - rangeStart) * PX_PER_MIN}
-                      height={(timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * PX_PER_MIN}
+                      top={(timeToMinutes(h.hora_inicio) - rangeStart) * pxPerMin}
+                      height={(timeToMinutes(h.hora_fin) - timeToMinutes(h.hora_inicio)) * pxPerMin}
                       onTap={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const offY = e.clientY - rect.top;
-                        const min = Math.round(offY / PX_PER_MIN / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
+                        const min = Math.round(offY / pxPerMin / SLOT_MIN) * SLOT_MIN + timeToMinutes(h.hora_inicio);
                         onSlotClick(b.id, minutesToTime(min));
                       }}
                     />
@@ -485,8 +565,8 @@ export function AgendaDayView({
                       );
                     }
                     if (!bl.hora_inicio || !bl.hora_fin) return null;
-                    const top = (timeToMinutes(bl.hora_inicio) - rangeStart) * PX_PER_MIN;
-                    const height = (timeToMinutes(bl.hora_fin) - timeToMinutes(bl.hora_inicio)) * PX_PER_MIN;
+                    const top = (timeToMinutes(bl.hora_inicio) - rangeStart) * pxPerMin;
+                    const height = (timeToMinutes(bl.hora_fin) - timeToMinutes(bl.hora_inicio)) * pxPerMin;
                     return (
                       <div
                         key={bl.id}
@@ -503,8 +583,8 @@ export function AgendaDayView({
 
                   {/* Turnos */}
                   {barberTurnos.map((t) => {
-                    const top = (timeToMinutes(t.hora_inicio) - rangeStart) * PX_PER_MIN;
-                    const height = Math.max(20, (timeToMinutes(t.hora_fin) - timeToMinutes(t.hora_inicio)) * PX_PER_MIN);
+                    const top = (timeToMinutes(t.hora_inicio) - rangeStart) * pxPerMin;
+                    const height = Math.max(20, (timeToMinutes(t.hora_fin) - timeToMinutes(t.hora_inicio)) * pxPerMin);
                     const layout = layouts.get(t.id) || { idx: 0, count: 1 };
                     const widthPct = 100 / layout.count;
                     const leftPct = widthPct * layout.idx;
@@ -532,9 +612,15 @@ export function AgendaDayView({
                           WebkitTouchCallout: 'none',
                         }}
                       >
-                        <div className="text-[10px] font-mono text-muted-foreground leading-tight">
-                          {formatHHMM(t.hora_inicio)} → {formatHHMM(t.hora_fin)}
-                        </div>
+                        {/* Escalera de contenido por altura de tarjeta (Build B):
+                            <32px sólo nombre · 32-45px +hora · 45px+ +servicio.
+                            Sin "+barbero": en vista Día cada columna ya ES un
+                            barbero, agregarlo repetiría el dato. */}
+                        {height >= 32 && (
+                          <div className="text-[10px] font-mono text-muted-foreground leading-tight">
+                            {formatHHMM(t.hora_inicio)} → {formatHHMM(t.hora_fin)}
+                          </div>
+                        )}
                         <div className="text-xs font-medium text-foreground truncate leading-tight">
                           {t.cliente_nombre || 'Sin nombre'}
                         </div>
@@ -579,7 +665,7 @@ export function AgendaDayView({
             {isToday && nowMin >= rangeStart && nowMin <= rangeEnd && (
               <div
                 className="absolute left-0 right-0 h-px bg-destructive z-[5] pointer-events-none"
-                style={{ top: (nowMin - rangeStart) * PX_PER_MIN }}
+                style={{ top: (nowMin - rangeStart) * pxPerMin }}
               >
                 <div className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-destructive" />
               </div>

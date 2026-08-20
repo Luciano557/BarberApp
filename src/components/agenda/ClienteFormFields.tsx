@@ -2,6 +2,7 @@ import type { Control, FieldValues, Path } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { PhoneInput, type PhoneInputChange } from '@/components/ui/phone-input';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { cn } from '@/lib/utils';
 
 interface ClienteFormFieldsProps<T extends FieldValues> {
   control: Control<T>;
@@ -9,6 +10,12 @@ interface ClienteFormFieldsProps<T extends FieldValues> {
   apellidoName: Path<T>;
   telefonoName: Path<T>;
   emailName: Path<T>;
+  /** Envoltorio visual (bg-muted/30 + rounded-lg) que marca este bloque como
+   *  sub-formulario embebido — mismo lenguaje que EmptySelectHint. Apagado
+   *  por defecto: solo se activa donde el padre no ya provee su propia
+   *  sección (ver AppointmentDetailDialog, que ya vive dentro de una
+   *  sección con EditableSectionHeader). */
+  wrapped?: boolean;
 }
 
 /**
@@ -22,9 +29,10 @@ export function ClienteFormFields<T extends FieldValues>({
   apellidoName,
   telefonoName,
   emailName,
+  wrapped = false,
 }: ClienteFormFieldsProps<T>) {
   return (
-    <div className="space-y-3">
+    <div className={cn('space-y-3', wrapped && 'rounded-lg bg-muted/30 p-3')}>
       <div className="grid grid-cols-2 gap-3">
         <FormField
           control={control}
@@ -35,7 +43,7 @@ export function ClienteFormFields<T extends FieldValues>({
               <FormControl>
                 <Input {...field} maxLength={80} />
               </FormControl>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
@@ -48,7 +56,7 @@ export function ClienteFormFields<T extends FieldValues>({
               <FormControl>
                 <Input {...field} maxLength={80} />
               </FormControl>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
@@ -59,7 +67,7 @@ export function ClienteFormFields<T extends FieldValues>({
           name={telefonoName}
           render={({ field }) => (
             <FormItem className="space-y-1">
-              <FormLabel className="text-xs">Telefono</FormLabel>
+              <FormLabel className="text-xs">Teléfono</FormLabel>
               <PhoneInput
                 value={(field.value as PhoneInputChange | null)?.e164 ?? null}
                 onChange={(o) => field.onChange(o)}
@@ -67,7 +75,7 @@ export function ClienteFormFields<T extends FieldValues>({
                 allowedCountries={['AR', 'UY', 'CL', 'CO', 'MX', 'ES', 'BR']}
                 mode="mobile"
               />
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />
@@ -80,7 +88,7 @@ export function ClienteFormFields<T extends FieldValues>({
               <FormControl>
                 <Input type="email" {...field} maxLength={120} />
               </FormControl>
-              <FormMessage />
+              <FormMessage className="text-xs" />
             </FormItem>
           )}
         />

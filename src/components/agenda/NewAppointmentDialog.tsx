@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DrawerForm } from '@/components/ui/drawer-form';
+import { DrawerForm, DrawerFormSection } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { Barber } from '@/types/barbershop';
 import { Servicio } from './hooks/useAgendaData';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
-import { UserPlus, Zap, ArrowLeft } from 'lucide-react';
+import { UserPlus, Zap, ArrowLeft, CalendarPlus, Scissors, Clock } from 'lucide-react';
 import { useClienteSearch, clienteFullName } from './hooks/useClienteSearch';
 import { ClienteSearchPicker } from './ClienteSearchPicker';
 import { ClienteFormFields } from './ClienteFormFields';
@@ -287,7 +287,7 @@ export function NewAppointmentDialog({
       return (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Cita rápida sin cliente</Label>
+            <Label className="text-sm font-medium">Cita rápida sin cliente</Label>
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromQuick}>
               <ArrowLeft className="h-3 w-3 mr-1" /> Volver
             </Button>
@@ -302,7 +302,7 @@ export function NewAppointmentDialog({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">Datos del nuevo cliente</Label>
+          <Label className="text-sm font-medium">Datos del nuevo cliente</Label>
           <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromNew}>
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
@@ -313,6 +313,7 @@ export function NewAppointmentDialog({
           apellidoName="apellido"
           telefonoName="telefono"
           emailName="email"
+          wrapped
         />
       </div>
     );
@@ -323,7 +324,12 @@ export function NewAppointmentDialog({
     <DrawerForm
       open={open}
       onOpenChange={onOpenChange}
-      title="Nueva cita"
+      title={
+        <span className="flex items-center gap-2">
+          <CalendarPlus className="h-4 w-4 text-muted-foreground" />
+          Nueva cita
+        </span>
+      }
       size="md"
       isDirty={form.formState.isDirty}
       footer={
@@ -338,106 +344,122 @@ export function NewAppointmentDialog({
       }
     >
       <Form {...form}>
-        <form id="new-appointment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {renderClienteBlock()}
+        <form id="new-appointment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {/* Sin DrawerFormSection acá: un solo control (el buscador de
+              cliente) ya trae su propio label "Cliente" — un encabezado de
+              sección aparte lo duplicaría (CRITERIOS_DISEÑO.md §1.10). */}
+          <div className="space-y-3">
+            {renderClienteBlock()}
 
-          {mode === 'existing' && (
-            <div className="flex flex-wrap gap-2 -mt-1">
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToNew}>
-                <UserPlus className="h-3.5 w-3.5 mr-1" /> Nuevo cliente
-              </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToQuick}>
-                <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
-              </Button>
+            {mode === 'existing' && (
+              <div className="flex min-h-[44px] flex-wrap items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs" onClick={handleSwitchToNew}>
+                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Nuevo cliente
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs" onClick={handleSwitchToQuick}>
+                  <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Criterio general: toda sección CON encabezado propio (2+
+              controles) lleva descripción breve, por consistencia — no solo
+              cuando la acción tiene una consecuencia no obvia. */}
+          <DrawerFormSection icon={Scissors} title="Turno" description="Elegí quién atiende y qué servicio se realiza.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {activeBarbers.length === 0 ? (
+                <EmptySelectHint
+                  message="No hay barberos activos."
+                  ctaLabel="Añadir miembro del equipo"
+                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="barberoId"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Barbero</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {activeBarbers.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              )}
+              {servicios.length === 0 ? (
+                <EmptySelectHint
+                  message="No hay servicios cargados."
+                  ctaLabel="Configurar servicios"
+                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="servicioId"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Servicio</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {servicios.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
-          )}
+          </DrawerFormSection>
 
-          <div className="grid grid-cols-2 gap-3">
-            {activeBarbers.length === 0 ? (
-              <EmptySelectHint
-                message="No hay barberos activos."
-                ctaLabel="Añadir miembro del equipo"
-                onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
-              />
-            ) : (
+          <DrawerFormSection icon={Clock} title="Cuándo" description="Fecha y horario de la cita.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="barberoId"
+                name="fecha"
                 render={({ field }) => (
                   <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Barbero</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeBarbers.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                    <FormLabel className="text-xs">Fecha</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
-            )}
-            {servicios.length === 0 ? (
-              <EmptySelectHint
-                message="No hay servicios cargados."
-                ctaLabel="Configurar servicios"
-                onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
-              />
-            ) : (
               <FormField
                 control={form.control}
-                name="servicioId"
+                name="horaInicio"
                 render={({ field }) => (
                   <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Servicio</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {servicios.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                    <FormLabel className="text-xs">Hora inicio</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="fecha"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Fecha</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="horaInicio"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Hora inicio</FormLabel>
-                  <FormControl>
-                    <Input type="time" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            </div>
+          </DrawerFormSection>
+
+          {/* Sin DrawerFormSection: un solo control, el textarea ya trae su
+              propio label "Notas (opcional)" (§1.10). */}
           <FormField
             control={form.control}
             name="notas"
@@ -447,7 +469,7 @@ export function NewAppointmentDialog({
                 <FormControl>
                   <Textarea {...field} maxLength={1500} rows={2} />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />

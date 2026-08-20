@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DrawerForm } from '@/components/ui/drawer-form';
+import { DrawerForm, DrawerFormSection } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Barber } from '@/types/barbershop';
 import { format } from 'date-fns';
+import { Ban, User, Clock } from 'lucide-react';
 
 interface UnavailableSlotDialogProps {
   open: boolean;
@@ -95,7 +96,12 @@ export function UnavailableSlotDialog({
     <DrawerForm
       open={open}
       onOpenChange={onOpenChange}
-      title="Horario no disponible"
+      title={
+        <span className="flex items-center gap-2">
+          <Ban className="h-4 w-4 text-muted-foreground" />
+          Horario no disponible
+        </span>
+      }
       size="sm"
       isDirty={form.formState.isDirty}
       footer={
@@ -109,38 +115,50 @@ export function UnavailableSlotDialog({
         </div>
       }
     >
-      <p className="text-xs text-muted-foreground mb-4">Bloquea una franja horaria para un barbero específico.</p>
       <Form {...form}>
-        <form id="unavailable-slot-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          {activeBarbers.length === 0 ? (
-            <EmptySelectHint
-              message="No hay barberos activos en esta sucursal."
-              ctaLabel="Añadir miembro del equipo"
-              onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
-            />
-          ) : (
-            <FormField
-              control={form.control}
-              name="barberoId"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Barbero</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {activeBarbers.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-          <div className="grid grid-cols-3 gap-3">
+        <form id="unavailable-slot-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <DrawerFormSection
+            icon={User}
+            title="Quién"
+            description="Bloquea una franja horaria para un barbero específico."
+          >
+            {activeBarbers.length === 0 ? (
+              <EmptySelectHint
+                message="No hay barberos activos en esta sucursal."
+                ctaLabel="Añadir miembro del equipo"
+                onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+              />
+            ) : (
+              <FormField
+                control={form.control}
+                name="barberoId"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Barbero</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeBarbers.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            )}
+          </DrawerFormSection>
+
+          <DrawerFormSection icon={Clock} title="Cuándo" description="Franja horaria que se bloquea para este barbero.">
+            {/* Fecha a ancho completo, no en la misma fila que las horas: a
+                380px fijos (size="sm"), 3 columnas dejan ~103px cada una para
+                un input date/time con chrome nativo que no se achica — y
+                sm:grid-cols-3 no lo resuelve, porque el drawer queda fijo en
+                380px apenas el viewport pasa el breakpoint sm (640px), sea
+                mobile en horizontal, tablet o desktop. */}
             <FormField
               control={form.control}
               name="fecha"
@@ -150,50 +168,52 @@ export function UnavailableSlotDialog({
                   <FormControl>
                     <Input type="date" {...field} />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs" />
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="horaInicio"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Desde</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="horaFin"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Hasta</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
-              name="horaInicio"
+              name="motivo"
               render={({ field }) => (
                 <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Desde</FormLabel>
+                  <FormLabel className="text-xs">Motivo (opcional)</FormLabel>
                   <FormControl>
-                    <Input type="time" {...field} />
+                    <Textarea {...field} maxLength={240} rows={2} />
                   </FormControl>
-                  <FormMessage />
+                  <FormMessage className="text-xs" />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="horaFin"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Hasta</FormLabel>
-                  <FormControl>
-                    <Input type="time" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <FormField
-            control={form.control}
-            name="motivo"
-            render={({ field }) => (
-              <FormItem className="space-y-1">
-                <FormLabel className="text-xs">Motivo (opcional)</FormLabel>
-                <FormControl>
-                  <Textarea {...field} maxLength={240} rows={2} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          </DrawerFormSection>
         </form>
       </Form>
     </DrawerForm>
