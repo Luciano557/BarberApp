@@ -26,19 +26,6 @@
   }
 
   :root {
-    /* Color scale - Vittro indigo */
-    --color-50: 231 80% 95%;
-    --color-100: 232 78% 86%;
-    --color-200: 232 76% 77%;
-    --color-300: 232 74% 68%;
-    --color-400: 232 75% 59%;
-    --color-500: 232 74% 50%;
-    --color-600: 232 74% 41%;
-    --color-700: 232 74% 32%;
-    --color-800: 232 74% 19%;
-    --color-900: 232 75% 14%;
-    --color-950: 232 79% 5%;
-
     /* Semantic tokens */
     --background: 0 0% 100%;
     --foreground: 232 75% 14%;
@@ -96,6 +83,11 @@
     --ring: 224 43% 30%;
 
     --radius: 0.5rem;
+    /* Radio de contenedores (card/dialog) — DESIGN.md § Shapes, rol "container" */
+    --radius-container: 0.75rem;
+    /* Radio exclusivo del tile de identidad ~40×40 (PageHeader, SubscriptionGate,
+       tiles del resumen mensual) — DESIGN.md § Shapes. No usar en otro rol. */
+    --radius-tile: 0.625rem;
 
     /* Sidebar tokens */
     --sidebar-background: 0 0% 100%;
@@ -106,14 +98,6 @@
     --sidebar-primary: 224 43% 20%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-ring: 224 43% 30%;
-    --sidebar: 0 0% 100%;
-
-    /* Chart tokens */
-    --chart-1: 232 74% 41%;
-    --chart-2: 232 74% 50%;
-    --chart-3: 232 76% 77%;
-    --chart-4: 232 74% 32%;
-    --chart-5: 232 75% 59%;
 
     /* Chart tokens — Estadísticas (reusan valores de --status-*) */
     --chart-cash: 142 76% 36%;
@@ -194,13 +178,6 @@
     --sidebar-primary: 234 50% 65%;
     --sidebar-primary-foreground: 234 80% 6%;
     --sidebar-ring: 234 50% 65%;
-    --sidebar: 234 30% 12%;
-
-    --chart-1: 234 50% 65%;
-    --chart-2: 234 42% 75%;
-    --chart-3: 234 25% 50%;
-    --chart-4: 234 30% 40%;
-    --chart-5: 234 20% 30%;
 
     /* Chart tokens — Estadísticas (reusan valores de --status-*) */
     --chart-cash: 142 76% 42%;

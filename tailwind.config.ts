@@ -93,6 +93,7 @@ export default {
           indigo: {
             DEFAULT: "hsl(var(--status-indigo))",
             foreground: "hsl(var(--status-indigo-foreground))",
+            bg: "hsl(var(--status-indigo-bg))",
           },
         },
         "chart-cash": "hsl(var(--chart-cash))",
@@ -107,6 +108,8 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        container: "var(--radius-container)",
+        tile: "var(--radius-tile)",
       },
       transitionDuration: {
         "sidebar-text": "120ms",

@@ -305,11 +305,11 @@ export function ImportPreviewStep({
                         {r.discarded ? (
                           <Badge variant="outline" className="text-[10px]">Descartada</Badge>
                         ) : status === 'listo' ? (
-                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
+                          <Badge variant="outline" className="text-[10px] border-status-success/30 text-status-success-foreground">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Listo
                           </Badge>
                         ) : status === 'corregido' ? (
-                          <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-500">
+                          <Badge variant="outline" className="text-[10px] border-status-success/30 text-status-success-foreground">
                             <CheckCircle2 className="h-3 w-3 mr-1" /> Corregido
                           </Badge>
                         ) : status === 'error' ? (
@@ -317,7 +317,7 @@ export function ImportPreviewStep({
                             <AlertTriangle className="h-3 w-3 mr-1" /> Error
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 dark:text-amber-500">
+                          <Badge variant="outline" className="text-[10px] border-status-warning/40 text-status-warning-foreground">
                             <Users2 className="h-3 w-3 mr-1" /> Posible duplicado
                           </Badge>
                         )}

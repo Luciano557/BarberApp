@@ -1,6 +1,17 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-08-20
+Última actualización: 2026-08-22
+
+## Sistema de diseño — Operate
+
+**C3 (Navegación jerárquica) cerrado — build de normalización visual, 2026-08-22.**
+Tres controles migraron de `Tabs` a `SegmentedControl` canónico, sin cambio de
+comportamiento funcional: Recurrencias (Tareas → Tareas → Recurrencias),
+Horarios de atención (Mi Negocio → [Sucursal]) y Marcas (Productos, ambos
+accesos). `SegmentedControl` sumó roving focus + flechas/Home/End para no
+perder la navegación por teclado que aportaba Radix Tabs. Detalle completo en
+`DESIGN_BACKLOG.md` (D08 resuelto, D09 descartado) y `DESIGN.md` → Components
+→ Navigation.
 
 ## Turnos / Agenda
 

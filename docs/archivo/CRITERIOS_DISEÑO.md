@@ -1,3 +1,13 @@
+> **ARCHIVADO — histórico, no instrucción vigente (2026-08-22, cierre de C2).**
+> Las dos reglas declaradas explícitamente en este archivo (§1.9 color de chip,
+> §1.10 FormLabel vs. heading) y las 5 reglas de formularios verificadas como
+> vigentes sin migrar (obligatorio/opcional, escala de `maxLength`, errores
+> inline vs. toast, `EmptySelectHint`, `QuickApplyCard` como excepción del
+> canon DrawerForm) ya están en `DESIGN.md`. No quedó ninguna regla activa
+> sin representar. La especificación normativa del sistema visual vive en
+> `DESIGN.md`; la deuda conocida vive en `DESIGN_BACKLOG.md`. Conservar este
+> archivo solo como registro histórico de cómo se llegó al canon actual.
+
 # CRITERIOS DE DISEÑO — Fase 1: Sistema de diseño (inventario y diagnóstico)
 
 > **Fecha:** 2026-07-07 · **Alcance:** relevamiento del estado ACTUAL, sin soluciones.

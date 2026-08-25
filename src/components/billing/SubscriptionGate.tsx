@@ -141,7 +141,7 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-5xl flex-col justify-center gap-6">
         <div className="flex items-center justify-center rounded-lg border border-border bg-card px-4 py-3 shadow-sm">
-          <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-primary">
+          <div className="grid h-10 w-10 place-items-center rounded-tile bg-primary">
             <img src="/favicon.png" alt="Vittro" className="h-6 w-6 object-contain" />
           </div>
         </div>

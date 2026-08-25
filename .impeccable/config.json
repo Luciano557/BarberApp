@@ -11,6 +11,30 @@
         ],
         "createdAt": "2026-08-09T16:42:58.525Z",
         "reason": "Color-coding de turnos preexistente"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-08-22T04:59:41.731Z",
+        "reason": "Confirmado en CRITERIOS_DISEÑO.md (2026-07-08, 'Tipografía confirmada como fuente elegida') y en DESIGN.md como tipografía única del sistema; no es hallazgo de C1"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "src/components/AppSidebar.tsx"
+        ],
+        "createdAt": "2026-08-22T04:59:43.747Z",
+        "reason": "Coreografía de colapso del sidebar, decisión ya tomada y documentada en CRITERIOS_DISEÑO.md ('se mantiene la animación de width en el aside, no se migró a compositor'); territorio de C11 (Motion), fuera de alcance de C1"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "files": [
+          "src/components/AppSidebar.tsx"
+        ],
+        "createdAt": "2026-08-22T12:51:18.320Z",
+        "reason": "Badge de plan bloqueado y section labels 'Principal'/'Gestión' del sidebar — coincide con la excepción ya sancionada en DESIGN.md Typography ('Micro 10px: exclusivo de badges, contadores y section labels uppercase del sidebar')"
       }
     ]
   }

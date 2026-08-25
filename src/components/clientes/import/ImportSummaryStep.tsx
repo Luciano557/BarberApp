@@ -11,8 +11,8 @@ export function ImportSummaryStep({ inserted, total, errors }: Props) {
   return (
     <div className="space-y-4">
       <Card className="p-5 text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-3">
-          <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
+        <div className="w-12 h-12 rounded-full bg-status-success-bg flex items-center justify-center mx-auto mb-3">
+          <CheckCircle2 className="h-6 w-6 text-status-success-foreground" />
         </div>
         <p className="text-base font-medium">
           Se importaron {inserted} de {total} clientes

@@ -1,15 +1,15 @@
 # Decisiones de arquitectura y criterio — Vittro
 
 Registro del "por qué", no del "qué". Para el estado actual de cada módulo,
-ver `ESTADO_ACTUAL.md`. Para el sistema visual, ver `CRITERIOS_DISEÑO.md`.
+ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
+visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
+contexto y el razonamiento detrás de cada decisión.
 
-## Regla de color de chip (§1.9 de CRITERIOS_DISEÑO.md)
+## Por qué existe la regla de color de chip
 
-`bg-primary/10` + `text-primary` = la card se edita en esta pantalla.
-`bg-muted` + `text-muted-foreground` = la card es un atajo a otra pantalla,
-o contenido de solo lectura/acciones sin edición.
-
-Por qué: surgió de una auditoría sobre Configuración de reservas, donde 3
+La especificación vigente (`bg-primary/10` = se edita acá, `bg-muted` = atajo
+o solo lectura) vive en `DESIGN.md` → Colors → Named Rules. Acá solo el
+porqué: surgió de una auditoría sobre Configuración de reservas, donde 3
 tratamientos de chip convivían sin regla escrita. Se declaró explícitamente
 y ya se aplicó retroactivamente en Portal público ("Compartir tu portal"
 corregido de primary a muted, porque no edita nada).

@@ -361,7 +361,7 @@ export function ServicesConfig({ services, lines, onAdd, onUpdate, onAddLine, on
                       toast.success('Servicio activado');
                       closeDrawer();
                     }}
-                    className="bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                    className="bg-status-success-bg text-status-success-foreground hover:bg-status-success/15"
                   >
                     Activar
                   </Button>

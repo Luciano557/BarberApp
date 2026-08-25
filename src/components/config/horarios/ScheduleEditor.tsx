@@ -4,8 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { TimePicker } from '@/components/ui/time-picker';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Switch } from '@/components/ui/switch';
 import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
@@ -151,11 +151,11 @@ function QuickApplyCard({
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
             <label className="text-[11px] text-muted-foreground">Desde</label>
-            <Input type="time" value={draftStart} onChange={e => setDraftStart(e.target.value)} className="w-28 h-9 text-sm" />
+            <TimePicker value={draftStart} onChange={setDraftStart} className="w-32" />
           </div>
           <div className="space-y-1">
             <label className="text-[11px] text-muted-foreground">Hasta</label>
-            <Input type="time" value={draftEnd} onChange={e => setDraftEnd(e.target.value)} className="w-28 h-9 text-sm" />
+            <TimePicker value={draftEnd} onChange={setDraftEnd} className="w-32" />
           </div>
           <Button type="button" variant="outline" size="sm" onClick={addRange} className="h-9">
             <Plus className="h-4 w-4 mr-1" /> Agregar rango
@@ -363,7 +363,7 @@ function DayEditSheet({
                     render={({ field: f }) => (
                       <FormItem className="flex-1 space-y-0">
                         <FormControl>
-                          <Input type="time" {...f} className="h-8 text-sm" disabled={!isActive} />
+                          <TimePicker value={f.value} onChange={f.onChange} disabled={!isActive} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -376,7 +376,7 @@ function DayEditSheet({
                     render={({ field: f }) => (
                       <FormItem className="flex-1 space-y-0">
                         <FormControl>
-                          <Input type="time" {...f} className="h-8 text-sm" disabled={!isActive} />
+                          <TimePicker value={f.value} onChange={f.onChange} disabled={!isActive} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

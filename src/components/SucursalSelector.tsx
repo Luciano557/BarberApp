@@ -100,7 +100,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
             Sucursales
           </SelectLabel>
           {(isOwner || isGeneralManager) && sucursales.length > 1 && (
-            <SelectItem value="__all__" className="data-[highlighted]:bg-[#F4F5F7]">
+            <SelectItem value="__all__" className="data-[highlighted]:bg-muted">
               <span className="flex min-w-0 items-center gap-1.5">
                 <Building2 className="h-3 w-3 shrink-0" />
                 <span className="truncate">Todas las sucursales</span>
@@ -108,7 +108,7 @@ export function SucursalSelector({ collapsed = false }: SucursalSelectorProps) {
             </SelectItem>
           )}
           {sucursales.map((s) => (
-            <SelectItem key={s.id} value={s.id} className="data-[highlighted]:bg-[#F4F5F7]">
+            <SelectItem key={s.id} value={s.id} className="data-[highlighted]:bg-muted">
               <span className="flex min-w-0 items-center gap-1.5">
                 <MapPin className="h-3 w-3 shrink-0" />
                 <span className="truncate">{s.nombre}</span>

@@ -45,7 +45,7 @@ export function ResumenMetodosCard({ metodos, mesLabel }: ResumenMetodosCardProp
       <div className="flex items-center gap-3">
         <span
           aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile"
           style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}
         >
           <Wallet className="h-5 w-5 text-primary" />

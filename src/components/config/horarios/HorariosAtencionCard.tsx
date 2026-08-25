@@ -5,7 +5,7 @@ import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 import { Barber } from '@/types/barbershop';
 import { cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ export function HorariosAtencionCard({
     createOverride, removeOverride, refetch,
   } = useHorariosTrabajo(sucursalId, organizationId);
 
+  const [activeView, setActiveView] = useState<'sucursal' | 'barberos'>('sucursal');
   const [selectedBarberId, setSelectedBarberId] = useState('');
   /** `null` = editando el horario de sucursal · string = override del barbero · `undefined` = panel cerrado. */
   const [editorBarberoId, setEditorBarberoId] = useState<string | null | undefined>(undefined);
@@ -112,18 +113,21 @@ export function HorariosAtencionCard({
         {loading ? (
           <p className="py-4 text-sm text-muted-foreground">Cargando horarios...</p>
         ) : (
-          <Tabs defaultValue="sucursal" className="w-full">
-            <TabsList variant="underline" className="w-auto">
-              <TabsTrigger value="sucursal" variant="underline" className="text-[13px]">
-                Sucursal
-              </TabsTrigger>
-              <TabsTrigger value="barberos" variant="underline" className="text-[13px]">
-                Barberos
-              </TabsTrigger>
-            </TabsList>
+          <div className="w-full">
+            <SegmentedControl
+              ariaLabel="Alcance del horario"
+              className="sm:max-w-xs"
+              options={[
+                { value: 'sucursal', label: 'Sucursal' },
+                { value: 'barberos', label: 'Barberos' },
+              ]}
+              value={activeView}
+              onChange={(v) => setActiveView(v as 'sucursal' | 'barberos')}
+            />
 
             {/* ---------- Sucursal ---------- */}
-            <TabsContent value="sucursal" className="mt-4 space-y-4">
+            {activeView === 'sucursal' && (
+            <div role="tabpanel" aria-label="Horario de la sucursal" className="mt-4 space-y-4">
               {sucursalTieneHorario ? (
                 <>
                   <SummaryFrame>
@@ -155,10 +159,12 @@ export function HorariosAtencionCard({
                   </Button>
                 </div>
               )}
-            </TabsContent>
+            </div>
+            )}
 
             {/* ---------- Barberos ---------- */}
-            <TabsContent value="barberos" className="mt-4 space-y-4">
+            {activeView === 'barberos' && (
+            <div role="tabpanel" aria-label="Horarios de barberos" className="mt-4 space-y-4">
               {activeBarbers.length === 0 ? (
                 <EmptySelectHint
                   message="No hay barberos activos en esta sucursal."
@@ -237,8 +243,9 @@ export function HorariosAtencionCard({
                   )}
                 </>
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+            )}
+          </div>
         )}
       </CatalogSectionCard>
 

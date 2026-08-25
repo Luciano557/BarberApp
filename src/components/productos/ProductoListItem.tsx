@@ -151,7 +151,7 @@ export function ProductoListItem({
               <>
                 <Button
                   variant="ghost"
-                  className="w-full justify-start bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-950/30 dark:text-green-400 dark:hover:bg-green-950/50"
+                  className="w-full justify-start bg-status-success-bg text-status-success-foreground hover:bg-status-success/15"
                   onClick={() => { onToggleActive(true); setDrawerOpen(false); }}
                 >
                   Activar en sucursal
@@ -171,7 +171,7 @@ export function ProductoListItem({
         }
       >
         <div className="space-y-5">
-          <p className={`text-sm font-medium ${activeInSucursal ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+          <p className={`text-sm font-medium ${activeInSucursal ? 'text-status-success-foreground' : 'text-muted-foreground'}`}>
             {statusLabel}
           </p>
 

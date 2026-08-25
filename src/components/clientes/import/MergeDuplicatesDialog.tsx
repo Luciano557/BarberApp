@@ -112,7 +112,7 @@ export function MergeDuplicatesDialog({ open, onOpenChange, group, onResolve, on
                 <div key={f as string} className="space-y-2">
                   <Label className="text-xs font-medium">
                     {HEADER_LABELS[f as string] ?? (f as string)}
-                    <span className="ml-2 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-500">
+                    <span className="ml-2 text-[10px] uppercase tracking-wide text-status-warning-foreground">
                       Conflicto
                     </span>
                   </Label>

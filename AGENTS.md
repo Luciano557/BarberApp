@@ -66,5 +66,8 @@ o archivos, no autoreporte del agente), actualizar la documentación
 correspondiente antes de dar la tarea por cerrada. Ver `docs/INDICE.md`
 para la estructura completa.
 
-Criterios visuales y de diseño detallados: ver `CRITERIOS_DISEÑO.md` (raíz
-del repo) — no se duplican acá.
+Criterios visuales y de diseño: ver `DESIGN.md` (raíz del repo) — **fuente de
+verdad activa del sistema visual** — y `DESIGN_BACKLOG.md` (deuda y migraciones
+pendientes). `docs/archivo/CRITERIOS_DISEÑO.md` es la bitácora de auditorías
+que precedió a `DESIGN.md`, archivada: consultarla como historial, no como
+instrucción activa. No se duplican acá.

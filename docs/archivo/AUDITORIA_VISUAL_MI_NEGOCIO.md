@@ -1,3 +1,11 @@
+> **ARCHIVADO — histórico, no instrucción vigente.** Auditoría previa a la
+> migración de Mi Negocio/Configuración al canon `DrawerForm` + RHF/Zod
+> (cerrada en `CRITERIOS_DISEÑO.md`, "Cierre de la Tanda 2", 2026-07-13 a
+> 2026-07-28). Casi todos los componentes relevados acá fueron reescritos
+> después de esta fecha. La regla vigente del sistema visual vive en
+> `DESIGN.md`; la deuda conocida vive en `DESIGN_BACKLOG.md`. Conservar solo
+> como contexto histórico de cómo se llegó al canon actual.
+
 # Auditoría Visual — Mi Negocio + Configuración
 
 > **Modo:** Exploración / solo lectura. Generado el 2026-06-12.

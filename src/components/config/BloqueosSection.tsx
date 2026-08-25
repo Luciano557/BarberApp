@@ -4,11 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
+import { TimePicker } from '@/components/ui/time-picker';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { ShieldOff, Plus, Trash2, Calendar } from 'lucide-react';
@@ -235,7 +236,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                   <FormItem>
                     <FormLabel className="text-xs">Fecha inicio</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} className="h-8 text-sm" />
+                      <DatePicker value={field.value || null} onChange={(v) => field.onChange(v ?? '')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -248,7 +249,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                   <FormItem>
                     <FormLabel className="text-xs">Fecha fin</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} className="h-8 text-sm" />
+                      <DatePicker value={field.value || null} onChange={(v) => field.onChange(v ?? '')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -278,7 +279,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                     <FormItem>
                       <FormLabel className="text-xs">Hora inicio</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} className="h-8 text-sm" />
+                        <TimePicker value={field.value} onChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -290,7 +291,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                     <FormItem>
                       <FormLabel className="text-xs">Hora fin</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} className="h-8 text-sm" />
+                        <TimePicker value={field.value} onChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}

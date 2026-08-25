@@ -240,7 +240,7 @@ export function ProductoPickerDialog({
                           <CurrencyInput
                             value={String(item!.precio_unitario)}
                             onChange={(v) => updatePrice(row.sucursal.id, v)}
-                            className="h-7 w-28 text-xs"
+                            className="h-9 w-28 text-base md:h-7 md:text-xs"
                             placeholder="0"
                           />
                         </div>
@@ -293,9 +293,9 @@ export function ProductoPickerDialog({
         </ScrollArea>
 
         {Array.from(cart.values()).some(it => it.cantidad > it.stock_actual) && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs">
-            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-            <span className="text-amber-700 dark:text-amber-300">
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-bg border border-status-warning/30 text-xs">
+            <AlertTriangle className="h-4 w-4 text-status-warning-foreground flex-shrink-0 mt-0.5" />
+            <span className="text-status-warning-foreground">
               Algunos productos quedarán con stock negativo. Se permite continuar pero recordá reponer.
             </span>
           </div>

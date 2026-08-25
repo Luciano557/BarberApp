@@ -138,7 +138,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             railMode ? 'px-0' : 'px-2',
             active
               ? 'bg-primary font-semibold text-primary-foreground'
-              : 'font-medium text-muted-foreground hover:bg-[#F4F5F7] hover:text-foreground',
+              : 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
           )}
           style={{ transition: `padding-left 200ms ${SIZE_EASE}, padding-right 200ms ${SIZE_EASE}` }}
         >
@@ -148,7 +148,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               railMode
                 ? cn(
                     'rounded-[10px]',
-                    active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground group-hover:bg-[#F4F5F7]',
+                    active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground group-hover:bg-muted',
                   )
                 : active
                   ? 'h-7 w-7 rounded-md bg-primary-foreground/15 text-primary-foreground'
@@ -235,14 +235,14 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         <button
           type="button"
           aria-label="Cerrar navegación"
-          className="fixed inset-0 z-40 bg-[hsl(var(--color-950))]/50 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-40 bg-foreground/50 backdrop-blur-sm animate-fade-in"
           onClick={() => setCollapsed(true)}
         />
       )}
 
       <aside
         className={cn(
-          'flex flex-col border-r border-[#EEEFF2] bg-background',
+          'flex flex-col border-r border-border bg-background',
           isMobile
             ? 'fixed inset-y-0 left-0 z-40 w-[min(85vw,20rem)] max-w-sm transition-transform duration-200 [transition-timing-function:var(--ease-out-quint)]'
             : cn(
@@ -350,7 +350,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 </p>
                 {principalItems.length > 0 && (
                   <div
-                    className="absolute inset-x-2 top-3 h-px bg-[#EEEFF2]"
+                    className="absolute inset-x-2 top-3 h-px bg-border"
                     style={{
                       opacity: railMode ? 1 : 0,
                       transition: railMode
@@ -375,7 +375,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             propiedad animable por CSS, así que esta parte sigue siendo un
             swap condicional (igual que hoy). El chevron de colapsar SÍ
             quedó unificado como un solo botón persistente. Ver reporte. */}
-        <div className="border-t border-[#EEEFF2] p-2">
+        <div className="border-t border-border p-2">
           {railMode ? (
             <div className="flex flex-col items-center gap-1.5 py-2">
               <Avatar className="h-9 w-9" title={displayName}>
