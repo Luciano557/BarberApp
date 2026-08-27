@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +26,7 @@ export function PinConfigSection() {
   const { profile } = useAuth();
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(isLoading);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -134,10 +137,20 @@ export function PinConfigSection() {
   };
 
   if (isLoading) {
+    if (!showSkeleton) return null;
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin" />
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-5 w-5 rounded-full" />
+            <Skeleton className="h-5 w-32" />
+          </div>
+          <Skeleton className="h-3.5 w-72 max-w-full mt-1" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-3.5 w-24" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-9 w-24" />
         </CardContent>
       </Card>
     );

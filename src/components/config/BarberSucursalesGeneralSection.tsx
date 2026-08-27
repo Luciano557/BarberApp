@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, MapPin, Loader2, Repeat, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, MapPin, Repeat, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -47,6 +49,7 @@ export function BarberSucursalesGeneralSection({
   const bs = useBarberosSucursales(organizationId);
 
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
   const [fetchError, setFetchError] = useState(false);
   const [rows, setRows] = useState<BarberoSucursalRow[]>([]);
   const [savingPrincipal, setSavingPrincipal] = useState(false);
@@ -114,9 +117,12 @@ export function BarberSucursalesGeneralSection({
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" /> Cargando…
-        </div>
+        showSkeleton ? (
+          <div className="space-y-1.5">
+            <Skeleton className="h-3.5 w-40" />
+            <Skeleton className="h-3.5 w-28" />
+          </div>
+        ) : null
       ) : fetchError ? (
         <div className="flex items-center gap-2 py-2">
           <p className="text-xs text-destructive flex-1">No se pudo cargar la información · </p>

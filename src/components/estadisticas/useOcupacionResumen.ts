@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Sucursal } from '@/contexts/SucursalContext';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 export interface OcupacionMonthData {
   month: string; // 'yyyy-MM'
@@ -27,43 +28,51 @@ export function useOcupacionResumen(
   currentSucursal: Sucursal | null,
   periodoMeses: string,
 ) {
-  const [ocupacionPorMes, setOcupacionPorMes] = useState<OcupacionMonthData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}::${periodoMeses}`;
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, periodoMeses, currentSucursal]);
+  const readState = useReadState<OcupacionMonthData[]>({
+    contextKey,
+    errorMessage: 'No pudimos cargar la ocupación.',
+    staleErrorMessage: 'No pudimos actualizar la ocupación.',
+    surfaceId: `estadisticas-ocupacion:${organizationId ?? 'none'}`,
+  });
 
-  const fetchData = async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: [], error: null };
 
-    try {
       const meses = parseInt(periodoMeses);
-      const { data, error } = await supabase.rpc('estadisticas_ocupacion_mensual', {
+      const { data, error, status } = await supabase.rpc('estadisticas_ocupacion_mensual', {
         _organization_id: organizationId,
         _sucursal_id: currentSucursal?.id ?? undefined,
         _meses: meses,
-      });
-      if (error) throw error;
+      }).abortSignal(signal);
+      if (error) return { data: null, error, status };
 
       const rows = data || [];
-      setOcupacionPorMes(rows.map((r) => ({
-        month: String(r.mes).slice(0, 7),
-        tasaOcupacion: r.tasa_ocupacion == null ? null : Number(r.tasa_ocupacion),
-        tasaOcupacionParcial: r.tasa_ocupacion_parcial == null ? null : Number(r.tasa_ocupacion_parcial),
-        coberturaIncompleta: !!r.cobertura_incompleta,
-        duracionPromedioMin: r.duracion_promedio_ponderada == null ? null : Number(r.duracion_promedio_ponderada),
-      })));
-    } catch (error) {
-      console.error('Error fetching ocupación (resumen):', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return {
+        data: rows.map((r) => ({
+          month: String(r.mes).slice(0, 7),
+          tasaOcupacion: r.tasa_ocupacion == null ? null : Number(r.tasa_ocupacion),
+          tasaOcupacionParcial: r.tasa_ocupacion_parcial == null ? null : Number(r.tasa_ocupacion_parcial),
+          coberturaIncompleta: !!r.cobertura_incompleta,
+          duracionPromedioMin: r.duracion_promedio_ponderada == null ? null : Number(r.duracion_promedio_ponderada),
+        })),
+        error: null,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, periodoMeses, readState.run]);
 
-  return { ocupacionPorMes, isLoading };
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  return {
+    ocupacionPorMes: readState.data ?? [],
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

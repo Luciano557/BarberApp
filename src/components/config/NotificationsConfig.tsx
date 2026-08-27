@@ -10,7 +10,7 @@ import {
   type PrefMode,
 } from '@/lib/notifications/catalog';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
-import { toast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { cn } from '@/lib/utils';
 
 const MODE_OPTIONS: Array<{ value: PrefMode; label: string }> = [
@@ -33,7 +33,7 @@ export function NotificationsConfig() {
       {
         onError: (e: unknown) => {
           const msg = e instanceof Error ? e.message : 'No se pudo guardar la preferencia';
-          toast({ title: 'Error', description: msg, variant: 'destructive' });
+          feedback.error('Error', { description: msg });
         },
       },
     );
@@ -45,7 +45,7 @@ export function NotificationsConfig() {
       {
         onError: (e: unknown) => {
           const msg = e instanceof Error ? e.message : 'No se pudo guardar la preferencia';
-          toast({ title: 'Error', description: msg, variant: 'destructive' });
+          feedback.error('Error', { description: msg });
         },
       },
     );

@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscriptionAccess, type BillingPlanCode } from '@/hooks/useSubscriptionAccess';
@@ -74,6 +76,7 @@ function planRank(plan: SubscriptionPlan | undefined) {
 
 export function BillingSettings() {
   const { access, isLoading, error, refreshAccess } = useSubscriptionAccess();
+  const showSkeleton = useDelayedVisible(isLoading);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [payments, setPayments] = useState<SubscriptionPayment[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -219,9 +222,17 @@ export function BillingSettings() {
   };
 
   if (isLoading) {
+    if (!showSkeleton) return null;
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-        Cargando facturacion...
+      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-24 rounded-full" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </div>
+          <Skeleton className="h-9 w-28 shrink-0" />
+        </div>
       </div>
     );
   }

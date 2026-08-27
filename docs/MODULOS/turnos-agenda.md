@@ -120,15 +120,14 @@ estirado a ese ancho se vería desproporcionado. La sección **mantiene su
 chip `bg-muted`** — sigue sin campos editables, la clasificación de
 CRITERIOS_DISEÑO §1.9 no cambia por pasar a pestañas.
 
-**Deriva conocida, sin resolver:** el `<Skeleton>` de carga inicial
-(early return de `PortalPublicoSection.tsx`) sigue espejando el layout
-apilado *anterior* de esta sección — muestra el campo de URL **y** un
-cuadrado de 166px para el QR. Con pestañas, la vista por defecto (Link) no
-renderiza ningún QR, así que el esqueleto promete un bloque que no aparece
-al terminar de cargar. Quedó fuera del candado del build que introdujo las
-pestañas (que solo tocaba el bloque de "Compartir tu portal"); las
-dimensiones del `<Skeleton>` se fijaron en la Fase 7 y no se han
-reajustado desde entonces. Corregirlo es un build aparte.
+**Deriva corregida (C4B, 2026-08-22).** El `<Skeleton>` de carga inicial
+(early return de `PortalPublicoSection.tsx`) espejaba el layout apilado
+*anterior* de esta sección — mostraba el campo de URL **y** un cuadrado de
+166px para el QR, cuando la vista por defecto (Link) no renderiza ningún
+QR. Ahora refleja la geometría real de esa pestaña: chip + título,
+`SegmentedControl`, encabezado de "Link público del portal", campo de URL
+y los botones Copiar / Ver portal. El bloque de QR salió del skeleton. La
+columna derecha (Vista previa) y las 3 Cards de abajo no cambiaron.
 
 **"Logo y portada" con pestañas** (`SegmentedControl`, `ui/SegmentedControl.tsx`
 — pill navy deslizante): antes apilaba los 2 uploaders completos uno debajo
@@ -158,12 +157,14 @@ estado local que cubre el ciclo completo (upload + save, no solo la mitad):
 `removingLogo`/`removingCover` (nuevos). Encuadre y submit general ya
 estaban correctos (`saving`/`savingAll`) y no se tocaron.
 
-Asimetría conocida, no un bug: "Quitar portada" solo queda `disabled`
-durante el ciclo, sin texto "Quitando..." — a diferencia de "Quitar logo".
-El botón vive dentro de `PortalCoverUploader.tsx` con label hardcodeado y
-un único prop `disabled` genérico compartido con "Ajustar portada"; ese
-archivo quedó fuera del alcance de este build. Si se quiere simetría total,
-requiere una prop nueva en `PortalCoverUploader.tsx` (build aparte).
+**Asimetría resuelta (C4B, 2026-08-22).** "Quitar portada" quedaba solo
+`disabled` durante el ciclo, sin texto "Quitando..." — a diferencia de
+"Quitar logo". `PortalCoverUploader.tsx` ahora recibe una prop `removing`
+propia (separada del `disabled` genérico que comparte con "Ajustar
+portada"), y el padre le pasa `removingCover` — el estado que ya existía
+desde la Fase 4 y hasta ahora solo alimentaba `disabled`. Ambas acciones de
+quitar comunican progreso igual. Sin cambios en subida, borrado, encuadre
+ni persistencia.
 
 Dos modelos de guardado sin señal visual que los distinga (instantáneo vs.
 diferido) — eso es Fase 5, sigue pendiente, sin tocar acá.

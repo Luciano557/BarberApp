@@ -81,7 +81,10 @@ export function EstadisticasPanel({ onNavigateToHorarios }: EstadisticasPanelPro
   const [periodoMeses, setPeriodoMeses] = useState('6');
   const [selectedMetric, setSelectedMetric] = useState<MetricCardDef | null>(null);
 
-  const { monthlyData, isLoading, ingresosRaw, datosIncompletos: incompletoEstadisticas } = useEstadisticasData(
+  const {
+    monthlyData, isLoading, ingresosRaw, datosIncompletos: incompletoEstadisticas,
+    phase: phaseEstadisticas, error: errorEstadisticas, retry: retryEstadisticas,
+  } = useEstadisticasData(
     organization?.id,
     currentSucursal,
     periodoMeses,
@@ -89,27 +92,53 @@ export function EstadisticasPanel({ onNavigateToHorarios }: EstadisticasPanelPro
 
   const {
     ocupacionPorMes, isLoading: isLoadingOcupacion,
+    phase: phaseOcupacion, error: errorOcupacion, retry: retryOcupacion,
   } = useOcupacionResumen(organization?.id, currentSucursal, periodoMeses);
 
   const {
     montosMesActual, montosMesAnterior, isLoading: isLoadingPagoMetodo,
     datosIncompletos: incompletoPagoMetodo,
+    phase: phasePagoMetodo, error: errorPagoMetodo, retry: retryPagoMetodo,
   } = usePagoMetodoData(organization?.id, currentSucursal);
 
   const {
     rankingActual, productosRanking, historialPorBarbero, isLoading: isLoadingEquipo,
     datosIncompletos: incompletoEquipo,
+    phase: phaseEquipo, error: errorEquipo, retry: retryEquipo,
   } = useEquipoData(organization?.id, currentSucursal, periodoMeses);
 
   const {
     monthlyStats: serviciosClientesData, ventasAgregadas,
     isLoading: isLoadingServiciosClientes, error: serviciosClientesError,
     datosIncompletos: incompletoServiciosClientes,
+    phase: phaseServiciosClientes, retry: retryServiciosClientes,
   } = useServiciosClientesData(organization?.id, currentSucursal, periodoMeses);
 
   const {
     saldoPendiente, proximaCuota, isLoading: isLoadingDeuda,
+    phase: phaseDeuda, error: errorDeuda, retry: retryDeuda,
   } = useDeudaPendienteData(organization?.id, currentSucursal);
+
+  // Fallo inicial (sin datos previos) de cada hook — nunca se muestra como $0/vacío, ver
+  // DESIGN.md → Feedback ("Una lectura fallida nunca es un vacío"). El refetch fallido con
+  // datos previos no necesita gate acá: useReadState ya conserva los datos y dispara el toast
+  // con "Reintentar" por su cuenta.
+  const estadisticasFailed = phaseEstadisticas === 'error';
+  const ocupacionFailed = phaseOcupacion === 'error';
+  const pagoMetodoFailed = phasePagoMetodo === 'error';
+  const equipoFailed = phaseEquipo === 'error';
+  const serviciosClientesFailed = phaseServiciosClientes === 'error';
+  const deudaFailed = phaseDeuda === 'error';
+
+  // "Vistazo rápido" compone 3 hooks en un solo bloque visual — un fallo de lectura inicial en
+  // cualquiera de los tres se muestra como un único error claro en vez de tres avisos
+  // superpuestos dentro del mismo componente (VistazoRapido no distingue su origen interno).
+  const vistazoFailed = estadisticasFailed || pagoMetodoFailed || deudaFailed;
+  const retryVistazo = () => {
+    if (estadisticasFailed) retryEstadisticas();
+    if (pagoMetodoFailed) retryPagoMetodo();
+    if (deudaFailed) retryDeuda();
+  };
 
   // Salvaguarda de truncado: si alguna consulta que todavía lee filas crudas llegó al tope,
   // avisamos en vez de mostrar números parciales como si fueran reales.

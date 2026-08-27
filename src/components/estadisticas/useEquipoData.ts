@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { alcanzoLimiteFilas } from './rowLimit';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 
 export interface BarberoMonthStats {
@@ -37,30 +38,35 @@ export interface ProductoRankingRow {
  * Filtro de "barbero" en todo el hook: `barberos.roles_equipo` incluye 'barber' — mismo criterio
  * que el fix de DailySummary.tsx / useOcupacionResumen.ts, no el conteo genérico de activos.
  */
+interface EquipoBundle {
+  rankingActual: BarberoRankingRow[];
+  productosRanking: ProductoRankingRow[];
+  historialPorBarbero: Map<string, BarberoMonthStats[]>;
+  datosIncompletos: boolean;
+}
+
+const EMPTY_BUNDLE: EquipoBundle = {
+  rankingActual: [], productosRanking: [], historialPorBarbero: new Map(), datosIncompletos: false,
+};
+
 export function useEquipoData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
 ) {
-  const [rankingActual, setRankingActual] = useState<BarberoRankingRow[]>([]);
-  const [productosRanking, setProductosRanking] = useState<ProductoRankingRow[]>([]);
-  const [historialPorBarbero, setHistorialPorBarbero] = useState<Map<string, BarberoMonthStats[]>>(new Map());
-  const [datosIncompletos, setDatosIncompletos] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}::${periodoMeses}`;
 
+  const readState = useReadState<EquipoBundle>({
+    contextKey,
+    errorMessage: 'No pudimos cargar los datos de equipo.',
+    staleErrorMessage: 'No pudimos actualizar los datos de equipo.',
+    surfaceId: `estadisticas-equipo:${organizationId ?? 'none'}`,
+  });
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal, periodoMeses]);
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: null, error: null };
 
-  const fetchData = async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
-
-    try {
       const meses = parseInt(periodoMeses);
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
@@ -96,16 +102,16 @@ export function useEquipoData(
       if (currentSucursal) ventaProductoQuery = ventaProductoQuery.eq('sucursal_id', currentSucursal.id);
 
       const [barberosRes, ingresosRes, ventaProductoRes] = await Promise.all([
-        barberosQuery, ingresosQuery, ventaProductoQuery,
+        barberosQuery.abortSignal(signal), ingresosQuery.abortSignal(signal), ventaProductoQuery.abortSignal(signal),
       ]);
-      if (barberosRes.error) throw barberosRes.error;
-      if (ingresosRes.error) throw ingresosRes.error;
-      if (ventaProductoRes.error) throw ventaProductoRes.error;
+      const failed = [barberosRes, ingresosRes, ventaProductoRes].find((r) => r.error);
+      if (failed) {
+        return { data: null, error: failed.error, status: (failed as { status?: number }).status };
+      }
 
       // Salvaguarda de truncado: este hook sigue leyendo filas crudas y agregando en cliente.
-      setDatosIncompletos(
-        alcanzoLimiteFilas(ingresosRes.data) || alcanzoLimiteFilas(ventaProductoRes.data),
-      );
+      const datosIncompletos =
+        alcanzoLimiteFilas(ingresosRes.data) || alcanzoLimiteFilas(ventaProductoRes.data);
 
 
       const barberosBarber = (barberosRes.data || []).filter(
@@ -132,7 +138,7 @@ export function useEquipoData(
         actualByBarbero.set(bid, acc);
       });
 
-      const ranking: BarberoRankingRow[] = Array.from(actualByBarbero.entries()).map(([bid, acc]) => ({
+      const rankingActual: BarberoRankingRow[] = Array.from(actualByBarbero.entries()).map(([bid, acc]) => ({
         id: bid,
         nombre: nombreMap.get(bid) || 'Sin nombre',
         facturacion: acc.facturacion,
@@ -140,11 +146,10 @@ export function useEquipoData(
         comisionDevengada: acc.comision,
         ticketPromedio: acc.servicios > 0 ? acc.facturacion / acc.servicios : 0,
       }));
-      setRankingActual(ranking);
 
       // Historial mensual por barbero, para el detalle al click (mismo rango que el resto del panel)
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
-      const historial = new Map<string, BarberoMonthStats[]>();
+      const historialPorBarbero = new Map<string, BarberoMonthStats[]>();
       barberoIds.forEach((bid) => {
         const ingresosBarbero = ingresos.filter((i) => i.barbero_id === bid);
         const serie: BarberoMonthStats[] = months.map((monthDate) => {
@@ -162,9 +167,8 @@ export function useEquipoData(
             comisionDevengada: rows.reduce((s, i) => s + (Number(i.sueldo) || 0) + (Number(i.comision_productos) || 0), 0),
           };
         });
-        historial.set(bid, serie);
+        historialPorBarbero.set(bid, serie);
       });
-      setHistorialPorBarbero(historial);
 
       // Ranking de venta de productos — condicional (ver EstadisticasPanel.tsx: no se renderiza
       // en absoluto si queda vacío).
@@ -176,18 +180,31 @@ export function useEquipoData(
           (productosPorBarbero.get(vp.barbero_id) || 0) + (Number(vp.subtotal) || 0),
         );
       });
-      const productos: ProductoRankingRow[] = Array.from(productosPorBarbero.entries()).map(([bid, total]) => ({
+      const productosRanking: ProductoRankingRow[] = Array.from(productosPorBarbero.entries()).map(([bid, total]) => ({
         id: bid,
         nombre: nombreMap.get(bid) || 'Sin nombre',
         totalProductos: total,
       }));
-      setProductosRanking(productos);
-    } catch (error) {
-      console.error('Error fetching datos de equipo:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  return { rankingActual, productosRanking, historialPorBarbero, isLoading, datosIncompletos };
+      return { data: { rankingActual, productosRanking, historialPorBarbero, datosIncompletos }, error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, periodoMeses, readState.run]);
+
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  return {
+    rankingActual: bundle.rankingActual,
+    productosRanking: bundle.productosRanking,
+    historialPorBarbero: bundle.historialPorBarbero,
+    datosIncompletos: bundle.datosIncompletos,
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

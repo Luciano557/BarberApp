@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +55,7 @@ export function ProductoPickerDialog({
 
   const [rows, setRows] = useState<RowData[]>([]);
   const [loading, setLoading] = useState(false);
+  const showSkeleton = useDelayedVisible(loading);
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<Map<string, CartItem>>(new Map());
 
@@ -190,7 +193,15 @@ export function ProductoPickerDialog({
 
         <ScrollArea className="flex-1 -mx-6 px-6">
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Cargando...</p>
+            showSkeleton ? (
+              <div className="space-y-2 py-1">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-3 rounded-lg border border-border">
+                    <SkeletonRow leading="bar" />
+                  </div>
+                ))}
+              </div>
+            ) : null
           ) : filtered.length === 0 ? (
             <div className="text-center py-10 space-y-1">
               <p className="text-sm text-muted-foreground">

@@ -6,6 +6,8 @@ import { TrendingUp, Trash2, Plus, Package } from 'lucide-react';
 import { useInversiones, type Inversion } from '@/hooks/useInversiones';
 import { useDeudas } from '@/hooks/useDeudas';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,6 +76,7 @@ const getInversionFormDefaults = (): InversionFormValues => ({
 
 export function InversionesPanel() {
   const { inversiones, isLoading, addInversion, deleteInversion, getAmortizacionMensual, getMesesTranscurridos } = useInversiones();
+  const showSkeleton = useDelayedVisible(isLoading);
   const { addDeuda } = useDeudas();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -319,7 +322,17 @@ export function InversionesPanel() {
       </DrawerForm>
 
       {isLoading ? (
-        <p className="text-muted-foreground text-sm">Cargando...</p>
+        showSkeleton ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="py-4">
+                  <SkeletonRow leading={false} />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : null
       ) : inversiones.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">

@@ -447,13 +447,28 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
   if (orgLoading || loading) {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        {/* Espeja el bloque superior: Compartir (izquierda) + Vista previa. */}
+        {/* Espeja "Compartir tu portal" (izquierda) + Vista previa. La pestaña
+            por defecto es Link público (D28: el skeleton antes mostraba
+            también un QR, que solo aparece si el usuario cambia a esa
+            pestaña) — ver docs/MODULOS/turnos-agenda.md. */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4 min-w-0">
-            <Skeleton className="h-5 w-44" />
-            <Skeleton className="h-10 w-full" />
-            {/* 166px = QR de 140 + p-3 a cada lado + el borde de la caja. */}
-            <Skeleton className="h-[166px] w-[166px] rounded-lg" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            <Skeleton className="h-9 w-56 sm:max-w-xs" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-64 max-w-full" />
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                <Skeleton className="h-10 w-full sm:flex-1" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-20" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </div>
+            </div>
           </div>
           <div className="space-y-3">
             <Skeleton className="h-4 w-24" />
@@ -670,6 +685,7 @@ export function PortalPublicoSection({ onDirtyChange }: PortalPublicoSectionProp
                     coverPositionY={watchedCoverPosY}
                     coverZoom={watchedCoverZoom}
                     uploading={uploadingCover}
+                    removing={removingCover}
                     disabled={removingCover || saving}
                     onUpload={handleCoverFile}
                     onRemove={handleRemoveCover}

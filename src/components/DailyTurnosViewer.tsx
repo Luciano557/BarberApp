@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
@@ -15,6 +17,7 @@ import { buildHourRails, buildHalfHourRails, MULTI_PX_PER_MIN, MULTI_RANGE_START
 import { AgendaHourRailScroll } from './agenda/AgendaHourRailScroll';
 import { AgendaMultiDayColumn } from './agenda/AgendaMultiDayColumn';
 import { AppointmentDetailDialog } from './agenda/AppointmentDetailDialog';
+import { InlineReadError } from '@/components/ui/InlineReadError';
 
 interface DailyTurnosViewerProps {
   barbers: Barber[];
@@ -30,12 +33,15 @@ export function DailyTurnosViewer({ barbers }: DailyTurnosViewerProps) {
   const dateStr = useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
   const isToday = isSameDay(currentDate, new Date());
 
-  const { turnos, bloqueos, servicios, loading, refetch } = useAgendaData(
+  const { turnos, bloqueos, servicios, loading, phase, error, refetch, retry } = useAgendaData(
     currentSucursal?.id || '',
     organization?.id || '',
     currentDate,
     currentDate,
   );
+  const loadFailed = phase === 'error';
+
+  const showSkeleton = useDelayedVisible(loading);
 
   // Realtime: refetch silencioso de los turnos del día para esta sucursal.
   useTurnosRealtime({ sucursalId: currentSucursal?.id, onChange: refetch });
@@ -85,7 +91,22 @@ export function DailyTurnosViewer({ barbers }: DailyTurnosViewerProps) {
 
           {/* Vista de agenda del día */}
           {loading ? (
-            <p className="text-xs text-muted-foreground text-center py-8">Cargando turnos...</p>
+            showSkeleton ? (
+              <div className="space-y-2 py-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3" style={{ paddingLeft: `${i * 14}%` }}>
+                    <Skeleton className="h-3 w-10 shrink-0" />
+                    <Skeleton className="h-9 flex-1 max-w-[220px] rounded-md" />
+                  </div>
+                ))}
+              </div>
+            ) : null
+          ) : loadFailed ? (
+            <InlineReadError
+              message={error ?? 'No pudimos cargar los turnos del día.'}
+              onRetry={retry}
+              bordered={false}
+            />
           ) : (
             <AgendaHourRailScroll ref={scrollRef} maxHeight="360px">
               <AgendaMultiDayColumn

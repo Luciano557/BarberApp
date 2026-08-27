@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Calendar as CalendarIcon, User, Clock, FileX, MessageSquare, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, User, Clock, FileX, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Card, CardContent } from '@/components/ui/card';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { InlineReadError } from '@/components/ui/InlineReadError';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
+import { useReadState } from '@/hooks/useReadState';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,50 +38,64 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onExternalOpenChange || setInternalOpen;
-  const [records, setRecords] = useState<AnulacionRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [selectedBarber, setSelectedBarber] = useState<string>('all');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const { organization } = useOrganization();
 
-  const fetchRecords = async () => {
+  const contextKey = [
+    organization?.id ?? 'none',
+    selectedBarber,
+    startDate ? format(startDate, 'yyyy-MM-dd') : 'none',
+    endDate ? format(endDate, 'yyyy-MM-dd') : 'none',
+    open ? 'open' : 'closed',
+  ].join('::');
+
+  const readState = useReadState<AnulacionRecord[]>({
+    contextKey,
+    errorMessage: 'No pudimos cargar el historial.',
+    staleErrorMessage: 'No pudimos actualizar el historial.',
+    surfaceId: 'caja-anulaciones',
+  });
+
+  const fetchRecords = useCallback(() => {
     if (!organization?.id) return;
+    readState.run(async (signal) => {
+      let query = supabase
+        .from('anulaciones_cierre')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('anulado_at', { ascending: false });
 
-    setIsLoading(true);
-    let query = supabase
-      .from('anulaciones_cierre')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .order('anulado_at', { ascending: false });
+      if (selectedBarber && selectedBarber !== 'all') {
+        query = query.eq('barbero_nombre', selectedBarber);
+      }
 
-    if (selectedBarber && selectedBarber !== 'all') {
-      query = query.eq('barbero_nombre', selectedBarber);
-    }
+      if (startDate) {
+        query = query.gte('fecha_cierre', format(startDate, 'yyyy-MM-dd'));
+      }
 
-    if (startDate) {
-      query = query.gte('fecha_cierre', format(startDate, 'yyyy-MM-dd'));
-    }
+      if (endDate) {
+        query = query.lte('fecha_cierre', format(endDate, 'yyyy-MM-dd'));
+      }
 
-    if (endDate) {
-      query = query.lte('fecha_cierre', format(endDate, 'yyyy-MM-dd'));
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching anulaciones:', error);
-    } else {
-      setRecords(data || []);
-    }
-    setIsLoading(false);
-  };
+      const { data, error, status } = await query.abortSignal(signal);
+      if (error) return { data: null, error, status };
+      return { data: (data as AnulacionRecord[]) || [], error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organization?.id, selectedBarber, startDate, endDate, readState.run]);
 
   useEffect(() => {
     if (open) {
       fetchRecords();
     }
-  }, [open, selectedBarber, startDate, endDate, organization?.id]);
+  }, [open, fetchRecords]);
+
+  const records = readState.data ?? [];
+  const isLoading = readState.phase === 'loading';
+  const loadFailed = readState.phase === 'error';
+  const showSkeleton = useDelayedVisible(isLoading);
 
   const clearFilters = () => {
     setSelectedBarber('all');
@@ -171,9 +189,19 @@ export function AnulacionesCierreHistory({ barbers, externalOpen, onExternalOpen
         {/* Records List */}
         <div className="space-y-3 pt-4">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            showSkeleton ? (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="border border-border">
+                    <CardContent className="py-4">
+                      <SkeletonRow />
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : null
+          ) : loadFailed ? (
+            <InlineReadError message="No pudimos cargar el historial." onRetry={readState.retry} />
           ) : records.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
               <FileX className="h-8 w-8 text-muted-foreground/50" />

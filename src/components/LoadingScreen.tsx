@@ -91,31 +91,44 @@ export function LoadingScreen({ message, onRetry, fatalMessage, loading }: Props
     window.location.href = '/login';
   };
 
+  // Divisor entre marca y texto: vertical en fila (desktop/tablet), horizontal
+  // apilado (mobile) — mismo elemento, solo rota de eje. Composición V5 (ver
+  // scratchpad/loader-variantes.html), aprobada para C4B.
+  const divider = (
+    <div className="h-px w-7 shrink-0 self-center bg-border sm:h-auto sm:w-px sm:self-stretch" />
+  );
+
   if (fatal) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <div className="max-w-md text-center">
-          <h1 className="text-xl font-semibold text-foreground mb-2">
-            No pudimos terminar de cargar tu sesión
-          </h1>
-          <p className="text-muted-foreground text-sm mb-6">
-            {fatalMessage ?? 'Puede deberse a una conexión lenta o a un problema temporal.'}
-          </p>
-          <div className="flex gap-3 justify-center">
-            {onRetry && (
+        <div className="flex flex-col items-center gap-3.5 text-center sm:flex-row sm:items-center sm:gap-4 sm:text-left">
+          {/* Marca estática (sin logo-enter/breathe): mismo criterio que
+              RecoverableErrorScreen — esto no es un estado de carga. */}
+          <VittroMark className="h-auto w-[36px] shrink-0 text-primary sm:w-[42px]" />
+          {divider}
+          <div className="flex min-w-0 max-w-sm flex-col items-center gap-2 sm:items-start">
+            <p className="text-sm font-semibold text-foreground">
+              No pudimos terminar de cargar tu sesión
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {fatalMessage ?? 'Puede deberse a una conexión lenta o a un problema temporal.'}
+            </p>
+            <div className="flex justify-center gap-2 sm:justify-start">
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition"
+                >
+                  Reintentar
+                </button>
+              )}
               <button
-                onClick={onRetry}
-                className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition"
+                onClick={handleSignOut}
+                className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground hover:bg-muted transition"
               >
-                Reintentar
+                Cerrar sesión
               </button>
-            )}
-            <button
-              onClick={handleSignOut}
-              className="px-4 py-2 rounded-md border border-border text-foreground text-sm font-medium hover:bg-muted transition"
-            >
-              Cerrar sesión
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -130,10 +143,10 @@ export function LoadingScreen({ message, onRetry, fatalMessage, loading }: Props
         isExiting && 'pointer-events-none'
       )}
     >
-      <div className="text-center">
+      <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:gap-3.5 sm:text-left">
         <div
           className={cn(
-            'mb-4 flex justify-center',
+            'shrink-0',
             logoPhase === 'entering' && 'opacity-0 animate-logo-enter',
             logoPhase === 'idle' && 'animate-logo-breathe',
             logoPhase === 'exiting' && 'animate-logo-exit'
@@ -144,22 +157,25 @@ export function LoadingScreen({ message, onRetry, fatalMessage, loading }: Props
             }
           }}
         >
-          <VittroMark className="w-[clamp(72px,9vw,128px)] h-auto text-primary" />
+          <VittroMark className="h-auto w-[36px] text-primary sm:w-[42px]" />
         </div>
-        <p className="text-muted-foreground text-sm">{message}</p>
-        {delayed && (
-          <p className="text-muted-foreground/70 text-xs mt-3">
-            Esto está tardando más de lo normal...
-          </p>
-        )}
-        {showRetry && onRetry && (
-          <button
-            onClick={onRetry}
-            className="mt-4 px-3 py-1.5 rounded-md border border-border text-xs text-foreground hover:bg-muted transition"
-          >
-            Reintentar
-          </button>
-        )}
+        {divider}
+        <div className="flex min-w-0 max-w-sm flex-col items-center gap-2 sm:items-start">
+          <p className="text-sm text-muted-foreground">{message}</p>
+          {delayed && (
+            <p className="text-xs text-muted-foreground/70">
+              Esto está tardando más de lo normal...
+            </p>
+          )}
+          {showRetry && onRetry && (
+            <button
+              onClick={onRetry}
+              className="px-3 py-1.5 rounded-md border border-border text-xs text-foreground hover:bg-muted transition"
+            >
+              Reintentar
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

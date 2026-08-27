@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, Loader2, MapPin, CalendarCheck, UserX, ChevronDown, MoreVertical, User, Phone, Mail, Percent } from 'lucide-react';
+import { Plus, Trash2, Calendar as CalendarIcon, AlertTriangle, Repeat, MapPin, CalendarCheck, UserX, ChevronDown, MoreVertical, User, Phone, Mail, Percent } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -97,6 +99,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   const bs = useBarberosSucursales(organizationId);
 
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
   const [rows, setRows] = useState<BarberoSucursalRow[]>([]);
   const [barberos, setBarberos] = useState<Record<string, BarberoMini>>({});
 
@@ -381,9 +384,15 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
         description="Quién está disponible hoy y asignaciones temporales o automáticas."
       >
         {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-            <Loader2 className="h-4 w-4 animate-spin" /> Cargando equipo…
-          </div>
+          showSkeleton ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="p-3 rounded-lg bg-muted/30">
+                  <SkeletonRow />
+                </div>
+              ))}
+            </div>
+          ) : null
         ) : orderedBarberoIds.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-6 text-center">
             <MapPin className="h-5 w-5 mx-auto text-muted-foreground mb-2" />

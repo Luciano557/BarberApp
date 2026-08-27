@@ -25,6 +25,8 @@ import { toast } from 'sonner';
 import { timeToMinutes, minutesToTime, ZOOM_LEVELS, type ZoomLevel } from './lib/timeUtils';
 import { callUpdateTurnoInternal, type ConflictTurno } from './lib/updateTurnoInternal';
 import { useTurnosRealtime } from '@/hooks/useTurnosRealtime';
+import { InlineReadError } from '@/components/ui/InlineReadError';
+import { StaleDataNotice } from '@/components/ui/StaleDataNotice';
 
 
 
@@ -101,9 +103,10 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
     return { fromDate: ws, toDate: we };
   }, [view, date]);
 
-  const { turnos, bloqueos, servicios, horarios, refetch } = useAgendaData(
+  const { turnos, bloqueos, servicios, horarios, phase: agendaPhase, error: agendaError, isStale: agendaStale, refetch, retry: retryAgenda } = useAgendaData(
     sucursalId, organizationId, fromDate, toDate,
   );
+  const agendaLoadFailed = agendaPhase === 'error';
 
   // Realtime: refetch silencioso ante cambios en turnos de esta sucursal.
   // Salvaguarda: si hay un movimiento en curso (drag confirmado / diálogo de
@@ -334,52 +337,68 @@ export function AgendaPanel({ sucursalId, organizationId, sucursalTimezone, barb
         </div>
       </div>
 
+      {agendaStale && (
+        <div className="px-4 pt-2.5">
+          <StaleDataNotice onRefresh={retryAgenda} />
+        </div>
+      )}
+
       {/* Vista */}
-      {view === 'day' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
-          <AgendaDayView
-            date={date}
-            barbers={barbers}
-            turnos={turnos}
-            bloqueos={bloqueos}
-            servicios={servicios}
-            horarios={horarios}
-            onTurnoClick={setDetailTurno}
-            onSlotClick={handleSlotClick}
-            onMoveTurno={handleMoveTurno}
-            canDrag={canDrag}
-            zoomLevel={zoomLevel}
-            onAutoZoomSuggested={handleAutoZoomSuggested}
-          />
-        </div>
-      )}
-      {view === '3days' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
-          <AgendaMultiDayView
-            startDate={fromDate}
-            daysCount={3}
-            barbers={barbers}
-            turnos={turnos}
-            bloqueos={bloqueos}
-            servicios={servicios}
-            onTurnoClick={setDetailTurno}
-            onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
-          />
-        </div>
-      )}
-      {view === 'week' && (
-        <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
-          <AgendaMultiDayView
-            startDate={fromDate}
-            daysCount={7}
-            barbers={barbers}
-            turnos={turnos}
-            bloqueos={bloqueos}
-            servicios={servicios}
-            onTurnoClick={setDetailTurno}
-            onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
-          />
-        </div>
+      {agendaLoadFailed ? (
+        <InlineReadError
+          message={agendaError ?? 'No pudimos cargar la agenda.'}
+          onRetry={retryAgenda}
+          bordered={false}
+        />
+      ) : (
+        <>
+          {view === 'day' && (
+            <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
+              <AgendaDayView
+                date={date}
+                barbers={barbers}
+                turnos={turnos}
+                bloqueos={bloqueos}
+                servicios={servicios}
+                horarios={horarios}
+                onTurnoClick={setDetailTurno}
+                onSlotClick={handleSlotClick}
+                onMoveTurno={handleMoveTurno}
+                canDrag={canDrag}
+                zoomLevel={zoomLevel}
+                onAutoZoomSuggested={handleAutoZoomSuggested}
+              />
+            </div>
+          )}
+          {view === '3days' && (
+            <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
+              <AgendaMultiDayView
+                startDate={fromDate}
+                daysCount={3}
+                barbers={barbers}
+                turnos={turnos}
+                bloqueos={bloqueos}
+                servicios={servicios}
+                onTurnoClick={setDetailTurno}
+                onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
+              />
+            </div>
+          )}
+          {view === 'week' && (
+            <div className="animate-in fade-in slide-in-from-bottom-1 duration-200 [animation-timing-function:var(--ease-out-quint)]">
+              <AgendaMultiDayView
+                startDate={fromDate}
+                daysCount={7}
+                barbers={barbers}
+                turnos={turnos}
+                bloqueos={bloqueos}
+                servicios={servicios}
+                onTurnoClick={setDetailTurno}
+                onDayHeaderClick={(d) => { setDate(d); setView('day'); }}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <NewAppointmentDialog

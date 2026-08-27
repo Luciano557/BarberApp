@@ -8,6 +8,7 @@ interface Props {
   coverPositionY?: number;
   coverZoom?: number;
   uploading?: boolean;
+  removing?: boolean;
   disabled?: boolean;
   onUpload: (file: File) => void;
   onRemove: () => void;
@@ -20,6 +21,7 @@ export function PortalCoverUploader({
   coverPositionY = 50,
   coverZoom = 1,
   uploading,
+  removing,
   disabled,
   onUpload,
   onRemove,
@@ -86,7 +88,7 @@ export function PortalCoverUploader({
             disabled={disabled}
             aria-label="Quitar portada"
           >
-            <Trash2 className="h-4 w-4 mr-1" /> Quitar
+            <Trash2 className="h-4 w-4 mr-1" /> {removing ? 'Quitando...' : 'Quitar'}
           </Button>
         )}
       </div>

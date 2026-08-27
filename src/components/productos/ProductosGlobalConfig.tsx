@@ -7,6 +7,8 @@ import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { TagPill } from '@/components/ui/TagPill';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -40,6 +42,7 @@ export function ProductosGlobalConfig() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
   const [search, setSearch] = useState('');
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
 
@@ -205,8 +208,14 @@ export function ProductosGlobalConfig() {
         }
       >
         <div className="space-y-2" role="tabpanel">
-          {loading && (
-            <p className="text-sm text-muted-foreground text-center py-4">Cargando…</p>
+          {loading && showSkeleton && (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-3 rounded-lg bg-muted/30">
+                  <SkeletonRow leading="bar" />
+                </div>
+              ))}
+            </div>
           )}
           {!loading && filtered.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-4">

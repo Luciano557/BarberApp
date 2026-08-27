@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { alcanzoLimiteFilas } from './rowLimit';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 export interface MonthlyData {
   month: string;
@@ -56,28 +57,32 @@ interface IngresoRawRow {
  * Se sigue leyendo `ingresos` en crudo únicamente para el gráfico "ventas por día de semana"
  * (columna `dia`), con la salvaguarda de truncado activa.
  */
+interface EstadisticasBundle {
+  monthlyData: MonthlyData[];
+  ingresosRaw: IngresoRawRow[];
+  datosIncompletos: boolean;
+}
+
+const EMPTY_BUNDLE: EstadisticasBundle = { monthlyData: [], ingresosRaw: [], datosIncompletos: false };
+
 export function useEstadisticasData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
 ) {
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [ingresosRaw, setIngresosRaw] = useState<IngresoRawRow[]>([]);
-  const [datosIncompletos, setDatosIncompletos] = useState(false);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}::${periodoMeses}`;
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, periodoMeses, currentSucursal]);
+  const readState = useReadState<EstadisticasBundle>({
+    contextKey,
+    errorMessage: 'No pudimos cargar la facturación y los gastos.',
+    staleErrorMessage: 'No pudimos actualizar la facturación y los gastos.',
+    surfaceId: `estadisticas-general:${organizationId ?? 'none'}`,
+  });
 
-  const fetchData = async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: null, error: null };
 
-    try {
       const meses = parseInt(periodoMeses);
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
@@ -86,7 +91,7 @@ export function useEstadisticasData(
         _organization_id: organizationId,
         _sucursal_id: currentSucursal?.id ?? undefined,
         _meses: meses,
-      });
+      }).abortSignal(signal);
 
       // Solo para "ventas por día de semana" (columna `dia` de ingresos, fuera de alcance).
       let ingresosQuery = supabase
@@ -101,27 +106,28 @@ export function useEstadisticasData(
       }
 
       const [mensualesRes, ingresosRes] = await Promise.all([
-        mensualesRpc, ingresosQuery,
+        mensualesRpc, ingresosQuery.abortSignal(signal),
       ]);
 
-      if (mensualesRes.error) throw mensualesRes.error;
-      if (ingresosRes.error) throw ingresosRes.error;
+      const failed = [mensualesRes, ingresosRes].find((r) => r.error);
+      if (failed) {
+        return { data: null, error: failed.error, status: (failed as { status?: number }).status };
+      }
 
       // Salvaguarda de truncado: los totales ya no dependen de filas crudas; la única lectura
       // cruda que queda es la de `ingresos` para el gráfico por día de semana.
-      setDatosIncompletos(alcanzoLimiteFilas(ingresosRes.data));
+      const datosIncompletos = alcanzoLimiteFilas(ingresosRes.data);
 
-      setIngresosRaw((ingresosRes.data || []).map((i) => ({
+      const ingresosRaw: IngresoRawRow[] = (ingresosRes.data || []).map((i) => ({
         created_at: i.created_at,
         cantidad_de_servicios: Number(i.cantidad_de_servicios) || 0,
         dia: i.dia || null,
-      })));
+      }));
 
       const rows = mensualesRes.data || [];
       const currentMonthStr = format(new Date(), 'yyyy-MM');
-      const diaActual = new Date().getDate();
 
-      const monthlyStats: MonthlyData[] = rows.map((r, idx) => {
+      const monthlyData: MonthlyData[] = rows.map((r, idx) => {
         const monthDate = parseISO(`${String(r.mes).slice(0, 10)}T00:00:00`);
         const monthStr = format(monthDate, 'yyyy-MM');
 
@@ -163,13 +169,24 @@ export function useEstadisticasData(
         };
       });
 
-      setMonthlyData(monthlyStats);
-    } catch (error) {
-      console.error('Error fetching statistics:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { data: { monthlyData, ingresosRaw, datosIncompletos }, error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, periodoMeses, readState.run]);
 
-  return { monthlyData, isLoading, ingresosRaw, datosIncompletos };
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  return {
+    monthlyData: bundle.monthlyData,
+    ingresosRaw: bundle.ingresosRaw,
+    datosIncompletos: bundle.datosIncompletos,
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

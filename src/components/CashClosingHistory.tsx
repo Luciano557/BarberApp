@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { History, Calendar as CalendarIcon, User, Banknote, CreditCard, Filter, X, MoreVertical } from 'lucide-react';
@@ -11,9 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { InlineReadError } from '@/components/ui/InlineReadError';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
+import { useReadState } from '@/hooks/useReadState';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
-import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -48,8 +51,6 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
   const [internalOpen, setInternalOpen] = useState(false);
   const open = externalOpen !== undefined ? externalOpen : internalOpen;
   const setOpen = onExternalOpenChange || setInternalOpen;
-  const [records, setRecords] = useState<CashClosingRecord[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedBarber, setSelectedBarber] = useState<string>('all');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -58,25 +59,23 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
 
-  const {
-    voidingClosure,
-    setVoidingClosure,
-    voidReason,
-    setVoidReason,
-    handleVoidClosure,
-    isVoiding,
-  } = useVoidClosure({
-    currentSucursalId: currentSucursal?.id ?? null,
-    organizationId: organization?.id ?? '',
-    userId: user?.id ?? '',
-    userFullName: profile?.full_name || user?.email || 'Usuario',
-    userEmail: user?.email || '',
-    onSuccess: () => fetchRecords(),
+  const contextKey = [
+    organization?.id ?? 'none',
+    selectedBarber,
+    startDate ? format(startDate, 'yyyy-MM-dd') : 'none',
+    endDate ? format(endDate, 'yyyy-MM-dd') : 'none',
+    open ? 'open' : 'closed',
+  ].join('::');
+
+  const readState = useReadState<CashClosingRecord[]>({
+    contextKey,
+    errorMessage: 'No pudimos cargar el historial.',
+    staleErrorMessage: 'No pudimos actualizar el historial.',
+    surfaceId: 'caja-historial-cierres',
   });
 
-  const fetchRecords = async () => {
-    setLoading(true);
-    try {
+  const fetchRecords = useCallback(() => {
+    readState.run(async (signal) => {
       let query = supabase
         .from('ingresos')
         .select('id, created_at, closed_at, barbero, barbero_id, mp, efectivo, total_facturado, cantidad_de_servicios, sueldo, dia, estado, entry_mode, backfilled_at, backfill_reason')
@@ -94,26 +93,39 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
         query = query.lte('created_at', format(endDate, 'yyyy-MM-dd') + 'T23:59:59.999Z');
       }
 
-      const { data, error } = await query.limit(100);
+      const { data, error, status } = await query.limit(100).abortSignal(signal);
+      if (error) return { data: null, error, status };
+      return { data: (data as CashClosingRecord[]) || [], error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBarber, startDate, endDate, readState.run]);
 
-      if (error) {
-        console.error('Error fetching cash closing records:', error);
-        toast.error('Error al cargar historial');
-        return;
-      }
-
-      console.log('Cash closing records loaded:', data?.length || 0, 'records');
-      setRecords(data || []);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    voidingClosure,
+    setVoidingClosure,
+    voidReason,
+    setVoidReason,
+    handleVoidClosure,
+    isVoiding,
+  } = useVoidClosure({
+    currentSucursalId: currentSucursal?.id ?? null,
+    organizationId: organization?.id ?? '',
+    userId: user?.id ?? '',
+    userFullName: profile?.full_name || user?.email || 'Usuario',
+    userEmail: user?.email || '',
+    onSuccess: () => fetchRecords(),
+  });
 
   useEffect(() => {
     if (open) {
       fetchRecords();
     }
-  }, [open, selectedBarber, startDate, endDate]);
+  }, [open, fetchRecords]);
+
+  const records = readState.data ?? [];
+  const loading = readState.phase === 'loading';
+  const loadFailed = readState.phase === 'error';
+  const showSkeleton = useDelayedVisible(loading);
 
   const clearFilters = () => {
     setSelectedBarber('all');
@@ -215,9 +227,19 @@ export function CashClosingHistory({ barbers, externalOpen, onExternalOpenChange
         {/* Records List */}
         <div className="space-y-3 pt-4">
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>Cargando...</p>
-            </div>
+            showSkeleton ? (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Card key={i} className="border border-border">
+                    <CardContent className="p-4">
+                      <SkeletonRow />
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : null
+          ) : loadFailed ? (
+            <InlineReadError message="No pudimos cargar el historial." onRetry={readState.retry} />
           ) : records.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
               <History className="h-8 w-8 text-muted-foreground/50" />

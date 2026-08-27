@@ -3,6 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { TabBadge } from '@/components/ui/TabBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -58,6 +61,7 @@ const FECHA_OPTIONS = [
 
 export function TareasPanel({ barbers }: TareasPanelProps) {
   const { tareas, isLoading, addTarea, updateTarea, deleteTarea } = useTareas();
+  const showSkeleton = useDelayedVisible(isLoading);
   const { canManageConfig, isOwner, isGeneralManager, isManager, isBarber, isSucursalAccount, profile } = useAuth();
   const { organization } = useOrganization();
   const { currentSucursal, sucursales } = useSucursal();
@@ -410,20 +414,34 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     );
   };
 
-  const EmptyState = ({ label, hint }: { label: string; hint: string }) => (
-    <Card>
-      <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-center">
-        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-          <Inbox className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground max-w-xs">{hint}</p>
-      </CardContent>
-    </Card>
-  );
-
   if (isLoading) {
-    return <div className="text-center py-8 text-muted-foreground">Cargando...</div>;
+    if (!showSkeleton) return null;
+    return (
+      <div className="w-full max-w-4xl lg:max-w-6xl mx-auto space-y-6">
+        <div className="flex items-start gap-3">
+          <Skeleton className="h-10 w-10 rounded-[10px] shrink-0" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </div>
+        </div>
+        <Skeleton className="h-9 w-56" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-5 w-16 rounded-full shrink-0" />
+                </div>
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const estadoOptions = isTareasTab ? ESTADO_OPTIONS_TAREA : ESTADO_OPTIONS_PETICION;
@@ -563,10 +581,15 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
                 <span className="text-xs text-muted-foreground">{tareasCompletadas.length} tarea{tareasCompletadas.length === 1 ? '' : 's'}</span>
               </div>
               {tareasCompletadas.length === 0 ? (
-                <EmptyState
-                  label="Sin tareas completadas"
-                  hint="Cuando se completen tareas, vas a poder revisarlas acá con el detalle de quién y cuándo."
-                />
+                <Card>
+                  <CardContent className="py-12">
+                    <EmptyState
+                      icon={Inbox}
+                      title="Sin tareas completadas"
+                      description="Cuando se completen tareas, vas a poder revisarlas acá con el detalle de quién y cuándo."
+                    />
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                   {tareasCompletadas.map(t => <CompletadaCard key={t.id} t={t} />)}
@@ -574,10 +597,15 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               )}
             </div>
           ) : tareasAdmin.length === 0 ? (
-            <EmptyState
-              label="No hay tareas activas"
-              hint={canManageTareas ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
-            />
+            <Card>
+              <CardContent className="py-12">
+                <EmptyState
+                  icon={Inbox}
+                  title="No hay tareas activas"
+                  description={canManageTareas ? 'Creá una tarea para asignarla a un barbero o a todo el equipo.' : 'Aún no tenés tareas asignadas.'}
+                />
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
               {tareasAdmin.map(t => <TareaCard key={t.id} t={t} />)}
@@ -587,10 +615,15 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
         <TabsContent value="peticiones" className="mt-4">
           {peticiones.length === 0 ? (
-            <EmptyState
-              label="No hay peticiones"
-              hint="Las peticiones del equipo aparecerán acá para que las gestiones."
-            />
+            <Card>
+              <CardContent className="py-12">
+                <EmptyState
+                  icon={Inbox}
+                  title="No hay peticiones"
+                  description="Las peticiones del equipo aparecerán acá para que las gestiones."
+                />
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
               {peticiones.map(t => <PeticionCard key={t.id} t={t} />)}
