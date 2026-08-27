@@ -5,6 +5,8 @@ import { BookingLanding, PortalDataView } from "@/components/reservar/BookingLan
 import { BookingStepper } from "@/components/reservar/BookingStepper";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPortalThemeStyle } from "@/components/reservar/lib/portalTheme";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
+import { useMetaPixel } from "@/hooks/useMetaPixel";
 
 export interface OrgPublicData {
   organization: { id: string; name: string; logo_url: string | null; timezone: string | null };
@@ -20,6 +22,8 @@ const Reservar = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"landing" | "book" | "manage">("landing");
+
+  useMetaPixel(orgData?.portal?.meta_pixel_id);
 
   useEffect(() => {
     const fetchOrg = async () => {
@@ -41,25 +45,32 @@ const Reservar = () => {
     if (orgSlug) fetchOrg();
   }, [orgSlug]);
 
+  // Espacio reservado para que el banner de cookies (fixed, bottom) nunca
+  // tape contenido en el borde inferior — la altura real la publica
+  // CookieConsentBanner en esta variable (0px cuando está oculto).
+  const bannerPadding = { paddingBottom: 'calc(var(--consent-banner-h, 0px) + 16px)' };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40" style={bannerPadding}>
         <div className="space-y-4 w-full max-w-md px-4">
           <Skeleton className="h-8 w-48 mx-auto" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
         </div>
+        <CookieConsentBanner />
       </div>
     );
   }
 
   if (error || !orgData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4" style={bannerPadding}>
         <div className="text-center space-y-2">
           <h1 className="text-xl font-semibold text-foreground">No encontrado</h1>
           <p className="text-muted-foreground">{error || "No se pudo cargar la información"}</p>
         </div>
+        <CookieConsentBanner />
       </div>
     );
   }
@@ -68,7 +79,7 @@ const Reservar = () => {
   const sinReservables = orgData.sucursales.length === 0 || orgData.servicios.length === 0;
 
   return (
-    <div style={themeStyle} className="min-h-screen bg-muted/40">
+    <div style={{ ...themeStyle, ...bannerPadding }} className="min-h-screen bg-muted/40">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
         {mode === "landing" ? (
           <div className="mx-auto max-w-md">
@@ -91,6 +102,7 @@ const Reservar = () => {
           />
         )}
       </div>
+      <CookieConsentBanner />
     </div>
   );
 };

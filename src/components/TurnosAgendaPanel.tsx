@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Building2, CalendarClock } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal, Sucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Barber } from '@/types/barbershop';
-import { AgendaManagement } from './config/AgendaManagement';
+import { AgendaManagement, type AgendaTab } from './config/AgendaManagement';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
 
 function dbToBarber(row: any): Barber {
@@ -27,7 +27,12 @@ function dbToBarber(row: any): Barber {
   };
 }
 
-export function TurnosAgendaPanel() {
+interface TurnosAgendaPanelProps {
+  /** Lleva a Mi Negocio › ficha de sucursal › Horarios de atención. */
+  onNavigateToHorarios?: (sucursalId: string) => void;
+}
+
+export function TurnosAgendaPanel({ onNavigateToHorarios }: TurnosAgendaPanelProps) {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const { isOwner, isGeneralManager, isManager, isBarber, user } = useAuth();
@@ -35,6 +40,11 @@ export function TurnosAgendaPanel() {
   const [allSucursales, setAllSucursales] = useState<Sucursal[]>([]);
   const [allBarbers, setAllBarbers] = useState<(Barber & { sucursalId: string | null })[]>([]);
   const [managerSucursalIds, setManagerSucursalIds] = useState<string[]>([]);
+  const [selectedSucursalId, setSelectedSucursalId] = useState<string | undefined>(undefined);
+  // Refleja la pestaña de nivel superior de AgendaManagement (Agenda /
+  // Configuración) para que el título de acá arriba la siga, sin duplicar un
+  // segundo <h1> más abajo ni levantar el estado completo del hijo.
+  const [topTab, setTopTab] = useState<AgendaTab>('agenda');
 
   const isManagerOnly = isManager && !isOwner && !isGeneralManager;
 
@@ -108,35 +118,56 @@ export function TurnosAgendaPanel() {
     ? currentSucursal.id
     : visibleSucursales[0]?.id;
 
+  useEffect(() => {
+    if (!selectedSucursalId && defaultTabId) {
+      setSelectedSucursalId(defaultTabId);
+    }
+  }, [defaultTabId, selectedSucursalId]);
+
+  const activeSucursal = visibleSucursales.find(s => s.id === selectedSucursalId);
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <PageHeader title="Turnos" icon={CalendarClock} subtitle="Configurá horarios, disponibilidad y bloqueos" />
+      <PageHeader
+        title={topTab === 'config' ? 'Configuración' : 'Turnos'}
+        icon={CalendarClock}
+        subtitle={topTab === 'config'
+          ? 'Ajustá cómo funciona esta sección.'
+          : 'Tu agenda, las reglas de reserva y el portal de tus clientes'}
+      />
 
       {visibleSucursales.length > 0 && (
-        <Tabs defaultValue={defaultTabId} className="w-full">
+        <div className="space-y-4 sm:space-y-6">
           {visibleSucursales.length > 1 && (
-            <TabsList variant="underline" className="flex-wrap">
-              {visibleSucursales.map(s => (
-                <TabsTrigger key={s.id} value={s.id} variant="underline">
-                  <Building2 className="h-4 w-4" />
-                  {s.nombre}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <Select value={selectedSucursalId} onValueChange={setSelectedSucursalId}>
+              <SelectTrigger className="w-auto gap-2 border-border/60 bg-transparent px-3 text-sm font-medium hover:bg-accent/50">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Elegí una sucursal" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {visibleSucursales.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
-          {visibleSucursales.map(s => (
-            <TabsContent key={s.id} value={s.id} className="mt-4 sm:mt-6">
-              <AgendaManagement
-                sucursalId={s.id}
-                organizationId={organization?.id || ''}
-                barbers={allBarbers.filter(b => {
-                  if (b.sucursalId !== s.id) return false;
-                  return (b.rolesEquipo ?? []).includes('barber');
-                })}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
+
+          {activeSucursal && (
+            <AgendaManagement
+              key={activeSucursal.id}
+              sucursalId={activeSucursal.id}
+              organizationId={organization?.id || ''}
+              barbers={allBarbers.filter(b => {
+                if (b.sucursalId !== activeSucursal.id) return false;
+                return (b.rolesEquipo ?? []).includes('barber');
+              })}
+              onNavigateToHorarios={onNavigateToHorarios}
+              onTabChange={setTopTab}
+            />
+          )}
+        </div>
       )}
 
       {visibleSucursales.length === 0 && (

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DrawerForm } from '@/components/ui/drawer-form';
+import { DrawerForm, DrawerFormSection } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { CalendarX, Calendar } from 'lucide-react';
 
 interface DayOffDialogProps {
   open: boolean;
@@ -78,7 +79,12 @@ export function DayOffDialog({ open, onOpenChange, organizationId, sucursalId, d
     <DrawerForm
       open={open}
       onOpenChange={onOpenChange}
-      title="Día off de la sucursal"
+      title={
+        <span className="flex items-center gap-2">
+          <CalendarX className="h-4 w-4 text-muted-foreground" />
+          Día off de la sucursal
+        </span>
+      }
       size="sm"
       isDirty={form.formState.isDirty}
       footer={
@@ -92,39 +98,45 @@ export function DayOffDialog({ open, onOpenChange, organizationId, sucursalId, d
         </div>
       }
     >
-      <p className="text-xs text-muted-foreground mb-4">
-        Cierra la sucursal completa para una fecha o rango. Impide reservas online y operación interna ese día.
-      </p>
       <Form {...form}>
-        <form id="dayoff-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="fechaInicio"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Desde</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="fechaFin"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Hasta</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+        <form id="dayoff-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          <DrawerFormSection
+            icon={Calendar}
+            title="Cuándo"
+            description="Cierra la sucursal completa para una fecha o rango. Impide reservas online y operación interna ese día."
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="fechaInicio"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Desde</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fechaFin"
+                render={({ field }) => (
+                  <FormItem className="space-y-1">
+                    <FormLabel className="text-xs">Hasta</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </DrawerFormSection>
+
+          {/* Sin DrawerFormSection: un solo control, el textarea ya trae su
+              propio label "Motivo (opcional)" (§1.10). */}
           <FormField
             control={form.control}
             name="motivo"
@@ -134,7 +146,7 @@ export function DayOffDialog({ open, onOpenChange, organizationId, sucursalId, d
                 <FormControl>
                   <Textarea {...field} maxLength={240} rows={2} placeholder="Feriado, mantenimiento…" />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />

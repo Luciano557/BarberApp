@@ -4,11 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker';
+import { TimePicker } from '@/components/ui/time-picker';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { ShieldOff, Plus, Trash2, Calendar } from 'lucide-react';
@@ -159,8 +160,11 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <ShieldOff className="w-4 h-4 text-destructive" />
+            {/* Chip primary, no destructive: registrar una ausencia es una regla
+                de agenda que se edita acá, no una acción destructiva. Ver la
+                regla de color de chip en CRITERIOS_DISEÑO.md §1.9. */}
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShieldOff className="w-4 h-4 text-primary" />
             </div>
             <div>
               <CardTitle className="text-sm">Gestionar ausencias y cierres</CardTitle>
@@ -169,7 +173,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
               </p>
             </div>
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={openCreate}>
+          <Button size="sm" variant="outline" className="h-9 shrink-0 text-xs" onClick={openCreate}>
             <Plus className="h-3 w-3 mr-1" /> Nueva ausencia
           </Button>
         </div>
@@ -232,7 +236,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                   <FormItem>
                     <FormLabel className="text-xs">Fecha inicio</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} className="h-8 text-sm" />
+                      <DatePicker value={field.value || null} onChange={(v) => field.onChange(v ?? '')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -245,7 +249,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                   <FormItem>
                     <FormLabel className="text-xs">Fecha fin</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} className="h-8 text-sm" />
+                      <DatePicker value={field.value || null} onChange={(v) => field.onChange(v ?? '')} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -275,7 +279,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                     <FormItem>
                       <FormLabel className="text-xs">Hora inicio</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} className="h-8 text-sm" />
+                        <TimePicker value={field.value} onChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -287,7 +291,7 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
                     <FormItem>
                       <FormLabel className="text-xs">Hora fin</FormLabel>
                       <FormControl>
-                        <Input type="time" {...field} className="h-8 text-sm" />
+                        <TimePicker value={field.value} onChange={field.onChange} />
                       </FormControl>
                     </FormItem>
                   )}

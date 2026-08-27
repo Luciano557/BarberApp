@@ -3,9 +3,10 @@ import { es } from 'date-fns/locale';
 import { Barber } from '@/types/barbershop';
 import { Turno, Bloqueo, Servicio } from './hooks/useAgendaData';
 import { useBarberColors } from './hooks/useBarberColors';
-import { timeToMinutes, formatHHMM } from './lib/timeUtils';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
+import { MULTI_PX_PER_MIN, MULTI_RANGE_START, MULTI_RANGE_END } from './lib/multiDayLayout';
+import { AgendaMultiDayColumn } from './AgendaMultiDayColumn';
 
 interface Props {
   startDate: Date;
@@ -18,42 +19,9 @@ interface Props {
   onDayHeaderClick?: (d: Date) => void;
 }
 
-function computeLayouts(items: Turno[]) {
-  const sorted = [...items].sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
-  const groups: Turno[][] = [];
-
-  sorted.forEach((t) => {
-    const tStart = timeToMinutes(t.hora_inicio);
-    const tEnd = timeToMinutes(t.hora_fin);
-    let placed = false;
-
-    for (const g of groups) {
-      const overlaps = g.some((x) => {
-        const xs = timeToMinutes(x.hora_inicio);
-        const xe = timeToMinutes(x.hora_fin);
-        return tStart < xe && xs < tEnd;
-      });
-      if (overlaps) {
-        g.push(t);
-        placed = true;
-        break;
-      }
-    }
-
-    if (!placed) groups.push([t]);
-  });
-
-  const result = new Map<string, { idx: number; count: number }>();
-  groups.forEach((g) => {
-    g.forEach((t, i) => result.set(t.id, { idx: i, count: g.length }));
-  });
-  return result;
-}
-
 export function AgendaMultiDayView({
   startDate, daysCount, barbers, turnos, bloqueos, servicios, onTurnoClick, onDayHeaderClick,
 }: Props) {
-  const MULTI_PX_PER_MIN = 1.9;
   const colors = useBarberColors(barbers.map(b => b.id));
   const days = useMemo(() => Array.from({ length: daysCount }, (_, i) => {
     const d = new Date(startDate);
@@ -61,25 +29,23 @@ export function AgendaMultiDayView({
     return d;
   }), [startDate, daysCount]);
 
-  const rangeStart = 8 * 60;
-  const rangeEnd = 22 * 60;
-  const totalHeight = (rangeEnd - rangeStart) * MULTI_PX_PER_MIN;
+  const totalHeight = (MULTI_RANGE_END - MULTI_RANGE_START) * MULTI_PX_PER_MIN;
   const TIME_RAIL_WIDTH = 56;
   const today = new Date();
 
   const hourRails = useMemo(() => {
     const rails: number[] = [];
-    for (let m = rangeStart; m <= rangeEnd; m += 60) rails.push(m);
+    for (let m = MULTI_RANGE_START; m <= MULTI_RANGE_END; m += 60) rails.push(m);
     return rails;
-  }, [rangeStart, rangeEnd]);
+  }, []);
 
   const halfHourRails = useMemo(() => {
     const rails: number[] = [];
-    for (let m = rangeStart; m <= rangeEnd; m += 30) {
+    for (let m = MULTI_RANGE_START; m <= MULTI_RANGE_END; m += 30) {
       if (m % 60 !== 0) rails.push(m);
     }
     return rails;
-  }, [rangeStart, rangeEnd]);
+  }, []);
 
   return (
     <div className="bg-card overflow-clip">
@@ -125,7 +91,7 @@ export function AgendaMultiDayView({
               <div
                 key={m}
                 className="absolute left-0 right-0 text-[10px] text-muted-foreground px-1 -translate-y-1/2"
-                style={{ top: (m - rangeStart) * MULTI_PX_PER_MIN }}
+                style={{ top: (m - MULTI_RANGE_START) * MULTI_PX_PER_MIN }}
               >
                 {`${String(Math.floor(m / 60)).padStart(2, '0')}:00`}
               </div>
@@ -141,112 +107,20 @@ export function AgendaMultiDayView({
               const dayOff = bloqueos.find(b =>
                 b.barbero_id === null && b.todo_el_dia && b.fecha_inicio <= dStr && b.fecha_fin >= dStr,
               );
-              const layouts = computeLayouts(dayTurnos);
 
               return (
-                <div key={dStr} className={cn('border-r relative', isToday && 'bg-primary/5')}>
-                  {/* Hour lines */}
-                  {hourRails.slice(0, -1).map((m) => (
-                    <div
-                      key={m}
-                      className="absolute left-0 right-0 border-t border-border/40 pointer-events-none"
-                      style={{ top: (m - rangeStart) * MULTI_PX_PER_MIN }}
-                    />
-                  ))}
-
-                  {/* Half-hour dashed lines */}
-                  {halfHourRails.map((m) => (
-                    <div
-                      key={`half-${m}`}
-                      className="absolute left-0 right-0 pointer-events-none"
-                      style={{
-                        top: (m - rangeStart) * MULTI_PX_PER_MIN,
-                        borderTop: '1px dashed hsl(232, 30%, 92%)',
-                      }}
-                    />
-                  ))}
-
-                  {/* Appointment cards */}
-                  {dayTurnos.map(t => {
-                    const top = (timeToMinutes(t.hora_inicio) - rangeStart) * MULTI_PX_PER_MIN;
-                    const height = Math.max(18, (timeToMinutes(t.hora_fin) - timeToMinutes(t.hora_inicio)) * MULTI_PX_PER_MIN);
-                    const layout = layouts.get(t.id) || { idx: 0, count: 1 };
-                    const widthPct = 100 / layout.count;
-                    const leftPct = widthPct * layout.idx;
-                    const servicio = servicios.find(s => s.id === t.servicio_id);
-                    const borderColor = servicio?.linea_color ?? colors[t.barbero_id] ?? 'hsl(var(--primary))';
-                    const isPending = t.estado === 'pendiente';
-                    const barberObj = barbers.find(b => b.id === t.barbero_id);
-                    const barberName = barberObj ? `${barberObj.firstName} ${barberObj.lastName}` : null;
-
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => onTurnoClick(t)}
-                        className={cn(
-                          'absolute rounded-md py-1 px-1.5 overflow-hidden bg-card select-none cursor-pointer hover:shadow-sm transition duration-150 ease-out active:scale-[0.97] z-20 text-left',
-                          isPending ? 'border border-dashed' : 'border',
-                        )}
-                        style={{
-                          top,
-                          height,
-                          left: `calc(${leftPct}% + 2px)`,
-                          width: `calc(${widthPct}% - 4px)`,
-                          borderLeft: `3px solid ${borderColor}`,
-                        }}
-                      >
-                        <div className="text-[9px] font-mono text-muted-foreground leading-tight">
-                          {formatHHMM(t.hora_inicio)}
-                        </div>
-                        <div className="text-[11px] font-semibold text-foreground truncate leading-tight">
-                          {t.cliente_nombre || 'Sin nombre'}
-                        </div>
-                        {height >= 46 && (
-                          <div className="text-[9px] text-muted-foreground truncate leading-tight">
-                            {servicio?.nombre}
-                          </div>
-                        )}
-                        {height >= 60 && barberName && (
-                          <div className="text-[9px] text-muted-foreground truncate leading-tight">
-                            {barberName}
-                          </div>
-                        )}
-                        {t.eligio_barbero && (
-                          <div
-                            title="Eligió barbero específico"
-                            style={{
-                              position: 'absolute',
-                              top: 4,
-                              right: 4,
-                              width: 14,
-                              height: 14,
-                              borderRadius: '50%',
-                              backgroundColor: colors[t.barbero_id] ?? 'hsl(var(--primary))',
-                              boxShadow: '0 0 0 2px #fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              zIndex: 2,
-                            }}
-                          >
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                              <circle cx="4" cy="2.5" r="1.5" fill="white"/>
-                              <path d="M1 7c0-1.657 1.343-3 3-3s3 1.343 3 3" stroke="white" strokeWidth="1"/>
-                            </svg>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-
-                  {/* Day-off overlay */}
-                  {dayOff && (
-                    <div className="absolute inset-0 bg-muted/70 flex items-center justify-center z-30">
-                      <span className="text-[10px] text-muted-foreground">Cerrado</span>
-                    </div>
-                  )}
-                </div>
+                <AgendaMultiDayColumn
+                  key={dStr}
+                  isToday={isToday}
+                  dayTurnos={dayTurnos}
+                  dayOff={dayOff}
+                  servicios={servicios}
+                  barbers={barbers}
+                  colors={colors}
+                  hourRails={hourRails}
+                  halfHourRails={halfHourRails}
+                  onTurnoClick={onTurnoClick}
+                />
               );
             })}
           </div>

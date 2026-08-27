@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { DrawerForm } from '@/components/ui/drawer-form';
+import { DrawerForm, DrawerFormSection } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,12 +15,14 @@ import { Barber } from '@/types/barbershop';
 import { Servicio } from './hooks/useAgendaData';
 import { timeToMinutes, minutesToTime } from './lib/timeUtils';
 import { format } from 'date-fns';
-import { UserPlus, Zap, ArrowLeft } from 'lucide-react';
+import { UserPlus, Zap, ArrowLeft, CalendarPlus, Scissors, Clock } from 'lucide-react';
 import { useClienteSearch, clienteFullName } from './hooks/useClienteSearch';
 import { ClienteSearchPicker } from './ClienteSearchPicker';
 import { ClienteFormFields } from './ClienteFormFields';
 import { EmptySelectHint } from './EmptySelectHint';
 import { clienteModeFieldsSchema, validateClienteMode } from './clienteModeSchema';
+import { TurnoConflictDialog } from './TurnoConflictDialog';
+import type { ConflictTurno } from './lib/updateTurnoInternal';
 
 interface NewAppointmentDialogProps {
   open: boolean;
@@ -120,11 +122,47 @@ export function NewAppointmentDialog({
 
   const ensureRelacion = clienteSearch.ensureRelacion;
 
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<ConflictTurno[]>([]);
+  const [pendingValues, setPendingValues] = useState<NewAppointmentFormValues | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
   const onSubmit = async (values: NewAppointmentFormValues) => {
     const servicio = servicios.find((s) => s.id === values.servicioId);
     if (!servicio) return;
 
+    // Pre-chequeo de solapamiento (mismo criterio que findConflictingTurnos:
+    // org + sucursal + barbero + fecha, estados activos, sin buffers en el
+    // flujo interno). No se validan horarios de atención ni bloqueos: eso es
+    // exclusivo del portal público.
+    const horaFinCheck = minutesToTime(timeToMinutes(values.horaInicio) + servicio.duracion_min);
+    const { data: conflictRows, error: conflictErr } = await supabase
+      .from('turnos')
+      .select('id, hora_inicio, hora_fin, cliente_nombre')
+      .eq('organization_id', organizationId)
+      .eq('sucursal_id', sucursalId)
+      .eq('barbero_id', values.barberoId)
+      .eq('fecha', values.fecha)
+      .in('estado', ['pendiente', 'confirmado', 'en_curso'])
+      .lt('hora_inicio', horaFinCheck)
+      .gt('hora_fin', values.horaInicio);
+
+    if (!conflictErr && conflictRows && conflictRows.length > 0) {
+      setConflicts(conflictRows as ConflictTurno[]);
+      setPendingValues(values);
+      setConflictOpen(true);
+      return;
+    }
+
+    await createTurno(values, false);
+  };
+
+  const createTurno = async (values: NewAppointmentFormValues, overlapAutorizado: boolean) => {
+    const servicio = servicios.find((s) => s.id === values.servicioId);
+    if (!servicio) return;
+
     try {
+
       let clienteId: string | null = null;
       let snapNombre = '';
       let snapTelefono: string | null = null;
@@ -183,20 +221,22 @@ export function NewAppointmentDialog({
         estado: 'pendiente',
         notas: values.notas?.trim().slice(0, 1500) || null,
         eligio_barbero: true,
-      });
+        overlap_autorizado: overlapAutorizado,
+      } as any);
       if (turnoErr) throw turnoErr;
 
       toast.success('Turno creado');
       clienteSearch.reset();
       form.reset(defaultValues());
+      setConflictOpen(false);
+      setPendingValues(null);
+      setConflicts([]);
       onOpenChange(false);
       onCreated();
     } catch (e: any) {
       console.error('Crear turno error:', e);
-      // El insert directo no tiene pre-chequeo de choque de horario (a diferencia de
-      // update-turno-internal, que sí lo hace); el exclusion constraint de Postgres
-      // es la única red de seguridad. Se traduce a un mensaje claro antes de que el
-      // texto crudo del constraint llegue al usuario.
+      // Red de seguridad: si el pre-chequeo no vio el conflicto (carrera con otro
+      // usuario), el exclusion constraint de Postgres lo rechaza igual.
       const isOverlapConstraint = e?.code === '23P01' || (typeof e?.message === 'string' && e.message.includes('no_overlap_turnos'));
       if (isOverlapConstraint) {
         toast.error('Ese horario ya está ocupado. Elegí otro horario o profesional.');
@@ -205,6 +245,24 @@ export function NewAppointmentDialog({
       }
     }
   };
+
+  const handleConfirmOverlap = async () => {
+    if (!pendingValues) return;
+    setConfirming(true);
+    try {
+      await createTurno(pendingValues, true);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const conflictDescription = (() => {
+    if (conflicts.length === 1) {
+      return `Ese horario está ocupado por ${conflicts[0].cliente_nombre || 'otro turno'}. ¿Confirmás de todas formas?`;
+    }
+    return `Ese horario está ocupado por ${conflicts.length} turnos. ¿Confirmás de todas formas?`;
+  })();
+
 
   const renderClienteBlock = () => {
     if (mode === 'existing') {
@@ -229,7 +287,7 @@ export function NewAppointmentDialog({
       return (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Cita rápida sin cliente</Label>
+            <Label className="text-sm font-medium">Cita rápida sin cliente</Label>
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromQuick}>
               <ArrowLeft className="h-3 w-3 mr-1" /> Volver
             </Button>
@@ -244,7 +302,7 @@ export function NewAppointmentDialog({
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-xs">Datos del nuevo cliente</Label>
+          <Label className="text-sm font-medium">Datos del nuevo cliente</Label>
           <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleBackFromNew}>
             <ArrowLeft className="h-3 w-3 mr-1" /> Volver
           </Button>
@@ -255,16 +313,23 @@ export function NewAppointmentDialog({
           apellidoName="apellido"
           telefonoName="telefono"
           emailName="email"
+          wrapped
         />
       </div>
     );
   };
 
   return (
+    <>
     <DrawerForm
       open={open}
       onOpenChange={onOpenChange}
-      title="Nueva cita"
+      title={
+        <span className="flex items-center gap-2">
+          <CalendarPlus className="h-4 w-4 text-muted-foreground" />
+          Nueva cita
+        </span>
+      }
       size="md"
       isDirty={form.formState.isDirty}
       footer={
@@ -279,106 +344,122 @@ export function NewAppointmentDialog({
       }
     >
       <Form {...form}>
-        <form id="new-appointment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {renderClienteBlock()}
+        <form id="new-appointment-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+          {/* Sin DrawerFormSection acá: un solo control (el buscador de
+              cliente) ya trae su propio label "Cliente" — un encabezado de
+              sección aparte lo duplicaría (CRITERIOS_DISEÑO.md §1.10). */}
+          <div className="space-y-3">
+            {renderClienteBlock()}
 
-          {mode === 'existing' && (
-            <div className="flex flex-wrap gap-2 -mt-1">
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToNew}>
-                <UserPlus className="h-3.5 w-3.5 mr-1" /> Nuevo cliente
-              </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={handleSwitchToQuick}>
-                <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
-              </Button>
+            {mode === 'existing' && (
+              <div className="flex min-h-[44px] flex-wrap items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs" onClick={handleSwitchToNew}>
+                  <UserPlus className="h-3.5 w-3.5 mr-1" /> Nuevo cliente
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-9 px-2 text-xs" onClick={handleSwitchToQuick}>
+                  <Zap className="h-3.5 w-3.5 mr-1" /> Cita rápida sin cliente
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Criterio general: toda sección CON encabezado propio (2+
+              controles) lleva descripción breve, por consistencia — no solo
+              cuando la acción tiene una consecuencia no obvia. */}
+          <DrawerFormSection icon={Scissors} title="Turno" description="Elegí quién atiende y qué servicio se realiza.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {activeBarbers.length === 0 ? (
+                <EmptySelectHint
+                  message="No hay barberos activos."
+                  ctaLabel="Añadir miembro del equipo"
+                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="barberoId"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Barbero</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {activeBarbers.map((b) => (
+                            <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              )}
+              {servicios.length === 0 ? (
+                <EmptySelectHint
+                  message="No hay servicios cargados."
+                  ctaLabel="Configurar servicios"
+                  onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
+                />
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="servicioId"
+                  render={({ field }) => (
+                    <FormItem className="space-y-1">
+                      <FormLabel className="text-xs">Servicio</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {servicios.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage className="text-xs" />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
-          )}
+          </DrawerFormSection>
 
-          <div className="grid grid-cols-2 gap-3">
-            {activeBarbers.length === 0 ? (
-              <EmptySelectHint
-                message="No hay barberos activos."
-                ctaLabel="Añadir miembro del equipo"
-                onCta={() => toast.message('Abrí Mi Negocio y entrá en Equipo para añadir o activar barberos.')}
-              />
-            ) : (
+          <DrawerFormSection icon={Clock} title="Cuándo" description="Fecha y horario de la cita.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
-                name="barberoId"
+                name="fecha"
                 render={({ field }) => (
                   <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Barbero</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeBarbers.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.firstName} {b.lastName}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                    <FormLabel className="text-xs">Fecha</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
-            )}
-            {servicios.length === 0 ? (
-              <EmptySelectHint
-                message="No hay servicios cargados."
-                ctaLabel="Configurar servicios"
-                onCta={() => toast.message('Abrí Mi Negocio y entrá en Servicios para cargar al menos uno.')}
-              />
-            ) : (
               <FormField
                 control={form.control}
-                name="servicioId"
+                name="horaInicio"
                 render={({ field }) => (
                   <FormItem className="space-y-1">
-                    <FormLabel className="text-xs">Servicio</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Elegir" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {servicios.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.nombre} · {s.duracion_min}min</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                    <FormLabel className="text-xs">Hora inicio</FormLabel>
+                    <FormControl>
+                      <Input type="time" {...field} />
+                    </FormControl>
+                    <FormMessage className="text-xs" />
                   </FormItem>
                 )}
               />
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField
-              control={form.control}
-              name="fecha"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Fecha</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="horaInicio"
-              render={({ field }) => (
-                <FormItem className="space-y-1">
-                  <FormLabel className="text-xs">Hora inicio</FormLabel>
-                  <FormControl>
-                    <Input type="time" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+            </div>
+          </DrawerFormSection>
+
+          {/* Sin DrawerFormSection: un solo control, el textarea ya trae su
+              propio label "Notas (opcional)" (§1.10). */}
           <FormField
             control={form.control}
             name="notas"
@@ -388,12 +469,26 @@ export function NewAppointmentDialog({
                 <FormControl>
                   <Textarea {...field} maxLength={1500} rows={2} />
                 </FormControl>
-                <FormMessage />
+                <FormMessage className="text-xs" />
               </FormItem>
             )}
           />
         </form>
       </Form>
     </DrawerForm>
+    <TurnoConflictDialog
+      open={conflictOpen}
+      onOpenChange={(o) => {
+        setConflictOpen(o);
+        if (!o) setPendingValues(null);
+      }}
+      kind="choque_de_horario"
+      conflicts={conflicts}
+      onConfirm={handleConfirmOverlap}
+      loading={confirming}
+      descriptionOverride={conflictDescription}
+      confirmLabel="Confirmar de todas formas"
+    />
+    </>
   );
 }

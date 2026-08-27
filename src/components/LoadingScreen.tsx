@@ -1,5 +1,40 @@
+import { useEffect, useState } from 'react';
 import { useProgressiveLoading } from '@/hooks/useProgressiveLoading';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { supabase } from '@/integrations/supabase/client';
+import { VittroMark } from '@/components/VittroMark';
+import { cn } from '@/lib/utils';
+
+// Debe coincidir con la duración de `animate-screen-out` (220ms, tailwind.config.ts)
+// más el stagger de 80ms que la precede.
+const SCREEN_OUT_DELAY_MS = 80;
+const SCREEN_OUT_DURATION_MS = 220;
+export const LOADING_SCREEN_EXIT_MS = SCREEN_OUT_DELAY_MS + SCREEN_OUT_DURATION_MS;
+
+/**
+ * El padre debe seguir renderizando <LoadingScreen loading={...}/> por
+ * LOADING_SCREEN_EXIT_MS después de que `loading` pase a false, para darle
+ * tiempo a la animación de salida antes del desmontaje real.
+ */
+export function useLoadingScreenMounted(loading: boolean): boolean {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [mounted, setMounted] = useState(loading);
+
+  useEffect(() => {
+    if (loading) {
+      setMounted(true);
+      return;
+    }
+    if (prefersReducedMotion) {
+      setMounted(false);
+      return;
+    }
+    const timer = setTimeout(() => setMounted(false), LOADING_SCREEN_EXIT_MS);
+    return () => clearTimeout(timer);
+  }, [loading, prefersReducedMotion]);
+
+  return mounted;
+}
 
 interface Props {
   /** Texto principal del loader (ej: "Verificando sesión...") */
@@ -8,7 +43,16 @@ interface Props {
   onRetry?: () => void;
   /** Mensaje fatal que se muestra a los 90s. */
   fatalMessage?: string;
+  /**
+   * Estado real de carga. Al pasar a false dispara la secuencia de salida
+   * (logo-exit, luego screen-out); el componente sigue montado durante esa
+   * secuencia — quien lo use debe gatear el montaje con useLoadingScreenMounted,
+   * no con este prop directamente.
+   */
+  loading: boolean;
 }
+
+type LogoPhase = 'entering' | 'idle' | 'exiting';
 
 /**
  * Loader con fallback progresivo.
@@ -18,8 +62,29 @@ interface Props {
  *
  * No cierra sesión ni navega automáticamente: solo da salida manual al usuario.
  */
-export function LoadingScreen({ message, onRetry, fatalMessage }: Props) {
-  const { delayed, showRetry, fatal } = useProgressiveLoading(true);
+export function LoadingScreen({ message, onRetry, fatalMessage, loading }: Props) {
+  const { delayed, showRetry, fatal } = useProgressiveLoading(loading);
+  const prefersReducedMotion = usePrefersReducedMotion();
+
+  const [logoPhase, setLogoPhase] = useState<LogoPhase>('entering');
+  const [screenExiting, setScreenExiting] = useState(false);
+
+  useEffect(() => {
+    if (loading) {
+      setLogoPhase(p => (p === 'exiting' ? 'entering' : p));
+      setScreenExiting(false);
+      return;
+    }
+    setLogoPhase('exiting');
+    if (prefersReducedMotion) {
+      setScreenExiting(true);
+      return;
+    }
+    const timer = setTimeout(() => setScreenExiting(true), SCREEN_OUT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [loading, prefersReducedMotion]);
+
+  const isExiting = logoPhase === 'exiting';
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -58,10 +123,30 @@ export function LoadingScreen({ message, onRetry, fatalMessage }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div
+      className={cn(
+        'min-h-screen bg-background flex items-center justify-center px-4',
+        screenExiting ? 'animate-screen-out' : 'animate-screen-in',
+        isExiting && 'pointer-events-none'
+      )}
+    >
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-        <p className="text-muted-foreground">{message}</p>
+        <div
+          className={cn(
+            'mb-4 flex justify-center',
+            logoPhase === 'entering' && 'opacity-0 animate-logo-enter',
+            logoPhase === 'idle' && 'animate-logo-breathe',
+            logoPhase === 'exiting' && 'animate-logo-exit'
+          )}
+          onAnimationEnd={e => {
+            if (e.animationName === 'logo-enter' && logoPhase === 'entering') {
+              setLogoPhase('idle');
+            }
+          }}
+        >
+          <VittroMark className="w-[clamp(72px,9vw,128px)] h-auto text-primary" />
+        </div>
+        <p className="text-muted-foreground text-sm">{message}</p>
         {delayed && (
           <p className="text-muted-foreground/70 text-xs mt-3">
             Esto está tardando más de lo normal...
@@ -89,6 +174,8 @@ interface RecoverableProps {
 
 /**
  * Pantalla de error recuperable con dos acciones: Reintentar y Cerrar sesión.
+ * Mismo contenedor/tipografía que LoadingScreen; logo estático (sin
+ * logo-enter ni logo-breathe) porque esto no es un estado de carga.
  */
 export function RecoverableErrorScreen({
   title,
@@ -108,6 +195,7 @@ export function RecoverableErrorScreen({
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="max-w-md text-center">
+        <VittroMark className="w-[clamp(72px,9vw,128px)] h-auto mx-auto mb-4 text-primary" />
         <h1 className="text-xl font-semibold text-foreground mb-2">{title}</h1>
         {description && (
           <p className="text-muted-foreground text-sm mb-6">{description}</p>

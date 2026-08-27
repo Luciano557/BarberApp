@@ -3,7 +3,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useAuth, AppRole } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { ChangePasswordForm } from './ChangePasswordForm';
-import { LoadingScreen, RecoverableErrorScreen } from './LoadingScreen';
+import { LoadingScreen, RecoverableErrorScreen, useLoadingScreenMounted } from './LoadingScreen';
 import { SubscriptionGate } from './billing/SubscriptionGate';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 
@@ -23,6 +23,8 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   } = useSubscriptionAccess();
   const { orgSlug } = useParams<{ orgSlug?: string }>();
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const authOrgSubscriptionLoading = isLoading || orgLoading || subscriptionLoading;
+  const showLoadingScreen = useLoadingScreenMounted(authOrgSubscriptionLoading);
 
   // 1a. Error explícito cargando perfil/roles → no esperar 90s, mostrar pantalla recuperable.
   if (user && authError && !isLoading) {
@@ -40,9 +42,10 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   }
 
   // 1b. Mientras realmente se está inicializando, mostrar loader con fallback progresivo.
-  if (isLoading || orgLoading || subscriptionLoading) {
+  if (showLoadingScreen) {
     return (
       <LoadingScreen
+        loading={authOrgSubscriptionLoading}
         message="Verificando sesión..."
         onRetry={() => {
           void refreshOrganization();

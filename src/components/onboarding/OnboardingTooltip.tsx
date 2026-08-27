@@ -70,59 +70,33 @@ export function OnboardingTooltip() {
     const needV = h + MARGIN + EDGE;
     const needH = w + MARGIN + EDGE;
 
-    // Geometría resultante para un lado dado, con los clamps ya aplicados.
-    const compute = (p: Exclude<Placement, 'center'>) => {
-      let t: number;
-      let l: number;
-      let tr: string;
-      if (p === 'bottom' || p === 'top') {
-        const halfW = w / 2;
-        l = targetRect.left + targetRect.width / 2;
-        l = Math.min(Math.max(l, halfW + EDGE), vp.w - halfW - EDGE);
-        tr = p === 'bottom' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
-        t = p === 'bottom' ? targetRect.bottom + MARGIN : targetRect.top - MARGIN;
-        if (p === 'bottom') t = Math.max(Math.min(t, vp.h - h - EDGE), EDGE);
-        else t = Math.min(Math.max(t, h + EDGE), vp.h - EDGE);
-        return { top: t, left: l, transform: tr, box: { top: p === 'bottom' ? t : t - h, left: l - halfW, right: l + halfW, bottom: p === 'bottom' ? t + h : t } };
-      }
+    if (spaceBelow >= needV) placement = 'bottom';
+    else if (spaceAbove >= needV) placement = 'top';
+    else if (spaceRight >= needH) placement = 'right';
+    else if (spaceLeft >= needH) placement = 'left';
+    else placement = 'center';
+
+    if (placement === 'bottom' || placement === 'top') {
+      left = targetRect.left + targetRect.width / 2;
+      const halfW = w / 2;
+      left = Math.min(Math.max(left, halfW + EDGE), vp.w - halfW - EDGE);
+      transform = placement === 'bottom' ? 'translate(-50%, 0)' : 'translate(-50%, -100%)';
+      top = placement === 'bottom' ? targetRect.bottom + MARGIN : targetRect.top - MARGIN;
+      // Clamp vertical: el card siempre entra completo.
+      if (placement === 'bottom') top = Math.min(top, vp.h - h - EDGE);
+      else top = Math.max(top, h + EDGE);
+      top = placement === 'bottom' ? Math.max(top, EDGE) : Math.min(top, vp.h - EDGE);
+    } else if (placement === 'right' || placement === 'left') {
+      transform = placement === 'right' ? 'translate(0, -50%)' : 'translate(-100%, -50%)';
+      left = placement === 'right' ? targetRect.right + MARGIN : targetRect.left - MARGIN;
+      left = placement === 'right'
+        ? Math.min(left, vp.w - w - EDGE)
+        : Math.max(left, w + EDGE);
       const halfH = h / 2;
-      tr = p === 'right' ? 'translate(0, -50%)' : 'translate(-100%, -50%)';
-      l = p === 'right' ? targetRect.right + MARGIN : targetRect.left - MARGIN;
-      l = p === 'right' ? Math.min(l, vp.w - w - EDGE) : Math.max(l, w + EDGE);
-      t = targetRect.top + targetRect.height / 2;
-      t = Math.min(Math.max(t, halfH + EDGE), vp.h - halfH - EDGE);
-      return { top: t, left: l, transform: tr, box: { top: t - halfH, bottom: t + halfH, left: p === 'right' ? l : l - w, right: p === 'right' ? l + w : l } };
-    };
-
-    // El tooltip nunca puede solaparse con el área del target.
-    const overlapsTarget = (b: { top: number; bottom: number; left: number; right: number }) =>
-      b.left < targetRect.right && b.right > targetRect.left && b.top < targetRect.bottom && b.bottom > targetRect.top;
-
-    const candidates: Array<[Exclude<Placement, 'center'>, boolean]> = [
-      ['bottom', spaceBelow >= needV],
-      ['top', spaceAbove >= needV],
-      ['right', spaceRight >= needH],
-      ['left', spaceLeft >= needH],
-    ];
-
-    for (const [p, hasSpace] of candidates) {
-      if (!hasSpace) continue;
-      const geo = compute(p);
-      if (overlapsTarget(geo.box)) continue;
-      placement = p;
-      top = geo.top;
-      left = geo.left;
-      transform = geo.transform;
-      break;
-    }
-
-    if (placement === 'center') {
-      top = vp.h / 2;
-      left = vp.w / 2;
-      transform = 'translate(-50%, -50%)';
+      top = targetRect.top + targetRect.height / 2;
+      top = Math.min(Math.max(top, halfH + EDGE), vp.h - halfH - EDGE);
     }
   }
-
 
   const fits = placement !== 'center';
 
@@ -184,8 +158,7 @@ export function OnboardingTooltip() {
   }
 
   // === Target ausente: fallback centrado, siempre con salida ===
-  // Si ningún lado evita el solapamiento con el target, usamos el mismo fallback.
-  if (targetMissing || (!isMobile && placement === 'center')) {
+  if (targetMissing) {
     return (
       <Dialog open onOpenChange={(open) => { if (!open) skip(); }}>
         <DialogContent className="sm:max-w-md">

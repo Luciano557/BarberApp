@@ -51,8 +51,18 @@ export function PortalLinksEditor({ links, onChange }: Props) {
       {links.map((link, idx) => {
         const urlInvalid = link.url.length > 0 && !URL_RE.test(link.url);
         const Icon = getPortalIcon(link.icon);
+        const iconLabel = PORTAL_ICONS.find((opt) => opt.key === (link.icon ?? 'link'))?.label ?? 'Link';
+        const groupLabelId = `link-name-${idx}`;
+        const labelInputId = `link-label-${idx}`;
+        const urlInputId = `link-url-${idx}`;
+        const urlErrorId = `link-url-error-${idx}`;
         return (
-          <div key={idx} className="rounded-xl border border-border p-3 space-y-3 bg-card">
+          <div
+            key={idx}
+            role="group"
+            aria-labelledby={groupLabelId}
+            className="rounded-xl border border-border p-3 space-y-3 bg-card"
+          >
             {/* Header: ícono + etiqueta preview */}
             <div className="flex items-center gap-2">
               <Popover>
@@ -62,6 +72,7 @@ export function PortalLinksEditor({ links, onChange }: Props) {
                     size="sm"
                     className="h-9 px-2 gap-1.5"
                     type="button"
+                    aria-label={`Ícono del link ${idx + 1}: ${iconLabel}`}
                   >
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
                       <Icon className="h-3.5 w-3.5" />
@@ -93,15 +104,16 @@ export function PortalLinksEditor({ links, onChange }: Props) {
                   </div>
                 </PopoverContent>
               </Popover>
-              <span className="text-sm font-medium text-foreground truncate flex-1">
+              <span id={groupLabelId} className="text-sm font-medium text-foreground truncate flex-1">
                 {link.label.trim() || 'Nuevo link'}
               </span>
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-xs">Etiqueta</Label>
+                <Label htmlFor={labelInputId} className="text-xs">Etiqueta</Label>
                 <Input
+                  id={labelInputId}
                   value={link.label}
                   onChange={(e) => update(idx, { label: e.target.value })}
                   maxLength={80}
@@ -109,16 +121,19 @@ export function PortalLinksEditor({ links, onChange }: Props) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">URL</Label>
+                <Label htmlFor={urlInputId} className="text-xs">URL</Label>
                 <Input
+                  id={urlInputId}
                   value={link.url}
                   onChange={(e) => update(idx, { url: e.target.value })}
                   maxLength={500}
                   placeholder="https://..."
                   inputMode="url"
+                  aria-invalid={urlInvalid}
+                  aria-describedby={urlInvalid ? urlErrorId : undefined}
                 />
                 {urlInvalid && (
-                  <p className="text-xs text-destructive">Debe empezar con http:// o https://</p>
+                  <p id={urlErrorId} className="text-xs text-destructive">Debe empezar con http:// o https://</p>
                 )}
               </div>
             </div>
@@ -133,13 +148,33 @@ export function PortalLinksEditor({ links, onChange }: Props) {
                 <Label htmlFor={`active-${idx}`} className="text-xs">Activo</Label>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" onClick={() => move(idx, -1)} disabled={idx === 0}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => move(idx, -1)}
+                  disabled={idx === 0}
+                  aria-label={`Subir link ${idx + 1}`}
+                >
                   <ArrowUp className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => move(idx, 1)} disabled={idx === links.length - 1}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => move(idx, 1)}
+                  disabled={idx === links.length - 1}
+                  aria-label={`Bajar link ${idx + 1}`}
+                >
                   <ArrowDown className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => remove(idx)}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(idx)}
+                  aria-label={`Eliminar link ${idx + 1}`}
+                >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               </div>

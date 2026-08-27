@@ -13,7 +13,9 @@ export interface DerivedMonthlyMetrics {
   costoVariablePorServicio: number;
   gananciaPorServicio: number;
   puntoEquilibrio: number;
-  tasaOcupacion: number;
+  /** null cuando la sucursal no tiene datos suficientes (sin horario general, sin barberos con
+   * rol barbero, o sin ventas con servicio matcheado ese mes) — ver estadisticas_ocupacion_mensual. */
+  tasaOcupacion: number | null;
   recargos: number;
   descuentos: number;
   costoLaboralPct: number;

@@ -542,7 +542,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
 
           {isTareasTab && canViewRecurrentes && (
             <Button
-              variant={showRecurrencias ? 'default' : 'outline'}
+              variant={showRecurrencias ? 'secondary' : 'outline'}
               size="sm"
               className="h-9"
               onClick={() => setShowRecurrencias(v => !v)}

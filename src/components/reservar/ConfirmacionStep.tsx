@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
 import { formatFechaLegible } from "@/lib/dateUtils";
+import { trackMetaEvent } from "@/lib/analytics/metaPixel";
 
 interface Props {
   booking: BookingState;
@@ -71,6 +72,11 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
       }
 
       toast.success(`¡Turno reservado, ${nombreCompleto || "listo"}!`);
+      trackMetaEvent(orgData.portal?.meta_pixel_id, 'Schedule', {
+        content_name: booking.servicioNombre,
+        value: booking.servicioPrecio,
+        currency: 'ARS',
+      });
       onConfirmed();
     } catch {
       toast.error("Ocurrió un problema. Probá nuevamente.");

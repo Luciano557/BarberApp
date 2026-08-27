@@ -17,7 +17,8 @@ import { StatusPill } from '@/components/ui/StatusPill';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, CalendarIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, CalendarIcon, ChevronDown, ChevronRight, Wallet } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -935,68 +936,75 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-wrap items-center gap-2 justify-end">
-          {/* Period Presets */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant={!periodStartDate && !periodEndDate ? "default" : "outline"}
-              size="sm"
-              onClick={() => { setPeriodStartDate(undefined); setPeriodEndDate(undefined); }}
-            >
-              Todo
-            </Button>
-            <Button
-              variant={
-                !periodEndDate &&
-                periodStartDate &&
-                format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')
-                  ? "default"
-                  : "outline"
-              }
-              size="sm"
-              onClick={() => { setPeriodStartDate(startOfMonth(new Date())); setPeriodEndDate(undefined); }}
-            >
-              Este mes
-            </Button>
-          </div>
-
-          {/* Custom Date Range Picker */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "min-w-[180px] justify-start text-left font-normal",
-                  periodEndDate && "border-primary"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {periodStartDate && periodEndDate
-                  ? `${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")}`
-                  : 'Personalizado'}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="range"
-                selected={{ from: periodStartDate, to: periodEndDate }}
-                onSelect={(range) => {
-                  setPeriodStartDate(range?.from);
-                  setPeriodEndDate(range?.to);
-                }}
-                locale={es}
-                numberOfMonths={2}
-                initialFocus
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-          
-          <Button onClick={() => setIsPagoDrawerOpen(true)}>
+      <PageHeader
+        title="Sueldos"
+        icon={Wallet}
+        subtitle="Pagos al equipo, fijos y variables."
+        className="pl-0"
+        actions={(
+          <Button onClick={() => setIsPagoDrawerOpen(true)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Registrar Pago
           </Button>
+        )}
+      />
+
+      {/* Filtros de período — fila propia, separada del header (Opción A) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Button
+            variant={!periodStartDate && !periodEndDate ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setPeriodStartDate(undefined); setPeriodEndDate(undefined); }}
+          >
+            Todo
+          </Button>
+          <Button
+            variant={
+              !periodEndDate &&
+              periodStartDate &&
+              format(periodStartDate, 'yyyy-MM-dd') === format(startOfMonth(new Date()), 'yyyy-MM-dd')
+                ? "default"
+                : "outline"
+            }
+            size="sm"
+            onClick={() => { setPeriodStartDate(startOfMonth(new Date())); setPeriodEndDate(undefined); }}
+          >
+            Este mes
+          </Button>
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "min-w-[180px] justify-start text-left font-normal",
+                periodEndDate && "border-primary"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {periodStartDate && periodEndDate
+                ? `${format(periodStartDate, "dd/MM/yyyy")} – ${format(periodEndDate, "dd/MM/yyyy")}`
+                : 'Personalizado'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="range"
+              selected={{ from: periodStartDate, to: periodEndDate }}
+              onSelect={(range) => {
+                setPeriodStartDate(range?.from);
+                setPeriodEndDate(range?.to);
+              }}
+              locale={es}
+              numberOfMonths={2}
+              initialFocus
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
       </div>
 
       <DrawerForm

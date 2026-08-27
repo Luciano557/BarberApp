@@ -1,9 +1,35 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
-import type { MonthlyData } from './useEstadisticasData';
+import { alcanzoLimiteFilas } from './rowLimit';
+
+export interface MixServicioItem {
+  servicio: string;
+  facturacion: number;
+  tickets: number;
+}
+
+export interface HoraItem {
+  hora: number;
+  tickets: number;
+}
+
+export interface DiaHoraItem {
+  dia: number;
+  hora: number;
+  tickets: number;
+}
+
+/** Ventas agregadas por mes, ya resueltas en la base (huso horario de la sucursal). */
+export interface VentasAgregadasMes {
+  month: string;
+  tickets: number;
+  mix: MixServicioItem[];
+  porHora: HoraItem[];
+  porDiaHora: DiaHoraItem[];
+}
 
 export interface MonthlyServiciosClientesData {
   month: string;
@@ -20,50 +46,36 @@ export interface MonthlyServiciosClientesData {
 }
 
 /**
- * Datos de la Sección 4 (Servicios y clientes): tasa de attach de extras, clientes nuevos por
- * mes (con desglose de origen) y % que eligió barbero al reservar.
+ * Datos de la Sección 4 (Servicios y clientes).
  *
- * `venta_extra` no tiene organization_id/sucursal_id/created_at propios, por lo que se resuelve
- * server-side vía embed `!inner` a `venta` (INNER JOIN en PostgREST) filtrando por
- * organización, sucursal, estado y rango sobre `venta.fecha_hora`. Esto evita materializar una
- * lista larga de UUIDs en cliente y el consecuente 400 Bad Request por URL demasiado larga.
+ * Ventas (mix de servicios, attach de extras, distribución por hora y día-hora): salen de
+ * `estadisticas_ventas_agregadas(...)`, agregadas en Postgres con el huso horario de la
+ * sucursal. Antes se traían las filas crudas de `venta` y se agregaban en el cliente, lo que
+ * truncaba silenciosamente a 1000 filas en períodos largos.
+ *
+ * Clientes nuevos y % que eligió barbero siguen leyéndose como filas (volumen bajo), con la
+ * salvaguarda de truncado activa.
  */
 export function useServiciosClientesData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
-  monthlyData: MonthlyData[],
-  parentIsLoading: boolean,
 ) {
   const [monthlyStats, setMonthlyStats] = useState<MonthlyServiciosClientesData[]>([]);
+  const [ventasAgregadas, setVentasAgregadas] = useState<VentasAgregadasMes[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [datosIncompletos, setDatosIncompletos] = useState(false);
 
   useEffect(() => {
     if (organizationId) {
       fetchData();
     }
-    // `ventasData` se retiró de las dependencias: la query de venta_extra ahora filtra
-    // server-side vía embed a `venta`, sin depender del array de IDs del hook hermano.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal, periodoMeses, monthlyData, parentIsLoading]);
+  }, [organizationId, currentSucursal, periodoMeses]);
 
   const fetchData = async () => {
     if (!organizationId) return;
-
-    // Guard contra ciclos parciales del padre: mientras useEstadisticasData siga cargando,
-    // no sabemos aún si habrá datos o no, así que no tocamos el estado ni disparamos fetch.
-    if (parentIsLoading) return;
-
-    // Vacío real: el padre terminó y no hay ventas en el período. Sincronizamos el estado
-    // como vacío y salimos del loading, sin intentar traer extras/clientes/turnos que no
-    // tendrían correspondencia en monthlyData.
-    if (monthlyData.length === 0) {
-      setMonthlyStats([]);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
 
     setIsLoading(true);
     setError(null);
@@ -94,61 +106,55 @@ export function useServiciosClientesData(
         .lte('fecha', format(endDate, 'yyyy-MM-dd'));
       if (currentSucursal) turnosQuery = turnosQuery.eq('sucursal_id', currentSucursal.id);
 
-      // venta_extra vía embed `!inner` — los filtros sobre `venta.*` se resuelven en Postgres,
-      // sin exponer ninguna lista de UUIDs en la URL. Se tipa el select como `string` plano
-      // para no disparar el parser de tipos costoso de supabase-js sobre el embed.
-      const sel = (s: string): string => s;
-      let extrasQuery = supabase
-        .from('venta_extra')
-        .select(sel('venta_id, cantidad, precio_extra, venta!inner(fecha_hora, organization_id, sucursal_id, estado)'))
-        .eq('venta.organization_id', organizationId)
-        .eq('venta.estado', 'activo')
-        .gte('venta.fecha_hora', startDate.toISOString())
-        .lte('venta.fecha_hora', endDate.toISOString());
-      if (currentSucursal) extrasQuery = extrasQuery.eq('venta.sucursal_id', currentSucursal.id);
+      const ventasRpc = supabase.rpc('estadisticas_ventas_agregadas', {
+        _organization_id: organizationId,
+        _sucursal_id: currentSucursal?.id ?? undefined,
+        _meses: meses,
+      });
 
-      type ExtraRow = {
-        venta_id: string;
-        cantidad: number | null;
-        precio_extra: number | null;
-        venta: { fecha_hora: string } | null;
-      };
-
-      const [clientesRes, turnosRes, extrasRes] = await Promise.all([
+      const [clientesRes, turnosRes, ventasRes] = await Promise.all([
         clientesQuery,
         turnosQuery,
-        extrasQuery.returns<ExtraRow[]>(),
+        ventasRpc,
       ]);
       if (clientesRes.error) throw clientesRes.error;
       if (turnosRes.error) throw turnosRes.error;
-      if (extrasRes.error) throw extrasRes.error;
+      if (ventasRes.error) throw ventasRes.error;
 
-      const extrasData: ExtraRow[] = extrasRes.data ?? [];
+      // Salvaguarda de truncado: solo aplica a las consultas que todavía leen filas crudas.
+      setDatosIncompletos(
+        alcanzoLimiteFilas(clientesRes.data) || alcanzoLimiteFilas(turnosRes.data),
+      );
+
       const clientes = clientesRes.data || [];
       const turnos = turnosRes.data || [];
+      const ventasRows = ventasRes.data || [];
 
-      const months = eachMonthOfInterval({ start: startDate, end: endDate });
+      const agregadas: VentasAgregadasMes[] = ventasRows.map((r) => ({
+        month: String(r.mes).slice(0, 7),
+        tickets: Number(r.tickets) || 0,
+        mix: ((r.mix ?? []) as unknown as MixServicioItem[]).map((m) => ({
+          servicio: m.servicio,
+          facturacion: Number(m.facturacion) || 0,
+          tickets: Number(m.tickets) || 0,
+        })),
+        porHora: ((r.por_hora ?? []) as unknown as HoraItem[]).map((h) => ({
+          hora: Number(h.hora) || 0,
+          tickets: Number(h.tickets) || 0,
+        })),
+        porDiaHora: ((r.por_dia_hora ?? []) as unknown as DiaHoraItem[]).map((d) => ({
+          dia: Number(d.dia) || 0,
+          hora: Number(d.hora) || 0,
+          tickets: Number(d.tickets) || 0,
+        })),
+      }));
+      setVentasAgregadas(agregadas);
 
-      const stats: MonthlyServiciosClientesData[] = months.map((monthDate, idx) => {
+      const stats: MonthlyServiciosClientesData[] = ventasRows.map((r, idx) => {
+        const monthDate = parseISO(`${String(r.mes).slice(0, 10)}T00:00:00`);
         const monthStr = format(monthDate, 'yyyy-MM');
         const monthStart = startOfMonth(monthDate);
         const monthEnd = endOfMonth(monthDate);
-
-        // Ahora cada fila de venta_extra trae `fecha_hora` embebida — se agrega directo,
-        // sin cruzar contra un Map de ventasData.
-        let extrasCantidad = 0;
-        let extrasIngreso = 0;
-        for (const e of extrasData) {
-          if (!e.venta?.fecha_hora) continue;
-          const d = parseISO(e.venta.fecha_hora);
-          if (d < monthStart || d > monthEnd) continue;
-          const cant = Number(e.cantidad) || 0;
-          const precio = Number(e.precio_extra) || 0;
-          extrasCantidad += cant;
-          extrasIngreso += cant * precio;
-        }
-        const serviciosDelMes = monthlyData.find((m) => m.month === monthStr)?.servicios ?? 0;
-        const tasaAttachExtras = serviciosDelMes > 0 ? (extrasCantidad / serviciosDelMes) * 100 : 0;
 
         const clientesDelMes = clientes.filter((c) => {
           const d = parseISO(c.created_at);
@@ -168,8 +174,10 @@ export function useServiciosClientesData(
           : 0;
 
         // Parcial (mismos primeros N días) solo para clientesNuevos — mismo patrón cumulativo
-        // que Facturación/Servicios en useEstadisticasData; los ratios se comparan mes completo.
-        const nextMonthStr = idx < months.length - 1 ? format(months[idx + 1], 'yyyy-MM') : null;
+        // que Facturación/Servicios; los ratios se comparan mes completo contra mes completo.
+        const nextMonthStr = idx < ventasRows.length - 1
+          ? String(ventasRows[idx + 1].mes).slice(0, 7)
+          : null;
         let parcialClientesNuevos: number | undefined;
         if (nextMonthStr === currentMonthStr) {
           parcialClientesNuevos = clientesDelMes.filter((c) => parseISO(c.created_at).getDate() <= diaActual).length;
@@ -178,8 +186,9 @@ export function useServiciosClientesData(
         return {
           month: monthStr,
           monthLabel: format(monthDate, 'MMM yy', { locale: es }),
-          tasaAttachExtras,
-          ingresoExtras: extrasIngreso,
+          // Ya resueltas en la base (fin_* / estadisticas_ventas_agregadas): no se recalculan acá.
+          tasaAttachExtras: Number(r.tasa_attach_extras) || 0,
+          ingresoExtras: Number(r.extras_ingreso) || 0,
           clientesNuevos,
           clientesManual,
           clientesImportado,
@@ -198,5 +207,5 @@ export function useServiciosClientesData(
     }
   };
 
-  return { monthlyStats, isLoading, error };
+  return { monthlyStats, ventasAgregadas, isLoading, error, datosIncompletos };
 }

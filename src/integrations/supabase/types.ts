@@ -839,6 +839,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_job_errors: {
+        Row: {
+          contexto: Json
+          created_at: string
+          error_detail: string | null
+          error_message: string
+          id: string
+          job_name: string
+        }
+        Insert: {
+          contexto?: Json
+          created_at?: string
+          error_detail?: string | null
+          error_message: string
+          id?: string
+          job_name: string
+        }
+        Update: {
+          contexto?: Json
+          created_at?: string
+          error_detail?: string | null
+          error_message?: string
+          id?: string
+          job_name?: string
+        }
+        Relationships: []
+      }
       descuentos: {
         Row: {
           activo: boolean
@@ -2581,6 +2608,7 @@ export type Database = {
           description: string | null
           links: Json
           logo_path: string | null
+          meta_pixel_id: string | null
           organization_id: string
           primary_color: string | null
           updated_at: string
@@ -2594,6 +2622,7 @@ export type Database = {
           description?: string | null
           links?: Json
           logo_path?: string | null
+          meta_pixel_id?: string | null
           organization_id: string
           primary_color?: string | null
           updated_at?: string
@@ -2607,6 +2636,7 @@ export type Database = {
           description?: string | null
           links?: Json
           logo_path?: string | null
+          meta_pixel_id?: string | null
           organization_id?: string
           primary_color?: string | null
           updated_at?: string
@@ -2916,6 +2946,119 @@ export type Database = {
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resumenes_mensuales: {
+        Row: {
+          created_at: string
+          facturacion_actual: number
+          facturacion_hace_2_meses: number | null
+          facturacion_mes_anterior: number | null
+          generado_at: string
+          id: string
+          mes: string
+          metodos_cobro: Json
+          organization_id: string
+          rentabilidad_hace_2_meses_pct: number | null
+          rentabilidad_mes_anterior_pct: number | null
+          rentabilidad_pct: number | null
+          servicios_actual: number
+          servicios_hace_2_meses: number | null
+          servicios_mes_anterior: number | null
+          sucursal_id: string
+        }
+        Insert: {
+          created_at?: string
+          facturacion_actual: number
+          facturacion_hace_2_meses?: number | null
+          facturacion_mes_anterior?: number | null
+          generado_at?: string
+          id?: string
+          mes: string
+          metodos_cobro?: Json
+          organization_id: string
+          rentabilidad_hace_2_meses_pct?: number | null
+          rentabilidad_mes_anterior_pct?: number | null
+          rentabilidad_pct?: number | null
+          servicios_actual: number
+          servicios_hace_2_meses?: number | null
+          servicios_mes_anterior?: number | null
+          sucursal_id: string
+        }
+        Update: {
+          created_at?: string
+          facturacion_actual?: number
+          facturacion_hace_2_meses?: number | null
+          facturacion_mes_anterior?: number | null
+          generado_at?: string
+          id?: string
+          mes?: string
+          metodos_cobro?: Json
+          organization_id?: string
+          rentabilidad_hace_2_meses_pct?: number | null
+          rentabilidad_mes_anterior_pct?: number | null
+          rentabilidad_pct?: number | null
+          servicios_actual?: number
+          servicios_hace_2_meses?: number | null
+          servicios_mes_anterior?: number | null
+          sucursal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumenes_mensuales_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resumenes_mensuales_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resumenes_mensuales_estado: {
+        Row: {
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          organization_id: string
+          postponed_at: string | null
+          read_at: string | null
+          resumen_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          organization_id: string
+          postponed_at?: string | null
+          read_at?: string | null
+          resumen_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          organization_id?: string
+          postponed_at?: string | null
+          read_at?: string | null
+          resumen_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resumenes_mensuales_estado_resumen_id_fkey"
+            columns: ["resumen_id"]
+            isOneToOne: false
+            referencedRelation: "resumenes_mensuales"
             referencedColumns: ["id"]
           },
         ]
@@ -4416,6 +4559,35 @@ export type Database = {
           },
         ]
       }
+      v_estadisticas_mensuales: {
+        Row: {
+          barberos_del_mes: number | null
+          comision_productos: number | null
+          costos_fijos: number | null
+          costos_semivariables: number | null
+          costos_variables: number | null
+          efectivo: number | null
+          facturacion: number | null
+          mes: string | null
+          mp: number | null
+          organization_id: string | null
+          parcial_barberos_del_mes: number | null
+          parcial_costos_fijos: number | null
+          parcial_efectivo: number | null
+          parcial_facturacion: number | null
+          parcial_mp: number | null
+          parcial_perdida: number | null
+          parcial_recargos_total: number | null
+          parcial_servicios: number | null
+          perdida: number | null
+          recargos_total: number | null
+          servicios: number | null
+          sucursal_id: string | null
+          sueldo_total: number | null
+          total_egresos: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _assert_can_write_sucursal_catalog: {
@@ -4532,45 +4704,138 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
-      create_cliente_with_sucursal:
-        | {
-            Args: {
-              _acepta_marketing?: boolean
-              _alergias?: string
-              _apellido?: string
-              _email?: string
-              _fecha_nacimiento?: string
-              _instagram?: string
-              _nombre: string
-              _otra_red_social?: string
-              _sucursal_id?: string
-              _telefono?: string
-              _tiktok?: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              _acepta_marketing?: boolean
-              _alergias?: string
-              _apellido?: string
-              _email?: string
-              _fecha_nacimiento?: string
-              _instagram?: string
-              _nombre: string
-              _otra_red_social?: string
-              _posible_duplicado_de?: string
-              _sucursal_id?: string
-              _telefono?: string
-              _tiktok?: string
-            }
-            Returns: string
-          }
+      create_cliente_with_sucursal: {
+        Args: {
+          _acepta_marketing?: boolean
+          _alergias?: string
+          _apellido?: string
+          _email?: string
+          _fecha_nacimiento?: string
+          _instagram?: string
+          _nombre: string
+          _otra_red_social?: string
+          _posible_duplicado_de?: string
+          _sucursal_id?: string
+          _telefono?: string
+          _tiktok?: string
+        }
+        Returns: string
+      }
       current_user_has_pin: { Args: never; Returns: boolean }
       delete_mp_connection: { Args: { _org_id: string }; Returns: undefined }
       ensure_organization_subscription: {
         Args: { _org_id: string }
         Returns: string
+      }
+      estadisticas_mensuales: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          barberos_del_mes: number
+          comision_productos: number
+          costo_fijo_por_servicio: number
+          costo_laboral_pct: number
+          costo_variable_por_servicio: number
+          costos_fijos: number
+          costos_semivariables: number
+          costos_variables: number
+          efectivo: number
+          facturacion: number
+          ganancia_por_servicio: number
+          mes: string
+          mp: number
+          parcial_barberos_del_mes: number
+          parcial_costos_fijos: number
+          parcial_efectivo: number
+          parcial_facturacion: number
+          parcial_mp: number
+          parcial_perdida: number
+          parcial_recargos_total: number
+          parcial_servicios: number
+          perdida: number
+          punto_equilibrio: number
+          recargos_total: number
+          rentabilidad_pct: number
+          servicios: number
+          sueldo_total: number
+          ticket_promedio: number
+          total_egresos: number
+        }[]
+      }
+      estadisticas_ocupacion_mensual: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          cobertura_incompleta: boolean
+          duracion_promedio_ponderada: number
+          mes: string
+          tasa_ocupacion: number
+          tasa_ocupacion_parcial: number
+        }[]
+      }
+      estadisticas_ventas_agregadas: {
+        Args: {
+          _meses?: number
+          _organization_id: string
+          _sucursal_id?: string
+        }
+        Returns: {
+          duracion_promedio_ponderada: number
+          extras_cantidad: number
+          extras_ingreso: number
+          mes: string
+          mix: Json
+          por_dia_hora: Json
+          por_hora: Json
+          tasa_attach_extras: number
+          tickets: number
+        }[]
+      }
+      fin_costo_fijo_por_servicio: {
+        Args: { _costos_fijos: number; _servicios: number }
+        Returns: number
+      }
+      fin_costo_laboral_pct: {
+        Args: {
+          _comision_productos: number
+          _facturacion: number
+          _sueldos: number
+        }
+        Returns: number
+      }
+      fin_costo_variable_por_servicio: {
+        Args: { _costos_variables: number; _servicios: number }
+        Returns: number
+      }
+      fin_ganancia_por_servicio: {
+        Args: {
+          _costos_totales: number
+          _facturacion: number
+          _servicios: number
+        }
+        Returns: number
+      }
+      fin_punto_equilibrio: {
+        Args: { _costos_fijos: number; _ganancia_por_servicio: number }
+        Returns: number
+      }
+      fin_rentabilidad_pct: {
+        Args: { _egresos: number; _facturacion: number }
+        Returns: number
+      }
+      fin_ticket_promedio: {
+        Args: { _facturacion: number; _servicios: number }
+        Returns: number
+      }
+      fin_variacion_pct: {
+        Args: { _actual: number; _anterior: number }
+        Returns: number
       }
       find_cliente_by_phone_in_org: {
         Args: { _organization_id: string; _telefono: string }
@@ -4583,6 +4848,14 @@ export type Database = {
           sucursales: Json
           telefono: string
         }[]
+      }
+      generar_resumenes_mensuales: {
+        Args: { target_mes?: string }
+        Returns: number
+      }
+      generar_resumenes_mensuales_job: {
+        Args: { target_mes?: string }
+        Returns: undefined
       }
       get_mp_connection_status: {
         Args: { _org_id: string }

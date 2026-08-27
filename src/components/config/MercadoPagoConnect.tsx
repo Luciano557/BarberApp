@@ -67,7 +67,7 @@ export function MercadoPagoConnect() {
             <div className="space-y-1">
               <CardTitle className="text-base flex items-center gap-2">
                 {isConnected ? (
-                  <Wifi className="h-4 w-4 text-green-600" />
+                  <Wifi className="h-4 w-4 text-status-success-foreground" />
                 ) : (
                   <WifiOff className="h-4 w-4 text-muted-foreground" />
                 )}

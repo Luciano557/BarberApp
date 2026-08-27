@@ -6,7 +6,7 @@ import { Plus, Edit2, Power, PowerOff, Tag } from 'lucide-react';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { Marca, MARCA_COLORS } from './types';
 import { cn } from '@/lib/utils';
 import { EntityColorBar } from '@/components/ui/EntityColorBar';
-import { TabBadge } from '@/components/ui/TabBadge';
 
 interface Props {
   open: boolean;
@@ -212,17 +211,18 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
             )}
           </div>
 
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'active' | 'inactive')}>
-            <TabsList className="w-full h-9 bg-muted/50 p-1 rounded-md">
-              <TabsTrigger value="active" className="group flex-1 text-xs data-[state=active]:bg-card">
-                Activas<TabBadge count={active.length} />
-              </TabsTrigger>
-              <TabsTrigger value="inactive" className="group flex-1 text-xs data-[state=active]:bg-card">
-                Inactivas<TabBadge count={inactive.length} />
-              </TabsTrigger>
-            </TabsList>
+          <SegmentedControl
+            ariaLabel="Estado de marcas"
+            options={[
+              { value: 'active', label: 'Activas', count: active.length },
+              { value: 'inactive', label: 'Inactivas', count: inactive.length },
+            ]}
+            value={tab}
+            onChange={(v) => setTab(v as 'active' | 'inactive')}
+          />
 
-            <TabsContent value="active" className="mt-3 space-y-2">
+          {tab === 'active' ? (
+            <div role="tabpanel" aria-label="Marcas activas" className="mt-3 space-y-2">
               {isAdding && renderEditor()}
               {active.map(renderItem)}
               {active.length === 0 && !isAdding && (
@@ -230,16 +230,17 @@ export function MarcasManagerDialog({ open, marcas, onClose, onChanged }: Props)
                   No hay marcas. Agregá la primera para empezar.
                 </p>
               )}
-            </TabsContent>
-            <TabsContent value="inactive" className="mt-3 space-y-2">
+            </div>
+          ) : (
+            <div role="tabpanel" aria-label="Marcas inactivas" className="mt-3 space-y-2">
               {inactive.map(renderItem)}
               {inactive.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-6">
                   No hay marcas inactivas.
                 </p>
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
       </DrawerForm>
 

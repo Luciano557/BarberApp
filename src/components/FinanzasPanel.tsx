@@ -16,6 +16,9 @@ interface FinanzasPanelProps {
   barbers: Barber[];
   currentPlan: BillingPlanCode;
   onNavigateToBilling: () => void;
+  /** Deep-link a Mi Negocio → ficha de sucursal → card de Horarios, para el estado vacío de
+   * Ocupación en Estadísticas. */
+  onNavigateToHorarios?: (sucursalId: string) => void;
 }
 
 interface LockedFinanceProps {
@@ -60,7 +63,7 @@ function LockedFinance({
   );
 }
 
-export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: FinanzasPanelProps) {
+export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling, onNavigateToHorarios }: FinanzasPanelProps) {
   const { isSucursalAccount } = useAuth();
 
   const canUseStatistics = planAllowsFeature(currentPlan, 'finance.statistics');
@@ -160,7 +163,7 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling }: Fin
 
         <TabsContent value="estadisticas">
           {canUseStatistics ? (
-            <EstadisticasPanel />
+            <EstadisticasPanel onNavigateToHorarios={onNavigateToHorarios} />
           ) : (
             <LockedFinance
               feature="finance.statistics"

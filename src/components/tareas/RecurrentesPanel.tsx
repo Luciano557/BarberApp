@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Repeat } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -105,17 +105,6 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
 
   return (
     <div className="space-y-4">
-      {onClose && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />Volver a tareas
-        </button>
-      )}
-
-
       {showSucursalFilter && (
         <Select value={filtroSucursal} onValueChange={setFiltroSucursal}>
           <SelectTrigger className="w-[180px] h-9"><SelectValue /></SelectTrigger>
@@ -126,17 +115,31 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
         </Select>
       )}
 
-      <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}>
-        <TabsList className="w-full sm:w-auto h-9 bg-muted/50 p-1 rounded-md">
-          <TabsTrigger value="active" className="flex-1 sm:flex-initial text-xs data-[state=active]:bg-card">
-            Activas ({activas.length})
-          </TabsTrigger>
-          <TabsTrigger value="inactive" className="flex-1 sm:flex-initial text-xs data-[state=active]:bg-card">
-            Pausadas ({pausadas.length})
-          </TabsTrigger>
-        </TabsList>
+      <div className="flex flex-wrap items-center gap-3">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />Volver a tareas
+          </button>
+        )}
 
-        <TabsContent value="active" className="mt-4">
+        <SegmentedControl
+          ariaLabel="Estado de recurrencias"
+          className="sm:ml-auto sm:max-w-xs"
+          options={[
+            { value: 'active', label: 'Activas', count: activas.length },
+            { value: 'inactive', label: 'Pausadas', count: pausadas.length },
+          ]}
+          value={activeSubTab}
+          onChange={(v) => setActiveSubTab(v as 'active' | 'inactive')}
+        />
+      </div>
+
+      {activeSubTab === 'active' ? (
+        <div role="tabpanel" aria-label="Recurrencias activas" className="mt-4">
           {renderList(
             activas,
             'No hay recurrencias activas',
@@ -144,16 +147,16 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
               ? 'Creá una recurrencia para generar tareas automáticamente.'
               : 'Cuando se creen recurrencias, vas a poder verlas y gestionarlas acá.',
           )}
-        </TabsContent>
-
-        <TabsContent value="inactive" className="mt-4">
+        </div>
+      ) : (
+        <div role="tabpanel" aria-label="Recurrencias pausadas" className="mt-4">
           {renderList(
             pausadas,
             'No hay recurrencias pausadas',
             'Las recurrencias pausadas dejan de generar tareas hasta que las reactives.',
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       <TareaRecurrenteFormDialog
         open={showForm}

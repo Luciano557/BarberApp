@@ -43,9 +43,10 @@ export function PortalCoverUploader({
             draggable={false}
           />
         ) : (
-          <div className="flex flex-col items-center gap-1 text-muted-foreground">
+          <div className="flex flex-col items-center gap-1 px-4 text-center text-muted-foreground">
             <ImageIcon className="h-6 w-6" />
             <span className="text-xs">Sin foto de portada</span>
+            <span className="text-xs">PNG, JPG o WEBP. Máximo 2 MB. Recomendado 16:9.</span>
           </div>
         )}
       </div>
@@ -62,6 +63,7 @@ export function PortalCoverUploader({
       />
       <div className="flex flex-wrap gap-2">
         <Button
+          type="button"
           variant="outline"
           size="sm"
           onClick={() => ref.current?.click()}
@@ -71,17 +73,23 @@ export function PortalCoverUploader({
           {uploading ? 'Subiendo...' : coverUrl ? 'Cambiar portada' : 'Subir portada'}
         </Button>
         {coverUrl && onAdjust && (
-          <Button variant="outline" size="sm" onClick={onAdjust} disabled={disabled}>
+          <Button type="button" variant="outline" size="sm" onClick={onAdjust} disabled={disabled}>
             <Move className="h-4 w-4 mr-1" /> Ajustar portada
           </Button>
         )}
         {coverUrl && (
-          <Button variant="outline" size="sm" onClick={onRemove} disabled={disabled}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRemove}
+            disabled={disabled}
+            aria-label="Quitar portada"
+          >
             <Trash2 className="h-4 w-4 mr-1" /> Quitar
           </Button>
         )}
       </div>
-      <p className="text-xs text-muted-foreground">PNG, JPG o WEBP. Máximo 2 MB. Recomendado 16:9.</p>
     </div>
   );
 }

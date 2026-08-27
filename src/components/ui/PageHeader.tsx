@@ -15,7 +15,7 @@ export function PageHeader({ title, subtitle, icon: Icon, actions, actionsLayout
     <div className={cn('pl-14 sm:pl-0 mb-6', className)}>
       <div className={cn('flex flex-col gap-4', actionsLayout === 'inline' && 'sm:flex-row sm:items-start sm:justify-between')}>
         <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-tile bg-primary">
             <Icon className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>

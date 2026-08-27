@@ -18,6 +18,7 @@ export interface PortalDataView {
   description: string | null;
   primary_color: string | null;
   links: PortalLandingLink[];
+  meta_pixel_id: string | null;
 }
 
 interface Props {
@@ -27,6 +28,10 @@ interface Props {
   onStart?: () => void;
   onManage: () => void;
   emptyMessage?: string;
+  /** 'h2' cuando se embebe en una pantalla que ya tiene su propio h1 (ej. la
+      vista previa dentro de Configuración). Default 'h1' para el portal
+      público real, donde este es el único heading de nivel superior. */
+  headingLevel?: 'h1' | 'h2';
 }
 
 export const buildDefaultPortalDescription = (orgName: string) =>
@@ -42,7 +47,8 @@ const clampZoom = (n: number | null | undefined) => {
   return Math.max(1, Math.min(3, n));
 };
 
-export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage, emptyMessage }: Props) => {
+export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage, emptyMessage, headingLevel = 'h1' }: Props) => {
+  const NameHeading = headingLevel;
   const logo = portal?.logo_url || fallbackLogo || null;
   const cover = portal?.cover_url || null;
   const description = portal?.description?.trim() || buildDefaultPortalDescription(orgName);
@@ -107,7 +113,7 @@ export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManag
           {/* Cuerpo */}
           <div className="flex flex-col items-center gap-5 text-center pt-14">
             <div className="space-y-1.5 px-2">
-              <h1 className="text-2xl font-semibold text-foreground">{orgName}</h1>
+              <NameHeading className="text-2xl font-semibold text-foreground">{orgName}</NameHeading>
               <p className="text-sm text-muted-foreground max-w-xs mx-auto whitespace-pre-line">
                 {description}
               </p>

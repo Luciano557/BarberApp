@@ -13,6 +13,8 @@ interface TurnoConflictDialogProps {
   conflicts?: ConflictTurno[];
   onConfirm: () => void;
   loading?: boolean;
+  descriptionOverride?: string;
+  confirmLabel?: string;
 }
 
 export function TurnoConflictDialog({
@@ -22,22 +24,24 @@ export function TurnoConflictDialog({
   conflicts,
   onConfirm,
   loading,
+  descriptionOverride,
+  confirmLabel,
 }: TurnoConflictDialogProps) {
   if (!kind) return null;
 
   const isChoque = kind === 'choque_de_horario';
   const title = isChoque ? 'Este horario ya está ocupado' : 'Fuera del horario habitual';
-  const description = isChoque
+  const description = descriptionOverride ?? (isChoque
     ? 'Si continuás, este turno quedará superpuesto con otro turno del mismo profesional.'
-    : 'El horario elegido queda fuera del horario habitual del profesional en esta sucursal.';
-  const cta = isChoque ? 'Guardar igual (superponer)' : 'Guardar igual (fuera de horario)';
+    : 'El horario elegido queda fuera del horario habitual del profesional en esta sucursal.');
+  const cta = confirmLabel ?? (isChoque ? 'Guardar igual (superponer)' : 'Guardar igual (fuera de horario)');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-status-warning-foreground" />
             {title}
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>

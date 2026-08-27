@@ -38,9 +38,9 @@ function buildNuevoClienteSchema(needsSucursalPicker: boolean) {
     .extend({
       sucursalId: z.string().optional().default(''),
       fechaNacimiento: z.string().optional().default(''),
-      instagram: z.string().max(80).optional().default(''),
-      tiktok: z.string().max(80).optional().default(''),
-      otraRedSocial: z.string().max(80).optional().default(''),
+      instagram: z.string().max(120).optional().default(''),
+      tiktok: z.string().max(120).optional().default(''),
+      otraRedSocial: z.string().max(120).optional().default(''),
       alergias: z.string().max(240).optional().default(''),
       aceptaMarketing: z.boolean().default(true),
     })
@@ -342,7 +342,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
                     <FormItem className="space-y-1">
                       <FormLabel className="text-xs">Instagram (opcional)</FormLabel>
                       <FormControl>
-                        <Input {...field} maxLength={80} placeholder="@usuario" />
+                        <Input {...field} maxLength={120} placeholder="@usuario" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -355,7 +355,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
                     <FormItem className="space-y-1">
                       <FormLabel className="text-xs">TikTok (opcional)</FormLabel>
                       <FormControl>
-                        <Input {...field} maxLength={80} placeholder="@usuario" />
+                        <Input {...field} maxLength={120} placeholder="@usuario" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -369,7 +369,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
                   <FormItem className="space-y-1">
                     <FormLabel className="text-xs">Otra red social (opcional)</FormLabel>
                     <FormControl>
-                      <Input {...field} maxLength={80} placeholder="Ej: Twitter @usuario" />
+                      <Input {...field} maxLength={120} placeholder="Ej: Twitter @usuario" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -422,7 +422,7 @@ export function NuevoClienteDialog({ open, onOpenChange, onCreated }: NuevoClien
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <AlertCircle className="h-5 w-5 text-status-warning-foreground" />
               Ya existe un cliente con ese teléfono
             </AlertDialogTitle>
             <AlertDialogDescription asChild>

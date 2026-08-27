@@ -27,8 +27,6 @@ interface OnboardingContextValue {
   registerSubTabProbe: (fn: (() => boolean) | null) => void;
   /** El tooltip informa si entra completo en el viewport; si no, se libera el scroll */
   setTooltipFits: (fits: boolean) => void;
-  /** false cuando el tooltip cayó al modo diálogo centrado */
-  tooltipFits: boolean;
   notifyEvent: (event: OnboardingEvent) => void;
 }
 
@@ -314,9 +312,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     registerSectionOpener,
     registerSubTabProbe,
     setTooltipFits,
-    tooltipFits,
     notifyEvent,
-  }), [isActive, currentStep, currentIndex, steps.length, targetRect, targetMissing, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, registerSectionOpener, registerSubTabProbe, tooltipFits, notifyEvent]);
+  }), [isActive, currentStep, currentIndex, steps.length, targetRect, targetMissing, next, skip, restart, isAllowedTab, registerTabSetter, registerSubTabSetter, registerSectionOpener, registerSubTabProbe, notifyEvent]);
 
 
   return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;

@@ -19,6 +19,7 @@ export interface PortalConfig {
   description: string | null;
   primary_color: string | null;
   links: PortalLink[];
+  meta_pixel_id: string | null;
 }
 
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
@@ -56,9 +57,9 @@ export function usePortalConfig(organizationId: string | undefined) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (opts?: { silent?: boolean }) => {
     if (!organizationId) return;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     const { data } = await supabase
       .from('portal_config')
       .select('*')
@@ -76,6 +77,7 @@ export function usePortalConfig(organizationId: string | undefined) {
         description: d.description,
         primary_color: d.primary_color,
         links: Array.isArray(d.links) ? (d.links as unknown as PortalLink[]) : [],
+        meta_pixel_id: d.meta_pixel_id ?? null,
       });
     } else {
       setConfig({
@@ -88,9 +90,10 @@ export function usePortalConfig(organizationId: string | undefined) {
         description: null,
         primary_color: null,
         links: [],
+        meta_pixel_id: null,
       });
     }
-    setLoading(false);
+    if (!opts?.silent) setLoading(false);
   }, [organizationId]);
 
   useEffect(() => { fetch(); }, [fetch]);
@@ -114,12 +117,13 @@ export function usePortalConfig(organizationId: string | undefined) {
       description: updates.description !== undefined ? updates.description : config?.description ?? null,
       primary_color: updates.primary_color !== undefined ? updates.primary_color : config?.primary_color ?? null,
       links: (updates.links ?? config?.links ?? []) as any,
+      meta_pixel_id: updates.meta_pixel_id !== undefined ? updates.meta_pixel_id : config?.meta_pixel_id ?? null,
     };
     const { error } = await supabase
       .from('portal_config')
       .upsert(payload, { onConflict: 'organization_id' });
     setSaving(false);
-    if (!error) await fetch();
+    if (!error) await fetch({ silent: true });
     return { error };
   }, [organizationId, config, fetch]);
 

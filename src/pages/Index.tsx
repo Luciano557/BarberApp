@@ -11,7 +11,7 @@ import { ClientesPanel } from '@/components/ClientesPanel';
 import { AppSidebar } from '@/components/AppSidebar';
 import { PlanLockedFeature } from '@/components/billing/PlanLockedFeature';
 // PinProtectedSection eliminado: el PIN solo aplica a Cuenta de sucursal vía gates de acción/vista.
-import { LoadingScreen, RecoverableErrorScreen } from '@/components/LoadingScreen';
+import { LoadingScreen, RecoverableErrorScreen, useLoadingScreenMounted } from '@/components/LoadingScreen';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useCobrarBarbers } from '@/hooks/useCobrarBarbers';
 import { useTransactions } from '@/hooks/useTransactions';
@@ -26,6 +26,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useOnboarding } from '@/components/onboarding/OnboardingProvider';
 import { OnboardingOverlay } from '@/components/onboarding/OnboardingOverlay';
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
+import { ResumenMensualStory } from '@/components/resumenMensual/ResumenMensualStory';
 
 const Index = () => {
   const isMobile = useIsMobile();
@@ -159,6 +160,22 @@ const Index = () => {
     }
   }, [activeTab, organization?.id]);
 
+  const navigateToMiNegocioHorarios = useCallback((sucursalId: string) => {
+    if (activeTab === 'mi-negocio') {
+      miNegocioPanelRef.current?.navigateToSucursalHorarios(sucursalId);
+    } else {
+      if (organization?.id) {
+        try {
+          localStorage.setItem(`vittro:miNegocio:activeTab:${organization.id}`, sucursalId);
+          localStorage.setItem(`vittro:miNegocio:highlightHorarios:${organization.id}`, sucursalId);
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+      setActiveTab('mi-negocio');
+    }
+  }, [activeTab, organization?.id]);
+
   // Refresca datos solo cuando se entra a Cobrar desde otra pestaña.
   useEffect(() => {
     const prevTab = prevActiveTabRef.current;
@@ -170,10 +187,12 @@ const Index = () => {
   }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
+  const showLoadingScreen = useLoadingScreenMounted(isLoading);
 
-  if (isLoading) {
+  if (showLoadingScreen) {
     return (
       <LoadingScreen
+        loading={isLoading}
         message="Cargando datos..."
         onRetry={refetchData}
       />
@@ -195,6 +214,7 @@ const Index = () => {
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       <OnboardingOverlay />
       <OnboardingTooltip />
+      <ResumenMensualStory />
 
       <main className={cn("h-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden")}>
         <div className={cn("mx-auto px-4 py-6 sm:px-6 md:px-8", activeTab === 'turnos-agenda' ? "max-w-none px-4 md:px-4" : "max-w-7xl")}>
@@ -232,6 +252,7 @@ const Index = () => {
               barbers={barbers}
               currentPlan={effectivePlan}
               onNavigateToBilling={goToBilling}
+              onNavigateToHorarios={canViewMiNegocio ? navigateToMiNegocioHorarios : undefined}
             />
           )}
 
@@ -280,7 +301,7 @@ const Index = () => {
 
           {activeTab === 'turnos-agenda' && canViewTurnosAgenda && (
             planAllowsFeature(effectivePlan, 'appointments') ? (
-              <TurnosAgendaPanel />
+              <TurnosAgendaPanel onNavigateToHorarios={canViewMiNegocio ? navigateToMiNegocioHorarios : undefined} />
             ) : (
               <PlanLockedFeature
                 title="Turnos requiere plan Profesional"

@@ -56,8 +56,8 @@ const STATUS_CONFIG: Record<
   },
   approved: {
     label: '¡Pago aprobado!',
-    icon: <CheckCircle2 className="h-10 w-10 text-green-600" />,
-    color: 'text-green-600',
+    icon: <CheckCircle2 className="h-10 w-10 text-status-success-foreground" />,
+    color: 'text-status-success-foreground',
   },
   rejected: {
     label: 'Pago rechazado',
@@ -71,8 +71,8 @@ const STATUS_CONFIG: Record<
   },
   timeout: {
     label: 'Tiempo agotado',
-    icon: <Clock className="h-10 w-10 text-amber-600" />,
-    color: 'text-amber-600',
+    icon: <Clock className="h-10 w-10 text-status-warning-foreground" />,
+    color: 'text-status-warning-foreground',
   },
   error: {
     label: 'Error al procesar',

@@ -24,6 +24,7 @@ import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EquipoSucursalPanel } from './config/EquipoSucursalPanel';
+import { HorariosAtencionCard } from './config/horarios/HorariosAtencionCard';
 import { CobrarConfig } from './config/CobrarConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
 import { PaymentMethodsConfig } from './config/PaymentMethodsConfig';
@@ -54,6 +55,8 @@ interface SucursalTabContentProps {
   onSucursalUpdated: () => void;
   onGoToGeneralConfig?: () => void;
   highlightBarberoId?: string;
+  /** Cambia de valor cuando se llega desde Turnos: dispara scroll + resalte en Horarios. */
+  highlightHorariosNonce?: number;
 }
 
 export function SucursalTabContent({
@@ -67,6 +70,7 @@ export function SucursalTabContent({
   onSucursalUpdated,
   onGoToGeneralConfig,
   highlightBarberoId,
+  highlightHorariosNonce,
 }: SucursalTabContentProps) {
   const { organization } = useOrganization();
   const { isOwner, isGeneralManager, isManager } = useAuth();
@@ -77,6 +81,8 @@ export function SucursalTabContent({
     isOwner ||
     isGeneralManager ||
     (isManager && sucursalesAsignadas.some((s) => s.id === sucursal.id));
+  // Misma condición de rol que Turnos › Configuración (owner, encargado general, encargado).
+  const canManageHorarios = isOwner || isGeneralManager || isManager;
   const [cuentaOpen, setCuentaOpen] = useState(false);
 
   // Captura el flag de highlight al renderizar (antes de que el efecto del hijo lo borre).
@@ -226,6 +232,11 @@ export function SucursalTabContent({
           <button onClick={() => scrollTo('seccion-equipo')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Equipo
           </button>
+          {canManageHorarios && (
+            <button onClick={() => scrollTo('seccion-horarios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              Horarios
+            </button>
+          )}
           <button onClick={() => scrollTo('seccion-servicios')} className="shrink-0 rounded px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
             Servicios
           </button>
@@ -328,6 +339,22 @@ export function SucursalTabContent({
             highlightBarberoId={highlightBarberoId}
           />
         </div>
+
+        {/* Horarios de atención — misma condición de rol que Turnos › Configuración */}
+        {canManageHorarios && (
+          <div
+            id="seccion-horarios"
+            className="border-t pt-6 mt-6"
+            data-onboarding-id="horarios-atencion-card"
+          >
+            <HorariosAtencionCard
+              sucursalId={sucursal.id}
+              organizationId={organization?.id || ''}
+              barbers={barbers.filter((b) => (b.rolesEquipo ?? []).includes('barber'))}
+              highlightNonce={highlightHorariosNonce}
+            />
+          </div>
+        )}
 
         {/* Servicios */}
         <section id="seccion-servicios" className="border-t pt-6 mt-6" data-onboarding-id="catalogo-section">

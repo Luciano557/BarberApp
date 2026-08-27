@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addMonths, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Trash2, ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react';
+import { Trash2, ChevronLeft, ChevronRight, Plus, Repeat, Receipt } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useGastos, TipoCosto } from '@/hooks/useGastos';
 import { supabase } from '@/integrations/supabase/client';
 import { useGastosRecurrentes } from '@/hooks/useGastosRecurrentes';
@@ -213,13 +214,17 @@ export function GastosPanel() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Formulario */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">Gastos</h3>
-        <Button size="sm" onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Registrar gasto
-        </Button>
-      </div>
+      <PageHeader
+        title="Gastos"
+        icon={Receipt}
+        subtitle="Costos fijos, variables y recurrentes del negocio."
+        className="pl-0"
+        actions={(
+          <Button size="sm" onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Registrar gasto
+          </Button>
+        )}
+      />
 
       <DrawerForm
         open={isFormOpen}

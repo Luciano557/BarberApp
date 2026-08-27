@@ -93,6 +93,7 @@ export default {
           indigo: {
             DEFAULT: "hsl(var(--status-indigo))",
             foreground: "hsl(var(--status-indigo-foreground))",
+            bg: "hsl(var(--status-indigo-bg))",
           },
         },
         "chart-cash": "hsl(var(--chart-cash))",
@@ -107,6 +108,8 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        container: "var(--radius-container)",
+        tile: "var(--radius-tile)",
       },
       transitionDuration: {
         "sidebar-text": "120ms",
@@ -149,12 +152,63 @@ export default {
             height: "0",
           },
         },
+        "logo-enter": {
+          from: {
+            opacity: "0",
+            transform: "scale(0.95) translateY(6px)",
+          },
+          to: {
+            opacity: "1",
+            transform: "scale(1) translateY(0)",
+          },
+        },
+        "logo-breathe": {
+          "0%, 100%": {
+            opacity: "1",
+          },
+          "50%": {
+            opacity: "0.55",
+          },
+        },
+        "logo-exit": {
+          from: {
+            opacity: "1",
+            transform: "scale(1)",
+          },
+          to: {
+            opacity: "0",
+            transform: "scale(1.045)",
+          },
+        },
+        "screen-in": {
+          from: {
+            opacity: "0",
+          },
+          to: {
+            opacity: "1",
+          },
+        },
+        "screen-out": {
+          from: {
+            opacity: "1",
+            filter: "blur(0px)",
+          },
+          to: {
+            opacity: "0",
+            filter: "blur(2px)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "collapsible-down": "collapsible-down 0.2s ease-out",
         "collapsible-up": "collapsible-up 0.2s ease-out",
+        "logo-enter": "logo-enter 420ms var(--ease-out-quint) forwards",
+        "logo-breathe": "logo-breathe 1600ms var(--ease-out-quint) infinite",
+        "logo-exit": "logo-exit 200ms var(--ease-in-quint) forwards",
+        "screen-in": "screen-in 180ms var(--ease-out-quint) forwards",
+        "screen-out": "screen-out 220ms var(--ease-in-quint) forwards",
       },
     },
   },

@@ -25,6 +25,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { format } from 'date-fns';
 
 const CATEGORIAS = ['Mobiliario', 'Equipamiento', 'Reforma', 'Tecnología', 'Vehículo', 'Otro'];
@@ -125,12 +126,17 @@ export function InversionesPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">Inversiones</h3>
-        <Button size="sm" onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Nueva
-        </Button>
-      </div>
+      <PageHeader
+        title="Inversiones"
+        icon={TrendingUp}
+        subtitle="Bienes y equipamiento del negocio."
+        className="pl-0"
+        actions={(
+          <Button size="sm" onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Nueva
+          </Button>
+        )}
+      />
 
       <DrawerForm
         open={isFormOpen}

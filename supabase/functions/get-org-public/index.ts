@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
         .or("eliminado.is.null,eliminado.eq.false", { foreignTable: "servicios" }),
       supabase
         .from("portal_config")
-        .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links")
+        .select("logo_path, cover_path, cover_position_x, cover_position_y, cover_zoom, description, primary_color, links, meta_pixel_id")
         .eq("organization_id", org.id)
         .maybeSingle(),
       supabase
@@ -106,6 +106,9 @@ Deno.serve(async (req) => {
       return Math.max(1, Math.min(3, v));
     };
 
+    const sanitizePixelId = (v: any): string | null =>
+      typeof v === "string" && /^[0-9]{10,20}$/.test(v.trim()) ? v.trim() : null;
+
     let portal: {
       logo_url: string | null;
       cover_url: string | null;
@@ -115,6 +118,7 @@ Deno.serve(async (req) => {
       description: string | null;
       primary_color: string | null;
       links: { label: string; url: string; icon: string | null }[];
+      meta_pixel_id: string | null;
     } | null = null;
 
     const pc: any = portalRes.data;
@@ -150,6 +154,7 @@ Deno.serve(async (req) => {
           ? pc.primary_color
           : null,
         links,
+        meta_pixel_id: sanitizePixelId(pc.meta_pixel_id),
       };
     } else {
       portal = {
@@ -161,6 +166,7 @@ Deno.serve(async (req) => {
         description: null,
         primary_color: null,
         links: [],
+        meta_pixel_id: null,
       };
     }
 
