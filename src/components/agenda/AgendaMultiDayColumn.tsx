@@ -88,7 +88,7 @@ export function AgendaMultiDayColumn({
 
       {/* Day-off overlay */}
       {dayOff && (
-        <div className="absolute inset-0 bg-muted/70 flex items-center justify-center z-30">
+        <div className="absolute inset-0 bg-muted/70 flex items-center justify-center z-[10]">
           <span className="text-[10px] text-muted-foreground">Cerrado</span>
         </div>
       )}

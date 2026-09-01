@@ -1,12 +1,21 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 /*
- * Stack de z-index — bandas globales de la app (fuera de src/components/agenda,
- * que tiene su propio sub-stack interno documentado en ese módulo).
+ * Stack de z-index — bandas globales de la app.
  *
- *   0-20   Capas locales (hero de portal, sticky menores dentro de un panel)
- *   40     Chrome fijo: header/nav sticky, botón hamburguesa y scrim del
- *          sidebar mobile — nunca debe competir con overlays de Radix
+ *   0-20   Capas locales: todo sticky/elevación que pertenece al CONTENIDO
+ *          de una pantalla o módulo, no a la navegación global (hero de
+ *          portal, sticky menores dentro de un panel, navs internas de
+ *          Mi Negocio/Sucursal/Portal Público, header del panel de
+ *          notificaciones). Incluye la sub-escala propia de Agenda
+ *          (src/components/agenda): 2 línea de hora actual · 4 bloqueos ·
+ *          6 tarjetas de turno · 8 tarjeta en hover · 10 overlays "Día
+ *          cerrado"/"No disponible" · 20 headers sticky de columnas/fechas.
+ *   40     Chrome GLOBAL overlay de Operate — navegación superpuesta, no
+ *          contenido: sidebar mobile, su scrim, botón hamburguesa y
+ *          backdrop del panel de notificaciones. Nunca debe competir con
+ *          overlays de Radix, y ningún sticky de contenido usa esta banda
+ *          aunque esté "fijo" durante el scroll.
  *   50     Overlays de Radix (dialog, sheet/drawer-form, popover, dropdown,
  *          select, tooltip, alert-dialog, menubar, context-menu, hover-card,
  *          navigation-menu) y el overlay de éxito de cobro
@@ -14,6 +23,14 @@
  *          overlays normales, por debajo de toasts
  *   80     Ghost de drag de turnos en Agenda
  *   100    Toast viewport — siempre la capa más alta
+ *
+ * Regla de empate: dentro de una misma banda no debe haber dos elementos
+ * que necesiten orden entre sí — a igual z-index el desempate lo decide el
+ * orden en el DOM, que no es una garantía de diseño (fue la causa exacta
+ * del bug de headers de Agenda sobre el sidebar mobile, corregido bajando
+ * los headers a la banda local). La sub-escala de Agenda participa del
+ * stacking context raíz — no hay `isolation` — así que sus valores son
+ * correctos por ESTAR dentro de 0-20, no por aislamiento real (deuda D34).
  */
 
 @tailwind base;
