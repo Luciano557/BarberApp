@@ -80,6 +80,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
+function asNonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function pendingPreapprovalId(
+  subscription: { metadata?: unknown; mercadopago_preapproval_id?: unknown; mercadopago_status?: unknown },
+): string | null {
+  const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+  const metadataId = asNonEmptyString(metadata.pending_mercadopago_preapproval_id);
+  if (metadataId) return metadataId;
+
+  return subscription.mercadopago_status === 'pending'
+    ? asNonEmptyString(subscription.mercadopago_preapproval_id)
+    : null;
+}
+
+function withoutPendingCheckoutMetadata(value: unknown): Record<string, unknown> {
+  const metadata = isRecord(value) ? { ...value } : {};
+  delete metadata.pending_mercadopago_preapproval_id;
+  delete metadata.pending_mercadopago_external_reference;
+  delete metadata.pending_checkout_amount_ars;
+  delete metadata.pending_checkout_price_version;
+  delete metadata.checkout_requested_at;
+  delete metadata.checkout_requested_by;
+  delete metadata.previous_mercadopago_preapproval_id;
+  delete metadata.previous_mercadopago_external_reference;
+  return metadata;
+}
+
+function withoutScheduledRenewalMetadata(value: unknown): Record<string, unknown> {
+  const metadata = isRecord(value) ? { ...value } : {};
+  delete metadata.scheduled_renewal_amount_ars;
+  delete metadata.scheduled_renewal_price_version;
+  return metadata;
+}
+
+function finiteAmount(value: unknown): number | null {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function positiveVersion(value: unknown): number | null {
+  const version = Number(value);
+  return Number.isInteger(version) && version > 0 ? version : null;
+}
+
 function parseSubscriptionExternalReference(value: string | null | undefined): {
   organizationId: string;
   planCode: string;
@@ -161,7 +207,7 @@ async function syncPreapproval(
   const mpRes = await mpPlatformFetch(`/preapproval/${preapprovalId}`);
   if (!mpRes.ok) {
     const mpError = await readMpError(mpRes);
-    console.warn('[subscription-mp-webhook] preapproval fetch failed:', mpRes.status, mpError.payload);
+    console.warn('[subscription-mp-webhook] preapproval fetch failed:', mpRes.status, mpError.code);
     return;
   }
 
@@ -171,14 +217,32 @@ async function syncPreapproval(
 
   let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, current_period_start, current_period_end')
-    .or(`mercadopago_preapproval_id.eq.${preapprovalId},mercadopago_external_reference.eq.${externalReference ?? '__missing__'}`)
+    .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+    .eq('mercadopago_preapproval_id', String(preapprovalId))
     .maybeSingle();
+
+  if (!subscription) {
+    const pendingFallback = await supabaseAdmin
+      .from('organization_subscriptions')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+      .contains('metadata', { pending_mercadopago_preapproval_id: String(preapprovalId) })
+      .maybeSingle();
+    subscription = pendingFallback.data;
+  }
+
+  if (!subscription && externalReference) {
+    const referenceFallback = await supabaseAdmin
+      .from('organization_subscriptions')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+      .eq('mercadopago_external_reference', externalReference)
+      .maybeSingle();
+    subscription = referenceFallback.data;
+  }
 
   if (!subscription && parsedExternalReference) {
     const fallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, current_period_start, current_period_end')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
       .eq('organization_id', parsedExternalReference.organizationId)
       .maybeSingle();
     subscription = fallback.data;
@@ -189,48 +253,66 @@ async function syncPreapproval(
     return;
   }
 
+  const localPendingPreapprovalId = pendingPreapprovalId(subscription);
+  const isPendingCheckout = localPendingPreapprovalId === String(preapprovalId);
+  const isCurrentPreapproval = subscription.mercadopago_preapproval_id === String(preapprovalId);
+
+  if (!isPendingCheckout && !isCurrentPreapproval) {
+    console.warn('[subscription-mp-webhook] ignored stale preapproval:', preapprovalId);
+    if (eventRowId) {
+      await supabaseAdmin
+        .from('mercadopago_subscription_events')
+        .update({
+          organization_id: subscription.organization_id,
+          subscription_id: subscription.id,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventRowId);
+    }
+    return;
+  }
+
   const nextStatus = mapSubscriptionStatus(preapproval.status as string | undefined, subscription.status);
   const nextPaymentDate = preapproval.next_payment_date
     ? new Date(preapproval.next_payment_date as string)
     : null;
-  const periodStart = nextStatus === 'active'
-    ? new Date()
-    : subscription.current_period_start
-      ? new Date(subscription.current_period_start)
-      : new Date();
-  const periodEnd = nextStatus === 'active'
-    ? nextPaymentDate ?? addMonths(periodStart, 1)
-    : subscription.current_period_end
-      ? new Date(subscription.current_period_end)
-      : null;
-  const nextPlan =
-    subscription.pending_plan_code ??
-    subscription.current_plan_code ??
-    subscription.effective_plan_code ??
-    'basico';
-  const shouldHoldPendingPlanUntilPayment = nextStatus === 'active' && Boolean(subscription.pending_plan_code);
-  const shouldApplyPlanFromPreapproval = nextStatus === 'active' && !shouldHoldPendingPlanUntilPayment;
+  const preservesCurrentProvider = isPendingCheckout && !isCurrentPreapproval && Boolean(subscription.current_plan_code);
+  const pendingCheckoutTerminated = isPendingCheckout && (
+    nextStatus === 'cancelled' || nextStatus === 'past_due'
+  );
   const subscriptionUpdate: Record<string, unknown> = {
-    status: shouldHoldPendingPlanUntilPayment ? subscription.status : nextStatus,
-    current_plan_code: shouldApplyPlanFromPreapproval ? nextPlan : subscription.current_plan_code,
-    effective_plan_code: shouldApplyPlanFromPreapproval ? nextPlan : subscription.effective_plan_code,
-    pending_plan_code: shouldApplyPlanFromPreapproval ? null : subscription.pending_plan_code,
-    mercadopago_status: preapproval.status ?? null,
-    mercadopago_init_point: preapproval.init_point ?? preapproval.sandbox_init_point ?? null,
-    mercadopago_external_reference: externalReference ?? null,
-    next_payment_date: nextPaymentDate?.toISOString() ?? null,
-    current_period_start: shouldApplyPlanFromPreapproval ? periodStart.toISOString() : subscription.current_period_start,
-    current_period_end: shouldApplyPlanFromPreapproval ? periodEnd?.toISOString() ?? null : subscription.current_period_end,
+    // A preapproval becoming authorized is not proof of an approved debit.
+    // Plan, billing snapshot and paid period are promoted only by the
+    // authorized_payment branch below.
+    status: isPendingCheckout ? subscription.status : nextStatus,
+    pending_plan_code: pendingCheckoutTerminated ? null : subscription.pending_plan_code,
+    next_payment_date: isPendingCheckout
+      ? subscription.next_payment_date
+      : nextPaymentDate?.toISOString() ?? null,
   };
 
-  if (shouldApplyPlanFromPreapproval) {
-    subscriptionUpdate.billing_plan_code = nextPlan;
+  if (!preservesCurrentProvider) {
+    subscriptionUpdate.mercadopago_status = preapproval.status ?? null;
+    subscriptionUpdate.mercadopago_init_point = preapproval.init_point ?? preapproval.sandbox_init_point ?? null;
+    subscriptionUpdate.mercadopago_external_reference = externalReference ?? null;
   }
 
-  await supabaseAdmin
+  if (pendingCheckoutTerminated) {
+    subscriptionUpdate.pending_checkout_amount_ars = null;
+    subscriptionUpdate.pending_checkout_price_version = null;
+    subscriptionUpdate.mercadopago_init_point = null;
+    subscriptionUpdate.metadata = withoutPendingCheckoutMetadata(subscription.metadata);
+  }
+
+  const { error: subscriptionUpdateError } = await supabaseAdmin
     .from('organization_subscriptions')
     .update(subscriptionUpdate)
     .eq('id', subscription.id);
+
+  if (subscriptionUpdateError) {
+    console.error('[subscription-mp-webhook] preapproval sync failed:', subscriptionUpdateError.code);
+    return;
+  }
 
   if (eventRowId) {
     await supabaseAdmin
@@ -252,7 +334,7 @@ async function syncAuthorizedPayment(
   const mpRes = await mpPlatformFetch(`/authorized_payments/${authorizedPaymentId}`);
   if (!mpRes.ok) {
     const mpError = await readMpError(mpRes);
-    console.warn('[subscription-mp-webhook] authorized payment fetch failed:', mpRes.status, mpError.payload);
+    console.warn('[subscription-mp-webhook] authorized payment fetch failed:', mpRes.status, mpError.code);
     return;
   }
 
@@ -263,7 +345,7 @@ async function syncAuthorizedPayment(
     authorizedPayment.preapproval?.id;
 
   if (!preapprovalId) {
-    console.warn('[subscription-mp-webhook] authorized payment without preapproval:', authorizedPayment);
+    console.warn('[subscription-mp-webhook] authorized payment without preapproval:', authorizedPaymentId);
     return;
   }
 
@@ -286,14 +368,23 @@ async function syncAuthorizedPayment(
 
   let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, current_period_start, current_period_end, metadata')
+    .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
     .eq('mercadopago_preapproval_id', String(preapprovalId))
     .maybeSingle();
+
+  if (!subscription) {
+    const pendingFallback = await supabaseAdmin
+      .from('organization_subscriptions')
+      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
+      .contains('metadata', { pending_mercadopago_preapproval_id: String(preapprovalId) })
+      .maybeSingle();
+    subscription = pendingFallback.data;
+  }
 
   if (!subscription && parsedExternalReference) {
     const fallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, current_period_start, current_period_end, metadata')
+      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
       .eq('organization_id', parsedExternalReference.organizationId)
       .maybeSingle();
     subscription = fallback.data;
@@ -304,13 +395,33 @@ async function syncAuthorizedPayment(
     return;
   }
 
+  const localPendingPreapprovalId = pendingPreapprovalId(subscription);
+  const isPendingCheckout = localPendingPreapprovalId === String(preapprovalId);
+  const isCurrentPreapproval = subscription.mercadopago_preapproval_id === String(preapprovalId);
+  const isScheduledRenewal = !isPendingCheckout && isCurrentPreapproval && Boolean(subscription.pending_plan_code);
+
+  if (!isPendingCheckout && !isCurrentPreapproval) {
+    console.warn('[subscription-mp-webhook] ignored stale authorized payment:', authorizedPaymentId);
+    if (eventRowId) {
+      await supabaseAdmin
+        .from('mercadopago_subscription_events')
+        .update({
+          organization_id: subscription.organization_id,
+          subscription_id: subscription.id,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventRowId);
+    }
+    return;
+  }
+
   const paymentStatus = mapPaymentStatus(authorizedPayment.status as string | undefined);
-  const amount = Number(
+  const amount = finiteAmount(
     authorizedPayment.transaction_amount ??
     authorizedPayment.amount ??
     authorizedPayment.payment?.transaction_amount ??
     0,
-  );
+  ) ?? 0;
   const paidAt = paymentStatus === 'approved'
     ? new Date(
       authorizedPayment.date_approved ??
@@ -320,22 +431,45 @@ async function syncAuthorizedPayment(
     ).toISOString()
     : null;
   const planCode =
-    subscription.pending_plan_code ??
-    parsedExternalReference?.planCode ??
+    (isPendingCheckout ? parsedExternalReference?.planCode : null) ??
+    ((isPendingCheckout || isScheduledRenewal) ? subscription.pending_plan_code : null) ??
     subscription.billing_plan_code ??
     subscription.current_plan_code ??
     subscription.effective_plan_code ??
     'basico';
+  const pendingAmount = finiteAmount(subscription.pending_checkout_amount_ars);
+  const pendingPriceVersion = positiveVersion(subscription.pending_checkout_price_version);
+  const currencyId = String(authorizedPayment.currency_id ?? 'ARS');
+  const pendingPlanMatchesReference =
+    !isPendingCheckout ||
+    !parsedExternalReference?.planCode ||
+    !subscription.pending_plan_code ||
+    parsedExternalReference.planCode === subscription.pending_plan_code;
+  const pendingCheckoutMatchesStoredPrice =
+    !isPendingCheckout ||
+    (
+      pendingPlanMatchesReference &&
+      pendingAmount !== null &&
+      pendingPriceVersion !== null &&
+      amount === pendingAmount &&
+      currencyId === 'ARS'
+    );
+  const subscriptionMetadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+  const scheduledAmount = finiteAmount(subscriptionMetadata.scheduled_renewal_amount_ars);
+  const scheduledPriceVersion = positiveVersion(subscriptionMetadata.scheduled_renewal_price_version);
+  const scheduledRenewalMatchesStoredPrice = !isScheduledRenewal || scheduledAmount === null || (
+    amount === scheduledAmount && currencyId === 'ARS'
+  );
 
-  const { data: payment } = await supabaseAdmin
+  const { data: payment, error: paymentError } = await supabaseAdmin
     .from('subscription_payments')
     .upsert({
       organization_id: subscription.organization_id,
       subscription_id: subscription.id,
       plan_code: planCode,
-      billing_plan_code: subscription.billing_plan_code ?? planCode,
-      amount_ars: Number.isFinite(amount) ? amount : 0,
-      currency_id: authorizedPayment.currency_id ?? 'ARS',
+      billing_plan_code: planCode,
+      amount_ars: amount,
+      currency_id: currencyId,
       status: paymentStatus,
       provider: 'mercadopago',
       mercadopago_authorized_payment_id: String(authorizedPaymentId),
@@ -350,6 +484,34 @@ async function syncAuthorizedPayment(
     .select('id')
     .maybeSingle();
 
+  if (paymentError) {
+    console.error('[subscription-mp-webhook] payment upsert failed:', paymentError.code);
+    return;
+  }
+
+  if (
+    paymentStatus === 'approved' &&
+    (!pendingCheckoutMatchesStoredPrice || !scheduledRenewalMatchesStoredPrice)
+  ) {
+    console.error('[subscription-mp-webhook] subscription price mismatch:', {
+      authorizedPaymentId,
+      preapprovalId: String(preapprovalId),
+      planCode,
+    });
+
+    if (eventRowId) {
+      await supabaseAdmin
+        .from('mercadopago_subscription_events')
+        .update({
+          organization_id: subscription.organization_id,
+          subscription_id: subscription.id,
+          payment_id: payment?.id ?? null,
+        })
+        .eq('id', eventRowId);
+    }
+    return;
+  }
+
   if (paymentStatus === 'approved') {
     const nextPaymentDate = authorizedPayment.next_payment_date
       ? new Date(authorizedPayment.next_payment_date as string)
@@ -357,33 +519,82 @@ async function syncAuthorizedPayment(
     const periodStart = paidAt ? new Date(paidAt) : new Date();
     const periodEnd = nextPaymentDate ?? addMonths(periodStart, 1);
 
-    const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
-    const previousPreapprovalId = typeof metadata.previous_mercadopago_preapproval_id === 'string'
+    const metadata = subscriptionMetadata;
+    const previousPreapprovalId = isPendingCheckout && typeof metadata.previous_mercadopago_preapproval_id === 'string'
       ? metadata.previous_mercadopago_preapproval_id
       : null;
+    let confirmedPriceVersion = isPendingCheckout
+      ? pendingPriceVersion
+      : isScheduledRenewal
+        ? scheduledPriceVersion
+        : positiveVersion(subscription.billing_price_version);
+    const confirmedBillingAmount = isPendingCheckout && pendingAmount !== null
+      ? pendingAmount
+      : amount;
 
-    await supabaseAdmin
+    if (
+      !isPendingCheckout &&
+      (!confirmedPriceVersion || finiteAmount(subscription.billing_amount_ars) !== amount)
+    ) {
+      const { data: catalogPlan } = await supabaseAdmin
+        .from('subscription_plans')
+        .select('amount_ars, price_version')
+        .eq('code', planCode)
+        .maybeSingle();
+
+      confirmedPriceVersion = catalogPlan && finiteAmount(catalogPlan.amount_ars) === amount
+        ? positiveVersion(catalogPlan.price_version)
+        : null;
+    }
+
+    const confirmedMetadata = {
+      ...(isPendingCheckout
+        ? withoutPendingCheckoutMetadata(metadata)
+        : isScheduledRenewal
+          ? withoutScheduledRenewalMetadata(metadata)
+          : metadata),
+      last_confirmed_mercadopago_preapproval_id: String(preapprovalId),
+      last_confirmed_mercadopago_external_reference: externalReference,
+      last_confirmed_plan_code: planCode,
+      last_confirmed_payment_at: paidAt,
+      last_confirmed_amount_ars: confirmedBillingAmount,
+      last_confirmed_price_version: confirmedPriceVersion,
+    };
+
+    const subscriptionUpdate: Record<string, unknown> = {
+      status: 'active',
+      current_plan_code: planCode,
+      effective_plan_code: planCode,
+      billing_plan_code: planCode,
+      billing_amount_ars: confirmedBillingAmount,
+      billing_price_version: confirmedPriceVersion,
+      mercadopago_preapproval_id: String(preapprovalId),
+      mercadopago_external_reference: externalReference ?? subscription.mercadopago_external_reference,
+      mercadopago_status: 'authorized',
+      next_payment_date: nextPaymentDate?.toISOString() ?? null,
+      current_period_start: periodStart.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      last_payment_at: paidAt,
+      metadata: confirmedMetadata,
+    };
+
+    if (isPendingCheckout || isScheduledRenewal) {
+      subscriptionUpdate.pending_plan_code = null;
+    }
+    if (isPendingCheckout) {
+      subscriptionUpdate.pending_checkout_amount_ars = null;
+      subscriptionUpdate.pending_checkout_price_version = null;
+    }
+
+    const { error: subscriptionUpdateError } = await supabaseAdmin
       .from('organization_subscriptions')
-      .update({
-        status: 'active',
-        current_plan_code: planCode,
-        effective_plan_code: planCode,
-        billing_plan_code: planCode,
-        pending_plan_code: null,
-        mercadopago_preapproval_id: String(preapprovalId),
-        mercadopago_external_reference: externalReference,
-        current_period_start: periodStart.toISOString(),
-        current_period_end: periodEnd.toISOString(),
-        last_payment_at: paidAt,
-        metadata: {
-          ...metadata,
-          last_confirmed_mercadopago_preapproval_id: String(preapprovalId),
-          last_confirmed_mercadopago_external_reference: externalReference,
-          last_confirmed_plan_code: planCode,
-          last_confirmed_payment_at: paidAt,
-        },
-      })
+      .update(subscriptionUpdate)
       .eq('id', subscription.id);
+
+    if (subscriptionUpdateError) {
+      console.error('[subscription-mp-webhook] approved payment sync failed:', subscriptionUpdateError.code);
+      return;
+    }
 
     if (previousPreapprovalId && previousPreapprovalId !== String(preapprovalId)) {
       const cancelPreviousRes = await mpPlatformFetch(`/preapproval/${previousPreapprovalId}`, {
@@ -393,26 +604,36 @@ async function syncAuthorizedPayment(
 
       if (!cancelPreviousRes.ok) {
         const mpError = await readMpError(cancelPreviousRes);
-        console.warn('[subscription-mp-webhook] previous preapproval cancel failed:', cancelPreviousRes.status, mpError.payload);
+        console.warn('[subscription-mp-webhook] previous preapproval cancel failed:', cancelPreviousRes.status, mpError.code);
       }
     }
   } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
-    const hasCurrentPaidAccess = Boolean(subscription.current_plan_code) && (
-      !subscription.current_period_end ||
-      new Date(subscription.current_period_end).getTime() > Date.now()
+    const hasCurrentPaidAccess = Boolean(
+      subscription.current_plan_code &&
+      subscription.current_period_end &&
+      Number.isFinite(Date.parse(subscription.current_period_end)) &&
+      Date.parse(subscription.current_period_end) > Date.now(),
     );
 
-    await supabaseAdmin
+    const failureUpdate: Record<string, unknown> = {
+      status: hasCurrentPaidAccess
+        ? (subscription.status === 'active' ? 'active' : subscription.status)
+        : 'past_due',
+    };
+
+    // A rejected/cancelled authorized-payment is an attempt outcome, not a
+    // terminal preapproval state. Keep the immutable pending intent so a later
+    // Mercado Pago retry is still resolved to the same plan/amount/version.
+
+    const { error: subscriptionUpdateError } = await supabaseAdmin
       .from('organization_subscriptions')
-      .update(hasCurrentPaidAccess
-        ? {
-            status: subscription.status === 'active' ? 'active' : subscription.status,
-            pending_plan_code: null,
-          }
-        : {
-            status: 'past_due',
-          })
+      .update(failureUpdate)
       .eq('id', subscription.id);
+
+    if (subscriptionUpdateError) {
+      console.error('[subscription-mp-webhook] failed payment sync failed:', subscriptionUpdateError.code);
+      return;
+    }
   }
 
   if (eventRowId) {

@@ -26,7 +26,6 @@ interface PlanFeatures {
   max_services: number;
   can_export_reports: boolean;
   can_view_analytics: boolean;
-  price_monthly: number;
 }
 
 interface OrganizationContextType {
@@ -108,7 +107,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         try {
           const { data: featuresData } = await supabase
             .from('plan_features')
-            .select('*')
+            .select('max_barbers, max_services, can_export_reports, can_view_analytics')
             .eq('plan', org.plan)
             .maybeSingle();
           if (featuresData) setPlanFeatures(featuresData as PlanFeatures);

@@ -1,8 +1,9 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
 import { ActionPinGateProvider } from "@/components/ActionPinGate";
@@ -16,6 +17,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import Reservar from "./pages/Reservar";
+import AdminApp from "@/admin/AdminApp";
 
 const queryClient = new QueryClient();
 
@@ -33,40 +35,56 @@ function AppToaster() {
   return <Sonner position={isPublicPage ? "top-center" : "bottom-right"} />;
 }
 
+function TenantProviders() {
+  return (
+    <AuthProvider>
+      <OrganizationProvider>
+        <SucursalProvider>
+          <ActionPinGateProvider>
+            <OnboardingProvider>
+              <Outlet />
+            </OnboardingProvider>
+          </ActionPinGateProvider>
+        </SucursalProvider>
+      </OrganizationProvider>
+    </AuthProvider>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <OrganizationProvider>
-          <SucursalProvider>
-            <ActionPinGateProvider>
-              <OnboardingProvider>
-              <BrowserRouter>
-                <AppToaster />
-                <Routes>
-                  <Route path="/" element={<Homepage />} />
-                  <Route path="/login" element={<Login />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/verify-email" element={<VerifyEmail />} />
-                  <Route path="/auth/callback" element={<AuthCallback />} />
-                  <Route path="/:orgSlug/reservar" element={<Reservar />} />
-                  <Route
-                    path="/app/:orgSlug"
-                    element={
-                      <ProtectedRoute>
-                        <Index />
-                      </ProtectedRoute>
-                    }
-                  />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </BrowserRouter>
-              </OnboardingProvider>
-            </ActionPinGateProvider>
-          </SucursalProvider>
-        </OrganizationProvider>
-      </AuthProvider>
+      <BrowserRouter>
+        <AppToaster />
+        <Routes>
+          <Route
+            path="/admin/*"
+            element={
+              <AdminAuthProvider>
+                <AdminApp />
+              </AdminAuthProvider>
+            }
+          />
+          <Route element={<TenantProviders />}>
+            <Route path="/" element={<Homepage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/:orgSlug/reservar" element={<Reservar />} />
+            <Route
+              path="/app/:orgSlug"
+              element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
