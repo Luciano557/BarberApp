@@ -128,11 +128,19 @@ function PlansPanel() {
     setIsProcessingBatch(true);
     try {
       let hasMore = true;
+      let finalStatus: PlatformAdminPriceChangeBatchDto['status'] | null = null;
       while (hasMore) {
         const result = await processBatch({ batchId });
         hasMore = result.hasMore;
+        finalStatus = result.batch.status;
       }
-      feedback.success('El lote de precios terminó de procesarse.');
+      if (finalStatus === 'processing') {
+        feedback.info('El lote todavía tiene ítems tomados por otro proceso.', {
+          description: 'El estado se actualizará automáticamente; también podés continuarlo cuando el claim venza.',
+        });
+      } else {
+        feedback.success('El lote de precios terminó de procesarse.');
+      }
     } catch {
       feedback.error('El lote quedó pendiente de revisión.', {
         description: 'Podés continuarlo desde esta pantalla sin duplicar efectos.',
@@ -301,15 +309,15 @@ function PriceBatchCard({
           <BatchCount label="Correctos" value={data.succeededCount} />
           <BatchCount label="Fallidos" value={data.failedCount} warning={data.failedCount > 0} />
         </div>
-        {(canContinue || data.failedCount > 0) && (
+        {(canContinue || data.retryableCount > 0) && (
           <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
-            {data.failedCount > 0 && (
+            {data.retryableCount > 0 && (
               <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={isProcessing || isRetrying}>
                 {isRetrying ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-                Reintentar fallidos
+                Reintentar incidencias
               </Button>
             )}
-            {canContinue && data.pendingCount > 0 && (
+            {canContinue && (data.pendingCount > 0 || data.processingCount > 0) && (
               <Button type="button" size="sm" onClick={() => onContinue(data.id)} disabled={isProcessing || isRetrying}>
                 {isProcessing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
                 Continuar lote

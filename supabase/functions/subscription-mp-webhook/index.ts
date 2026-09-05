@@ -1,8 +1,8 @@
 /**
  * Mercado Pago webhook for Vittro subscriptions.
  *
- * Public endpoint. It validates x-signature when MERCADOPAGO_WEBHOOK_SECRET is
- * configured, logs the raw event, and best-effort syncs local subscription state.
+ * Public endpoint. It fails closed unless Mercado Pago's x-signature validates,
+ * persists the event before processing, and only acknowledges durable state.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -21,30 +21,60 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function validateMpSignature(req: Request): Promise<boolean> {
+type SignatureValidation = 'valid' | 'invalid' | 'misconfigured';
+
+function signaturesMatch(expected: string, received: string): boolean {
+  if (expected.length !== received.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    mismatch |= expected.charCodeAt(index) ^ received.charCodeAt(index);
+  }
+  return mismatch === 0;
+}
+
+async function validateMpSignature(req: Request): Promise<SignatureValidation> {
   const secret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
   if (!secret) {
-    console.warn('[subscription-mp-webhook] MERCADOPAGO_WEBHOOK_SECRET not configured, skipping validation');
-    return true;
+    if (Deno.env.get('MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS')?.toLowerCase() === 'true') {
+      console.warn('[subscription-mp-webhook] unsigned webhooks explicitly enabled for sandbox');
+      return 'valid';
+    }
+    console.error('[subscription-mp-webhook] MERCADOPAGO_WEBHOOK_SECRET not configured');
+    return 'misconfigured';
   }
 
   const xSignature = req.headers.get('x-signature');
   const xRequestId = req.headers.get('x-request-id');
-  if (!xSignature || !xRequestId) return false;
+  if (!xSignature || !xRequestId) return 'invalid';
 
-  const parts = Object.fromEntries(
-    xSignature.split(',').map((part) => {
-      const [key, value] = part.split('=');
-      return [key.trim(), value.trim()];
-    }),
-  );
+  const parts: Record<string, string> = {};
+  for (const part of xSignature.split(',')) {
+    const separator = part.indexOf('=');
+    if (separator <= 0) continue;
+    const key = part.slice(0, separator).trim();
+    const value = part.slice(separator + 1).trim();
+    if (key && value) parts[key] = value;
+  }
 
   const ts = parts.ts;
   const v1 = parts.v1;
-  if (!ts || !v1) return false;
+  if (!ts || !v1) return 'invalid';
+
+  const rawTimestamp = Number(ts);
+  const timestampMs = rawTimestamp > 1_000_000_000_000
+    ? rawTimestamp
+    : rawTimestamp * 1000;
+  const configuredTolerance = Number(Deno.env.get('MERCADOPAGO_WEBHOOK_TOLERANCE_SECONDS'));
+  const toleranceMs = Number.isFinite(configuredTolerance)
+    ? Math.min(Math.max(configuredTolerance, 60), 3600) * 1000
+    : 15 * 60 * 1000;
+  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > toleranceMs) {
+    return 'invalid';
+  }
 
   const url = new URL(req.url);
-  const dataId = url.searchParams.get('data.id') ?? '';
+  const dataId = url.searchParams.get('data.id')?.trim() ?? '';
+  if (!dataId) return 'invalid';
   const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
 
   const encoder = new TextEncoder();
@@ -63,17 +93,17 @@ async function validateMpSignature(req: Request): Promise<boolean> {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 
-  return computed === v1;
+  return signaturesMatch(computed, v1.toLowerCase()) ? 'valid' : 'invalid';
 }
 
 function payloadDataId(payload: Record<string, unknown>, req: Request): string | null {
   const url = new URL(req.url);
-  const queryId = url.searchParams.get('data.id') ?? url.searchParams.get('id');
-  const data = payload.data as Record<string, unknown> | undefined;
-  const nestedId = data?.id;
-  const directId = payload.id;
+  const queryId = url.searchParams.get('data.id')?.trim();
+  if (!queryId) return null;
 
-  return String(queryId ?? nestedId ?? directId ?? '') || null;
+  const data = isRecord(payload.data) ? payload.data : null;
+  const nestedId = data?.id == null ? null : String(data.id);
+  return nestedId && nestedId !== queryId ? null : queryId;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -126,6 +156,53 @@ function positiveVersion(value: unknown): number | null {
   return Number.isInteger(version) && version > 0 ? version : null;
 }
 
+async function cancelSupersededPreapproval(preapprovalId: string): Promise<boolean> {
+  const path = `/preapproval/${encodeURIComponent(preapprovalId)}`;
+  const currentResponse = await mpPlatformFetch(path);
+  if (currentResponse.status === 404) return true;
+  if (!currentResponse.ok) {
+    const providerError = await readMpError(currentResponse);
+    console.warn('[subscription-mp-webhook] superseded preapproval verification failed:', currentResponse.status, providerError.code);
+    return false;
+  }
+
+  const current = await currentResponse.json() as Record<string, unknown>;
+  const status = asNonEmptyString(current.status)?.toLowerCase();
+  if (status === 'cancelled' || status === 'canceled') return true;
+
+  const cancelResponse = await mpPlatformFetch(path, {
+    method: 'PUT',
+    body: JSON.stringify({ status: 'cancelled' }),
+  });
+  if (!cancelResponse.ok) {
+    const providerError = await readMpError(cancelResponse);
+    console.warn('[subscription-mp-webhook] superseded preapproval cancellation failed:', cancelResponse.status, providerError.code);
+    return false;
+  }
+  return true;
+}
+
+async function findExistingEvent(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  topic: string,
+  action: string | null,
+  dataId: string | null,
+  providerEventId: string | null,
+): Promise<{ id: string; processed_at: string | null } | null> {
+  let query = supabaseAdmin
+    .from('mercadopago_subscription_events')
+    .select('id,processed_at')
+    .eq('topic', topic);
+  query = action ? query.eq('action', action) : query.is('action', null);
+  query = dataId ? query.eq('data_id', dataId) : query.is('data_id', null);
+  query = providerEventId
+    ? query.eq('provider_event_id', providerEventId)
+    : query.is('provider_event_id', null);
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) return null;
+  return data as { id: string; processed_at: string | null } | null;
+}
+
 function parseSubscriptionExternalReference(value: string | null | undefined): {
   organizationId: string;
   planCode: string;
@@ -141,16 +218,33 @@ function parseSubscriptionExternalReference(value: string | null | undefined): {
   };
 }
 
+function externalReferenceMatches(
+  parsed: { organizationId: string; planCode: string } | null,
+  actualReference: string | null | undefined,
+  organizationId: string,
+  expectedStoredReference: string | null | undefined,
+  expectedPlanCode?: string | null,
+): boolean {
+  return Boolean(
+    parsed &&
+    actualReference &&
+    expectedStoredReference &&
+    parsed.organizationId === organizationId &&
+    actualReference === expectedStoredReference &&
+    (!expectedPlanCode || parsed.planCode === expectedPlanCode),
+  );
+}
+
 function eventTopic(payload: Record<string, unknown>): string {
   return String(payload.type ?? payload.topic ?? payload.action ?? 'unknown');
 }
 
-function isPreapprovalEvent(topic: string, action?: string): boolean {
+function isPreapprovalEvent(topic: string, action?: string | null): boolean {
   const value = `${topic} ${action ?? ''}`.toLowerCase();
   return value.includes('preapproval') || value.includes('subscription_preapproval');
 }
 
-function isAuthorizedPaymentEvent(topic: string, action?: string): boolean {
+function isAuthorizedPaymentEvent(topic: string, action?: string | null): boolean {
   const value = `${topic} ${action ?? ''}`.toLowerCase();
   return value.includes('authorized_payment') || value.includes('subscription_authorized_payment');
 }
@@ -199,32 +293,125 @@ function mapPaymentStatus(mpStatus: string | null | undefined): string {
   }
 }
 
+type PaymentOwnership = {
+  organization_id: string;
+  subscription_id: string;
+  mercadopago_preapproval_id: string;
+  mercadopago_authorized_payment_id: string;
+};
+
+type ExistingPayment = PaymentOwnership & { id: string };
+
+function paymentOwnershipMatches(
+  existing: ExistingPayment,
+  expected: PaymentOwnership,
+): boolean {
+  return existing.organization_id === expected.organization_id &&
+    existing.subscription_id === expected.subscription_id &&
+    existing.mercadopago_preapproval_id === expected.mercadopago_preapproval_id &&
+    existing.mercadopago_authorized_payment_id === expected.mercadopago_authorized_payment_id;
+}
+
+async function persistAuthorizedPayment(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  ownership: PaymentOwnership,
+  mutableFields: Record<string, unknown>,
+): Promise<{ id: string } | null> {
+  const readExisting = async (): Promise<ExistingPayment | null> => {
+    const { data, error } = await supabaseAdmin
+      .from('subscription_payments')
+      .select('id,organization_id,subscription_id,mercadopago_preapproval_id,mercadopago_authorized_payment_id')
+      .eq('mercadopago_authorized_payment_id', ownership.mercadopago_authorized_payment_id)
+      .maybeSingle();
+    if (error) {
+      console.error('[subscription-mp-webhook] payment lookup failed:', error.code);
+      throw error;
+    }
+    return data as ExistingPayment | null;
+  };
+
+  const updateExisting = async (existing: ExistingPayment): Promise<{ id: string } | null> => {
+    if (!paymentOwnershipMatches(existing, ownership)) {
+      console.error('[subscription-mp-webhook] payment ownership mismatch');
+      return null;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('subscription_payments')
+      .update(mutableFields)
+      .eq('id', existing.id)
+      .eq('organization_id', ownership.organization_id)
+      .eq('subscription_id', ownership.subscription_id)
+      .eq('mercadopago_preapproval_id', ownership.mercadopago_preapproval_id)
+      .select('id')
+      .maybeSingle();
+    if (error || !data) {
+      console.error('[subscription-mp-webhook] payment update failed:', error?.code ?? 'ownership_changed');
+      return null;
+    }
+    return data as { id: string };
+  };
+
+  let existing: ExistingPayment | null;
+  try {
+    existing = await readExisting();
+  } catch {
+    return null;
+  }
+  if (existing) return updateExisting(existing);
+
+  const { data, error } = await supabaseAdmin
+    .from('subscription_payments')
+    .insert({ ...ownership, ...mutableFields })
+    .select('id')
+    .maybeSingle();
+
+  if (!error && data) return data as { id: string };
+  if (error?.code !== '23505') {
+    console.error('[subscription-mp-webhook] payment insert failed:', error?.code ?? 'missing_row');
+    return null;
+  }
+
+  // A duplicate notification can race the first insert. Re-read the winner and
+  // update only after its immutable tenant/subscription ownership is identical.
+  try {
+    existing = await readExisting();
+  } catch {
+    return null;
+  }
+  return existing ? updateExisting(existing) : null;
+}
+
 async function syncPreapproval(
   supabaseAdmin: ReturnType<typeof createAdminClient>,
   preapprovalId: string,
   eventRowId: string | null,
-) {
+): Promise<boolean> {
   const mpRes = await mpPlatformFetch(`/preapproval/${preapprovalId}`);
   if (!mpRes.ok) {
     const mpError = await readMpError(mpRes);
     console.warn('[subscription-mp-webhook] preapproval fetch failed:', mpRes.status, mpError.code);
-    return;
+    return false;
   }
 
   const preapproval = await mpRes.json();
+  if (String(preapproval.id ?? '') !== String(preapprovalId)) {
+    console.error('[subscription-mp-webhook] preapproval identity mismatch');
+    return false;
+  }
   const externalReference = preapproval.external_reference as string | undefined;
   const parsedExternalReference = parseSubscriptionExternalReference(externalReference);
 
   let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+    .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
     .eq('mercadopago_preapproval_id', String(preapprovalId))
     .maybeSingle();
 
   if (!subscription) {
     const pendingFallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
       .contains('metadata', { pending_mercadopago_preapproval_id: String(preapprovalId) })
       .maybeSingle();
     subscription = pendingFallback.data;
@@ -233,7 +420,7 @@ async function syncPreapproval(
   if (!subscription && externalReference) {
     const referenceFallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
       .eq('mercadopago_external_reference', externalReference)
       .maybeSingle();
     subscription = referenceFallback.data;
@@ -242,7 +429,7 @@ async function syncPreapproval(
   if (!subscription && parsedExternalReference) {
     const fallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_status, metadata')
+      .select('id, organization_id, status, current_plan_code, pending_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, next_payment_date, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
       .eq('organization_id', parsedExternalReference.organizationId)
       .maybeSingle();
     subscription = fallback.data;
@@ -250,7 +437,7 @@ async function syncPreapproval(
 
   if (!subscription) {
     console.warn('[subscription-mp-webhook] subscription not found for preapproval:', preapprovalId);
-    return;
+    return false;
   }
 
   const localPendingPreapprovalId = pendingPreapprovalId(subscription);
@@ -260,7 +447,7 @@ async function syncPreapproval(
   if (!isPendingCheckout && !isCurrentPreapproval) {
     console.warn('[subscription-mp-webhook] ignored stale preapproval:', preapprovalId);
     if (eventRowId) {
-      await supabaseAdmin
+      const { error: ignoredEventError } = await supabaseAdmin
         .from('mercadopago_subscription_events')
         .update({
           organization_id: subscription.organization_id,
@@ -268,8 +455,25 @@ async function syncPreapproval(
           processed_at: new Date().toISOString(),
         })
         .eq('id', eventRowId);
+      if (ignoredEventError) return false;
     }
-    return;
+    return true;
+  }
+
+  const subscriptionMetadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+  const expectedStoredReference = isPendingCheckout
+    ? asNonEmptyString(subscriptionMetadata.pending_mercadopago_external_reference) ??
+      (isCurrentPreapproval ? asNonEmptyString(subscription.mercadopago_external_reference) : null)
+    : asNonEmptyString(subscription.mercadopago_external_reference);
+  if (!externalReferenceMatches(
+    parsedExternalReference,
+    externalReference,
+    subscription.organization_id,
+    expectedStoredReference,
+    isPendingCheckout ? subscription.pending_plan_code : null,
+  )) {
+    console.error('[subscription-mp-webhook] preapproval reference mismatch');
+    return false;
   }
 
   const nextStatus = mapSubscriptionStatus(preapproval.status as string | undefined, subscription.status);
@@ -304,18 +508,21 @@ async function syncPreapproval(
     subscriptionUpdate.metadata = withoutPendingCheckoutMetadata(subscription.metadata);
   }
 
-  const { error: subscriptionUpdateError } = await supabaseAdmin
+  const { data: updatedSubscription, error: subscriptionUpdateError } = await supabaseAdmin
     .from('organization_subscriptions')
     .update(subscriptionUpdate)
-    .eq('id', subscription.id);
+    .eq('id', subscription.id)
+    .eq('updated_at', subscription.updated_at)
+    .select('id')
+    .maybeSingle();
 
-  if (subscriptionUpdateError) {
-    console.error('[subscription-mp-webhook] preapproval sync failed:', subscriptionUpdateError.code);
-    return;
+  if (subscriptionUpdateError || !updatedSubscription) {
+    console.error('[subscription-mp-webhook] preapproval sync failed:', subscriptionUpdateError?.code ?? 'concurrent_change');
+    return false;
   }
 
   if (eventRowId) {
-    await supabaseAdmin
+    const { error: eventUpdateError } = await supabaseAdmin
       .from('mercadopago_subscription_events')
       .update({
         organization_id: subscription.organization_id,
@@ -323,22 +530,28 @@ async function syncPreapproval(
         processed_at: new Date().toISOString(),
       })
       .eq('id', eventRowId);
+    if (eventUpdateError) return false;
   }
+  return true;
 }
 
 async function syncAuthorizedPayment(
   supabaseAdmin: ReturnType<typeof createAdminClient>,
   authorizedPaymentId: string,
   eventRowId: string | null,
-) {
+): Promise<boolean> {
   const mpRes = await mpPlatformFetch(`/authorized_payments/${authorizedPaymentId}`);
   if (!mpRes.ok) {
     const mpError = await readMpError(mpRes);
     console.warn('[subscription-mp-webhook] authorized payment fetch failed:', mpRes.status, mpError.code);
-    return;
+    return false;
   }
 
   const authorizedPayment = await mpRes.json();
+  if (String(authorizedPayment.id ?? '') !== String(authorizedPaymentId)) {
+    console.error('[subscription-mp-webhook] authorized payment identity mismatch');
+    return false;
+  }
   const preapprovalId =
     authorizedPayment.preapproval_id ??
     authorizedPayment.subscription_id ??
@@ -346,7 +559,7 @@ async function syncAuthorizedPayment(
 
   if (!preapprovalId) {
     console.warn('[subscription-mp-webhook] authorized payment without preapproval:', authorizedPaymentId);
-    return;
+    return false;
   }
 
   let externalReference =
@@ -368,14 +581,14 @@ async function syncAuthorizedPayment(
 
   let { data: subscription } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
+    .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, last_payment_at, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
     .eq('mercadopago_preapproval_id', String(preapprovalId))
     .maybeSingle();
 
   if (!subscription) {
     const pendingFallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
+      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, last_payment_at, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
       .contains('metadata', { pending_mercadopago_preapproval_id: String(preapprovalId) })
       .maybeSingle();
     subscription = pendingFallback.data;
@@ -384,7 +597,7 @@ async function syncAuthorizedPayment(
   if (!subscription && parsedExternalReference) {
     const fallback = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata')
+      .select('id, organization_id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, pending_checkout_amount_ars, pending_checkout_price_version, current_period_start, current_period_end, last_payment_at, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_status, metadata, updated_at')
       .eq('organization_id', parsedExternalReference.organizationId)
       .maybeSingle();
     subscription = fallback.data;
@@ -392,18 +605,27 @@ async function syncAuthorizedPayment(
 
   if (!subscription) {
     console.warn('[subscription-mp-webhook] subscription not found for authorized payment:', authorizedPaymentId);
-    return;
+    return false;
   }
 
   const localPendingPreapprovalId = pendingPreapprovalId(subscription);
   const isPendingCheckout = localPendingPreapprovalId === String(preapprovalId);
   const isCurrentPreapproval = subscription.mercadopago_preapproval_id === String(preapprovalId);
-  const isScheduledRenewal = !isPendingCheckout && isCurrentPreapproval && Boolean(subscription.pending_plan_code);
+  const subscriptionMetadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+  const isScheduledRenewal = Boolean(
+    !isPendingCheckout &&
+    isCurrentPreapproval &&
+    subscription.pending_plan_code &&
+    !asNonEmptyString(subscriptionMetadata.pending_mercadopago_preapproval_id) &&
+    subscription.mercadopago_status !== 'pending' &&
+    subscription.pending_checkout_amount_ars == null &&
+    subscription.pending_checkout_price_version == null,
+  );
 
   if (!isPendingCheckout && !isCurrentPreapproval) {
     console.warn('[subscription-mp-webhook] ignored stale authorized payment:', authorizedPaymentId);
     if (eventRowId) {
-      await supabaseAdmin
+      const { error: ignoredEventError } = await supabaseAdmin
         .from('mercadopago_subscription_events')
         .update({
           organization_id: subscription.organization_id,
@@ -411,8 +633,24 @@ async function syncAuthorizedPayment(
           processed_at: new Date().toISOString(),
         })
         .eq('id', eventRowId);
+      if (ignoredEventError) return false;
     }
-    return;
+    return true;
+  }
+
+  const expectedStoredReference = isPendingCheckout
+    ? asNonEmptyString(subscriptionMetadata.pending_mercadopago_external_reference) ??
+      (isCurrentPreapproval ? asNonEmptyString(subscription.mercadopago_external_reference) : null)
+    : asNonEmptyString(subscription.mercadopago_external_reference);
+  if (!externalReferenceMatches(
+    parsedExternalReference,
+    externalReference,
+    subscription.organization_id,
+    expectedStoredReference,
+    isPendingCheckout ? subscription.pending_plan_code : null,
+  )) {
+    console.error('[subscription-mp-webhook] authorized payment reference mismatch');
+    return false;
   }
 
   const paymentStatus = mapPaymentStatus(authorizedPayment.status as string | undefined);
@@ -440,58 +678,78 @@ async function syncAuthorizedPayment(
   const pendingAmount = finiteAmount(subscription.pending_checkout_amount_ars);
   const pendingPriceVersion = positiveVersion(subscription.pending_checkout_price_version);
   const currencyId = String(authorizedPayment.currency_id ?? 'ARS');
-  const pendingPlanMatchesReference =
-    !isPendingCheckout ||
-    !parsedExternalReference?.planCode ||
-    !subscription.pending_plan_code ||
-    parsedExternalReference.planCode === subscription.pending_plan_code;
   const pendingCheckoutMatchesStoredPrice =
     !isPendingCheckout ||
     (
-      pendingPlanMatchesReference &&
       pendingAmount !== null &&
       pendingPriceVersion !== null &&
+      amount > 0 &&
       amount === pendingAmount &&
       currencyId === 'ARS'
     );
-  const subscriptionMetadata = isRecord(subscription.metadata) ? subscription.metadata : {};
   const scheduledAmount = finiteAmount(subscriptionMetadata.scheduled_renewal_amount_ars);
   const scheduledPriceVersion = positiveVersion(subscriptionMetadata.scheduled_renewal_price_version);
-  const scheduledRenewalMatchesStoredPrice = !isScheduledRenewal || scheduledAmount === null || (
-    amount === scheduledAmount && currencyId === 'ARS'
+  const scheduledRenewalMatchesStoredPrice = !isScheduledRenewal || (
+    scheduledAmount !== null &&
+    scheduledPriceVersion !== null &&
+    amount > 0 &&
+    amount === scheduledAmount &&
+    currencyId === 'ARS'
+  );
+  const currentRenewalMatchesStoredPrice = isPendingCheckout || isScheduledRenewal || (
+    finiteAmount(subscription.billing_amount_ars) !== null &&
+    positiveVersion(subscription.billing_price_version) !== null &&
+    amount > 0 &&
+    amount === finiteAmount(subscription.billing_amount_ars) &&
+    currencyId === 'ARS'
   );
 
-  const { data: payment, error: paymentError } = await supabaseAdmin
-    .from('subscription_payments')
-    .upsert({
+  const rawNextPaymentDate = authorizedPayment.next_payment_date
+    ? new Date(authorizedPayment.next_payment_date as string)
+    : null;
+  const nextPaymentDate = rawNextPaymentDate && Number.isFinite(rawNextPaymentDate.getTime())
+    ? rawNextPaymentDate
+    : null;
+  const approvedPeriodStart = paymentStatus === 'approved' && paidAt
+    ? new Date(paidAt)
+    : null;
+  const approvedPeriodEnd = approvedPeriodStart
+    ? nextPaymentDate ?? addMonths(approvedPeriodStart, 1)
+    : null;
+
+  const payment = await persistAuthorizedPayment(
+    supabaseAdmin,
+    {
       organization_id: subscription.organization_id,
       subscription_id: subscription.id,
+      mercadopago_preapproval_id: String(preapprovalId),
+      mercadopago_authorized_payment_id: String(authorizedPaymentId),
+    },
+    {
       plan_code: planCode,
       billing_plan_code: planCode,
       amount_ars: amount,
       currency_id: currencyId,
       status: paymentStatus,
       provider: 'mercadopago',
-      mercadopago_authorized_payment_id: String(authorizedPaymentId),
       mercadopago_payment_id: authorizedPayment.payment_id ? String(authorizedPayment.payment_id) : null,
-      mercadopago_preapproval_id: String(preapprovalId),
-      period_start: subscription.current_period_start,
-      period_end: subscription.current_period_end,
+      period_start: approvedPeriodStart?.toISOString() ?? subscription.current_period_start,
+      period_end: approvedPeriodEnd?.toISOString() ?? subscription.current_period_end,
       due_at: authorizedPayment.payment_date ?? authorizedPayment.date_created ?? null,
       paid_at: paidAt,
       raw_payload: authorizedPayment,
-    }, { onConflict: 'mercadopago_authorized_payment_id' })
-    .select('id')
-    .maybeSingle();
+    },
+  );
 
-  if (paymentError) {
-    console.error('[subscription-mp-webhook] payment upsert failed:', paymentError.code);
-    return;
-  }
+  if (!payment) return false;
 
   if (
     paymentStatus === 'approved' &&
-    (!pendingCheckoutMatchesStoredPrice || !scheduledRenewalMatchesStoredPrice)
+    (
+      !pendingCheckoutMatchesStoredPrice ||
+      !scheduledRenewalMatchesStoredPrice ||
+      !currentRenewalMatchesStoredPrice
+    )
   ) {
     console.error('[subscription-mp-webhook] subscription price mismatch:', {
       authorizedPaymentId,
@@ -509,20 +767,45 @@ async function syncAuthorizedPayment(
         })
         .eq('id', eventRowId);
     }
-    return;
+    return false;
+  }
+
+  if (
+    paymentStatus === 'approved' &&
+    paidAt &&
+    subscription.last_payment_at &&
+    Date.parse(paidAt) <= Date.parse(subscription.last_payment_at)
+  ) {
+    if (eventRowId) {
+      const { error: staleEventError } = await supabaseAdmin
+        .from('mercadopago_subscription_events')
+        .update({
+          organization_id: subscription.organization_id,
+          subscription_id: subscription.id,
+          payment_id: payment?.id ?? null,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', eventRowId);
+      if (staleEventError) return false;
+    }
+    return true;
   }
 
   if (paymentStatus === 'approved') {
-    const nextPaymentDate = authorizedPayment.next_payment_date
-      ? new Date(authorizedPayment.next_payment_date as string)
-      : null;
-    const periodStart = paidAt ? new Date(paidAt) : new Date();
-    const periodEnd = nextPaymentDate ?? addMonths(periodStart, 1);
+    const periodStart = approvedPeriodStart ?? new Date();
+    const periodEnd = approvedPeriodEnd ?? addMonths(periodStart, 1);
 
     const metadata = subscriptionMetadata;
     const previousPreapprovalId = isPendingCheckout && typeof metadata.previous_mercadopago_preapproval_id === 'string'
       ? metadata.previous_mercadopago_preapproval_id
       : null;
+    if (
+      previousPreapprovalId &&
+      previousPreapprovalId !== String(preapprovalId) &&
+      !(await cancelSupersededPreapproval(previousPreapprovalId))
+    ) {
+      return false;
+    }
     let confirmedPriceVersion = isPendingCheckout
       ? pendingPriceVersion
       : isScheduledRenewal
@@ -586,27 +869,19 @@ async function syncAuthorizedPayment(
       subscriptionUpdate.pending_checkout_price_version = null;
     }
 
-    const { error: subscriptionUpdateError } = await supabaseAdmin
+    const { data: updatedSubscription, error: subscriptionUpdateError } = await supabaseAdmin
       .from('organization_subscriptions')
       .update(subscriptionUpdate)
-      .eq('id', subscription.id);
+      .eq('id', subscription.id)
+      .eq('updated_at', subscription.updated_at)
+      .select('id')
+      .maybeSingle();
 
-    if (subscriptionUpdateError) {
-      console.error('[subscription-mp-webhook] approved payment sync failed:', subscriptionUpdateError.code);
-      return;
+    if (subscriptionUpdateError || !updatedSubscription) {
+      console.error('[subscription-mp-webhook] approved payment sync failed:', subscriptionUpdateError?.code ?? 'concurrent_change');
+      return false;
     }
 
-    if (previousPreapprovalId && previousPreapprovalId !== String(preapprovalId)) {
-      const cancelPreviousRes = await mpPlatformFetch(`/preapproval/${previousPreapprovalId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: 'cancelled' }),
-      });
-
-      if (!cancelPreviousRes.ok) {
-        const mpError = await readMpError(cancelPreviousRes);
-        console.warn('[subscription-mp-webhook] previous preapproval cancel failed:', cancelPreviousRes.status, mpError.code);
-      }
-    }
   } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
     const hasCurrentPaidAccess = Boolean(
       subscription.current_plan_code &&
@@ -625,19 +900,22 @@ async function syncAuthorizedPayment(
     // terminal preapproval state. Keep the immutable pending intent so a later
     // Mercado Pago retry is still resolved to the same plan/amount/version.
 
-    const { error: subscriptionUpdateError } = await supabaseAdmin
+    const { data: updatedSubscription, error: subscriptionUpdateError } = await supabaseAdmin
       .from('organization_subscriptions')
       .update(failureUpdate)
-      .eq('id', subscription.id);
+      .eq('id', subscription.id)
+      .eq('updated_at', subscription.updated_at)
+      .select('id')
+      .maybeSingle();
 
-    if (subscriptionUpdateError) {
-      console.error('[subscription-mp-webhook] failed payment sync failed:', subscriptionUpdateError.code);
-      return;
+    if (subscriptionUpdateError || !updatedSubscription) {
+      console.error('[subscription-mp-webhook] failed payment sync failed:', subscriptionUpdateError?.code ?? 'concurrent_change');
+      return false;
     }
   }
 
   if (eventRowId) {
-    await supabaseAdmin
+    const { error: eventUpdateError } = await supabaseAdmin
       .from('mercadopago_subscription_events')
       .update({
         organization_id: subscription.organization_id,
@@ -646,7 +924,9 @@ async function syncAuthorizedPayment(
         processed_at: new Date().toISOString(),
       })
       .eq('id', eventRowId);
+    if (eventUpdateError) return false;
   }
+  return true;
 }
 
 serve(async (req: Request): Promise<Response> => {
@@ -658,8 +938,11 @@ serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Method not allowed' }, 405);
   }
 
-  const isValid = await validateMpSignature(req);
-  if (!isValid) {
+  const signatureValidation = await validateMpSignature(req);
+  if (signatureValidation === 'misconfigured') {
+    return jsonResponse({ error: 'Webhook signature validation is not configured' }, 503);
+  }
+  if (signatureValidation !== 'valid') {
     console.warn('[subscription-mp-webhook] invalid signature');
     return jsonResponse({ error: 'Invalid signature' }, 401);
   }
@@ -671,36 +954,68 @@ serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ error: 'Invalid JSON' }, 400);
   }
 
-  const supabaseAdmin = createAdminClient();
   const topic = eventTopic(payload);
-  const action = payload.action as string | undefined;
+  const action = typeof payload.action === 'string' ? payload.action : null;
   const dataId = payloadDataId(payload, req);
+  if (!dataId) {
+    return jsonResponse({ error: 'Signed data identifier does not match the payload' }, 400);
+  }
+  const providerEventId = payload.id ? String(payload.id) : null;
+  const supabaseAdmin = createAdminClient();
 
   const { data: eventRow, error: eventError } = await supabaseAdmin
     .from('mercadopago_subscription_events')
     .insert({
       topic,
-      action: action ?? null,
+      action,
       data_id: dataId,
-      provider_event_id: payload.id ? String(payload.id) : null,
+      provider_event_id: providerEventId,
       payload,
     })
     .select('id')
     .maybeSingle();
 
-  if (eventError) {
-    console.warn('[subscription-mp-webhook] event log insert failed:', eventError);
+  let eventRowId = eventRow?.id ?? null;
+  if (eventError?.code === '23505') {
+    const existingEvent = await findExistingEvent(
+      supabaseAdmin,
+      topic,
+      action,
+      dataId,
+      providerEventId,
+    );
+    if (!existingEvent) {
+      return jsonResponse({ error: 'Could not recover webhook event' }, 503);
+    }
+    if (existingEvent.processed_at) {
+      return jsonResponse({ received: true, duplicate: true });
+    }
+    eventRowId = existingEvent.id;
+  } else if (eventError) {
+    console.warn('[subscription-mp-webhook] event log insert failed:', eventError.code);
+    return jsonResponse({ error: 'Could not persist webhook event' }, 503);
   }
 
+  let synchronized = true;
   try {
     if (dataId && isPreapprovalEvent(topic, action)) {
-      await syncPreapproval(supabaseAdmin, dataId, eventRow?.id ?? null);
+      synchronized = await syncPreapproval(supabaseAdmin, dataId, eventRowId);
     } else if (dataId && isAuthorizedPaymentEvent(topic, action)) {
-      await syncAuthorizedPayment(supabaseAdmin, dataId, eventRow?.id ?? null);
+      synchronized = await syncAuthorizedPayment(supabaseAdmin, dataId, eventRowId);
+    } else if (eventRowId) {
+      const { error: ignoredEventError } = await supabaseAdmin
+        .from('mercadopago_subscription_events')
+        .update({ processed_at: new Date().toISOString() })
+        .eq('id', eventRowId);
+      synchronized = !ignoredEventError;
     }
   } catch (err) {
-    console.error('[subscription-mp-webhook] sync error:', err);
+    console.error('[subscription-mp-webhook] sync error:', err instanceof Error ? err.message : 'unknown');
+    synchronized = false;
   }
 
+  if (!synchronized) {
+    return jsonResponse({ error: 'Webhook synchronization is pending' }, 503);
+  }
   return jsonResponse({ received: true });
 });

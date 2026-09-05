@@ -38,6 +38,7 @@ la dejó obsoleta.
 
 ## Módulos documentados en `MODULOS/`
 
+- [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
 - [x] `turnos-agenda.md` — Configuración de reservas, Portal público, Horarios de trabajo
 - [ ] Cobrar
 - [ ] Finanzas

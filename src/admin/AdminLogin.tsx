@@ -127,7 +127,7 @@ export default function AdminLogin({ onSignIn, isSubmitting = false, error }: Ad
           </form>
 
           <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-            El acceso y cada modificación quedan registrados en la auditoría administrativa.
+            Cada modificación queda registrada en la auditoría administrativa.
           </p>
         </div>
       </section>

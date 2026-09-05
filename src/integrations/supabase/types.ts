@@ -2607,6 +2607,54 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_admin_audit_log: {
+        Row: {
+          action: string
+          actor_alias: string
+          actor_user_id: string | null
+          created_at: string
+          id: string
+          next_state: Json
+          previous_state: Json
+          reason: string | null
+          request_id: string
+          result_detail: Json
+          result_status: string
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          actor_alias?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          next_state?: Json
+          previous_state?: Json
+          reason?: string | null
+          request_id: string
+          result_detail?: Json
+          result_status?: string
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          actor_alias?: string
+          actor_user_id?: string | null
+          created_at?: string
+          id?: string
+          next_state?: Json
+          previous_state?: Json
+          reason?: string | null
+          request_id?: string
+          result_detail?: Json
+          result_status?: string
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
       portal_config: {
         Row: {
           cover_path: string | null
@@ -3406,6 +3454,171 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      subscription_price_change_batches: {
+        Row: {
+          actor_alias: string
+          actor_user_id: string | null
+          completed_at: string | null
+          created_at: string
+          expected_updated_at: string
+          failed_items: number
+          id: string
+          new_amount_ars: number
+          new_price_version: number
+          old_amount_ars: number
+          old_price_version: number
+          plan_code: string
+          processed_items: number
+          reason: string
+          request_id: string
+          skipped_items: number
+          started_at: string | null
+          status: string
+          succeeded_items: number
+          total_items: number
+          updated_at: string
+        }
+        Insert: {
+          actor_alias?: string
+          actor_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          expected_updated_at: string
+          failed_items?: number
+          id?: string
+          new_amount_ars: number
+          new_price_version: number
+          old_amount_ars: number
+          old_price_version: number
+          plan_code: string
+          processed_items?: number
+          reason: string
+          request_id: string
+          skipped_items?: number
+          started_at?: string | null
+          status?: string
+          succeeded_items?: number
+          total_items?: number
+          updated_at?: string
+        }
+        Update: {
+          actor_alias?: string
+          actor_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          expected_updated_at?: string
+          failed_items?: number
+          id?: string
+          new_amount_ars?: number
+          new_price_version?: number
+          old_amount_ars?: number
+          old_price_version?: number
+          plan_code?: string
+          processed_items?: number
+          reason?: string
+          request_id?: string
+          skipped_items?: number
+          started_at?: string | null
+          status?: string
+          succeeded_items?: number
+          total_items?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_price_change_batches_plan_code_fkey"
+            columns: ["plan_code"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      subscription_price_change_items: {
+        Row: {
+          attempts: number
+          batch_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          item_type: string
+          last_http_status: number | null
+          next_retry_at: string | null
+          organization_id: string | null
+          preapproval_id: string | null
+          provider_response_ref: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          batch_id: string
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          item_type: string
+          last_http_status?: number | null
+          next_retry_at?: string | null
+          organization_id?: string | null
+          preapproval_id?: string | null
+          provider_response_ref?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          batch_id?: string
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          item_type?: string
+          last_http_status?: number | null
+          next_retry_at?: string | null
+          organization_id?: string | null
+          preapproval_id?: string | null
+          provider_response_ref?: string | null
+          status?: string
+          subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_price_change_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_price_change_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_price_change_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_price_change_items_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "organization_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sucursal_accounts: {
         Row: {
@@ -4947,6 +5160,65 @@ export type Database = {
         Returns: undefined
       }
       org_has_any_pin: { Args: never; Returns: boolean }
+      platform_admin_claim_price_change_items: {
+        Args: { _batch_id: string; _limit?: number }
+        Returns: {
+          attempts: number
+          batch_id: string
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          item_type: string
+          last_http_status: number | null
+          next_retry_at: string | null
+          organization_id: string | null
+          preapproval_id: string | null
+          provider_response_ref: string | null
+          status: string
+          subscription_id: string | null
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "subscription_price_change_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      platform_admin_complete_price_change_item: {
+        Args: {
+          _attempts: number
+          _http_status: number
+          _item_id: string
+          _provider_response_ref?: string
+        }
+        Returns: Json
+      }
+      platform_admin_create_price_change_batch: {
+        Args: {
+          _actor_user_id: string
+          _expected_amount_ars: number
+          _expected_price_version: number
+          _expected_updated_at: string
+          _new_amount_ars: number
+          _plan_code: string
+          _reason: string
+          _request_id: string
+        }
+        Returns: Json
+      }
+      platform_admin_refresh_price_change_batch: {
+        Args: { _batch_id: string }
+        Returns: Json
+      }
+      platform_admin_retry_price_change_items: {
+        Args: { _batch_id: string; _item_ids?: string[] }
+        Returns: number
+      }
       process_tareas_recurrentes: { Args: never; Returns: number }
       process_vencimientos_tareas: { Args: never; Returns: number }
       registrar_movimiento_stock: {
@@ -5062,6 +5334,25 @@ export type Database = {
         }
       }
       soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
+      subscription_finalize_checkout: {
+        Args: {
+          _existing_subscription_id: string
+          _expected_amount_ars: number
+          _expected_plan_updated_at: string
+          _expected_price_version: number
+          _expected_subscription_updated_at: string
+          _external_reference: string
+          _init_point: string
+          _metadata: Json
+          _organization_id: string
+          _payer_email: string
+          _plan_code: string
+          _preapproval_id: string
+          _preserve_current_provider: boolean
+          _provider_status: string
+        }
+        Returns: Json
+      }
       sucursal_action_requires_pin: {
         Args: {
           _action_key: string

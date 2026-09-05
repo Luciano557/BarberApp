@@ -1,6 +1,75 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-08-27
+Última actualización: 2026-09-05
+
+## Centro de administración de plataforma
+
+**Implementación en repositorio completa; rollout externo pendiente —
+2026-09-05.** Se incorporó una cuarta superficie en `/admin`, separada del árbol
+tenant. Sus rutas no montan `OrganizationProvider`, `SucursalProvider`,
+onboarding ni `SubscriptionGate`; usan `AdminAuthProvider`, un cliente Supabase
+propio con `sessionStorage` y una clave de almacenamiento independiente. La
+sesión administrativa puede convivir con una sesión tenant en el mismo navegador
+y cierra solamente el contexto Admin tras 30 minutos de inactividad.
+
+El alias visible es `admin`, resuelto en frontend al email técnico configurado en
+`VITE_PLATFORM_ADMIN_EMAIL`. La autorización real exige una cuenta vigente de
+Supabase Auth con `app_metadata.platform_role = "platform_admin"`. El guard de
+React solo mejora la experiencia: tanto `platform-admin-query` como
+`platform-admin-price-change` vuelven a validar el JWT, el usuario actual y el
+claim antes de crear un cliente `service_role`. La contraseña no forma parte del
+código, migraciones, variables `VITE_*`, documentación, respuestas ni auditoría.
+
+Superficie implementada: shell responsive propio; Resumen; Barberías; Usuarios;
+Suscripciones con tabs Planes/Suscripciones/Pagos; y Auditoría. Los listados
+aceptan búsqueda, filtros, orden y paginación con máximo de 50 registros por
+página; desktop/tablet usan tablas densas y mobile cards equivalentes. Los DTO
+permitidos excluyen payloads crudos, tokens y metadata arbitraria. Carga inicial,
+refetch, error y vacío siguen el canon vigente de `DESIGN.md`.
+
+Definiciones de producto implementadas: una barbería con acceso es una
+organización habilitada cuyo trial o período de suscripción sigue vigente;
+`MAU 30 días` cuenta cuentas tenant con último inicio de sesión dentro de los 30
+días anteriores y excluye identidades de plataforma. Los cobros del resumen usan
+la fecha efectiva de aprobación, no la fecha de creación. Trials, vigentes,
+vencidas, canceladas y legacy permanecen diferenciados.
+
+Precios: `subscription_plans.amount_ars` quedó como única fuente consumida por
+Homepage, Registro, Facturación, `SubscriptionGate` y checkout. El precio lleva
+`price_version`; las suscripciones conservan snapshots de importe/versión de
+facturación y checkout pendiente. La migración preparada establece Profesional
+en ARS 60.000 mediante un lote auditable al aplicarse y elimina el campo legacy
+`plan_features.price_monthly`. Un checkout pendiente solo se reutiliza cuando
+plan, importe, versión, moneda, referencia y estado del proveedor coinciden.
+
+La edición de precio usa preview, confirmación del impacto, motivo y
+reautenticación con contraseña. La RPC `SECURITY INVOKER` actualiza catálogo y
+materializa el lote en una única transacción con control optimista de importe,
+versión y `updated_at`. El worker toma hasta 20 ítems, procesa con concurrencia
+máxima 5 y reintenta errores transitorios hasta tres veces. Antes de cada cambio
+verifica nuevamente la suscripción local y el `preapproval` de Mercado Pago;
+éxitos, fallos, exclusiones e interrupciones quedan trazables y reintentables. Un
+éxito parcial no revierte el catálogo porque algunos débitos externos ya pueden
+haber cambiado.
+
+El webhook de suscripciones ahora falla cerrado si falta
+`MERCADOPAGO_WEBHOOK_SECRET` (salvo opt-in explícito para sandbox), valida firma
+y antigüedad del timestamp, trata los eventos de manera idempotente y serializa
+actualizaciones locales con comparación de `updated_at`. No promueve acceso ante
+importe, moneda, plan o referencia incompatibles; preserva la intención de un
+checkout rechazado para su recuperación y no procesa dos veces un pago anterior.
+
+**No está desplegado ni habilitado en producción.** Quedan pendientes, fuera de
+esta sesión local: revisión y aplicación de
+`20260904153000_platform_admin_center.sql` mediante Lovable (incluye la excepción
+de provisioning sobre la función existente `handle_new_user`, que es
+`SECURITY DEFINER`); creación y confirmación de la cuenta técnica en Supabase
+Auth; asignación server-side del claim; configuración de secrets/orígenes;
+deploy de Edge Functions; regeneración de tipos contra la base migrada; QA
+autenticado; prueba integral de precio/checkout/webhook en Mercado Pago sandbox;
+y, solo después, activación de `PLATFORM_ADMIN_PRICE_MUTATIONS_ENABLED`. Hasta
+completar esos pasos, `/admin` no debe considerarse operativo fuera del entorno
+local ni las mutaciones de precio habilitadas.
 
 ## Sistema de diseño — Operate
 

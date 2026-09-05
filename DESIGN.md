@@ -110,14 +110,16 @@ El sistema es **light-only** hoy. Existe una variante dark completa de los token
 congelada: no se documenta como experiencia soportada, no se escriben variantes
 `dark:` nuevas, y no se elimina (si dark mode llega, será una iniciativa propia).
 
-**Tres superficies, un núcleo.** La app interna (Operate), el portal público de
-reservas (white-label del cliente final de cada barbería) y la homepage comercial
-(Persuade) comparten un núcleo obligatorio — color de marca, tipografía Inter,
-criterios de forma, foco y accesibilidad, calidad de interacción — y conservan
-libertad de composición y densidad según su función. Las páginas de Auth
-(Login/VerifyEmail/AuthCallback) **pertenecen al núcleo**: su micro-sistema
+**Cuatro superficies, un núcleo.** La app interna tenant (Operate), el portal
+público de reservas (white-label del cliente final de cada barbería), la homepage
+comercial (Persuade) y el centro de administración de plataforma (`/admin`,
+Operate interno) comparten un núcleo obligatorio — color de marca, tipografía
+Inter, criterios de forma, foco y accesibilidad, calidad de interacción — y
+conservan libertad de composición y densidad según su función. Las páginas de
+Auth (Login/VerifyEmail/AuthCallback) **pertenecen al núcleo**: su micro-sistema
 actual de valores propios es un gap conocido (ver DESIGN_BACKLOG), no un sistema
-paralelo válido.
+paralelo válido. Admin comparte el lenguaje visual de Operate, pero su shell y
+sesión son deliberadamente propios: nunca reutiliza navegación ni contexto tenant.
 
 **Key Characteristics:**
 - Denso donde se escanea, legible donde se lee; nada compite con la tarea.
@@ -157,7 +159,7 @@ El color principal de cada turno sale de la **línea/categoría del servicio**: 
 
 **La regla del estado con token.** Todo color de estado de UI (éxito, advertencia, error, activo/inactivo) sale de las familias `--status-*` o de `--destructive`/`--success`. Clases directas de la paleta Tailwind (`green-*`, `emerald-*`, `amber-*`) están prohibidas en la app interna.
 
-**Neutros por superficie.** La homepage puede usar su propia escala neutra (slate) como parte de su expresividad Persuade, siempre que el navy ancle las acciones clave y no construya una identidad de marca distinta. La app interna y Auth usan exclusivamente los neutros del sistema.
+**Neutros por superficie.** La homepage puede usar su propia escala neutra (slate) como parte de su expresividad Persuade, siempre que el navy ancle las acciones clave y no construya una identidad de marca distinta. La app interna, Admin y Auth usan exclusivamente los neutros del sistema.
 
 ## Typography
 
@@ -182,8 +184,8 @@ El color principal de cada turno sale de la **línea/categoría del servicio**: 
 
 ## Layout
 
-- **Contenedor de la app interna:** `max-w-7xl` centrado con padding lateral responsivo (`px-4 sm:px-6 md:px-8`). Excepción única: la Agenda usa ancho completo.
-- **Densidad por superficie:** la app interna es densa y escaneable; la homepage respira como landing; el portal es una columna angosta centrada (max-w-md en landing de reserva).
+- **Contenedor de las superficies Operate:** `max-w-7xl` centrado con padding lateral responsivo (`px-4 sm:px-6 md:px-8`). Excepción única: la Agenda usa ancho completo. Admin aplica el mismo ancho dentro de su shell propio.
+- **Densidad por superficie:** la app interna y Admin son densos y escaneables; la homepage respira como landing; el portal es una columna angosta centrada (max-w-md en landing de reserva).
 - **Breakpoints:** el ancho gobierna **layout** (columnas, densidad, apilado); las capacidades táctiles se resuelven por media queries de capacidad (`pointer`, `hover`), no por ancho. Si JS necesita reaccionar al mismo corte que CSS, usa la misma condición — nunca dos números distintos contestando la misma pregunta. No introducir breakpoints nuevos sin razón clara. El corte dominante de la app es `sm:` (640px).
 - **Spacing:** escala default de Tailwind (múltiplos de 4px). Ritmo típico: `gap-2`/`gap-3` dentro de componentes, `space-y-4`/`space-y-6` entre bloques, `p-6` interno de cards. Valores arbitrarios `[Npx]` solo cuando un requisito real lo exige (anchos de columna, offsets de alineación), nunca como spacing general.
 - **Toolbar + panel scrolleable:** toda sección que combine un toolbar de controles con un panel de contenido scrolleable se envuelve en un único card, con el toolbar como header separado por `border-b`. El wrapper usa `overflow:clip` — nunca `overflow:hidden` si contiene elementos `sticky` (hidden crea un contexto de scroll propio y rompe el sticky). [Regla vigente de AGENTS.md.]
@@ -257,6 +259,27 @@ Canon nuevo (C2): `DatePicker` y `TimePicker` (`ui/date-picker.tsx`, `ui/time-pi
 - **SegmentedControl** (pill navy deslizante, contador integrado) = **segundo nivel / navegación contextual** dentro de la sección activa: filtros (Activos/Inactivos), subsecciones, vistas relacionadas.
 - **Excepciones documentadas, no precedentes:** `ProductoDialog` (secciones de un mismo formulario con indicador de error por pestaña), `BackfillWizard` (modos de un paso de wizard) y `NotificationsBell` (No leídas/Leídas dentro de un Popover de 380px) usan Tabs pill fuera del rol de primer nivel. `AgendaPanel` (Día/3 días/Semana, toolbar de Agenda) usa `ToggleGroup` — es un selector de modo de vista, no navegación entre secciones, y por eso no es ni Tabs ni SegmentedControl.
 - **Sidebar:** rail colapsable con tile de logo navy, section labels uppercase 10px, ítem activo navy sólido. El detalle de su coreografía vive en el código y en `docs/DECISIONES.md`.
+
+### Centro de administración de plataforma
+
+- **Shell aislado:** `AdminShell`, incluida su navegación lateral propia,
+  conserva Inter, navy, tokens, focos y densidad de Operate, pero no reutiliza
+  `AppSidebar` ni componentes que presuponen organización, sucursal, onboarding
+  o suscripción tenant.
+- **Navegación:** Resumen, Barberías, Usuarios, Suscripciones y Auditoría. Dentro
+  de Suscripciones, `SegmentedControl` separa Planes, Suscripciones y Pagos como
+  segundo nivel contextual.
+- **Lectura responsive:** desktop y tablet priorizan tablas densas; mobile
+  presenta cards equivalentes, sin ocultar significado ni acciones. Búsqueda,
+  filtros y resultados forman un solo card con toolbar separado por `border-b`
+  y wrapper `overflow:clip`.
+- **Edición de precios:** siempre ocurre en `DrawerForm`, nunca inline. El drawer
+  explicita importe, motivo, contraseña de confirmación e impacto antes de
+  aplicar; el progreso y los resultados parciales del lote siguen visibles y se
+  pueden reintentar.
+- **Estados de lectura:** aplica sin excepción delayed skeleton, datos anteriores
+  durante refetch, `InlineReadError` ante fallo sin datos y vacío real solamente
+  después de una lectura exitosa.
 
 ### Status & Badges
 - **StatusPill** es el canon de estado: `success/neutral/info/warning/error`, dot o ícono, 100% tokens `--status-*`.

@@ -137,10 +137,10 @@ CREATE TABLE IF NOT EXISTS public.subscription_price_change_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   batch_id uuid NOT NULL
     REFERENCES public.subscription_price_change_batches(id) ON DELETE CASCADE,
-  organization_id uuid NOT NULL
-    REFERENCES public.organizations(id) ON DELETE RESTRICT,
-  subscription_id uuid NOT NULL
-    REFERENCES public.organization_subscriptions(id) ON DELETE RESTRICT,
+  organization_id uuid
+    REFERENCES public.organizations(id) ON DELETE SET NULL,
+  subscription_id uuid
+    REFERENCES public.organization_subscriptions(id) ON DELETE SET NULL,
   preapproval_id text,
   item_type text NOT NULL
     CHECK (item_type IN ('active_renewal', 'pending_checkout')),
@@ -296,7 +296,7 @@ BEGIN
     'active_renewal',
     CASE
       WHEN subscription.provider <> 'mercadopago' THEN 'skipped'
-      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') IS NULL THEN 'failed'
+      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') IS NULL THEN 'skipped'
       ELSE 'pending'
     END,
     CASE
@@ -350,7 +350,7 @@ BEGIN
     'pending_checkout',
     CASE
       WHEN subscription.provider <> 'mercadopago' THEN 'skipped'
-      WHEN pending_checkout.preapproval_id IS NULL THEN 'failed'
+      WHEN pending_checkout.preapproval_id IS NULL THEN 'skipped'
       ELSE 'pending'
     END,
     CASE
@@ -440,6 +440,28 @@ BEGIN
   IF current_user <> 'service_role' THEN
     RAISE EXCEPTION 'PLATFORM_ADMIN_SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
   END IF;
+
+  UPDATE public.subscription_price_change_items AS item
+  SET
+    status = 'skipped',
+    error_code = 'subscription_removed',
+    error_message = 'La suscripcion fue eliminada antes del procesamiento.',
+    claimed_at = NULL,
+    next_retry_at = NULL,
+    completed_at = now()
+  WHERE item.batch_id = _batch_id
+    AND (
+      item.status = 'pending'
+      OR (item.status = 'processing' AND item.claimed_at < now() - interval '15 minutes')
+    )
+    AND (
+      item.subscription_id IS NULL
+      OR NOT EXISTS (
+        SELECT 1
+        FROM public.organization_subscriptions AS subscription
+        WHERE subscription.id = item.subscription_id
+      )
+    );
 
   -- A subscription can change plan or checkout while a batch is waiting. Do
   -- not let a stale work item mutate the replacement preapproval.
@@ -544,6 +566,30 @@ BEGIN
     RAISE EXCEPTION 'PLATFORM_ADMIN_SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
   END IF;
 
+  UPDATE public.subscription_price_change_items AS item
+  SET
+    status = 'skipped',
+    error_code = 'subscription_removed',
+    error_message = 'La suscripcion fue eliminada antes del reintento.',
+    next_retry_at = NULL,
+    claimed_at = NULL,
+    completed_at = now()
+  WHERE item.batch_id = _batch_id
+    AND (
+      item.status = 'failed'
+      OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
+      OR (item.status = 'processing' AND item.claimed_at < now() - interval '5 minutes')
+    )
+    AND (_item_ids IS NULL OR item.id = ANY(_item_ids))
+    AND (
+      item.subscription_id IS NULL
+      OR NOT EXISTS (
+        SELECT 1
+        FROM public.organization_subscriptions AS subscription
+        WHERE subscription.id = item.subscription_id
+      )
+    );
+
   -- A different plan is a terminal exclusion for this immutable batch.
   UPDATE public.subscription_price_change_items AS item
   SET
@@ -560,6 +606,7 @@ BEGIN
     AND item.subscription_id = subscription.id
     AND (
       item.status = 'failed'
+      OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
       OR (item.status = 'processing' AND item.claimed_at < now() - interval '5 minutes')
     )
     AND (_item_ids IS NULL OR item.id = ANY(_item_ids))
@@ -632,6 +679,7 @@ BEGIN
     AND item.subscription_id = subscription.id
     AND (
       item.status = 'failed'
+      OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
       OR (item.status = 'processing' AND item.claimed_at < now() - interval '5 minutes')
     )
     AND (_item_ids IS NULL OR item.id = ANY(_item_ids))
@@ -764,6 +812,9 @@ $function$;
 -- after Mercado Pago accepted the idempotent PUT.
 CREATE OR REPLACE FUNCTION public.platform_admin_complete_price_change_item(
   _item_id uuid,
+  _expected_idempotency_key uuid,
+  _expected_preapproval_id text,
+  _expected_claimed_at timestamptz,
   _attempts integer,
   _http_status integer,
   _provider_response_ref text DEFAULT NULL
@@ -789,6 +840,12 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'ITEM_NOT_FOUND' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF _item.idempotency_key IS DISTINCT FROM _expected_idempotency_key
+    OR _item.preapproval_id IS DISTINCT FROM _expected_preapproval_id
+    OR _item.claimed_at IS DISTINCT FROM _expected_claimed_at THEN
+    RAISE EXCEPTION 'ITEM_CLAIM_LOST' USING ERRCODE = '40001';
   END IF;
 
   IF _item.status = 'succeeded' THEN
@@ -840,20 +897,15 @@ BEGIN
       )
     )
   ) THEN
-    UPDATE public.subscription_price_change_items
-    SET
-      status = 'skipped',
-      attempts = LEAST(GREATEST(_attempts, attempts), 100),
-      last_http_status = _http_status,
-      error_code = 'subscription_changed',
-      error_message = 'La suscripcion cambio antes de confirmar el resultado.',
-      provider_response_ref = left(_provider_response_ref, 250),
-      next_retry_at = NULL,
-      completed_at = now()
-    WHERE id = _item.id
-    RETURNING * INTO _item;
-
-    RETURN to_jsonb(_item);
+    -- Mercado Pago already accepted the PUT, so the worker must first restore
+    -- the provider's newly-current local intent (or cancel an orphan) before
+    -- this item can become skipped/failed. Keep the fenced claim untouched.
+    RETURN to_jsonb(_item) || jsonb_build_object(
+      'status', 'compensation_required',
+      'attempts', LEAST(GREATEST(_attempts, _item.attempts), 100),
+      'last_http_status', _http_status,
+      'provider_response_ref', left(_provider_response_ref, 250)
+    );
   END IF;
 
   IF _item.item_type = 'active_renewal' THEN
@@ -1020,6 +1072,165 @@ BEGIN
 END;
 $function$;
 
+-- Finalizes a scheduled downgrade under the same catalog-row lock used by
+-- price batches. Mercado Pago is updated first; a stale catalog or subscription
+-- snapshot makes this transaction fail so the Edge Function can compensate the
+-- provider instead of committing an old amount/version locally.
+CREATE OR REPLACE FUNCTION public.subscription_finalize_scheduled_plan_change(
+  _organization_id uuid,
+  _subscription_id uuid,
+  _expected_subscription_updated_at timestamptz,
+  _expected_preapproval_id text,
+  _from_plan_code text,
+  _to_plan_code text,
+  _expected_amount_ars numeric,
+  _expected_price_version integer,
+  _expected_plan_updated_at timestamptz,
+  _metadata jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $function$
+DECLARE
+  _plan public.subscription_plans%ROWTYPE;
+  _subscription public.organization_subscriptions%ROWTYPE;
+BEGIN
+  IF current_user <> 'service_role' THEN
+    RAISE EXCEPTION 'SUBSCRIPTION_SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO _plan
+  FROM public.subscription_plans
+  WHERE code = _to_plan_code
+  FOR SHARE;
+
+  IF NOT FOUND
+    OR NOT _plan.is_active
+    OR _plan.amount_ars IS DISTINCT FROM _expected_amount_ars
+    OR _plan.price_version IS DISTINCT FROM _expected_price_version
+    OR _plan.updated_at IS DISTINCT FROM _expected_plan_updated_at THEN
+    RAISE EXCEPTION 'CATALOG_CONFLICT' USING ERRCODE = '40001';
+  END IF;
+
+  SELECT * INTO _subscription
+  FROM public.organization_subscriptions
+  WHERE id = _subscription_id
+    AND organization_id = _organization_id
+  FOR UPDATE;
+
+  IF NOT FOUND
+    OR _subscription.status <> 'active'
+    OR _subscription.provider <> 'mercadopago'
+    OR NULLIF(_expected_preapproval_id, '') IS NULL
+    OR _subscription.mercadopago_preapproval_id IS DISTINCT FROM _expected_preapproval_id
+    OR _subscription.updated_at IS DISTINCT FROM _expected_subscription_updated_at
+    OR COALESCE(
+      _subscription.effective_plan_code,
+      _subscription.current_plan_code,
+      _subscription.billing_plan_code
+    ) IS DISTINCT FROM _from_plan_code THEN
+    RAISE EXCEPTION 'SUBSCRIPTION_CONFLICT' USING ERRCODE = '40001';
+  END IF;
+
+  UPDATE public.organization_subscriptions
+  SET
+    pending_plan_code = _plan.code,
+    pending_checkout_amount_ars = NULL,
+    pending_checkout_price_version = NULL,
+    mercadopago_init_point = NULL,
+    metadata = COALESCE(_metadata, '{}'::jsonb)
+  WHERE id = _subscription.id
+  RETURNING * INTO _subscription;
+
+  RETURN to_jsonb(_subscription);
+END;
+$function$;
+
+-- Reactivation is likewise serialized with catalog price changes. It only
+-- restores immediate access for a cancelled subscription whose paid period is
+-- still current; expired subscriptions must create a fresh checkout.
+CREATE OR REPLACE FUNCTION public.subscription_finalize_reactivation(
+  _organization_id uuid,
+  _subscription_id uuid,
+  _expected_subscription_updated_at timestamptz,
+  _expected_preapproval_id text,
+  _plan_code text,
+  _expected_amount_ars numeric,
+  _expected_price_version integer,
+  _expected_plan_updated_at timestamptz,
+  _metadata jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $function$
+DECLARE
+  _plan public.subscription_plans%ROWTYPE;
+  _subscription public.organization_subscriptions%ROWTYPE;
+BEGIN
+  IF current_user <> 'service_role' THEN
+    RAISE EXCEPTION 'SUBSCRIPTION_SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO _plan
+  FROM public.subscription_plans
+  WHERE code = _plan_code
+  FOR SHARE;
+
+  IF NOT FOUND
+    OR NOT _plan.is_active
+    OR _plan.amount_ars IS DISTINCT FROM _expected_amount_ars
+    OR _plan.price_version IS DISTINCT FROM _expected_price_version
+    OR _plan.updated_at IS DISTINCT FROM _expected_plan_updated_at THEN
+    RAISE EXCEPTION 'CATALOG_CONFLICT' USING ERRCODE = '40001';
+  END IF;
+
+  SELECT * INTO _subscription
+  FROM public.organization_subscriptions
+  WHERE id = _subscription_id
+    AND organization_id = _organization_id
+  FOR UPDATE;
+
+  IF NOT FOUND
+    OR _subscription.status <> 'cancelled'
+    OR _subscription.provider <> 'mercadopago'
+    OR NULLIF(_expected_preapproval_id, '') IS NULL
+    OR _subscription.mercadopago_preapproval_id IS DISTINCT FROM _expected_preapproval_id
+    OR _subscription.updated_at IS DISTINCT FROM _expected_subscription_updated_at
+    OR _subscription.current_period_end IS NULL
+    OR _subscription.current_period_end <= now()
+    OR COALESCE(
+      _subscription.current_plan_code,
+      _subscription.billing_plan_code,
+      _subscription.effective_plan_code
+    ) IS DISTINCT FROM _plan.code THEN
+    RAISE EXCEPTION 'SUBSCRIPTION_CONFLICT' USING ERRCODE = '40001';
+  END IF;
+
+  UPDATE public.organization_subscriptions
+  SET
+    status = 'active',
+    cancel_at_period_end = false,
+    cancelled_at = NULL,
+    pending_plan_code = NULL,
+    billing_plan_code = _plan.code,
+    billing_amount_ars = _plan.amount_ars,
+    billing_price_version = _plan.price_version,
+    pending_checkout_amount_ars = NULL,
+    pending_checkout_price_version = NULL,
+    mercadopago_status = 'authorized',
+    mercadopago_init_point = NULL,
+    metadata = COALESCE(_metadata, '{}'::jsonb)
+  WHERE id = _subscription.id
+  RETURNING * INTO _subscription;
+
+  RETURN to_jsonb(_subscription);
+END;
+$function$;
+
 REVOKE ALL ON FUNCTION public.platform_admin_create_price_change_batch(
   text, numeric, numeric, integer, timestamptz, uuid, text, uuid
 ) FROM PUBLIC, anon, authenticated;
@@ -1030,11 +1241,17 @@ REVOKE ALL ON FUNCTION public.platform_admin_retry_price_change_items(uuid, uuid
 REVOKE ALL ON FUNCTION public.platform_admin_refresh_price_change_batch(uuid)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.platform_admin_complete_price_change_item(
-  uuid, integer, integer, text
+  uuid, uuid, text, timestamptz, integer, integer, text
 ) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.subscription_finalize_checkout(
   uuid, text, numeric, integer, timestamptz, uuid, timestamptz,
   text, text, text, text, text, jsonb, boolean
+) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.subscription_finalize_scheduled_plan_change(
+  uuid, uuid, timestamptz, text, text, text, numeric, integer, timestamptz, jsonb
+) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.subscription_finalize_reactivation(
+  uuid, uuid, timestamptz, text, text, numeric, integer, timestamptz, jsonb
 ) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.platform_admin_create_price_change_batch(
@@ -1047,11 +1264,17 @@ GRANT EXECUTE ON FUNCTION public.platform_admin_retry_price_change_items(uuid, u
 GRANT EXECUTE ON FUNCTION public.platform_admin_refresh_price_change_batch(uuid)
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.platform_admin_complete_price_change_item(
-  uuid, integer, integer, text
+  uuid, uuid, text, timestamptz, integer, integer, text
 ) TO service_role;
 GRANT EXECUTE ON FUNCTION public.subscription_finalize_checkout(
   uuid, text, numeric, integer, timestamptz, uuid, timestamptz,
   text, text, text, text, text, jsonb, boolean
+) TO service_role;
+GRANT EXECUTE ON FUNCTION public.subscription_finalize_scheduled_plan_change(
+  uuid, uuid, timestamptz, text, text, text, numeric, integer, timestamptz, jsonb
+) TO service_role;
+GRANT EXECUTE ON FUNCTION public.subscription_finalize_reactivation(
+  uuid, uuid, timestamptz, text, text, numeric, integer, timestamptz, jsonb
 ) TO service_role;
 
 -- Bootstrap through the exact same auditable work queue if an older deployment
