@@ -15,7 +15,10 @@ vi.mock('@/contexts/AdminAuthContext', () => ({
 
 function renderGuard() {
   return render(
-    <MemoryRouter initialEntries={['/admin/barberias']}>
+    <MemoryRouter
+      initialEntries={['/admin/barberias']}
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/admin/login" element={<p>Pantalla de acceso</p>} />
         <Route element={<AdminProtectedRoute />}>

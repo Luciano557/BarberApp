@@ -3,6 +3,7 @@ import {
   hasSubscriptionAccess,
   isPlatformAdminIdentity,
   mapWithConcurrency,
+  numberValue,
   sanitizeMessage,
 } from './platform-admin.ts';
 
@@ -47,6 +48,13 @@ Deno.test('subscription access uses effective dates instead of stale status text
   assert(!hasSubscriptionAccess('trialing', past, null), 'Expired trial must not have access');
   assert(hasSubscriptionAccess('active', null, future), 'Paid future period must have access');
   assert(!hasSubscriptionAccess('active', null, null), 'Undated legacy active row must not be assumed current');
+});
+
+Deno.test('numeric DTO parsing preserves missing values as null', () => {
+  assertEquals(numberValue(null), null, 'Null must not become zero');
+  assertEquals(numberValue(undefined), null, 'Undefined must stay missing');
+  assertEquals(numberValue(''), null, 'Empty strings must stay missing');
+  assertEquals(numberValue('60000'), 60_000, 'Numeric strings must still parse');
 });
 
 Deno.test('bounded worker preserves order and never exceeds configured concurrency', async () => {

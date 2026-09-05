@@ -217,6 +217,7 @@ export interface PlatformAdminPriceChangeBatchDto {
   succeededCount: number;
   failedCount: number;
   skippedCount: number;
+  retryableCount: number;
   actorUserId: string;
   actorAlias: string;
   reason: string;

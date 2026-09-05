@@ -21,6 +21,61 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
+function parseSubscriptionExternalReference(value: unknown): {
+  organizationId: string;
+  planCode: string;
+} | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^sub_([0-9a-fA-F-]{36})_(basico|profesional|premium)_/);
+  return match ? { organizationId: match[1], planCode: match[2] } : null;
+}
+
+type OwnedPreapproval = {
+  id: string;
+  status: string;
+  external_reference: string;
+};
+
+async function loadOwnedPreapproval(
+  preapprovalId: string,
+  organizationId: string,
+  expectedPlanCode: string,
+): Promise<{ preapproval: OwnedPreapproval | null; error: Response | null }> {
+  const currentResponse = await mpPlatformFetch(`/preapproval/${encodeURIComponent(preapprovalId)}`);
+  if (!currentResponse.ok) {
+    const providerError = await readMpError(currentResponse);
+    console.warn('[subscription-change-plan] preapproval verification failed:', currentResponse.status, providerError.code);
+    return {
+      preapproval: null,
+      error: jsonResponse({ error: 'No pudimos verificar la suscripcion en Mercado Pago' }, 502),
+    };
+  }
+
+  const current = await currentResponse.json() as Record<string, unknown>;
+  const parsedReference = parseSubscriptionExternalReference(current.external_reference);
+  if (
+    String(current.id ?? '') !== preapprovalId ||
+    !parsedReference ||
+    parsedReference.organizationId !== organizationId ||
+    parsedReference.planCode !== expectedPlanCode
+  ) {
+    console.error('[subscription-change-plan] preapproval ownership mismatch');
+    return {
+      preapproval: null,
+      error: jsonResponse({ error: 'La referencia de Mercado Pago no coincide con la suscripcion' }, 409),
+    };
+  }
+
+  return {
+    preapproval: {
+      id: preapprovalId,
+      status: String(current.status ?? '').toLowerCase(),
+      external_reference: String(current.external_reference),
+    },
+    error: null,
+  };
+}
+
 function withoutPendingCheckoutMetadata(value: unknown): Record<string, unknown> {
   const metadata = isRecord(value) ? { ...value } : {};
   delete metadata.pending_mercadopago_preapproval_id;
@@ -34,18 +89,19 @@ function withoutPendingCheckoutMetadata(value: unknown): Record<string, unknown>
   return metadata;
 }
 
-async function cancelPendingCheckout(preapprovalId: string): Promise<Response | null> {
-  const currentResponse = await mpPlatformFetch(`/preapproval/${preapprovalId}`);
-  if (currentResponse.status === 404) return null;
+async function cancelPendingCheckout(
+  preapprovalId: string,
+  organizationId: string,
+  expectedPlanCode: string,
+): Promise<Response | null> {
+  const { preapproval, error } = await loadOwnedPreapproval(
+    preapprovalId,
+    organizationId,
+    expectedPlanCode,
+  );
+  if (error) return error;
 
-  if (!currentResponse.ok) {
-    const providerError = await readMpError(currentResponse);
-    console.warn('[subscription-change-plan] pending checkout verification failed:', currentResponse.status, providerError.code);
-    return jsonResponse({ error: 'No pudimos verificar el checkout pendiente' }, 502);
-  }
-
-  const current = await currentResponse.json() as { status?: string };
-  const status = current.status?.toLowerCase();
+  const status = preapproval?.status;
   if (status === 'cancelled' || status === 'canceled') return null;
   if (status !== 'pending') {
     return jsonResponse({
@@ -53,7 +109,7 @@ async function cancelPendingCheckout(preapprovalId: string): Promise<Response | 
     }, 409);
   }
 
-  const cancelResponse = await mpPlatformFetch(`/preapproval/${preapprovalId}`, {
+  const cancelResponse = await mpPlatformFetch(`/preapproval/${encodeURIComponent(preapprovalId)}`, {
     method: 'PUT',
     body: JSON.stringify({ status: 'cancelled' }),
   });
@@ -87,7 +143,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const { data: subscription, error: subscriptionError } = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, status, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_init_point, metadata')
+      .select('id, status, provider, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_init_point, metadata, updated_at')
       .eq('organization_id', context.organizationId)
       .maybeSingle();
 
@@ -110,7 +166,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const { data: plans, error: plansError } = await supabaseAdmin
       .from('subscription_plans')
-      .select('code, name, amount_ars, price_version, sort_order')
+      .select('code, name, amount_ars, price_version, sort_order, is_active, updated_at')
       .in('code', planCodes);
 
     if (plansError || !plans) {
@@ -118,7 +174,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const planByCode = new Map(
-      (plans as Array<{ code: string; name: string; amount_ars: number; price_version: number; sort_order: number }>)
+      (plans as Array<{ code: string; name: string; amount_ars: number; price_version: number; sort_order: number; is_active: boolean; updated_at: string }>)
         .map((plan) => [plan.code, plan]),
     );
 
@@ -128,6 +184,10 @@ serve(async (req: Request): Promise<Response> => {
 
     if (!toPlan) {
       return jsonResponse({ error: 'Plan no encontrado' }, 404);
+    }
+
+    if (!toPlan.is_active) {
+      return jsonResponse({ error: 'El plan seleccionado no esta disponible' }, 409);
     }
 
     if (fromPlan?.code === toPlan.code && !subscription.pending_plan_code) {
@@ -155,24 +215,131 @@ serve(async (req: Request): Promise<Response> => {
         : null;
 
       if (pendingPreapprovalId && pendingPreapprovalId !== subscription.mercadopago_preapproval_id) {
-        const cancellationError = await cancelPendingCheckout(pendingPreapprovalId);
+        if (!subscription.pending_plan_code) {
+          return jsonResponse({ error: 'El checkout pendiente no tiene un plan verificable' }, 409);
+        }
+        const cancellationError = await cancelPendingCheckout(
+          pendingPreapprovalId,
+          context.organizationId,
+          subscription.pending_plan_code,
+        );
         if (cancellationError) return cancellationError;
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('organization_subscriptions')
-        .update({
-          pending_plan_code: toPlan.code,
-          pending_checkout_amount_ars: null,
-          pending_checkout_price_version: null,
-          mercadopago_init_point: null,
-          metadata: withoutPendingCheckoutMetadata(metadata),
-        })
-        .eq('id', subscription.id);
+      const targetAmount = Number(toPlan.amount_ars);
+      const targetPriceVersion = Number(toPlan.price_version);
+      if (
+        subscription.provider !== 'mercadopago' ||
+        !subscription.mercadopago_preapproval_id ||
+        !Number.isFinite(targetAmount) ||
+        targetAmount <= 0 ||
+        !Number.isInteger(targetPriceVersion) ||
+        targetPriceVersion < 1
+      ) {
+        return jsonResponse({
+          error: 'El cambio requiere un nuevo checkout',
+          requires_checkout: true,
+        }, 409);
+      }
 
-      if (updateError) {
-        console.error('[subscription-change-plan] downgrade update error:', updateError);
-        return jsonResponse({ error: 'No se pudo programar la baja de plan' }, 500);
+      const { preapproval: currentPreapproval, error: verificationError } = await loadOwnedPreapproval(
+        subscription.mercadopago_preapproval_id,
+        context.organizationId,
+        fromPlan.code,
+      );
+      if (verificationError) return verificationError;
+      if (!currentPreapproval || !['authorized', 'active'].includes(currentPreapproval.status)) {
+        return jsonResponse({
+          error: 'La suscripcion de Mercado Pago no esta activa. Se necesita un nuevo checkout.',
+          requires_checkout: true,
+        }, 409);
+      }
+
+      const providerUpdate = await mpPlatformFetch(
+        `/preapproval/${encodeURIComponent(subscription.mercadopago_preapproval_id)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            auto_recurring: {
+              transaction_amount: targetAmount,
+              currency_id: 'ARS',
+            },
+          }),
+        },
+      );
+      if (!providerUpdate.ok) {
+        const providerError = await readMpError(providerUpdate);
+        console.warn('[subscription-change-plan] scheduled price update failed:', providerUpdate.status, providerError.code);
+        return jsonResponse({ error: 'No pudimos programar el importe del proximo periodo' }, 502);
+      }
+
+      const scheduledMetadata = {
+        ...withoutPendingCheckoutMetadata(metadata),
+        scheduled_renewal_amount_ars: targetAmount,
+        scheduled_renewal_price_version: targetPriceVersion,
+      };
+
+      const { data: updatedSubscription, error: updateError } = await supabaseAdmin.rpc(
+        'subscription_finalize_scheduled_plan_change',
+        {
+          _organization_id: context.organizationId,
+          _subscription_id: subscription.id,
+          _expected_subscription_updated_at: subscription.updated_at,
+          _expected_preapproval_id: subscription.mercadopago_preapproval_id,
+          _from_plan_code: fromPlan.code,
+          _to_plan_code: toPlan.code,
+          _expected_amount_ars: targetAmount,
+          _expected_price_version: targetPriceVersion,
+          _expected_plan_updated_at: toPlan.updated_at,
+          _metadata: scheduledMetadata,
+        },
+      );
+
+      if (updateError || !updatedSubscription) {
+        const { data: latestSubscription } = await supabaseAdmin
+          .from('organization_subscriptions')
+          .select('mercadopago_preapproval_id,billing_amount_ars,metadata')
+          .eq('id', subscription.id)
+          .eq('organization_id', context.organizationId)
+          .maybeSingle();
+        const latestMetadata = isRecord(latestSubscription?.metadata)
+          ? latestSubscription.metadata
+          : {};
+        const latestScheduledAmount = Number(latestMetadata.scheduled_renewal_amount_ars);
+        const latestBillingAmount = Number(latestSubscription?.billing_amount_ars);
+        const compensationAmount = Number.isFinite(latestScheduledAmount) && latestScheduledAmount > 0
+          ? latestScheduledAmount
+          : latestBillingAmount;
+        if (
+          latestSubscription?.mercadopago_preapproval_id === subscription.mercadopago_preapproval_id &&
+          Number.isFinite(compensationAmount) &&
+          compensationAmount > 0
+        ) {
+          const compensation = await mpPlatformFetch(
+            `/preapproval/${encodeURIComponent(subscription.mercadopago_preapproval_id)}`,
+            {
+              method: 'PUT',
+              body: JSON.stringify({
+                auto_recurring: {
+                  transaction_amount: compensationAmount,
+                  currency_id: 'ARS',
+                },
+              }),
+            },
+          );
+          if (!compensation.ok) {
+            console.error('[subscription-change-plan] provider compensation failed:', compensation.status);
+          }
+        }
+        console.error('[subscription-change-plan] downgrade update error:', updateError?.code ?? 'concurrent_change');
+        const conflict = updateError?.code === '40001' ||
+          updateError?.message?.includes('CATALOG_CONFLICT') ||
+          updateError?.message?.includes('SUBSCRIPTION_CONFLICT');
+        return jsonResponse({
+          error: conflict
+            ? 'El precio o la suscripcion cambiaron mientras se programaba la baja. Actualiza y reintenta.'
+            : 'No se pudo programar la baja de plan',
+        }, conflict ? 409 : 500);
       }
 
       await supabaseAdmin.from('subscription_plan_changes').insert({
@@ -185,9 +352,9 @@ serve(async (req: Request): Promise<Response> => {
         effective_at: subscription.current_period_end,
         period_start: subscription.current_period_start,
         period_end: subscription.current_period_end,
-        amount_ars: Number(toPlan.amount_ars),
+        amount_ars: targetAmount,
         metadata: {
-          price_version: Number(toPlan.price_version),
+          price_version: targetPriceVersion,
         },
       });
 

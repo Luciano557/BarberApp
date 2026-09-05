@@ -220,6 +220,10 @@ function batchDto(
   if (!row) return null;
   const pendingCount = itemRows.filter((item) => item.status === 'pending').length;
   const processingCount = itemRows.filter((item) => item.status === 'processing').length;
+  const retryableCount = itemRows.filter((item) => (
+    item.status === 'failed' ||
+    (item.status === 'skipped' && item.error_code === 'missing_preapproval')
+  )).length;
   return {
     id: stringValue(row.id),
     planCode: stringValue(row.plan_code),
@@ -237,6 +241,7 @@ function batchDto(
     succeededCount: numberValue(row.succeeded_items) ?? 0,
     failedCount: numberValue(row.failed_items) ?? 0,
     skippedCount: numberValue(row.skipped_items) ?? 0,
+    retryableCount,
     actorUserId: stringValue(row.actor_user_id) ?? '',
     actorAlias: stringValue(row.actor_alias) ?? 'admin',
     reason: stringValue(row.reason),
@@ -300,8 +305,8 @@ async function overview(supabaseAdmin: Parameters<typeof fetchAllRows>[0]) {
     );
   }).length;
   const priceChangeIncidents = priceItems.filter((item) => item.status === 'failed').length;
-  const rejectedPaymentIncidents = payments.filter((payment) => (
-    payment.status === 'rejected' &&
+  const adversePaymentIncidents = payments.filter((payment) => (
+    ['rejected', 'cancelled', 'refunded', 'charged_back'].includes(String(payment.status)) &&
     typeof payment.created_at === 'string' &&
     Date.parse(payment.created_at) >= thirtyDaysAgo
   )).length;
@@ -360,7 +365,7 @@ async function overview(supabaseAdmin: Parameters<typeof fetchAllRows>[0]) {
     incidencias:
       subscriptionIncidents +
       priceChangeIncidents +
-      rejectedPaymentIncidents +
+      adversePaymentIncidents +
       staleWebhookIncidents,
     breakdowns: {
       organizations: organizationStatuses,

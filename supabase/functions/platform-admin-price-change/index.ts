@@ -42,9 +42,9 @@ interface WorkItem extends Record<string, unknown> {
   status: string;
   attempts: number;
   idempotency_key: string;
+  claimed_at: string;
   plan_code: string;
   expected_external_reference?: string | null;
-  provider_plan_code?: string | null;
 }
 
 interface ProcessResult {
@@ -56,7 +56,6 @@ interface ProcessResult {
 interface RevalidatedTarget {
   current: boolean;
   expectedExternalReference: string | null;
-  providerPlanCode: string | null;
 }
 
 type ProviderTargetCheck =
@@ -154,6 +153,10 @@ function batchDto(
   const processingCount = itemRows.filter((item) => item.status === 'processing').length;
   const total = numberValue(row.total_items) ?? itemRows.length;
   const skipped = numberValue(row.skipped_items) ?? itemRows.filter((item) => item.status === 'skipped').length;
+  const retryable = itemRows.filter((item) => (
+    item.status === 'failed' ||
+    (item.status === 'skipped' && item.error_code === 'missing_preapproval')
+  )).length;
 
   return {
     id: stringValue(row.id) ?? '',
@@ -169,6 +172,7 @@ function batchDto(
     succeededCount: numberValue(row.succeeded_items) ?? 0,
     failedCount: numberValue(row.failed_items) ?? 0,
     skippedCount: skipped,
+    retryableCount: retryable,
     actorUserId: stringValue(row.actor_user_id) ?? '',
     actorAlias: stringValue(row.actor_alias) ?? 'admin',
     reason: stringValue(row.reason) ?? '',
@@ -388,7 +392,7 @@ async function failItem(
   code: string,
   message: string,
 ): Promise<ProcessResult> {
-  const { error } = await supabaseAdmin
+  let update = supabaseAdmin
     .from('subscription_price_change_items')
     .update({
       status: 'failed',
@@ -400,8 +404,15 @@ async function failItem(
       completed_at: new Date().toISOString(),
     })
     .eq('id', item.id)
-    .eq('status', 'processing');
+    .eq('status', 'processing')
+    .eq('idempotency_key', item.idempotency_key)
+    .eq('claimed_at', item.claimed_at);
+  update = item.preapproval_id
+    ? update.eq('preapproval_id', item.preapproval_id)
+    : update.is('preapproval_id', null);
+  const { data, error } = await update.select('id').maybeSingle();
   if (error) throw new Error('ITEM_FAILURE_WRITE_FAILED');
+  if (!data) return { itemId: item.id, succeeded: false, status: 'claim_lost' };
   return { itemId: item.id, succeeded: false, status: 'failed' };
 }
 
@@ -411,7 +422,7 @@ async function skipItem(
   code: string,
   message: string,
 ): Promise<ProcessResult> {
-  const { error } = await supabaseAdmin
+  let update = supabaseAdmin
     .from('subscription_price_change_items')
     .update({
       status: 'skipped',
@@ -421,8 +432,15 @@ async function skipItem(
       completed_at: new Date().toISOString(),
     })
     .eq('id', item.id)
-    .eq('status', 'processing');
+    .eq('status', 'processing')
+    .eq('idempotency_key', item.idempotency_key)
+    .eq('claimed_at', item.claimed_at);
+  update = item.preapproval_id
+    ? update.eq('preapproval_id', item.preapproval_id)
+    : update.is('preapproval_id', null);
+  const { data, error } = await update.select('id').maybeSingle();
   if (error) throw new Error('ITEM_SKIP_WRITE_FAILED');
+  if (!data) return { itemId: item.id, succeeded: false, status: 'claim_lost' };
   return { itemId: item.id, succeeded: false, status: 'skipped' };
 }
 
@@ -432,12 +450,12 @@ async function workItemStillCurrent(
 ): Promise<RevalidatedTarget> {
   const { data: subscription, error } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,mercadopago_preapproval_id,mercadopago_external_reference,mercadopago_status,metadata')
+    .select('status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_external_reference,mercadopago_status,metadata')
     .eq('id', item.subscription_id)
     .maybeSingle();
   if (error) throw new Error('SUBSCRIPTION_REVALIDATION_FAILED');
   if (!subscription || subscription.provider !== 'mercadopago') {
-    return { current: false, expectedExternalReference: null, providerPlanCode: null };
+    return { current: false, expectedExternalReference: null };
   }
 
   if (item.item_type === 'active_renewal') {
@@ -447,7 +465,6 @@ async function workItemStillCurrent(
         planCode === item.plan_code &&
         stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id,
       expectedExternalReference: stringValue(subscription.mercadopago_external_reference),
-      providerPlanCode: currentBillingPlanCode(subscription as Record<string, unknown>),
     };
   }
 
@@ -460,7 +477,6 @@ async function workItemStillCurrent(
       (subscription.mercadopago_status === 'pending'
         ? stringValue(subscription.mercadopago_external_reference)
         : null),
-    providerPlanCode: item.plan_code,
   };
 }
 
@@ -497,8 +513,8 @@ async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck
         String(payload.id ?? '') !== item.preapproval_id ||
         !parsedReference ||
         parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase() ||
-        parsedReference.planCode !== item.provider_plan_code ||
-        (item.expected_external_reference && providerReference !== item.expected_external_reference)
+        !item.expected_external_reference ||
+        providerReference !== item.expected_external_reference
       ) {
         return {
           kind: 'skip',
@@ -543,6 +559,95 @@ async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck
   };
 }
 
+async function compensateProviderAfterLocalChange(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+): Promise<boolean> {
+  const { data: subscription, error } = await supabaseAdmin
+    .from('organization_subscriptions')
+    .select('status,provider,billing_amount_ars,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_status,metadata')
+    .eq('id', item.subscription_id)
+    .maybeSingle();
+  if (error) return false;
+
+  let desiredAmount: number | null = null;
+  if (subscription?.provider === 'mercadopago') {
+    const subscriptionRow = subscription as Record<string, unknown>;
+    if (
+      item.item_type === 'active_renewal' &&
+      stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id
+    ) {
+      const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+      const isScheduledRenewal = Boolean(
+        stringValue(subscription.pending_plan_code) &&
+        !hasPendingCheckoutIntent(subscriptionRow),
+      );
+      desiredAmount = isScheduledRenewal
+        ? numberValue(metadata.scheduled_renewal_amount_ars)
+        : numberValue(subscription.billing_amount_ars);
+    } else if (
+      item.item_type === 'pending_checkout' &&
+      pendingCheckoutPreapprovalId(subscriptionRow) === item.preapproval_id
+    ) {
+      desiredAmount = numberValue(subscription.pending_checkout_amount_ars);
+    }
+  }
+
+  let providerPayload: Record<string, unknown> | null = null;
+  for (let attempt = 1; attempt <= MAX_PROVIDER_ATTEMPTS; attempt += 1) {
+    const response = await mpPlatformFetch(
+      `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
+    );
+    if (response.status === 404) return true;
+    if (response.ok) {
+      providerPayload = await response.json() as Record<string, unknown>;
+      break;
+    }
+    if (!transientStatus(response.status) || attempt >= MAX_PROVIDER_ATTEMPTS) return false;
+    await wait(retryDelay(response, attempt));
+  }
+  if (!providerPayload) return false;
+
+  const parsedReference = parseSubscriptionExternalReference(providerPayload.external_reference);
+  if (
+    String(providerPayload.id ?? '') !== item.preapproval_id ||
+    !parsedReference ||
+    parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase()
+  ) {
+    return false;
+  }
+
+  const providerStatus = stringValue(providerPayload.status)?.toLowerCase();
+  if (!desiredAmount || desiredAmount <= 0) {
+    if (providerStatus === 'cancelled' || providerStatus === 'canceled') return true;
+  }
+
+  const idempotencyKey = crypto.randomUUID();
+  const body = desiredAmount && desiredAmount > 0
+    ? {
+      auto_recurring: {
+        transaction_amount: desiredAmount,
+        currency_id: 'ARS',
+      },
+    }
+    : { status: 'cancelled' };
+
+  for (let attempt = 1; attempt <= MAX_PROVIDER_ATTEMPTS; attempt += 1) {
+    const response = await mpPlatformFetch(
+      `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
+      {
+        method: 'PUT',
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+        body: JSON.stringify(body),
+      },
+    );
+    if (response.ok || response.status === 404) return true;
+    if (!transientStatus(response.status) || attempt >= MAX_PROVIDER_ATTEMPTS) return false;
+    await wait(retryDelay(response, attempt));
+  }
+  return false;
+}
+
 async function processItem(
   supabaseAdmin: SupabaseClient,
   item: WorkItem,
@@ -557,7 +662,6 @@ async function processItem(
     );
   }
   item.expected_external_reference = localTarget.expectedExternalReference;
-  item.provider_plan_code = localTarget.providerPlanCode;
 
   if (!item.preapproval_id) {
     return failItem(
@@ -621,14 +725,37 @@ async function processItem(
           'platform_admin_complete_price_change_item',
           {
             _item_id: item.id,
+            _expected_idempotency_key: item.idempotency_key,
+            _expected_preapproval_id: item.preapproval_id,
+            _expected_claimed_at: item.claimed_at,
             _attempts: attempts,
             _http_status: response.status,
             _provider_response_ref: providerReference,
           },
         );
-        if (error) throw new Error('ITEM_COMPLETION_WRITE_FAILED');
-        if (isRecord(completion) && completion.status === 'skipped') {
-          return { itemId: item.id, succeeded: false, status: 'skipped' };
+        if (error) {
+          if (error.code === '40001' || error.message?.includes('ITEM_CLAIM_LOST')) {
+            return { itemId: item.id, succeeded: false, status: 'claim_lost' };
+          }
+          throw new Error('ITEM_COMPLETION_WRITE_FAILED');
+        }
+        if (isRecord(completion) && completion.status === 'compensation_required') {
+          const compensated = await compensateProviderAfterLocalChange(supabaseAdmin, item);
+          return compensated
+            ? skipItem(
+              supabaseAdmin,
+              item,
+              'subscription_changed_compensated',
+              'La suscripcion cambio; se restauro el estado vigente en Mercado Pago.',
+            )
+            : failItem(
+              supabaseAdmin,
+              item,
+              attempts,
+              response.status,
+              'provider_compensation_failed',
+              'La suscripcion cambio y no se pudo restaurar Mercado Pago automaticamente.',
+            );
         }
         return { itemId: item.id, succeeded: true, status: 'succeeded' };
       }
@@ -680,6 +807,7 @@ async function processBatch(
     status: stringValue(row.status) ?? 'processing',
     attempts: numberValue(row.attempts) ?? 0,
     idempotency_key: String(row.idempotency_key),
+    claimed_at: String(row.claimed_at),
     plan_code: stringValue(before.batch.plan_code) ?? '',
     new_amount_ars: batchAmount,
   } satisfies WorkItem));
@@ -717,11 +845,14 @@ async function processBatch(
   const succeeded = results.filter((result) => result.succeeded).length;
   const failed = results.filter((result) => result.status === 'failed').length;
   const skipped = results.filter((result) => result.status === 'skipped').length;
-  const resultStatus: AuditResult = failed > 0
-    ? (succeeded > 0 || skipped > 0 ? 'partial' : 'failed')
-    : skipped > 0
-      ? 'partial'
-      : 'succeeded';
+  const claimLost = results.filter((result) => result.status === 'claim_lost').length;
+  const resultStatus: AuditResult = claimLost > 0
+    ? (succeeded > 0 || failed > 0 || skipped > 0 ? 'partial' : 'pending')
+    : failed > 0
+      ? (succeeded > 0 || skipped > 0 ? 'partial' : 'failed')
+      : skipped > 0
+        ? 'partial'
+        : 'succeeded';
 
   await insertAuditLog(supabaseAdmin, {
     actorUserId: context.userId,
@@ -735,6 +866,7 @@ async function processBatch(
       succeeded,
       failed,
       skipped,
+      claimLost,
     },
     requestId,
   });
