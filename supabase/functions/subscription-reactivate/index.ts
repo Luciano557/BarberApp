@@ -55,7 +55,7 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const { data: subscription, error: subscriptionError } = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, status, provider, current_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, metadata, updated_at')
+      .select('id, status, provider, current_plan_code, effective_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, metadata, updated_at')
       .eq('organization_id', context.organizationId)
       .maybeSingle();
 
@@ -141,7 +141,8 @@ serve(async (req: Request): Promise<Response> => {
       String(providerPreapproval.id ?? '') !== subscription.mercadopago_preapproval_id ||
       !parsedReference ||
       parsedReference.organizationId !== context.organizationId ||
-      parsedReference.planCode !== planCode
+      !subscription.mercadopago_external_reference ||
+      providerPreapproval.external_reference !== subscription.mercadopago_external_reference
     ) {
       console.error('[subscription-reactivate] preapproval ownership mismatch');
       return jsonResponse({ error: 'La referencia de Mercado Pago no coincide con la suscripcion' }, 409);

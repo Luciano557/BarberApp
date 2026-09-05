@@ -93,6 +93,10 @@ filtros y orden procesados en servidor, y limitan `pageSize` a 50. La lectura de
 Supabase Auth pagina hasta agotar usuarios, por lo que no se trunca en el límite
 habitual de 1.000. Los DTO usan una lista permitida de campos: no exponen
 `raw_payload`, tokens, metadata arbitraria ni información operativa de tenants.
+Las métricas y colecciones operativas se resuelven sobre vistas de lectura
+`platform_admin_*_v`, revocadas a `anon`/`authenticated`, para paginar, ordenar y
+agregar en Postgres. Solo el cruce de `last_sign_in_at` para MAU se completa en
+Edge mediante Auth Admin, porque ese dato no pertenece al esquema público.
 
 ### `platform-admin-price-change`
 
@@ -104,7 +108,8 @@ Acciones:
   catálogo esperado y crea el cambio/lote transaccional.
 - `process`: reclama un grupo acotado y sincroniza sus objetivos con Mercado
   Pago.
-- `retry`: reabre solamente ítems fallidos o interrumpidos válidos.
+- `retry`: reabre ítems fallidos o interrumpidos válidos y exclusiones por
+  `preapproval` faltante cuando la referencia ya fue reparada.
 
 Todas las acciones excepto `preview` están bloqueadas mientras
 `PLATFORM_ADMIN_PRICE_MUTATIONS_ENABLED` no sea `true`.
@@ -193,7 +198,8 @@ El webhook:
 
 - exige `MERCADOPAGO_WEBHOOK_SECRET` y valida HMAC y frescura del timestamp;
 - permite omitir firma únicamente con
-  `MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS=true`, reservado a sandbox;
+  `MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS=true` junto con
+  `MERCADOPAGO_ENVIRONMENT=sandbox`;
 - persiste eventos con unicidad, reanuda duplicados todavía no procesados y
   devuelve error reintentable cuando la sincronización no termina;
 - compara importe, moneda, plan, referencia, vínculo y orden temporal antes de
@@ -241,6 +247,8 @@ Edge Functions / secrets:
 - `MERCADOPAGO_WEBHOOK_TOLERANCE_SECONDS` — opcional; el backend limita el valor
   efectivo al rango 60–3600 segundos
 - `MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS` — solo sandbox; nunca producción
+- `MERCADOPAGO_ENVIRONMENT` — debe ser exactamente `sandbox` para habilitar el
+  modo sin firma; en cualquier otro entorno el webhook falla cerrado
 - `MERCADOPAGO_SUBSCRIPTION_WEBHOOK_URL` — opcional si no se deriva del proyecto
 
 `APP_ORIGIN` y `MERCADOPAGO_APP_ORIGIN` siguen siendo orígenes reconocidos por el
