@@ -35,7 +35,10 @@ function signaturesMatch(expected: string, received: string): boolean {
 async function validateMpSignature(req: Request): Promise<SignatureValidation> {
   const secret = Deno.env.get('MERCADOPAGO_WEBHOOK_SECRET');
   if (!secret) {
-    if (Deno.env.get('MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS')?.toLowerCase() === 'true') {
+    const unsignedSandboxEnabled =
+      Deno.env.get('MERCADOPAGO_ALLOW_UNSIGNED_WEBHOOKS')?.toLowerCase() === 'true' &&
+      Deno.env.get('MERCADOPAGO_ENVIRONMENT')?.toLowerCase() === 'sandbox';
+    if (unsignedSandboxEnabled) {
       console.warn('[subscription-mp-webhook] unsigned webhooks explicitly enabled for sandbox');
       return 'valid';
     }

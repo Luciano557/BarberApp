@@ -26,6 +26,9 @@ aceptan búsqueda, filtros, orden y paginación con máximo de 50 registros por
 página; desktop/tablet usan tablas densas y mobile cards equivalentes. Los DTO
 permitidos excluyen payloads crudos, tokens y metadata arbitraria. Carga inicial,
 refetch, error y vacío siguen el canon vigente de `DESIGN.md`.
+Las métricas y listas operativas se filtran, agregan, ordenan y paginan en vistas
+Postgres exclusivas de `service_role`; solamente MAU combina en Edge la lectura
+paginada de Auth Admin con los perfiles tenant.
 
 Definiciones de producto implementadas: una barbería con acceso es una
 organización habilitada cuyo trial o período de suscripción sigue vigente;
@@ -53,7 +56,7 @@ verifica nuevamente la suscripción local y el `preapproval` de Mercado Pago;
 haber cambiado.
 
 El webhook de suscripciones ahora falla cerrado si falta
-`MERCADOPAGO_WEBHOOK_SECRET` (salvo opt-in explícito para sandbox), valida firma
+`MERCADOPAGO_WEBHOOK_SECRET` (salvo opt-in doble y explícito para sandbox), valida firma
 y antigüedad del timestamp, trata los eventos de manera idempotente y serializa
 actualizaciones locales con comparación de `updated_at`. No promueve acceso ante
 importe, moneda, plan o referencia incompatibles; preserva la intención de un

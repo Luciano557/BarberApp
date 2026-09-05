@@ -365,7 +365,7 @@ export function sanitizeMessage(value: unknown, fallback = 'Error externo'): str
       : fallback;
 
   return raw
-    .replace(/Bearer\s+[A-Za-z0-9._~+\/-]+/gi, 'Bearer [redacted]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+/gi, 'Bearer [redacted]')
     .replace(/(?:access|refresh|api|secret)[_-]?token\s*[:=]\s*[^\s,;]+/gi, 'token=[redacted]')
     .replace(/[\r\n\t]+/g, ' ')
     .slice(0, 500);

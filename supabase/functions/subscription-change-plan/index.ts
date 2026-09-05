@@ -39,7 +39,7 @@ type OwnedPreapproval = {
 async function loadOwnedPreapproval(
   preapprovalId: string,
   organizationId: string,
-  expectedPlanCode: string,
+  expectedExternalReference: string,
 ): Promise<{ preapproval: OwnedPreapproval | null; error: Response | null }> {
   const currentResponse = await mpPlatformFetch(`/preapproval/${encodeURIComponent(preapprovalId)}`);
   if (!currentResponse.ok) {
@@ -57,7 +57,7 @@ async function loadOwnedPreapproval(
     String(current.id ?? '') !== preapprovalId ||
     !parsedReference ||
     parsedReference.organizationId !== organizationId ||
-    parsedReference.planCode !== expectedPlanCode
+    current.external_reference !== expectedExternalReference
   ) {
     console.error('[subscription-change-plan] preapproval ownership mismatch');
     return {
@@ -92,12 +92,12 @@ function withoutPendingCheckoutMetadata(value: unknown): Record<string, unknown>
 async function cancelPendingCheckout(
   preapprovalId: string,
   organizationId: string,
-  expectedPlanCode: string,
+  expectedExternalReference: string,
 ): Promise<Response | null> {
   const { preapproval, error } = await loadOwnedPreapproval(
     preapprovalId,
     organizationId,
-    expectedPlanCode,
+    expectedExternalReference,
   );
   if (error) return error;
 
@@ -143,7 +143,7 @@ serve(async (req: Request): Promise<Response> => {
 
     const { data: subscription, error: subscriptionError } = await supabaseAdmin
       .from('organization_subscriptions')
-      .select('id, status, provider, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_init_point, metadata, updated_at')
+      .select('id, status, provider, current_plan_code, effective_plan_code, pending_plan_code, billing_plan_code, billing_amount_ars, billing_price_version, current_period_start, current_period_end, mercadopago_preapproval_id, mercadopago_external_reference, mercadopago_init_point, metadata, updated_at')
       .eq('organization_id', context.organizationId)
       .maybeSingle();
 
@@ -215,13 +215,16 @@ serve(async (req: Request): Promise<Response> => {
         : null;
 
       if (pendingPreapprovalId && pendingPreapprovalId !== subscription.mercadopago_preapproval_id) {
-        if (!subscription.pending_plan_code) {
-          return jsonResponse({ error: 'El checkout pendiente no tiene un plan verificable' }, 409);
+        const pendingExternalReference = typeof metadata.pending_mercadopago_external_reference === 'string'
+          ? metadata.pending_mercadopago_external_reference
+          : null;
+        if (!subscription.pending_plan_code || !pendingExternalReference) {
+          return jsonResponse({ error: 'El checkout pendiente no tiene una referencia verificable' }, 409);
         }
         const cancellationError = await cancelPendingCheckout(
           pendingPreapprovalId,
           context.organizationId,
-          subscription.pending_plan_code,
+          pendingExternalReference,
         );
         if (cancellationError) return cancellationError;
       }
@@ -242,10 +245,13 @@ serve(async (req: Request): Promise<Response> => {
         }, 409);
       }
 
+      if (!subscription.mercadopago_external_reference) {
+        return jsonResponse({ error: 'La suscripcion no tiene una referencia verificable' }, 409);
+      }
       const { preapproval: currentPreapproval, error: verificationError } = await loadOwnedPreapproval(
         subscription.mercadopago_preapproval_id,
         context.organizationId,
-        fromPlan.code,
+        subscription.mercadopago_external_reference,
       );
       if (verificationError) return verificationError;
       if (!currentPreapproval || !['authorized', 'active'].includes(currentPreapproval.status)) {

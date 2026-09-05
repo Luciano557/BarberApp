@@ -4784,6 +4784,169 @@ export type Database = {
           },
         ]
       }
+      platform_admin_audit_v: {
+        Row: {
+          action: string | null
+          actor_alias: string | null
+          actor_user_id: string | null
+          created_at: string | null
+          id: string | null
+          next_state: Json | null
+          previous_state: Json | null
+          reason: string | null
+          request_id: string | null
+          result: string | null
+          result_status: string | null
+          search_text: string | null
+          target_id: string | null
+          target_type: string | null
+        }
+        Relationships: []
+      }
+      platform_admin_organizations_v: {
+        Row: {
+          access_status: string | null
+          billing_amount_ars: number | null
+          branches_count: number | null
+          created_at: string | null
+          current_period_end: string | null
+          id: string | null
+          is_enabled: boolean | null
+          last_payment_at: string | null
+          name: string | null
+          plan_code: string | null
+          plan_name: string | null
+          search_text: string | null
+          slug: string | null
+          trial_ends_at: string | null
+          users_count: number | null
+        }
+        Relationships: []
+      }
+      platform_admin_overview_v: {
+        Row: {
+          approved_payments_amount_ars: number | null
+          approved_payments_count: number | null
+          barberias_acceso: number | null
+          incidencias: number | null
+          organizations_breakdown: Json | null
+          payments_30_breakdown: Json | null
+          price_changes_breakdown: Json | null
+          subscriptions_breakdown: Json | null
+        }
+        Relationships: []
+      }
+      platform_admin_payments_v: {
+        Row: {
+          amount_ars: number | null
+          created_at: string | null
+          currency_id: string | null
+          due_at: string | null
+          effective_at: string | null
+          id: string | null
+          mercadopago_authorized_payment_id: string | null
+          mercadopago_payment_id: string | null
+          organization_id: string | null
+          organization_name: string | null
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          plan_code: string | null
+          provider: string | null
+          search_text: string | null
+          status: string | null
+          subscription_id: string | null
+        }
+        Relationships: []
+      }
+      platform_admin_price_change_batches_v: {
+        Row: {
+          actor_alias: string | null
+          actor_user_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          expected_updated_at: string | null
+          failed_items: number | null
+          id: string | null
+          new_amount_ars: number | null
+          new_price_version: number | null
+          old_amount_ars: number | null
+          old_price_version: number | null
+          pending_count: number | null
+          plan_code: string | null
+          processed_items: number | null
+          processing_count: number | null
+          reason: string | null
+          request_id: string | null
+          retryable_count: number | null
+          skipped_items: number | null
+          started_at: string | null
+          status: string | null
+          succeeded_items: number | null
+          total_items: number | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      platform_admin_price_change_items_v: {
+        Row: {
+          attempts: number | null
+          batch_id: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          error_code: string | null
+          error_message: string | null
+          id: string | null
+          item_type: string | null
+          last_http_status: number | null
+          organization_id: string | null
+          organization_name: string | null
+          preapproval_id: string | null
+          status: string | null
+          subscription_id: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      platform_admin_price_impact_v: {
+        Row: {
+          eligible_active_renewals: number | null
+          excluded: number | null
+          exclusions: Json | null
+          pending_checkouts: number | null
+          plan_code: string | null
+        }
+        Relationships: []
+      }
+      platform_admin_subscriptions_v: {
+        Row: {
+          access_status: string | null
+          billing_amount_ars: number | null
+          billing_plan_code: string | null
+          billing_price_version: number | null
+          cancel_at_period_end: boolean | null
+          current_period_end: string | null
+          current_period_start: string | null
+          effective_plan_code: string | null
+          has_preapproval: boolean | null
+          id: string | null
+          mercadopago_status: string | null
+          next_payment_date: string | null
+          organization_id: string | null
+          organization_name: string | null
+          organization_slug: string | null
+          pending_checkout_amount_ars: number | null
+          pending_checkout_price_version: number | null
+          pending_plan_code: string | null
+          provider: string | null
+          resolved_plan_code: string | null
+          search_text: string | null
+          source_status: string | null
+          trial_ends_at: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
       v_estadisticas_mensuales: {
         Row: {
           barberos_del_mes: number | null
@@ -5192,6 +5355,9 @@ export type Database = {
       platform_admin_complete_price_change_item: {
         Args: {
           _attempts: number
+          _expected_claimed_at: string
+          _expected_idempotency_key: string
+          _expected_preapproval_id: string
           _http_status: number
           _item_id: string
           _provider_response_ref?: string
@@ -5350,6 +5516,35 @@ export type Database = {
           _preapproval_id: string
           _preserve_current_provider: boolean
           _provider_status: string
+        }
+        Returns: Json
+      }
+      subscription_finalize_reactivation: {
+        Args: {
+          _expected_amount_ars: number
+          _expected_plan_updated_at: string
+          _expected_preapproval_id: string
+          _expected_price_version: number
+          _expected_subscription_updated_at: string
+          _metadata: Json
+          _organization_id: string
+          _plan_code: string
+          _subscription_id: string
+        }
+        Returns: Json
+      }
+      subscription_finalize_scheduled_plan_change: {
+        Args: {
+          _expected_amount_ars: number
+          _expected_plan_updated_at: string
+          _expected_preapproval_id: string
+          _expected_price_version: number
+          _expected_subscription_updated_at: string
+          _from_plan_code: string
+          _metadata: Json
+          _organization_id: string
+          _subscription_id: string
+          _to_plan_code: string
         }
         Returns: Json
       }

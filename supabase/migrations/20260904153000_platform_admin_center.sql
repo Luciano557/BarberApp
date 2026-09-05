@@ -142,11 +142,16 @@ CREATE TABLE IF NOT EXISTS public.subscription_price_change_items (
   subscription_id uuid
     REFERENCES public.organization_subscriptions(id) ON DELETE SET NULL,
   preapproval_id text,
+  expected_external_reference text,
   item_type text NOT NULL
     CHECK (item_type IN ('active_renewal', 'pending_checkout')),
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'succeeded', 'failed', 'skipped')),
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 100),
+  compensation_attempts integer NOT NULL DEFAULT 0
+    CHECK (compensation_attempts BETWEEN 0 AND 100),
+  requires_compensation boolean NOT NULL DEFAULT false,
+  provider_mutation_started_at timestamptz,
   idempotency_key uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
   last_http_status integer,
   error_code text,
@@ -192,6 +197,383 @@ REVOKE ALL ON TABLE public.subscription_price_change_items FROM PUBLIC, anon, au
 GRANT SELECT, INSERT, UPDATE ON TABLE public.platform_admin_audit_log TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.subscription_price_change_batches TO service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.subscription_price_change_items TO service_role;
+
+-- Read models keep operational filtering, ordering and pagination inside
+-- Postgres. They deliberately expose only the platform DTO allow-list and are
+-- unavailable to browser roles. MAU remains joined from Auth Admin in Edge.
+CREATE OR REPLACE VIEW public.platform_admin_organizations_v
+WITH (security_invoker = true)
+AS
+WITH profile_counts AS (
+  SELECT organization_id, count(*)::integer AS users_count
+  FROM public.profiles
+  WHERE organization_id IS NOT NULL
+  GROUP BY organization_id
+), branch_counts AS (
+  SELECT organization_id, count(*)::integer AS branches_count
+  FROM public.sucursales
+  WHERE deleted_at IS NULL
+  GROUP BY organization_id
+)
+SELECT
+  organization.id,
+  organization.name,
+  organization.slug,
+  organization.is_active IS DISTINCT FROM false AS is_enabled,
+  organization.created_at,
+  CASE
+    WHEN organization.is_active = false THEN 'inactive'
+    WHEN subscription.id IS NULL THEN 'legacy'
+    WHEN subscription.status = 'trialing' THEN
+      CASE WHEN subscription.trial_ends_at > now() THEN 'trialing' ELSE 'expired' END
+    WHEN subscription.status IN ('active', 'cancelled') THEN
+      CASE
+        WHEN subscription.current_period_end > now() THEN subscription.status
+        WHEN subscription.current_period_end IS NULL THEN 'legacy'
+        ELSE 'expired'
+      END
+    ELSE subscription.status
+  END AS access_status,
+  COALESCE(
+    subscription.billing_plan_code,
+    subscription.current_plan_code,
+    subscription.effective_plan_code
+  ) AS plan_code,
+  plan.name AS plan_name,
+  subscription.trial_ends_at,
+  subscription.current_period_end,
+  subscription.billing_amount_ars,
+  COALESCE(branch_counts.branches_count, 0) AS branches_count,
+  COALESCE(profile_counts.users_count, 0) AS users_count,
+  COALESCE(subscription.last_payment_at, organization.last_payment_at) AS last_payment_at,
+  lower(concat_ws(' ', organization.name, organization.slug)) AS search_text
+FROM public.organizations AS organization
+LEFT JOIN public.organization_subscriptions AS subscription
+  ON subscription.organization_id = organization.id
+LEFT JOIN public.subscription_plans AS plan
+  ON plan.code = COALESCE(
+    subscription.billing_plan_code,
+    subscription.current_plan_code,
+    subscription.effective_plan_code
+  )
+LEFT JOIN profile_counts ON profile_counts.organization_id = organization.id
+LEFT JOIN branch_counts ON branch_counts.organization_id = organization.id;
+
+CREATE OR REPLACE VIEW public.platform_admin_subscriptions_v
+WITH (security_invoker = true)
+AS
+SELECT
+  subscription.id,
+  subscription.organization_id,
+  organization.name AS organization_name,
+  organization.slug AS organization_slug,
+  subscription.status AS source_status,
+  CASE
+    WHEN subscription.status = 'trialing' THEN
+      CASE WHEN subscription.trial_ends_at > now() THEN 'trialing' ELSE 'expired' END
+    WHEN subscription.status IN ('active', 'cancelled') THEN
+      CASE
+        WHEN subscription.current_period_end > now() THEN subscription.status
+        WHEN subscription.current_period_end IS NULL THEN 'legacy'
+        ELSE 'expired'
+      END
+    ELSE subscription.status
+  END AS access_status,
+  subscription.provider,
+  subscription.effective_plan_code,
+  subscription.pending_plan_code,
+  subscription.billing_plan_code,
+  COALESCE(subscription.billing_plan_code, subscription.effective_plan_code) AS resolved_plan_code,
+  subscription.billing_amount_ars,
+  subscription.billing_price_version,
+  subscription.pending_checkout_amount_ars,
+  subscription.pending_checkout_price_version,
+  subscription.trial_ends_at,
+  subscription.current_period_start,
+  subscription.current_period_end,
+  subscription.next_payment_date,
+  subscription.cancel_at_period_end,
+  subscription.mercadopago_status,
+  NULLIF(subscription.mercadopago_preapproval_id, '') IS NOT NULL AS has_preapproval,
+  subscription.updated_at,
+  lower(organization.name) AS search_text
+FROM public.organization_subscriptions AS subscription
+JOIN public.organizations AS organization
+  ON organization.id = subscription.organization_id;
+
+CREATE OR REPLACE VIEW public.platform_admin_payments_v
+WITH (security_invoker = true)
+AS
+SELECT
+  payment.id,
+  payment.organization_id,
+  organization.name AS organization_name,
+  payment.subscription_id,
+  COALESCE(payment.plan_code, payment.billing_plan_code) AS plan_code,
+  payment.amount_ars,
+  payment.currency_id,
+  payment.status,
+  payment.provider,
+  payment.mercadopago_payment_id,
+  payment.mercadopago_authorized_payment_id,
+  payment.period_start,
+  payment.period_end,
+  payment.due_at,
+  payment.paid_at,
+  payment.created_at,
+  COALESCE(payment.paid_at, payment.created_at) AS effective_at,
+  lower(concat_ws(
+    ' ',
+    organization.name,
+    payment.mercadopago_payment_id,
+    payment.mercadopago_authorized_payment_id
+  )) AS search_text
+FROM public.subscription_payments AS payment
+JOIN public.organizations AS organization
+  ON organization.id = payment.organization_id;
+
+CREATE OR REPLACE VIEW public.platform_admin_audit_v
+WITH (security_invoker = true)
+AS
+SELECT
+  audit.id,
+  audit.actor_user_id,
+  audit.actor_alias,
+  audit.action,
+  audit.target_type,
+  audit.target_id,
+  audit.reason,
+  audit.previous_state,
+  audit.next_state,
+  audit.result_status,
+  CASE
+    WHEN audit.result_status = 'succeeded' THEN 'success'
+    WHEN audit.result_status = 'failed' THEN 'failure'
+    ELSE 'partial'
+  END AS result,
+  audit.request_id,
+  audit.created_at,
+  lower(concat_ws(
+    ' ',
+    audit.actor_alias,
+    audit.action,
+    audit.target_type,
+    audit.target_id,
+    audit.reason,
+    audit.request_id::text
+  )) AS search_text
+FROM public.platform_admin_audit_log AS audit;
+
+CREATE OR REPLACE VIEW public.platform_admin_price_change_batches_v
+WITH (security_invoker = true)
+AS
+SELECT
+  batch.*,
+  COALESCE(item_counts.pending_count, 0) AS pending_count,
+  COALESCE(item_counts.processing_count, 0) AS processing_count,
+  COALESCE(item_counts.retryable_count, 0) AS retryable_count
+FROM public.subscription_price_change_batches AS batch
+LEFT JOIN LATERAL (
+  SELECT
+    count(*) FILTER (WHERE item.status = 'pending')::integer AS pending_count,
+    count(*) FILTER (WHERE item.status = 'processing')::integer AS processing_count,
+    count(*) FILTER (
+      WHERE item.status = 'failed'
+         OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
+    )::integer AS retryable_count
+  FROM public.subscription_price_change_items AS item
+  WHERE item.batch_id = batch.id
+) AS item_counts ON true;
+
+CREATE OR REPLACE VIEW public.platform_admin_price_change_items_v
+WITH (security_invoker = true)
+AS
+SELECT
+  item.id,
+  item.batch_id,
+  item.organization_id,
+  COALESCE(organization.name, 'Organizacion eliminada') AS organization_name,
+  item.subscription_id,
+  item.preapproval_id,
+  item.item_type,
+  item.status,
+  item.attempts,
+  item.last_http_status,
+  item.error_code,
+  item.error_message,
+  item.claimed_at,
+  item.completed_at,
+  item.updated_at
+FROM public.subscription_price_change_items AS item
+LEFT JOIN public.organizations AS organization
+  ON organization.id = item.organization_id;
+
+CREATE OR REPLACE VIEW public.platform_admin_price_impact_v
+WITH (security_invoker = true)
+AS
+WITH subscription_intents AS (
+  SELECT
+    subscription.*,
+    (
+      NULLIF(subscription.metadata->>'pending_mercadopago_preapproval_id', '') IS NOT NULL
+      OR (
+        subscription.mercadopago_status = 'pending'
+        AND NULLIF(subscription.mercadopago_preapproval_id, '') IS NOT NULL
+      )
+      OR subscription.pending_checkout_amount_ars IS NOT NULL
+      OR subscription.pending_checkout_price_version IS NOT NULL
+    ) AS has_pending_checkout
+  FROM public.organization_subscriptions AS subscription
+), candidates AS (
+  SELECT
+    COALESCE(
+      CASE WHEN NOT subscription.has_pending_checkout THEN subscription.pending_plan_code END,
+      subscription.billing_plan_code,
+      subscription.current_plan_code,
+      subscription.effective_plan_code
+    ) AS plan_code,
+    'active_renewal'::text AS item_type,
+    CASE
+      WHEN subscription.provider <> 'mercadopago' THEN 'Proveedor no compatible'
+      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') IS NULL THEN 'Falta preapproval activo'
+      ELSE NULL
+    END AS exclusion_reason
+  FROM subscription_intents AS subscription
+  WHERE subscription.status = 'active'
+
+  UNION ALL
+
+  SELECT
+    subscription.pending_plan_code AS plan_code,
+    'pending_checkout'::text AS item_type,
+    CASE
+      WHEN subscription.provider <> 'mercadopago' THEN 'Checkout con proveedor no compatible'
+      WHEN COALESCE(
+        NULLIF(subscription.metadata->>'pending_mercadopago_preapproval_id', ''),
+        CASE WHEN subscription.mercadopago_status = 'pending'
+          THEN NULLIF(subscription.mercadopago_preapproval_id, '')
+        END
+      ) IS NULL THEN 'Falta preapproval pendiente'
+      ELSE NULL
+    END AS exclusion_reason
+  FROM subscription_intents AS subscription
+  WHERE subscription.pending_plan_code IS NOT NULL
+    AND subscription.has_pending_checkout
+), grouped AS (
+  SELECT plan_code, item_type, exclusion_reason, count(*)::integer AS item_count
+  FROM candidates
+  WHERE plan_code IS NOT NULL
+  GROUP BY plan_code, item_type, exclusion_reason
+)
+SELECT
+  plan_code,
+  COALESCE(sum(item_count) FILTER (
+    WHERE item_type = 'active_renewal' AND exclusion_reason IS NULL
+  ), 0)::integer AS eligible_active_renewals,
+  COALESCE(sum(item_count) FILTER (
+    WHERE item_type = 'pending_checkout' AND exclusion_reason IS NULL
+  ), 0)::integer AS pending_checkouts,
+  COALESCE(sum(item_count) FILTER (WHERE exclusion_reason IS NOT NULL), 0)::integer AS excluded,
+  COALESCE(
+    jsonb_object_agg(exclusion_reason, item_count) FILTER (WHERE exclusion_reason IS NOT NULL),
+    '{}'::jsonb
+  ) AS exclusions
+FROM grouped
+GROUP BY plan_code;
+
+CREATE OR REPLACE VIEW public.platform_admin_overview_v
+WITH (security_invoker = true)
+AS
+WITH organization_breakdown AS (
+  SELECT access_status AS key, count(*)::integer AS value
+  FROM public.platform_admin_organizations_v
+  GROUP BY access_status
+), subscription_breakdown AS (
+  SELECT access_status AS key, count(*)::integer AS value
+  FROM public.platform_admin_subscriptions_v
+  GROUP BY access_status
+), payment_breakdown AS (
+  SELECT status AS key, count(*)::integer AS value
+  FROM public.platform_admin_payments_v
+  WHERE effective_at >= now() - interval '30 days'
+  GROUP BY status
+), price_breakdown AS (
+  SELECT status AS key, count(*)::integer AS value
+  FROM public.subscription_price_change_batches
+  GROUP BY status
+)
+SELECT
+  (
+    SELECT count(*)::integer
+    FROM public.platform_admin_organizations_v
+    WHERE is_enabled
+      AND access_status IN ('trialing', 'active', 'cancelled')
+  ) AS barberias_acceso,
+  (
+    SELECT count(*)::integer
+    FROM public.platform_admin_payments_v
+    WHERE status = 'approved'
+      AND paid_at >= now() - interval '30 days'
+  ) AS approved_payments_count,
+  COALESCE((
+    SELECT sum(amount_ars)
+    FROM public.platform_admin_payments_v
+    WHERE status = 'approved'
+      AND paid_at >= now() - interval '30 days'
+  ), 0) AS approved_payments_amount_ars,
+  (
+    SELECT count(*)
+    FROM public.platform_admin_subscriptions_v
+    WHERE access_status IN ('past_due', 'expired')
+       OR (access_status = 'legacy' AND source_status IN ('active', 'cancelled'))
+  ) + (
+    SELECT count(*)
+    FROM public.subscription_price_change_items
+    WHERE status = 'failed'
+  ) + (
+    SELECT count(*)
+    FROM public.platform_admin_payments_v
+    WHERE status IN ('rejected', 'cancelled', 'refunded', 'charged_back')
+      AND created_at >= now() - interval '30 days'
+  ) + (
+    SELECT count(*)
+    FROM public.mercadopago_subscription_events
+    WHERE processed_at IS NULL
+      AND created_at <= now() - interval '5 minutes'
+  ) AS incidencias,
+  COALESCE((SELECT jsonb_object_agg(key, value) FROM organization_breakdown), '{}'::jsonb)
+    AS organizations_breakdown,
+  COALESCE((SELECT jsonb_object_agg(key, value) FROM subscription_breakdown), '{}'::jsonb)
+    AS subscriptions_breakdown,
+  COALESCE((SELECT jsonb_object_agg(key, value) FROM payment_breakdown), '{}'::jsonb)
+    AS payments_30_breakdown,
+  COALESCE((SELECT jsonb_object_agg(key, value) FROM price_breakdown), '{}'::jsonb)
+    AS price_changes_breakdown;
+
+REVOKE ALL ON TABLE public.platform_admin_organizations_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_subscriptions_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_payments_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_audit_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_overview_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_price_change_batches_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_price_change_items_v FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.platform_admin_price_impact_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.platform_admin_organizations_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_subscriptions_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_payments_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_audit_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_overview_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_price_change_batches_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_price_change_items_v TO service_role;
+GRANT SELECT ON TABLE public.platform_admin_price_impact_v TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_platform_admin_organization
+  ON public.profiles (organization_id) WHERE organization_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_subscription_payments_paid_at
+  ON public.subscription_payments (paid_at DESC) WHERE paid_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_mp_subscription_events_unprocessed
+  ON public.mercadopago_subscription_events (created_at)
+  WHERE processed_at IS NULL;
 
 -- Transactionally updates the catalog and materializes an immutable work list.
 -- SECURITY INVOKER is deliberate: only service_role has table privileges/RLS
@@ -282,6 +664,7 @@ BEGIN
     organization_id,
     subscription_id,
     preapproval_id,
+    expected_external_reference,
     item_type,
     status,
     error_code,
@@ -293,6 +676,7 @@ BEGIN
     subscription.organization_id,
     subscription.id,
     NULLIF(subscription.mercadopago_preapproval_id, ''),
+    NULLIF(subscription.mercadopago_external_reference, ''),
     'active_renewal',
     CASE
       WHEN subscription.provider <> 'mercadopago' THEN 'skipped'
@@ -336,6 +720,7 @@ BEGIN
     organization_id,
     subscription_id,
     preapproval_id,
+    expected_external_reference,
     item_type,
     status,
     error_code,
@@ -347,6 +732,7 @@ BEGIN
     subscription.organization_id,
     subscription.id,
     pending_checkout.preapproval_id,
+    pending_checkout.external_reference,
     'pending_checkout',
     CASE
       WHEN subscription.provider <> 'mercadopago' THEN 'skipped'
@@ -371,12 +757,19 @@ BEGIN
     END
   FROM public.organization_subscriptions AS subscription
   CROSS JOIN LATERAL (
-    SELECT COALESCE(
-      NULLIF(subscription.metadata->>'pending_mercadopago_preapproval_id', ''),
-      CASE WHEN subscription.mercadopago_status = 'pending'
-        THEN NULLIF(subscription.mercadopago_preapproval_id, '')
-      END
-    ) AS preapproval_id
+    SELECT
+      COALESCE(
+        NULLIF(subscription.metadata->>'pending_mercadopago_preapproval_id', ''),
+        CASE WHEN subscription.mercadopago_status = 'pending'
+          THEN NULLIF(subscription.mercadopago_preapproval_id, '')
+        END
+      ) AS preapproval_id,
+      COALESCE(
+        NULLIF(subscription.metadata->>'pending_mercadopago_external_reference', ''),
+        CASE WHEN subscription.mercadopago_status = 'pending'
+          THEN NULLIF(subscription.mercadopago_external_reference, '')
+        END
+      ) AS external_reference
   ) AS pending_checkout
   WHERE subscription.pending_plan_code = _plan.code
     AND (
@@ -384,6 +777,49 @@ BEGIN
       OR subscription.pending_checkout_amount_ars IS NOT NULL
       OR subscription.pending_checkout_price_version IS NOT NULL
     );
+
+  -- Pending checkout links cannot be updated atomically with Mercado Pago.
+  -- Invalidate their local reuse contract in the same transaction as the
+  -- catalog change, while the immutable queue item keeps the provider ID and
+  -- reference required to cancel that old link asynchronously.
+  UPDATE public.organization_subscriptions AS subscription
+  SET
+    pending_plan_code = NULL,
+    pending_checkout_amount_ars = NULL,
+    pending_checkout_price_version = NULL,
+    mercadopago_preapproval_id = CASE
+      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') = item.preapproval_id
+        AND subscription.mercadopago_status = 'pending'
+      THEN NULL
+      ELSE subscription.mercadopago_preapproval_id
+    END,
+    mercadopago_external_reference = CASE
+      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') = item.preapproval_id
+        AND subscription.mercadopago_status = 'pending'
+      THEN NULL
+      ELSE subscription.mercadopago_external_reference
+    END,
+    mercadopago_status = CASE
+      WHEN NULLIF(subscription.mercadopago_preapproval_id, '') = item.preapproval_id
+        AND subscription.mercadopago_status = 'pending'
+      THEN NULL
+      ELSE subscription.mercadopago_status
+    END,
+    mercadopago_init_point = NULL,
+    metadata = COALESCE(subscription.metadata, '{}'::jsonb) - ARRAY[
+      'checkout_requested_at',
+      'checkout_requested_by',
+      'pending_mercadopago_preapproval_id',
+      'pending_mercadopago_external_reference',
+      'pending_checkout_amount_ars',
+      'pending_checkout_price_version',
+      'previous_mercadopago_preapproval_id',
+      'previous_mercadopago_external_reference'
+    ]
+  FROM public.subscription_price_change_items AS item
+  WHERE item.batch_id = _batch.id
+    AND item.item_type = 'pending_checkout'
+    AND item.subscription_id = subscription.id;
 
   INSERT INTO public.platform_admin_audit_log (
     actor_user_id,
@@ -450,6 +886,9 @@ BEGIN
     next_retry_at = NULL,
     completed_at = now()
   WHERE item.batch_id = _batch_id
+    AND item.item_type = 'active_renewal'
+    AND NOT item.requires_compensation
+    AND item.provider_mutation_started_at IS NULL
     AND (
       item.status = 'pending'
       OR (item.status = 'processing' AND item.claimed_at < now() - interval '15 minutes')
@@ -478,6 +917,9 @@ BEGIN
   WHERE item.batch_id = _batch_id
     AND batch.id = item.batch_id
     AND subscription.id = item.subscription_id
+    AND item.item_type = 'active_renewal'
+    AND NOT item.requires_compensation
+    AND item.provider_mutation_started_at IS NULL
     AND (
       item.status = 'pending'
       OR (item.status = 'processing' AND item.claimed_at < now() - interval '15 minutes')
@@ -530,7 +972,10 @@ BEGIN
     SELECT item.id
     FROM public.subscription_price_change_items AS item
     WHERE item.batch_id = _batch_id
-      AND item.attempts < 3
+      AND (
+        (item.requires_compensation AND item.compensation_attempts < 3)
+        OR (NOT item.requires_compensation AND item.attempts < 3)
+      )
       AND (
         (item.status = 'pending' AND (item.next_retry_at IS NULL OR item.next_retry_at <= now()))
         OR (item.status = 'processing' AND item.claimed_at < now() - interval '15 minutes')
@@ -561,6 +1006,7 @@ SET search_path = public
 AS $function$
 DECLARE
   _updated integer;
+  _step integer;
 BEGIN
   IF current_user <> 'service_role' THEN
     RAISE EXCEPTION 'PLATFORM_ADMIN_SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
@@ -575,6 +1021,9 @@ BEGIN
     claimed_at = NULL,
     completed_at = now()
   WHERE item.batch_id = _batch_id
+    AND item.item_type = 'active_renewal'
+    AND NOT item.requires_compensation
+    AND item.provider_mutation_started_at IS NULL
     AND (
       item.status = 'failed'
       OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
@@ -604,6 +1053,9 @@ BEGIN
   WHERE item.batch_id = _batch_id
     AND batch.id = item.batch_id
     AND item.subscription_id = subscription.id
+    AND item.item_type = 'active_renewal'
+    AND NOT item.requires_compensation
+    AND item.provider_mutation_started_at IS NULL
     AND (
       item.status = 'failed'
       OR (item.status = 'skipped' AND item.error_code = 'missing_preapproval')
@@ -637,6 +1089,42 @@ BEGIN
       )
     );
 
+  -- A frozen pending-checkout cancellation or any row whose provider mutation
+  -- may already have started must retain its original preapproval. Retargeting
+  -- it could hide an orphan that still charges at the wrong amount.
+  UPDATE public.subscription_price_change_items AS item
+  SET
+    status = 'pending',
+    attempts = CASE WHEN item.requires_compensation THEN item.attempts ELSE 0 END,
+    compensation_attempts = 0,
+    last_http_status = NULL,
+    error_code = CASE
+      WHEN item.requires_compensation THEN 'provider_compensation_required'
+      ELSE NULL
+    END,
+    error_message = CASE
+      WHEN item.requires_compensation
+      THEN 'Mercado Pago debe reconciliarse con la intencion local vigente.'
+      ELSE NULL
+    END,
+    provider_response_ref = NULL,
+    next_retry_at = NULL,
+    claimed_at = NULL,
+    completed_at = NULL
+  WHERE item.batch_id = _batch_id
+    AND (
+      item.status = 'failed'
+      OR (item.status = 'processing' AND item.claimed_at < now() - interval '5 minutes')
+    )
+    AND (_item_ids IS NULL OR item.id = ANY(_item_ids))
+    AND (
+      item.item_type = 'pending_checkout'
+      OR item.requires_compensation
+      OR item.provider_mutation_started_at IS NOT NULL
+    );
+
+  GET DIAGNOSTICS _updated = ROW_COUNT;
+
   -- Reopen only a target that still belongs to the same plan. If a checkout
   -- was safely recreated for that plan, rotate the provider idempotency key.
   UPDATE public.subscription_price_change_items AS item
@@ -650,6 +1138,7 @@ BEGIN
         END
       )
     END,
+    expected_external_reference = NULLIF(subscription.mercadopago_external_reference, ''),
     idempotency_key = CASE
       WHEN item.preapproval_id IS DISTINCT FROM CASE item.item_type
         WHEN 'active_renewal' THEN NULLIF(subscription.mercadopago_preapproval_id, '')
@@ -683,6 +1172,9 @@ BEGIN
       OR (item.status = 'processing' AND item.claimed_at < now() - interval '5 minutes')
     )
     AND (_item_ids IS NULL OR item.id = ANY(_item_ids))
+    AND item.item_type = 'active_renewal'
+    AND NOT item.requires_compensation
+    AND item.provider_mutation_started_at IS NULL
     AND subscription.provider = 'mercadopago'
     AND (
       (
@@ -715,7 +1207,8 @@ BEGIN
       )
     );
 
-  GET DIAGNOSTICS _updated = ROW_COUNT;
+  GET DIAGNOSTICS _step = ROW_COUNT;
+  _updated := _updated + _step;
 
   IF _updated > 0 THEN
     UPDATE public.subscription_price_change_batches
@@ -864,48 +1357,43 @@ BEGIN
   WHERE id = _item.subscription_id
   FOR UPDATE;
 
-  IF NOT FOUND OR NOT (
-    _subscription.provider = 'mercadopago'
-    AND (
-      (
-        _item.item_type = 'active_renewal'
-        AND _subscription.status = 'active'
-        AND COALESCE(
-          CASE
-            WHEN _subscription.pending_plan_code IS NOT NULL
-              AND NULLIF(_subscription.metadata->>'pending_mercadopago_preapproval_id', '') IS NULL
-              AND _subscription.mercadopago_status IS DISTINCT FROM 'pending'
-              AND _subscription.pending_checkout_amount_ars IS NULL
-              AND _subscription.pending_checkout_price_version IS NULL
-            THEN _subscription.pending_plan_code
-          END,
-          _subscription.billing_plan_code,
-          _subscription.current_plan_code,
-          _subscription.effective_plan_code
-        ) = _batch.plan_code
-        AND NULLIF(_subscription.mercadopago_preapproval_id, '') = _item.preapproval_id
-      )
-      OR (
-        _item.item_type = 'pending_checkout'
-        AND _subscription.pending_plan_code = _batch.plan_code
-        AND COALESCE(
-          NULLIF(_subscription.metadata->>'pending_mercadopago_preapproval_id', ''),
-          CASE WHEN _subscription.mercadopago_status = 'pending'
-            THEN NULLIF(_subscription.mercadopago_preapproval_id, '')
-          END
-        ) = _item.preapproval_id
-      )
+  IF _item.item_type = 'active_renewal' AND (
+    NOT FOUND OR NOT (
+      _subscription.provider = 'mercadopago'
+      AND _subscription.status = 'active'
+      AND COALESCE(
+        CASE
+          WHEN _subscription.pending_plan_code IS NOT NULL
+            AND NULLIF(_subscription.metadata->>'pending_mercadopago_preapproval_id', '') IS NULL
+            AND _subscription.mercadopago_status IS DISTINCT FROM 'pending'
+            AND _subscription.pending_checkout_amount_ars IS NULL
+            AND _subscription.pending_checkout_price_version IS NULL
+          THEN _subscription.pending_plan_code
+        END,
+        _subscription.billing_plan_code,
+        _subscription.current_plan_code,
+        _subscription.effective_plan_code
+      ) = _batch.plan_code
+      AND NULLIF(_subscription.mercadopago_preapproval_id, '') = _item.preapproval_id
     )
   ) THEN
     -- Mercado Pago already accepted the PUT, so the worker must first restore
     -- the provider's newly-current local intent (or cancel an orphan) before
     -- this item can become skipped/failed. Keep the fenced claim untouched.
-    RETURN to_jsonb(_item) || jsonb_build_object(
-      'status', 'compensation_required',
-      'attempts', LEAST(GREATEST(_attempts, _item.attempts), 100),
-      'last_http_status', _http_status,
-      'provider_response_ref', left(_provider_response_ref, 250)
-    );
+    UPDATE public.subscription_price_change_items
+    SET
+      requires_compensation = true,
+      attempts = LEAST(GREATEST(_attempts, attempts), 100),
+      last_http_status = _http_status,
+      error_code = 'provider_compensation_required',
+      error_message = 'La intencion local cambio despues de iniciar la mutacion externa.',
+      provider_response_ref = left(_provider_response_ref, 250),
+      next_retry_at = NULL,
+      completed_at = NULL
+    WHERE id = _item.id
+    RETURNING * INTO _item;
+
+    RETURN to_jsonb(_item) || jsonb_build_object('status', 'compensation_required');
   END IF;
 
   IF _item.item_type = 'active_renewal' THEN
@@ -927,12 +1415,6 @@ BEGIN
         billing_price_version = _batch.new_price_version
       WHERE id = _subscription.id;
     END IF;
-  ELSE
-    UPDATE public.organization_subscriptions
-    SET
-      pending_checkout_amount_ars = _batch.new_amount_ars,
-      pending_checkout_price_version = _batch.new_price_version
-    WHERE id = _subscription.id;
   END IF;
 
   UPDATE public.subscription_price_change_items
@@ -942,6 +1424,7 @@ BEGIN
     last_http_status = _http_status,
     error_code = NULL,
     error_message = NULL,
+    requires_compensation = false,
     provider_response_ref = left(_provider_response_ref, 250),
     next_retry_at = NULL,
     completed_at = now()

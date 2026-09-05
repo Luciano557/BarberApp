@@ -2,7 +2,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { mpPlatformFetch, readMpError } from '../_shared/mp-client.ts';
 import {
-  fetchAllRows,
   getPlatformAdminContext,
   getRequestId,
   insertAuditLog,
@@ -149,11 +148,13 @@ function batchDto(
   row: Record<string, unknown>,
   itemRows: Record<string, unknown>[] = [],
 ): Record<string, unknown> {
-  const pendingCount = itemRows.filter((item) => item.status === 'pending').length;
-  const processingCount = itemRows.filter((item) => item.status === 'processing').length;
+  const pendingCount = numberValue(row.pending_count) ??
+    itemRows.filter((item) => item.status === 'pending').length;
+  const processingCount = numberValue(row.processing_count) ??
+    itemRows.filter((item) => item.status === 'processing').length;
   const total = numberValue(row.total_items) ?? itemRows.length;
   const skipped = numberValue(row.skipped_items) ?? itemRows.filter((item) => item.status === 'skipped').length;
-  const retryable = itemRows.filter((item) => (
+  const retryable = numberValue(row.retryable_count) ?? itemRows.filter((item) => (
     item.status === 'failed' ||
     (item.status === 'skipped' && item.error_code === 'missing_preapproval')
   )).length;
@@ -187,23 +188,17 @@ async function readBatch(
   supabaseAdmin: SupabaseClient,
   batchId: string,
 ): Promise<{ batch: Record<string, unknown>; items: Record<string, unknown>[] }> {
-  const [{ data: batch, error: batchError }, { data: items, error: itemsError }] = await Promise.all([
-    supabaseAdmin
-      .from('subscription_price_change_batches')
-      .select('id,plan_code,old_amount_ars,new_amount_ars,old_price_version,new_price_version,status,total_items,processed_items,succeeded_items,failed_items,skipped_items,actor_user_id,actor_alias,reason,started_at,completed_at,created_at,updated_at')
-      .eq('id', batchId)
-      .maybeSingle(),
-    supabaseAdmin
-      .from('subscription_price_change_items')
-      .select('id,batch_id,status,claimed_at,next_retry_at')
-      .eq('batch_id', batchId),
-  ]);
+  const { data: batch, error: batchError } = await supabaseAdmin
+    .from('platform_admin_price_change_batches_v')
+    .select('id,plan_code,old_amount_ars,new_amount_ars,old_price_version,new_price_version,status,total_items,processed_items,succeeded_items,failed_items,skipped_items,pending_count,processing_count,retryable_count,actor_user_id,actor_alias,reason,started_at,completed_at,created_at,updated_at')
+    .eq('id', batchId)
+    .maybeSingle();
 
-  if (batchError || itemsError) throw new Error('BATCH_READ_FAILED');
+  if (batchError) throw new Error('BATCH_READ_FAILED');
   if (!batch) throw new Error('BATCH_NOT_FOUND');
   return {
     batch: batch as Record<string, unknown>,
-    items: (items ?? []) as Record<string, unknown>[],
+    items: [],
   };
 }
 
@@ -226,44 +221,30 @@ async function assertBatchIsCurrent(
 async function preview(supabaseAdmin: SupabaseClient, body: PriceBody) {
   if (!isPlanCode(body.planCode)) throw new Error('INVALID_PLAN');
 
-  const [{ data: plan, error: planError }, subscriptions] = await Promise.all([
+  const [{ data: plan, error: planError }, { data: impact, error: impactError }] = await Promise.all([
     supabaseAdmin
       .from('subscription_plans')
       .select('code,name,description,amount_ars,price_version,billing_period,is_active,sort_order,updated_at')
       .eq('code', body.planCode)
       .maybeSingle(),
-    fetchAllRows(
-      supabaseAdmin,
-      'organization_subscriptions',
-      'id,status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_status,metadata',
-    ),
+    supabaseAdmin
+      .from('platform_admin_price_impact_v')
+      .select('eligible_active_renewals,pending_checkouts,excluded,exclusions')
+      .eq('plan_code', body.planCode)
+      .maybeSingle(),
   ]);
   if (planError) throw new Error('PLAN_READ_FAILED');
+  if (impactError) throw new Error('PRICE_IMPACT_READ_FAILED');
   if (!plan) throw new Error('PLAN_NOT_FOUND');
 
-  let eligibleActiveRenewals = 0;
-  let pendingCheckouts = 0;
-  const exclusionCounts = new Map<string, number>();
-  const exclude = (reason: string) => exclusionCounts.set(reason, (exclusionCounts.get(reason) ?? 0) + 1);
-
-  for (const subscription of subscriptions) {
-    const activePlan = renewalTargetPlanCode(subscription);
-    if (subscription.status === 'active' && activePlan === body.planCode) {
-      if (subscription.provider !== 'mercadopago') exclude('Proveedor no compatible');
-      else if (!stringValue(subscription.mercadopago_preapproval_id)) exclude('Falta preapproval activo');
-      else eligibleActiveRenewals += 1;
-    }
-
-    const pendingId = pendingCheckoutPreapprovalId(subscription);
-    if (subscription.pending_plan_code === body.planCode && hasPendingCheckoutIntent(subscription)) {
-      if (subscription.provider !== 'mercadopago') exclude('Checkout con proveedor no compatible');
-      else if (!pendingId) exclude('Falta preapproval pendiente');
-      else pendingCheckouts += 1;
-    }
-  }
-
-  const exclusions = Array.from(exclusionCounts.entries()).map(([reason, count]) => ({ reason, count }));
-  const excluded = exclusions.reduce((total, item) => total + item.count, 0);
+  const eligibleActiveRenewals = numberValue(impact?.eligible_active_renewals) ?? 0;
+  const pendingCheckouts = numberValue(impact?.pending_checkouts) ?? 0;
+  const excluded = numberValue(impact?.excluded) ?? 0;
+  const exclusionMap = isRecord(impact?.exclusions) ? impact.exclusions : {};
+  const exclusions = Object.entries(exclusionMap).map(([reason, count]) => ({
+    reason,
+    count: numberValue(count) ?? 0,
+  }));
   return {
     plan: planDto(plan as Record<string, unknown>),
     impact: {
@@ -841,7 +822,7 @@ async function processBatch(
   const after = await readBatch(supabaseAdmin, batchId);
   // A concurrent worker may still own `processing` rows. Only advertise work
   // this caller can claim now, otherwise clients can spin in a tight loop.
-  const hasMore = after.items.some((item) => item.status === 'pending');
+  const hasMore = (numberValue(after.batch.pending_count) ?? 0) > 0;
   const succeeded = results.filter((result) => result.succeeded).length;
   const failed = results.filter((result) => result.status === 'failed').length;
   const skipped = results.filter((result) => result.status === 'skipped').length;
