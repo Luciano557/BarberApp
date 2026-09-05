@@ -11,11 +11,12 @@ import { perfEvent } from '@/lib/perfLog';
 import { CookieConsentBanner } from '@/components/consent/CookieConsentBanner';
 import { useMetaPixel } from '@/hooks/useMetaPixel';
 import { trackMetaEvent } from '@/lib/analytics/metaPixel';
+import { formatSubscriptionPrice, useSubscriptionPlans } from '@/hooks/useSubscriptionPlans';
 
 const PLANS = [
-  { id: 'basico',      label: 'Básico',      price: '$30.000'  },
-  { id: 'profesional', label: 'Profesional', price: '$50.000'  },
-  { id: 'premium',     label: 'Premium',     price: '$100.000' },
+  { id: 'basico', label: 'Básico' },
+  { id: 'profesional', label: 'Profesional' },
+  { id: 'premium', label: 'Premium' },
 ] as const;
 type PlanId = typeof PLANS[number]['id'];
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +28,11 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const { signIn, signUp, authError } = useAuth();
   const { organization, error: orgError } = useOrganization();
+  const {
+    data: subscriptionPlans = [],
+    isLoading: plansLoading,
+    isError: plansError,
+  } = useSubscriptionPlans();
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>(
     searchParams.get('mode') === 'signup' ? 'register' : 'login'
@@ -47,6 +53,12 @@ export default function Login() {
   const [plan, setPlan] = useState<PlanId>('basico');
 
   useMetaPixel(import.meta.env.VITE_META_PIXEL_ID);
+
+  const planPriceLabel = (planId: PlanId) => {
+    const catalogPlan = subscriptionPlans.find((item) => item.code === planId);
+    if (catalogPlan) return formatSubscriptionPrice(catalogPlan.amount_ars);
+    return plansLoading ? 'Cargando precio…' : plansError ? 'Precio no disponible' : 'Consultar precio';
+  };
 
   // Watcher post-login: cuando la org carga, navegamos. Si hay error de auth/org,
   // mostramos toast y soltamos el botón. Si pasa el timeout local de seguridad,
@@ -137,7 +149,11 @@ export default function Login() {
       return;
     }
     // Forzar cierre de sesión previa para que no se herede la org de otro usuario
-    try { await supabase.auth.signOut(); } catch {}
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutError) {
+      console.warn('[Login] No se pudo limpiar la sesion anterior:', signOutError);
+    }
 
     // Guardar email para la pantalla de verificación (limpiado tras éxito)
     localStorage.setItem('pending_verification_email', registerEmail);
@@ -445,7 +461,7 @@ export default function Login() {
                               Gratis
                             </span>
                             <span className="text-slate-400 text-xs break-words">
-                              <span className="line-through">{p.price}</span> después del primer mes
+                              <span className="line-through">{planPriceLabel(p.id)}</span> después de la prueba
                             </span>
                           </span>
                         );
@@ -464,7 +480,7 @@ export default function Login() {
                             Gratis
                           </span>
                           <span className="text-slate-400 text-xs">
-                            <span className="line-through">{p.price}</span> después del primer mes
+                            <span className="line-through">{planPriceLabel(p.id)}</span> después de la prueba
                           </span>
                         </span>
                       </SelectItem>

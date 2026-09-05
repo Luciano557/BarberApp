@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Clock, Pencil, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -46,6 +48,7 @@ export function HorariosAtencionCard({
     loading, sucursalHorarios, horariosDeBarbero, barbersWithOverride,
     createOverride, removeOverride, refetch,
   } = useHorariosTrabajo(sucursalId, organizationId);
+  const showSkeleton = useDelayedVisible(loading);
 
   const [activeView, setActiveView] = useState<'sucursal' | 'barberos'>('sucursal');
   const [selectedBarberId, setSelectedBarberId] = useState('');
@@ -111,7 +114,19 @@ export function HorariosAtencionCard({
         className={cn('transition-shadow duration-highlight', highlighted && 'ring-2 ring-primary/40')}
       >
         {loading ? (
-          <p className="py-4 text-sm text-muted-foreground">Cargando horarios...</p>
+          showSkeleton ? (
+            <div className="space-y-4">
+              <Skeleton className="h-9 w-56 sm:max-w-xs" />
+              <div className="space-y-2.5">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null
         ) : (
           <div className="w-full">
             <SegmentedControl

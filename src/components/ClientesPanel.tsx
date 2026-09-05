@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { Plus, Search, Users, MessageCircle, Upload, Loader2 } from 'lucide-react';
+import { Plus, Search, Users, MessageCircle, Upload } from 'lucide-react';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useClientes } from '@/hooks/useClientes';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { NuevoClienteDialog } from './clientes/NuevoClienteDialog';
 import { ClienteDetailDialog } from './clientes/ClienteDetailDialog';
 import { ImportClientesDialog } from './clientes/import/ImportClientesDialog';
@@ -15,6 +17,7 @@ import { canonicalizePhoneAR } from '@/lib/phone';
 export function ClientesPanel() {
   const { currentSucursal, isAllMode } = useSucursal();
   const { clientes, isLoading, error, refresh } = useClientes();
+  const showSkeleton = useDelayedVisible(isLoading);
 
   const [search, setSearch] = useState('');
   const [showNuevo, setShowNuevo] = useState(false);
@@ -94,10 +97,15 @@ export function ClientesPanel() {
 
       {/* Lista */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          Cargando clientes...
-        </div>
+        showSkeleton ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="rounded-xl border bg-card px-4 py-3">
+                <SkeletonRow />
+              </div>
+            ))}
+          </div>
+        ) : null
       ) : error ? (
         <Card className="p-8 text-center">
           <p className="text-sm text-destructive">{error}</p>

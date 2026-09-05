@@ -2247,7 +2247,9 @@ export type Database = {
       }
       organization_subscriptions: {
         Row: {
+          billing_amount_ars: number | null
           billing_plan_code: string | null
+          billing_price_version: number | null
           cancel_at_period_end: boolean
           cancelled_at: string | null
           created_at: string
@@ -2265,6 +2267,8 @@ export type Database = {
           next_payment_date: string | null
           organization_id: string
           payer_email: string | null
+          pending_checkout_amount_ars: number | null
+          pending_checkout_price_version: number | null
           pending_plan_code: string | null
           provider: string
           status: string
@@ -2273,7 +2277,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          billing_amount_ars?: number | null
           billing_plan_code?: string | null
+          billing_price_version?: number | null
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
@@ -2291,6 +2297,8 @@ export type Database = {
           next_payment_date?: string | null
           organization_id: string
           payer_email?: string | null
+          pending_checkout_amount_ars?: number | null
+          pending_checkout_price_version?: number | null
           pending_plan_code?: string | null
           provider?: string
           status?: string
@@ -2299,7 +2307,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          billing_amount_ars?: number | null
           billing_plan_code?: string | null
+          billing_price_version?: number | null
           cancel_at_period_end?: boolean
           cancelled_at?: string | null
           created_at?: string
@@ -2317,6 +2327,8 @@ export type Database = {
           next_payment_date?: string | null
           organization_id?: string
           payer_email?: string | null
+          pending_checkout_amount_ars?: number | null
+          pending_checkout_price_version?: number | null
           pending_plan_code?: string | null
           provider?: string
           status?: string
@@ -2574,7 +2586,6 @@ export type Database = {
           max_barbers: number | null
           max_services: number | null
           plan: string
-          price_monthly: number | null
         }
         Insert: {
           can_export_reports?: boolean | null
@@ -2584,7 +2595,6 @@ export type Database = {
           max_barbers?: number | null
           max_services?: number | null
           plan: string
-          price_monthly?: number | null
         }
         Update: {
           can_export_reports?: boolean | null
@@ -2594,7 +2604,6 @@ export type Database = {
           max_barbers?: number | null
           max_services?: number | null
           plan?: string
-          price_monthly?: number | null
         }
         Relationships: []
       }
@@ -3366,6 +3375,7 @@ export type Database = {
           is_active: boolean
           metadata: Json
           name: string
+          price_version: number
           sort_order: number
           updated_at: string
         }
@@ -3378,6 +3388,7 @@ export type Database = {
           is_active?: boolean
           metadata?: Json
           name: string
+          price_version?: number
           sort_order: number
           updated_at?: string
         }
@@ -3390,6 +3401,7 @@ export type Database = {
           is_active?: boolean
           metadata?: Json
           name?: string
+          price_version?: number
           sort_order?: number
           updated_at?: string
         }

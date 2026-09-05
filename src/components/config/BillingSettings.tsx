@@ -4,20 +4,20 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useSubscriptionAccess, type BillingPlanCode } from '@/hooks/useSubscriptionAccess';
+import {
+  formatSubscriptionPrice,
+  useSubscriptionPlans,
+  type SubscriptionPlan,
+} from '@/hooks/useSubscriptionPlans';
 import { getFunctionErrorMessage } from '@/lib/functionErrors';
 import { PLAN_BENEFITS, PLAN_SUMMARY } from '@/lib/planAccess';
 import { supabaseUntyped } from '@/lib/supabaseUntyped';
 import { cn } from '@/lib/utils';
-
-interface SubscriptionPlan {
-  code: BillingPlanCode;
-  name: string;
-  amount_ars: number | string;
-  sort_order: number;
-}
 
 interface SubscriptionPayment {
   id: string;
@@ -50,14 +50,6 @@ const PLAN_ACCENTS: Record<BillingPlanCode, string> = {
   premium: 'border-status-warning/50 bg-status-warning-bg/40',
 };
 
-function formatPrice(value: number | string) {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  }).format(Number(value));
-}
-
 function formatDate(value: string | null | undefined) {
   if (!value) return 'Sin fecha';
 
@@ -74,7 +66,14 @@ function planRank(plan: SubscriptionPlan | undefined) {
 
 export function BillingSettings() {
   const { access, isLoading, error, refreshAccess } = useSubscriptionAccess();
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const {
+    data: plans = [],
+    isLoading: plansLoading,
+    isError: plansError,
+    refetch: refreshPlans,
+  } = useSubscriptionPlans();
+  const showSkeleton = useDelayedVisible(isLoading);
+  const showPlansSkeleton = useDelayedVisible(plansLoading);
   const [payments, setPayments] = useState<SubscriptionPayment[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
@@ -82,21 +81,13 @@ export function BillingSettings() {
     let cancelled = false;
 
     async function fetchBillingData() {
-      const [plansRes, paymentsRes] = await Promise.all([
-        supabaseUntyped
-          .from<SubscriptionPlan>('subscription_plans')
-          .select('code, name, amount_ars, sort_order')
-          .eq('is_active', true)
-          .order('sort_order', { ascending: true }),
-        supabaseUntyped
-          .from<SubscriptionPayment>('subscription_payments')
-          .select('id, plan_code, amount_ars, status, paid_at, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5),
-      ]);
+      const paymentsRes = await supabaseUntyped
+        .from<SubscriptionPayment>('subscription_payments')
+        .select('id, plan_code, amount_ars, status, paid_at, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (!cancelled) {
-        if (!plansRes.error) setPlans((plansRes.data ?? []) as SubscriptionPlan[]);
         if (!paymentsRes.error) setPayments((paymentsRes.data ?? []) as SubscriptionPayment[]);
       }
     }
@@ -219,9 +210,17 @@ export function BillingSettings() {
   };
 
   if (isLoading) {
+    if (!showSkeleton) return null;
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">
-        Cargando facturacion...
+      <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-24 rounded-full" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-72 max-w-full" />
+          </div>
+          <Skeleton className="h-9 w-28 shrink-0" />
+        </div>
       </div>
     );
   }
@@ -263,7 +262,11 @@ export function BillingSettings() {
             </p>
           </div>
 
-          <Button variant="outline" size="sm" onClick={refreshAccess}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void Promise.all([refreshAccess(), refreshPlans()])}
+          >
             <RefreshCw className="h-4 w-4" />
             Actualizar
           </Button>
@@ -324,7 +327,24 @@ export function BillingSettings() {
           <Badge variant="secondary">Mercado Pago</Badge>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
+        {plansLoading && plans.length === 0 ? (
+          showPlansSkeleton ? (
+            <div className="grid gap-3 md:grid-cols-3" aria-label="Cargando planes">
+              {[0, 1, 2].map((item) => (
+                <Skeleton key={item} className="h-80 rounded-lg" />
+              ))}
+            </div>
+          ) : null
+        ) : plansError && plans.length === 0 ? (
+          <div className="rounded-lg border border-status-error/30 bg-status-error-bg p-4 text-sm text-status-error-foreground">
+            No pudimos cargar los precios de los planes. Actualiza para reintentar.
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+            No hay planes disponibles en este momento.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-3">
           {plans.map((plan) => {
             const isCurrent = currentPlan?.code === plan.code && access.status === 'active';
             const isEffective = effectivePlan?.code === plan.code;
@@ -339,7 +359,7 @@ export function BillingSettings() {
                     <div>
                       <CardTitle className="text-lg">{plan.name}</CardTitle>
                       <p className="mt-1 text-2xl font-semibold text-foreground">
-                        {formatPrice(plan.amount_ars)}
+                        {formatSubscriptionPrice(plan.amount_ars)}
                       </p>
                     </div>
                     {plan.code === 'premium' ? (
@@ -412,7 +432,8 @@ export function BillingSettings() {
               </Card>
             );
           })}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-border bg-card p-5">
@@ -429,7 +450,7 @@ export function BillingSettings() {
               <div key={payment.id} className="flex items-center justify-between gap-4 py-3 text-sm">
                 <div>
                   <p className="font-medium text-foreground">
-                    {payment.plan_code ?? 'Plan'} · {formatPrice(payment.amount_ars)}
+                    {payment.plan_code ?? 'Plan'} · {formatSubscriptionPrice(Number(payment.amount_ars))}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {formatDate(payment.paid_at ?? payment.created_at)}

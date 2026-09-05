@@ -5,6 +5,7 @@ import { Plus, Building2, Settings, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -536,23 +537,17 @@ export const MiNegocioPanel = forwardRef<MiNegocioPanelHandle, MiNegocioPanelPro
       )}
 
       {visibleSucursales.length === 0 && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-          <Building2 className="h-8 w-8 text-muted-foreground/50" />
-          <div>
-            <p className="text-sm font-medium">
-              {isManagerOnly ? 'No tenés sucursales asignadas.' : 'No tenés sucursales todavía'}
-            </p>
-            {!isManagerOnly && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Creá la primera para empezar a configurar el negocio.
-              </p>
+        <div className="rounded-lg border border-dashed p-8">
+          <EmptyState
+            icon={Building2}
+            title={isManagerOnly ? 'No tenés sucursales asignadas.' : 'No tenés sucursales todavía'}
+            description={!isManagerOnly ? 'Creá la primera para empezar a configurar el negocio.' : undefined}
+            action={canCreateSucursal && (
+              <Button variant="outline" size="sm" onClick={handleOpenCreate}>
+                Nueva sucursal
+              </Button>
             )}
-          </div>
-          {canCreateSucursal && (
-            <Button variant="outline" size="sm" onClick={handleOpenCreate}>
-              Nueva sucursal
-            </Button>
-          )}
+          />
         </div>
       )}
 

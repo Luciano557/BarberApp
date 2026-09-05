@@ -35,6 +35,15 @@
         ],
         "createdAt": "2026-08-22T12:51:18.320Z",
         "reason": "Badge de plan bloqueado y section labels 'Principal'/'Gestión' del sidebar — coincide con la excepción ya sancionada en DESIGN.md Typography ('Micro 10px: exclusivo de badges, contadores y section labels uppercase del sidebar')"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/agenda/AgendaDayView.tsx"
+        ],
+        "createdAt": "2026-09-01T12:37:52.416Z",
+        "reason": "Color-coding de turnos preexistente — mismo patrón ya sancionado en AgendaMultiDayTurnoCard.tsx (borderLeft por barbero/servicio), no tocado por el fix de z-index de 2026-09-01"
       }
     ]
   }

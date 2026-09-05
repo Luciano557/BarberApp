@@ -7,7 +7,11 @@ import { Loader2 } from 'lucide-react';
 import { CreditCard, Banknote, Check, Percent, ArrowLeft, ArrowRight, User, Sparkles, Wallet, Tag, Scissors, DollarSign, X, Split, Package, Plus, Trash2, MonitorSmartphone, Keyboard, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { useToast } from '@/hooks/use-toast';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { InlineReadError } from '@/components/ui/InlineReadError';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
+import { feedback } from '@/lib/feedback';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -120,6 +124,11 @@ interface PaymentRegistrationProps {
   services: Service[];
   extras: Extra[];
   barbers: Barber[];
+  /** true mientras `useCobrarBarbers` resuelve la primera carga o un refetch. */
+  barbersLoading?: boolean;
+  /** Mensaje humano cuando la carga de barberos se agota sin datos previos. */
+  barbersError?: string | null;
+  onRetryBarbers?: () => void;
   discounts: Discount[];
   lines?: Line[];
   sucursalId?: string | null;
@@ -164,6 +173,9 @@ export function PaymentRegistration({
   services,
   extras,
   barbers,
+  barbersLoading = false,
+  barbersError = null,
+  onRetryBarbers,
   discounts,
   lines = [],
   sucursalId,
@@ -174,7 +186,6 @@ export function PaymentRegistration({
   canViewDailyTurnos = true,
   currentPlan = 'basico',
 }: PaymentRegistrationProps) {
-  const { toast } = useToast();
   const { tareas } = useTareas();
   const { isOwner, isGeneralManager, isManager, isSucursalAccount } = useAuth();
   const canEditProductPrice = isOwner || isGeneralManager || isManager;
@@ -188,6 +199,20 @@ export function PaymentRegistration({
   const [selectedDigitalMethod, setSelectedDigitalMethod] = useState<PaymentMethod | ''>('');
   // (Notificaciones de tareas se centralizan en la campanita global; se quitó la burbuja inferior.)
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Distingue la primera carga de barberos (sin contenido usable → skeleton)
+  // de un refetch posterior (cambio de sucursal → mantener el grid visible).
+  // Sin esto, `barbers.length === 0` durante la carga se confunde con el
+  // EmptyState real de "sin equipo configurado".
+  // Solo se latchea en una carga REALMENTE exitosa — si el intento termina en
+  // `barbersError` (nunca hubo datos), un retry manual debe volver a mostrar
+  // el skeleton en vez de caer en el EmptyState falso de "sin equipo".
+  const [hasLoadedBarbersOnce, setHasLoadedBarbersOnce] = useState(false);
+  useEffect(() => {
+    if (!barbersLoading && !barbersError) setHasLoadedBarbersOnce(true);
+  }, [barbersLoading, barbersError]);
+  const barbersSkeletonDelayed = useDelayedVisible(barbersLoading);
+  const showBarbersSkeleton = !hasLoadedBarbersOnce && barbersSkeletonDelayed;
 
   // El total se resuelve vía ref porque el schema (módulo, no re-creado por render)
   // necesita leer el total vigente al momento de validar el split.
@@ -411,10 +436,8 @@ export function PaymentRegistration({
     if (cart.length > 0) {
       // Carrito asignado a otro barbero: bloquear.
       if (productSaleAssignment === 'barber' && cartBarberId && cartBarberId !== barberId) {
-        toast({
-          title: 'Productos asignados a otro barbero',
+        feedback.error('Productos asignados a otro barbero', {
           description: `Los productos están asignados a ${cartBarberName ?? 'otro barbero'}. Cambiá la asignación tocando ese barbero u otra opción, o cancelá la venta para empezar de nuevo.`,
-          variant: 'destructive',
         });
         return;
       }
@@ -428,7 +451,7 @@ export function PaymentRegistration({
     form.setValue('barberId', barberId);
     form.trigger();
     setTimeout(() => goToNextStep(), 100);
-  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, toast, form]);
+  }, [barbers, cart.length, cartBarberId, cartBarberName, productSaleAssignment, goToNextStep, form]);
 
   const handleSelectNoBarber = useCallback(() => {
     setProductSaleAssignment('no_barber');
@@ -449,8 +472,7 @@ export function PaymentRegistration({
 
   const handleGoToTeamSetup = useCallback(() => {
     if (isSucursalAccount) {
-      toast({
-        title: 'Cuenta de sucursal',
+      feedback.info('Cuenta de sucursal', {
         description: 'Pedile al dueño, al general manager o al manager que configure el equipo para habilitar cobros con servicios.',
       });
       return;
@@ -461,11 +483,10 @@ export function PaymentRegistration({
       return;
     }
 
-    toast({
-      title: 'Equipo',
+    feedback.info('Equipo', {
       description: 'Abrí Mi Negocio y entrá en Equipo para añadir o activar miembros.',
     });
-  }, [isSucursalAccount, onNavigateToTeamSetup, toast]);
+  }, [isSucursalAccount, onNavigateToTeamSetup]);
 
   const handleNavigateToBilling = useCallback(() => {
     if (onNavigateToBilling) {
@@ -473,27 +494,22 @@ export function PaymentRegistration({
       return;
     }
 
-    toast({
-      title: 'Plan y Suscripcion',
+    feedback.info('Plan y Suscripcion', {
       description: 'Abrilo desde Configuracion para cambiar el plan del negocio.',
     });
-  }, [onNavigateToBilling, toast]);
+  }, [onNavigateToBilling]);
 
   const handleSelectService = useCallback((serviceId: string) => {
     if (!selectedBarber) {
-      toast({
-        title: 'Falta barbero',
+      feedback.error('Falta barbero', {
         description: 'Para agregar un servicio, primero seleccioná un barbero.',
-        variant: 'destructive',
       });
       return;
     }
     const svc = services.find(s => s.id === serviceId);
     if (!svc || isPriceMissing(svc.price)) {
-      toast({
-        title: 'Precio pendiente',
+      feedback.error('Precio pendiente', {
         description: 'Definí un precio para este ítem antes de cobrarlo.',
-        variant: 'destructive',
       });
       return;
     }
@@ -501,7 +517,7 @@ export function PaymentRegistration({
     form.setValue('serviceId', serviceId);
     form.trigger();
     setTimeout(() => goToNextStep(), 100);
-  }, [selectedBarber, goToNextStep, toast, services, form]);
+  }, [selectedBarber, goToNextStep, services, form]);
 
 
   const handleToggleExtra = useCallback((extraId: string) => {
@@ -513,10 +529,8 @@ export function PaymentRegistration({
       }
       const ex = extras.find(e => e.id === extraId);
       if (!ex || isPriceMissing(ex.price)) {
-        toast({
-          title: 'Precio pendiente',
+        feedback.error('Precio pendiente', {
           description: 'Definí un precio para este ítem antes de cobrarlo.',
-          variant: 'destructive',
         });
         return prev;
       }
@@ -524,7 +538,7 @@ export function PaymentRegistration({
       form.setValue('extraIds', next);
       return next;
     });
-  }, [extras, toast, form]);
+  }, [extras, form]);
 
   const handleSelectDiscount = useCallback((discountId: string) => {
     setSelectedDiscount(discountId);
@@ -769,22 +783,18 @@ export function PaymentRegistration({
         triggerSuccessOverlay();
         resetForm();
       } else {
-        toast({
-          title: "❌ No se pudo guardar el cobro",
+        feedback.error("❌ No se pudo guardar el cobro", {
           description: "Revisá tu conexión a Internet e intentá de nuevo.",
-          variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
-        title: "❌ Error inesperado",
+      feedback.error("❌ Error inesperado", {
         description: "Ocurrió un problema al guardar. Intentá de nuevo.",
-        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, toast, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form, clienteSearch.selectedCliente]);
+  }, [selectedService, paymentMethod, barber, service, selectedExtrasData, selectedDiscountData, subtotal, total, onSubmit, resetForm, splitMode, splitEfectivoNum, splitMpNum, selectedDigitalMethod, pctEfectivo, pctDigital, pctSimple, cart, cartBarberId, cartBarberName, productSaleAssignment, form, clienteSearch.selectedCliente]);
 
   const handleSubmit = useCallback(async () => {
     await form.handleSubmit(onValidCobro)();
@@ -883,17 +893,15 @@ export function PaymentRegistration({
         triggerSuccessOverlay();
         resetForm();
       } else {
-        toast({
-          title: '❌ No se pudo guardar el cobro',
+        feedback.error('❌ No se pudo guardar el cobro', {
           description: 'El pago fue aprobado en la terminal pero falló al registrarse. Anotalo manualmente.',
-          variant: 'destructive',
         });
       }
     } finally {
       setIsSubmitting(false);
       setPendingMpPayload(null);
     }
-  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, toast, resetForm, clienteSearch.selectedCliente]);
+  }, [pendingMpPayload, onSubmit, service, selectedExtrasData, selectedDiscountData, subtotal, total, cart.length, recargoTotal, totalACobrar, resetForm, clienteSearch.selectedCliente]);
 
   // ── "Cobrar con Terminal" explicit handler ───────────────────────────────────
   // Called only when the user explicitly clicks the terminal button.
@@ -1043,58 +1051,73 @@ export function PaymentRegistration({
         {/* Barber Step */}
         {currentStep === 'barber' && (
           <div className="space-y-6">
-            {barbers.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-5">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">No tenés ningún barbero asignado</p>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{teamSetupDescription}</p>
-                  <Button type="button" variant="outline" size="sm" onClick={handleGoToTeamSetup}>
-                    Añadir miembro del equipo
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {(barbers.length > 0 || cart.length > 0) && (
+            {showBarbersSkeleton ? (
               <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
-                {barbers.map((barber, index) => {
-                  const isSelected =
-                    selectedBarber === barber.uid ||
-                    (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
-                  return (
-                    <SelectableCard
-                      key={barber.uid}
-                      number={index + 1}
-                      selected={isSelected}
-                      onClick={() => handleSelectBarber(barber.uid)}
-                    >
-                      <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                        <User className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
-                    </SelectableCard>
-                  );
-                })}
-
-                {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
-                {cart.length > 0 && (
-                  <SelectableCard
-                    number={barbers.length + 1}
-                    selected={productSaleAssignment === 'no_barber'}
-                    onClick={handleSelectNoBarber}
-                    className={productSaleAssignment === 'no_barber' ? '' : 'border-dashed'}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
-                      <Package className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <p className="font-medium text-center text-foreground">Sin barbero</p>
-                    <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
-                  </SelectableCard>
-                )}
+                {[0, 1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="rounded-lg border border-border bg-card p-4 sm:p-6">
+                    <Skeleton className="h-12 w-12 rounded-full mx-auto mb-3" />
+                    <Skeleton className="h-4 w-20 mx-auto" />
+                  </div>
+                ))}
               </div>
+            ) : barbersError ? (
+              <InlineReadError message={barbersError} onRetry={onRetryBarbers ?? (() => {})} />
+            ) : (
+              <>
+                {barbers.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-border bg-muted/30 p-5">
+                    <EmptyState
+                      icon={User}
+                      title="No tenés ningún barbero asignado"
+                      description={teamSetupDescription}
+                      action={(
+                        <Button type="button" variant="outline" size="sm" onClick={handleGoToTeamSetup}>
+                          Añadir miembro del equipo
+                        </Button>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {(barbers.length > 0 || cart.length > 0) && (
+                  <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3">
+                    {barbers.map((barber, index) => {
+                      const isSelected =
+                        selectedBarber === barber.uid ||
+                        (productSaleAssignment === 'barber' && cartBarberId === barber.uid);
+                      return (
+                        <SelectableCard
+                          key={barber.uid}
+                          number={index + 1}
+                          selected={isSelected}
+                          onClick={() => handleSelectBarber(barber.uid)}
+                        >
+                          <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                            <User className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="font-medium text-center text-foreground">{`${barber.firstName} ${barber.lastName}`}</p>
+                        </SelectableCard>
+                      );
+                    })}
+
+                    {/* Tarjeta "Sin barbero": solo visible cuando hay carrito */}
+                    {cart.length > 0 && (
+                      <SelectableCard
+                        number={barbers.length + 1}
+                        selected={productSaleAssignment === 'no_barber'}
+                        onClick={handleSelectNoBarber}
+                        className={productSaleAssignment === 'no_barber' ? '' : 'border-dashed'}
+                      >
+                        <div className="w-12 h-12 rounded-full bg-muted mx-auto mb-3 flex items-center justify-center">
+                          <Package className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium text-center text-foreground">Sin barbero</p>
+                        <p className="text-xs text-center text-muted-foreground mt-0.5">Solo productos</p>
+                      </SelectableCard>
+                    )}
+                  </div>
+                )}
+              </>
             )}
 
             {form.formState.submitCount > 0 && form.formState.errors.barberId && (
@@ -1425,11 +1448,12 @@ export function PaymentRegistration({
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : activeMethods.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8 text-center">
-                <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  No hay métodos de pago activos. Activá al menos uno en Mi Negocio.
-                </p>
+              <div className="rounded-lg border border-dashed border-border bg-muted/30 p-8">
+                <EmptyState
+                  icon={Wallet}
+                  title="No hay métodos de pago activos."
+                  description="Activá al menos uno en Mi Negocio."
+                />
               </div>
             ) : !splitMode ? (
               <>

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { alcanzoLimiteFilas } from './rowLimit';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 
 export interface MontoPorMetodo {
@@ -32,28 +33,33 @@ function emptyMontos(): MontoPorMetodo {
  * si una venta no tiene filas en venta_pagos (pre 17/abr/2026, o cualquier hueco), se
  * cuenta como un único pago con venta.metodo_pago + venta.total_final.
  */
+interface PagoMetodoBundle {
+  montosMesActual: MontoPorMetodo;
+  montosMesAnterior: MontoPorMetodo;
+  datosIncompletos: boolean;
+}
+
+const EMPTY_BUNDLE: PagoMetodoBundle = {
+  montosMesActual: emptyMontos(), montosMesAnterior: emptyMontos(), datosIncompletos: false,
+};
+
 export function usePagoMetodoData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
 ) {
-  const [montosMesActual, setMontosMesActual] = useState<MontoPorMetodo>(emptyMontos());
-  const [montosMesAnterior, setMontosMesAnterior] = useState<MontoPorMetodo>(emptyMontos());
-  const [datosIncompletos, setDatosIncompletos] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}`;
 
+  const readState = useReadState<PagoMetodoBundle>({
+    contextKey,
+    errorMessage: 'No pudimos cargar los métodos de pago.',
+    staleErrorMessage: 'No pudimos actualizar los métodos de pago.',
+    surfaceId: `estadisticas-pago-metodo:${organizationId ?? 'none'}`,
+  });
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal]);
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: null, error: null };
 
-  const fetchData = async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
-
-    try {
       const today = new Date();
       const rangeStart = startOfMonth(subMonths(today, 1));
       const rangeEnd = endOfMonth(today);
@@ -89,16 +95,16 @@ export function usePagoMetodoData(
       type PagoRow = { venta_id: string; metodo_pago: string; monto: number | string | null };
 
       const [ventasRes, pagosRes] = await Promise.all([
-        ventaQuery,
-        pagosQuery.returns<PagoRow[]>(),
+        ventaQuery.abortSignal(signal),
+        pagosQuery.returns<PagoRow[]>().abortSignal(signal),
       ]);
-      if (ventasRes.error) throw ventasRes.error;
-      if (pagosRes.error) throw pagosRes.error;
+      const failed = [ventasRes, pagosRes].find((r) => r.error);
+      if (failed) {
+        return { data: null, error: failed.error, status: (failed as { status?: number }).status };
+      }
 
       // Salvaguarda de truncado: estas dos consultas siguen leyendo filas crudas.
-      setDatosIncompletos(
-        alcanzoLimiteFilas(ventasRes.data) || alcanzoLimiteFilas(pagosRes.data),
-      );
+      const datosIncompletos = alcanzoLimiteFilas(ventasRes.data) || alcanzoLimiteFilas(pagosRes.data);
 
       const ventas = ventasRes.data || [];
 
@@ -135,14 +141,27 @@ export function usePagoMetodoData(
         });
       });
 
-      setMontosMesActual(montosActual);
-      setMontosMesAnterior(montosAnterior);
-    } catch (error) {
-      console.error('Error fetching método de pago:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return {
+        data: { montosMesActual: montosActual, montosMesAnterior: montosAnterior, datosIncompletos },
+        error: null,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, readState.run]);
 
-  return { montosMesActual, montosMesAnterior, isLoading, datosIncompletos };
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  return {
+    montosMesActual: bundle.montosMesActual,
+    montosMesAnterior: bundle.montosMesAnterior,
+    datosIncompletos: bundle.datosIncompletos,
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

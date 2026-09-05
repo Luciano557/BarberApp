@@ -3,6 +3,8 @@ import { useForm, type Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
@@ -192,6 +194,7 @@ type EditingSection = 'reglas' | 'limites' | null;
 export function AgendaConfigSection({ sucursalId, organizationId, onDirtyChange }: AgendaConfigSectionProps) {
   const [config, setConfig] = useState<ConfigData>(DEFAULTS);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<EditingSection>(null);
   const [customMode, setCustomMode] = useState<Partial<Record<string, boolean>>>({});
@@ -466,7 +469,31 @@ export function AgendaConfigSection({ sucursalId, organizationId, onDirtyChange 
     </span>
   );
 
-  if (loading) return <div className="py-4 text-sm text-muted-foreground">Cargando configuración...</div>;
+  if (loading) {
+    if (!showSkeleton) return null;
+    return (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j} className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-3.5 w-28" />
+                  <Skeleton className="h-4 w-16" />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

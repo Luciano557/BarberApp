@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Repeat } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +24,7 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
   const { isOwner, isGeneralManager, isManager, isSucursalAccount } = useAuth();
   const { currentSucursal, sucursales } = useSucursal();
   const { recetas, isLoading, addReceta, updateReceta, toggleActivo, deleteReceta } = useTareasRecurrentes();
+  const showSkeleton = useDelayedVisible(isLoading);
 
   const canManageTareas = isOwner || isGeneralManager || isManager;
   const canDelete = canManageTareas; // sucursal_account no tiene RLS de DELETE
@@ -64,25 +68,35 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
     setConfirmDelete(null);
   };
 
-  const EmptyState = ({ label, hint }: { label: string; hint: string }) => (
-    <Card>
-      <CardContent className="py-12 flex flex-col items-center justify-center gap-2 text-center">
-        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-          <Repeat className="h-5 w-5 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground max-w-xs">{hint}</p>
-      </CardContent>
-    </Card>
-  );
-
   if (isLoading) {
-    return <div className="text-center py-8 text-muted-foreground">Cargando...</div>;
+    if (!showSkeleton) return null;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-9 w-56 sm:ml-auto sm:max-w-xs" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4 space-y-3">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-1/3" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const renderList = (list: TareaRecurrente[], emptyLabel: string, emptyHint: string) => {
     if (list.length === 0) {
-      return <EmptyState label={emptyLabel} hint={emptyHint} />;
+      return (
+        <Card>
+          <CardContent className="py-12">
+            <EmptyState icon={Repeat} title={emptyLabel} description={emptyHint} />
+          </CardContent>
+        </Card>
+      );
     }
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">

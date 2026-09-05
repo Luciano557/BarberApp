@@ -187,7 +187,7 @@ El color principal de cada turno sale de la **línea/categoría del servicio**: 
 - **Breakpoints:** el ancho gobierna **layout** (columnas, densidad, apilado); las capacidades táctiles se resuelven por media queries de capacidad (`pointer`, `hover`), no por ancho. Si JS necesita reaccionar al mismo corte que CSS, usa la misma condición — nunca dos números distintos contestando la misma pregunta. No introducir breakpoints nuevos sin razón clara. El corte dominante de la app es `sm:` (640px).
 - **Spacing:** escala default de Tailwind (múltiplos de 4px). Ritmo típico: `gap-2`/`gap-3` dentro de componentes, `space-y-4`/`space-y-6` entre bloques, `p-6` interno de cards. Valores arbitrarios `[Npx]` solo cuando un requisito real lo exige (anchos de columna, offsets de alineación), nunca como spacing general.
 - **Toolbar + panel scrolleable:** toda sección que combine un toolbar de controles con un panel de contenido scrolleable se envuelve en un único card, con el toolbar como header separado por `border-b`. El wrapper usa `overflow:clip` — nunca `overflow:hidden` si contiene elementos `sticky` (hidden crea un contexto de scroll propio y rompe el sticky). [Regla vigente de AGENTS.md.]
-- **z-index por bandas** (documentado en `src/index.css`): 0–20 capas locales · 40 chrome fijo/sticky · 50 overlays Radix · 60–70 onboarding · 80 ghost de drag · 100 toasts. La agenda tiene su sub-stack interno propio. Ningún componente inventa valores fuera de las bandas.
+- **z-index por bandas** (documentado en `src/index.css`): 0–20 capas locales (contenido de pantalla/módulo, incluida la sub-escala numérica de Agenda) · 40 chrome global overlay de Operate (sidebar mobile, su scrim, hamburguesa, backdrop de notificaciones) — nunca sticky de contenido, aunque quede fijo durante el scroll · 50 overlays Radix · 60–70 onboarding · 80 ghost de drag · 100 toasts. Agenda documenta una sub-escala dentro de la banda local, no un stacking context aislado (deuda D34 en DESIGN_BACKLOG.md). Ningún componente inventa valores fuera de las bandas, y dentro de una misma banda no puede haber dos elementos que necesiten orden entre sí.
 
 ## Elevation & Depth
 
@@ -263,13 +263,41 @@ Canon nuevo (C2): `DatePicker` y `TimePicker` (`ui/date-picker.tsx`, `ui/time-pi
 - **TabBadge / contadores:** el contador vive dentro de `SegmentedControl` (integrado), no como badge suelto.
 - **Badge** `sm` = 10px; ese es el piso tipográfico de badges.
 
+### Loading — tres clases, tres patrones
+La espera se resuelve según **qué** espera el usuario, no según qué componente tenés a mano.
+
+1. **Loading de contenido** (una superficie todavía no tiene nada utilizable) → **Skeleton**, el patrón dominante. Debe **aproximar la geometría real** de lo que reemplaza: mismas filas, mismos anchos relativos, mismo contenedor. Un skeleton decorativo que no corresponde al layout final es peor que no tener skeleton — promete algo que no llega (ver el caso corregido en `docs/MODULOS/turnos-agenda.md`).
+2. **Pending de acción** (guardar, crear, eliminar, procesar, enviar, importar, finalizar) → **spinner dentro del control + texto de progreso** ("Guardar" → "Guardando…"), control deshabilitado durante el ciclo completo (upload + persistencia, no la mitad). **Nunca skeleton para una acción.**
+3. **Loading global branded** (`LoadingScreen`) → reservado al arranque, cuando el usuario espera a **Vittro como sistema**, no a una sección. Nunca dentro de una pantalla. Composición **V5 — Fila**: marca (`VittroMark`, sin `clamp` dominante) + divisor + mensaje en una fila horizontal (mobile: apila a columna, divisor rota a horizontal); el bloque crece hacia abajo dentro de esa misma columna de texto al aparecer aviso de demora, retry o el estado fatal — nunca recompone el eje marca↔texto. La marca reduce su protagonismo a propósito frente a versiones previas exploradas. Motion del loader (curvas, timings, entrada/salida) sigue sin tocar — pertenece a C11, no a esta composición estática.
+
+**The Delayed-Skeleton Rule.** El skeleton no aparece instantáneamente: se muestra recién tras ~180ms vía `useDelayedVisible(isLoading)` (`src/hooks/useDelayedVisible.ts`). Si los datos llegan antes, se pasa directo al contenido y nunca hubo parpadeo. El delay gatea **solo la presentación**: no retrasa fetch ni impone duración mínima artificial al skeleton.
+
+**The Silent-Refetch Rule.** El skeleton pertenece a la **primera** carga. Si ya hay contenido utilizable en pantalla, un refetch lo mantiene visible hasta que llegan los datos nuevos — nunca vuelve al skeleton. (Precedentes a preservar: el autosave del portal y el refetch al entrar a Cobrar.)
+
+**Texto de carga suelto ("Cargando…") no es un patrón de superficie.** Sobrevive solo acompañando un loader especializado donde el contexto lo justifique.
+
+**Composiciones compartidas:** `SkeletonRow` (`src/components/ui/SkeletonRow.tsx`) para listas de ítems previsibles — `leading` (`circle` | `bar` | `false`) y `lines` (1 | 2); el consumidor decide contenedor y cuántas repetir. Geometrías específicas (tablas, cards de config) se componen localmente con el primitivo `Skeleton`.
+
 ### Feedback
 - **Toasts: `sonner` es el único sistema.** Posición bottom-right en la app, top-center en páginas públicas. No montar un segundo store de toasts jamás.
+- **`src/lib/feedback.ts`** es el punto recomendado de invocación: `feedback.success/error/info(message, { description? })` sobre Sonner. Los cambios nuevos y las migraciones de código legacy lo usan; la migración de las llamadas directas a `sonner` ya existentes es progresiva, no retroactiva.
 - Acciones con estados de envío visibles (disabled + spinner/texto) — cada acción tiene respuesta.
 
+**Una lectura fallida nunca es un vacío.** Un fallo al leer datos no se renderiza jamás como si la entidad estuviera vacía — un empty state describe una ausencia real, no un problema de red o de servidor. Política (C4C.1):
+- Intento inicial + hasta dos reintentos automáticos silenciosos, esperando 1 segundo y luego 5 segundos entre intentos. Cada intento individual tiene un timeout máximo de 10 segundos.
+- El retry automático es exclusivo de errores transitorios demostrables (red, timeout, 408/429/5xx y equivalentes de Postgres/PostgREST). Errores de autenticación, autorización, RLS, permisos o validación fallan inmediatamente, sin reintentar.
+- Mientras queden reintentos disponibles: sin toast, sin mensaje de error, sin falso empty state — se conserva el skeleton inicial o los datos anteriores, según corresponda.
+- Si se agotan los intentos **sin datos previos**: error inline con "Reintentar" (`InlineReadError`), nunca un empty state.
+- Si se agotan los intentos **con datos previos** (refetch): los datos se conservan en pantalla y se muestra un toast con acción "Reintentar".
+- Superficies operativas críticas (hoy: Agenda y el resumen diario de Caja) pueden sumar una marca persistente y discreta de "datos desactualizados" (`StaleDataNotice`) sobre los datos conservados. La marca desaparece sola en cuanto una actualización posterior tiene éxito.
+- Los errores técnicos nunca se muestran crudos (`e.message`); el mensaje al usuario siempre es una traducción humana y accionable.
+- Un abort por desmontaje o por cambio de contexto (cambio de sucursal, de fecha, de organización) nunca es un error visible.
+- Esta política es exclusiva de lecturas. Las escrituras y mutaciones no la usan.
+
 ### Empty States — dos niveles
-- **Vacío de sección / primera vez** (la pantalla o card no tiene contenido real): patrón rico — ícono en círculo `bg-muted`, label `text-sm font-medium`, hint `text-xs text-muted-foreground`, acción si corresponde. Debe extraerse como componente compartido (backlog).
+- **Vacío de sección / primera vez** (la pantalla o card no tiene contenido real): patrón rico vía **`src/components/ui/EmptyState.tsx`** — `{ icon, title, description?, action?, className? }`. `icon` y `title` obligatorios. No impone contenedor (Card, dashed box, etc. los decide el consumidor) ni conoce roles/permisos/navegación — el `action` es un slot React libre que el consumidor arma con su propia lógica.
 - **Vacío de filtro** (el segmento/tab activo no tiene resultados pero la entidad existe): una línea simple — `"No hay servicios inactivos"` — sin ícono ni ceremonia. Prohibido usar el patrón rico en cada filtro vacío.
+- **`EmptyState` representa un vacío real y confirmado** — la lectura terminó, tuvo éxito, y la entidad efectivamente no tiene datos. Nunca representa una carga todavía pendiente (eso es Skeleton) ni un error de lectura (eso es `InlineReadError` — ver Feedback, "Una lectura fallida nunca es un vacío").
 
 ### PageHeader
 Tile navy `--radius-tile` de 40px con ícono contextual (prop obligatoria, sin default) + `h1` headline + subtítulo `text-sm text-muted-foreground`. El subtítulo nunca referencia un período específico si la pantalla tiene filtros de rango (se desactualiza al filtrar).
@@ -292,6 +320,7 @@ Trigger canónico: `h-7 w-7 rounded-md border-[0.5px] border-border` que abre `D
 - **Do** escribir todo copy en rioplatense con voseo (verdad de PRODUCT.md; el tuteo es un bug).
 - **Do** usar Lucide como único set de íconos (`h-4 w-4` en controles, `h-5 w-5`+ en énfasis).
 - **Do** mantener el patrón `text-base md:text-sm` en todo control editable nuevo.
+- **Do** gatear todo skeleton con `useDelayedVisible(isLoading)` — sin delay, una carga de 80ms produce un parpadeo peor que la espera.
 
 ### Don't:
 - **Don't** usar clases de color directas de Tailwind (`green-600`, `amber-500`, `slate-*`) en la app interna — todo estado y neutro sale de tokens. (Homepage es la excepción de neutros.)
@@ -301,4 +330,6 @@ Trigger canónico: `h-7 w-7 rounded-md border-[0.5px] border-border` que abre `D
 - **Don't** montar un segundo sistema de toasts, tabs con contador propio, o cualquier duplicado de un patrón canónico existente.
 - **Don't** usar el patrón rico de empty state en vacíos de filtro, ni la línea seca en primeras-veces de sección.
 - **Don't** deshabilitar el zoom del navegador (`maximum-scale`) para esconder problemas tipográficos.
+- **Don't** volver al skeleton en un refetch cuando ya hay contenido en pantalla, ni escribir un skeleton cuya geometría no corresponda al layout que va a aparecer.
+- **Don't** usar el loader branded (`LoadingScreen`) dentro de una sección — es exclusivo del arranque global.
 - **Don't** usar densidad como excusa para controles difíciles de tocar, ni convertir la metáfora del mostrador en decoración temática de barbería.

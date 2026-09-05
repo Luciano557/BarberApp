@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -69,6 +71,7 @@ const emptyValues: BloqueoFormValues = {
 export function BloqueosSection({ sucursalId, organizationId, barbers }: BloqueosSectionProps) {
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
   const [showForm, setShowForm] = useState(false);
 
   const form = useForm<BloqueoFormValues>({
@@ -152,7 +155,33 @@ export function BloqueosSection({ sucursalId, organizationId, barbers }: Bloqueo
 
   const todoElDiaValue = form.watch('todo_el_dia');
 
-  if (loading) return <div className="text-sm text-muted-foreground py-4">Cargando bloqueos...</div>;
+  if (loading) {
+    if (!showSkeleton) return null;
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-44" />
+                <Skeleton className="h-3 w-64 max-w-full" />
+              </div>
+            </div>
+            <Skeleton className="h-9 w-32 shrink-0" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="border rounded-lg p-3">
+              <Skeleton className="h-4 w-40 mb-2" />
+              <Skeleton className="h-3 w-24" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Sucursal } from '@/contexts/SucursalContext';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 export interface ProximaCuota {
   monto: number;
@@ -20,26 +21,30 @@ export interface ProximaCuota {
  * sin distinción visual de "sin permiso" vs. "sin deuda real". Limitación heredada de la RLS
  * existente, no introducida acá — no se resuelve en este build (candado: no tocar roles/RLS).
  */
+interface DeudaBundle {
+  saldoPendiente: number;
+  proximaCuota: ProximaCuota | null;
+}
+
+const EMPTY_BUNDLE: DeudaBundle = { saldoPendiente: 0, proximaCuota: null };
+
 export function useDeudaPendienteData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
 ) {
-  const [saldoPendiente, setSaldoPendiente] = useState(0);
-  const [proximaCuota, setProximaCuota] = useState<ProximaCuota | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}`;
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal]);
+  const readState = useReadState<DeudaBundle>({
+    contextKey,
+    errorMessage: 'No pudimos cargar la deuda pendiente.',
+    staleErrorMessage: 'No pudimos actualizar la deuda pendiente.',
+    surfaceId: `estadisticas-deuda:${organizationId ?? 'none'}`,
+  });
 
-  const fetchData = async () => {
-    if (!organizationId) return;
-    setIsLoading(true);
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: EMPTY_BUNDLE, error: null };
 
-    try {
       let query = supabase
         .from('deudas')
         .select('monto_total, monto_pagado, monto_cuota, fecha_proximo_pago')
@@ -49,11 +54,11 @@ export function useDeudaPendienteData(
         query = query.eq('sucursal_id', currentSucursal.id);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const { data, error, status } = await query.abortSignal(signal);
+      if (error) return { data: null, error, status };
 
       const rows = data || [];
-      const saldo = rows.reduce(
+      const saldoPendiente = rows.reduce(
         (sum, d) => sum + (Number(d.monto_total) || 0) - (Number(d.monto_pagado) || 0),
         0,
       );
@@ -67,14 +72,25 @@ export function useDeudaPendienteData(
         return min;
       }, null);
 
-      setSaldoPendiente(saldo);
-      setProximaCuota(proxima ? { monto: Number(proxima.monto_cuota), fecha: proxima.fecha_proximo_pago } : null);
-    } catch (error) {
-      console.error('Error fetching deuda pendiente:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const proximaCuota = proxima ? { monto: Number(proxima.monto_cuota), fecha: proxima.fecha_proximo_pago } : null;
 
-  return { saldoPendiente, proximaCuota, isLoading };
+      return { data: { saldoPendiente, proximaCuota }, error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, readState.run]);
+
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  return {
+    saldoPendiente: bundle.saldoPendiente,
+    proximaCuota: bundle.proximaCuota,
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

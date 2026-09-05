@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Textarea } from '@/components/ui/textarea';
 import { DrawerForm } from '@/components/ui/drawer-form';
+import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -381,6 +384,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
   const [salaryData, setSalaryData] = useState<BarberSalaryData[]>([]);
   const [pagos, setPagos] = useState<PagoSueldo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Distingue primera carga (sin contenido utilizable → skeleton) de refetch
+  // posterior (cambio de período, pago registrado → mantener contenido visible).
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [isPagoDrawerOpen, setIsPagoDrawerOpen] = useState(false);
 
   const pagoForm = useForm<PagoSueldoFormValues>({
@@ -827,6 +833,7 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
       toast.error('Error al cargar datos de sueldos');
     } finally {
       setIsLoading(false);
+      setHasLoadedOnce(true);
     }
   }, [organization, barbers, periodStartDate, periodEndDate, currentSucursal]);
 
@@ -926,13 +933,11 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Primera carga real: sin datos utilizables todavía. Un refetch posterior
+  // (cambio de período, pago registrado) ya tiene contenido en pantalla y no
+  // vuelve a este estado — ver Silent-Refetch Rule en DESIGN.md → Loading.
+  const skeletonDelayed = useDelayedVisible(isLoading);
+  const showSkeleton = !hasLoadedOnce && skeletonDelayed;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -1102,6 +1107,65 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             <Button onClick={handleUnlockSueldosView}>Ver sueldos</Button>
           </CardContent>
         </Card>
+      ) : showSkeleton ? (
+        <>
+          {/* Summary Cards — skeleton */}
+          <div className="grid gap-4 md:grid-cols-3">
+            {[0, 1, 2].map(i => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-7 w-40" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Resumen por Empleado — skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Resumen por Empleado</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-lg border p-4">
+                  <SkeletonRow leading={false} lines={2} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Historial de Pagos — skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historial de Pagos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Empleado</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[0, 1, 2].map(i => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-16" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
       ) : (
         <>
           {/* Summary Cards */}

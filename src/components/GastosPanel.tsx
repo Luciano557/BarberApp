@@ -19,6 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { DrawerForm } from '@/components/ui/drawer-form';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { RepeatPicker, getRepeatLabel } from '@/components/tareas/RepeatPicker';
@@ -111,6 +113,7 @@ const getGastoFormDefaults = (): GastoFormValues => ({
 
 export function GastosPanel() {
   const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
+  const showSkeleton = useDelayedVisible(isLoading);
   const requirePinForAction = useRequirePinForAction();
   const { currentSucursal } = useSucursal();
   const { isSucursalAccount } = useAuth();
@@ -409,7 +412,32 @@ export function GastosPanel() {
               <Button onClick={handleUnlockGastosView}>Ver gastos</Button>
             </div>
           ) : isLoading ? (
-            <p className="text-muted-foreground text-center py-4">Cargando...</p>
+            showSkeleton ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="text-right">Monto</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : null
           ) : gastos.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No hay gastos en este período</p>
           ) : (

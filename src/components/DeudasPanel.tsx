@@ -6,6 +6,8 @@ import { Landmark, Trash2, Plus, CreditCard, CheckCircle2, ChevronDown, ChevronU
 import { useDeudas, type Deuda, type PagoDeuda } from '@/hooks/useDeudas';
 import { useInversiones } from '@/hooks/useInversiones';
 import { Card, CardContent } from '@/components/ui/card';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -57,6 +59,7 @@ const getDeudaFormDefaults = (): DeudaFormValues => ({
 
 export function DeudasPanel() {
   const { deudas, isLoading, addDeuda, registrarPago, deleteDeuda, fetchPagosDeuda } = useDeudas();
+  const showSkeleton = useDelayedVisible(isLoading);
   const { inversiones } = useInversiones();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -250,7 +253,17 @@ export function DeudasPanel() {
       <div className="space-y-3">
         <p className="text-sm font-medium text-muted-foreground">Activas</p>
         {isLoading ? (
-          <p className="text-muted-foreground text-sm">Cargando...</p>
+          showSkeleton ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="py-4">
+                    <SkeletonRow leading={false} />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : null
         ) : deudasActivas.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">

@@ -4,6 +4,8 @@ import { useShowMore } from '@/hooks/useShowMore';
 import { ShowMoreDivider } from '@/components/ui/ShowMoreDivider';
 import { Button } from '@/components/ui/button';
 import { CatalogSectionCard } from '@/components/ui/CatalogSectionCard';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -28,6 +30,7 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [productosSucursal, setProductosSucursal] = useState<ProductoSucursal[]>([]);
   const [loading, setLoading] = useState(true);
+  const showSkeleton = useDelayedVisible(loading);
 
   const [activeSubTab, setActiveSubTab] = useState<'active' | 'inactive'>('active');
   const [search, setSearch] = useState('');
@@ -175,7 +178,15 @@ export function ProductosConfig({ sucursalId }: ProductosConfigProps) {
       >
         <div className="space-y-2" role="tabpanel">
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center py-6">Cargando...</p>
+            showSkeleton ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-muted/30">
+                    <SkeletonRow leading="bar" />
+                  </div>
+                ))}
+              </div>
+            ) : null
           ) : filteredItems.length === 0 ? (
             <div className="text-center py-8 space-y-2">
               <p className="text-sm text-muted-foreground">

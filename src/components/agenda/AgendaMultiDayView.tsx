@@ -51,7 +51,7 @@ export function AgendaMultiDayView({
     <div className="bg-card overflow-clip">
       {/* Day header row — sticky, outside scroll container */}
       <div
-        className="flex border-b bg-muted/30 sticky top-0 z-40"
+        className="flex border-b bg-muted/30 sticky top-0 z-20"
         style={{ boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}
       >
         <div className="shrink-0 border-r" style={{ width: TIME_RAIL_WIDTH }} />

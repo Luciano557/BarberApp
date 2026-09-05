@@ -116,8 +116,8 @@ const Index = () => {
   }, [activeTab, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewResumen, canViewTareas, canViewFinanzas, canViewMiNegocio, canViewTurnosAgenda, canViewClientes, hasNoAccess, rolesLoaded]);
 
   const {
-    isLoading,
-    error: dataError,
+    showBlockingLoader,
+    blockingError,
     refetch: refetchData,
     services,
     extras,
@@ -130,7 +130,7 @@ const Index = () => {
 
   const { addTransaction, voidTransaction, getDailySummary, selectedDate, setSelectedDate } = useTransactions();
   const { currentSucursal } = useSucursal();
-  const { barbers: cobrarBarbers, refetch: refetchCobrarBarbers } = useCobrarBarbers();
+  const { barbers: cobrarBarbers, isLoading: cobrarBarbersLoading, error: cobrarBarbersError, retry: retryCobrarBarbers, refetch: refetchCobrarBarbers } = useCobrarBarbers();
 
   const goToTeamSetup = useCallback(() => {
     if (organization?.id && currentSucursal?.id) {
@@ -187,23 +187,23 @@ const Index = () => {
   }, [activeTab, refetchData, refetchCobrarBarbers]);
 
   const summary = getDailySummary();
-  const showLoadingScreen = useLoadingScreenMounted(isLoading);
+  const showLoadingScreen = useLoadingScreenMounted(showBlockingLoader);
 
   if (showLoadingScreen) {
     return (
       <LoadingScreen
-        loading={isLoading}
+        loading={showBlockingLoader}
         message="Cargando datos..."
         onRetry={refetchData}
       />
     );
   }
 
-  if (dataError) {
+  if (blockingError) {
     return (
       <RecoverableErrorScreen
         title="No pudimos cargar los datos"
-        description={dataError}
+        description={blockingError}
         onRetry={refetchData}
       />
     );
@@ -223,6 +223,9 @@ const Index = () => {
               services={services}
               extras={extras}
               barbers={cobrarBarbers}
+              barbersLoading={cobrarBarbersLoading}
+              barbersError={cobrarBarbersError}
+              onRetryBarbers={retryCobrarBarbers}
               discounts={cobrarDiscounts}
               lines={lines}
               sucursalId={currentSucursal?.id || null}

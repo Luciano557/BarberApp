@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { Barber, TeamRole } from '@/types/barbershop';
 import type { AppRole } from '@/contexts/AuthContext';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
+import { useReadState } from '@/hooks/useReadState';
 
 /**
  * Lectura propia de "barberos disponibles para Cobrar".
@@ -61,35 +62,34 @@ function rowToBarber(row: any): Barber {
 export function useCobrarBarbers() {
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
-  const [barbers, setBarbers] = useState<Barber[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const orgId = organization?.id ?? null;
   const sucursalId = currentSucursal?.id ?? null;
+  const contextKey = `${orgId ?? 'none'}::${sucursalId ?? 'all'}`;
 
-  const fetchBarbers = useCallback(async () => {
-    if (!orgId) {
-      setBarbers([]);
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
+  const readState = useReadState<Barber[]>({
+    contextKey,
+    errorMessage: 'No pudimos cargar el equipo.',
+    staleErrorMessage: 'No pudimos actualizar el equipo.',
+    surfaceId: `cobrar-barbers:${orgId ?? 'none'}`,
+  });
+
+  const fetchBarbers = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!orgId) return { data: [], error: null };
+
       let ids: string[] | null = null;
 
       if (sucursalId) {
-        const { data: disp, error: dispErr } = await supabase
+        const { data: disp, error: dispErr, status: dispStatus } = await supabase
           .from('barberos_sucursales')
           .select('barbero_id')
           .eq('sucursal_id', sucursalId)
-          .eq('disponible', true);
-        if (dispErr) throw dispErr;
+          .eq('disponible', true)
+          .abortSignal(signal);
+        if (dispErr) return { data: null, error: dispErr, status: dispStatus };
         ids = (disp ?? []).map((r: any) => r.barbero_id);
-        if (ids.length === 0) {
-          setBarbers([]);
-          return;
-        }
+        if (ids.length === 0) return { data: [], error: null };
       }
 
       let q = supabase
@@ -101,32 +101,34 @@ export function useCobrarBarbers() {
 
       if (ids) q = q.in('id', ids);
 
-      const { data, error: bErr } = await q;
-      if (bErr) throw bErr;
+      const { data, error: bErr, status: bStatus } = await q.abortSignal(signal);
+      if (bErr) return { data: null, error: bErr, status: bStatus };
 
       const mapped = (data ?? [])
         .map(rowToBarber)
         .filter(b => (b.rolesEquipo ?? []).includes('barber'));
 
-      setBarbers(mapped);
-    } catch (err: any) {
-      console.error('[useCobrarBarbers] error', err);
-      setError(err?.message ?? 'No pudimos cargar los barberos de Cobrar.');
-      setBarbers([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [orgId, sucursalId]);
+      return { data: mapped, error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, sucursalId, readState.run]);
 
   useEffect(() => {
-    void fetchBarbers();
+    fetchBarbers();
   }, [fetchBarbers]);
 
   useBarberosSucursalesRealtime({
     orgId,
     sucursalId,
-    onChange: () => { void fetchBarbers(); },
+    onChange: () => { fetchBarbers(); },
   });
 
-  return { barbers, isLoading, error, refetch: fetchBarbers };
+  return {
+    barbers: readState.data ?? [],
+    isLoading: readState.phase === 'loading',
+    error: readState.error,
+    isStale: readState.isStale,
+    retry: readState.retry,
+    refetch: fetchBarbers,
+  };
 }

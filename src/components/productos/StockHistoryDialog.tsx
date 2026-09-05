@@ -5,6 +5,8 @@ import { History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ProductoConSucursal, MovimientoStock } from './types';
+import { SkeletonRow } from '@/components/ui/SkeletonRow';
+import { useDelayedVisible } from '@/hooks/useDelayedVisible';
 
 interface Props {
   open: boolean;
@@ -31,6 +33,7 @@ function fmtFecha(iso: string) {
 export function StockHistoryDialog({ open, item, onClose }: Props) {
   const [movs, setMovs] = useState<MovimientoStock[]>([]);
   const [loading, setLoading] = useState(false);
+  const showSkeleton = useDelayedVisible(loading);
 
   useEffect(() => {
     if (!open || !item.sucursal) return;
@@ -67,7 +70,15 @@ export function StockHistoryDialog({ open, item, onClose }: Props) {
         </DialogHeader>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground text-center py-6">Cargando...</p>
+          showSkeleton ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-3 rounded-lg bg-muted/30">
+                  <SkeletonRow leading={false} />
+                </div>
+              ))}
+            </div>
+          ) : null
         ) : movs.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-6">
             Aún no hay movimientos para este producto en esta sucursal.

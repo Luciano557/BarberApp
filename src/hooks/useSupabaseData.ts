@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line, TeamRole } from '@/types/barbershop';
 import { useAuth, type AppRole } from '@/contexts/AuthContext';
@@ -174,14 +174,45 @@ export function useSupabaseData() {
   const [lines, setLines] = useState<Line[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Contexto (organización + sucursal) al que pertenece `error` — evita que un
+  // error de un contexto anterior aparezca como bloqueante del contexto actual.
+  const [errorContextKey, setErrorContextKey] = useState<string | null>(null);
+  // Contexto para el que la última carga EXITOSA fue confirmada. Comparado
+  // contra `contextKey` en cada render — no requiere resetearse con un efecto.
+  const [loadedContextKey, setLoadedContextKey] = useState<string | null>(null);
 
   // Gating: hasta que auth y org no terminen de hidratar, o si el usuario no tiene cargo,
   // NO disparamos fetch (no hay datos que cargar).
   const ready = !authLoading && !orgLoading && !!user && !!organization && roles.length > 0 && !hasNoAccess;
   const skip = !authLoading && !orgLoading && (hasNoAccess || roles.length === 0);
 
+  // Clave estable del contexto de datos actual. Cambia de inmediato (mismo
+  // render) cuando cambia organización o sucursal — sin esperar ningún efecto.
+  const contextKey = `${organization?.id ?? 'none'}::${sucursalId ?? 'all'}`;
+  const hasLoadedCurrentContext = loadedContextKey === contextKey;
+
+  // Ref "siempre fresco" con el contexto seleccionado en la UI en este instante.
+  // Se actualiza en useLayoutEffect (antes del paint, antes del efecto pasivo
+  // que dispara el fetch nuevo) para no mutar un ref durante el render mismo
+  // — un render descartado por concurrent features no debe dejar el ref en un
+  // estado que nunca llegó a commitear.
+  const currentContextKeyRef = useRef(contextKey);
+  useLayoutEffect(() => {
+    currentContextKeyRef.current = contextKey;
+  }, [contextKey]);
+
+  // Ordena llamadas concurrentes al MISMO contexto (ej. doble refetch) — la
+  // comparación de contexto de arriba no distingue eso porque ambas comparten
+  // `contextKey`.
+  const requestIdRef = useRef(0);
+
   // Fetch all data
   const fetchData = useCallback(async () => {
+    const myRequestId = ++requestIdRef.current;
+    const myContextKey = `${organization?.id ?? 'none'}::${sucursalId ?? 'all'}`;
+    const stillCurrent = () =>
+      myContextKey === currentContextKeyRef.current && myRequestId === requestIdRef.current;
+
     setIsLoading(true);
     setError(null);
     console.info('[Data] phase=fetch:start', {
@@ -196,7 +227,6 @@ export function useSupabaseData() {
         supabase.from('lineas').select('*').eq('eliminado', false).order('orden', { ascending: true }).order('nombre', { ascending: true }) as any
       );
       const fetchedLines = linesData.map(dbToLine);
-      setLines(fetchedLines);
 
       let barbersQuery = supabase.from('barberos').select('*').order('nombre');
       if (sucursalId) {
@@ -243,7 +273,6 @@ export function useSupabaseData() {
           builtServices.push(dbToService(row, fetchedLines));
         }
       }
-      setServices(builtServices);
 
       const builtExtras: Extra[] = [];
       for (const row of extrasData) {
@@ -258,9 +287,6 @@ export function useSupabaseData() {
           builtExtras.push(dbToExtra(row));
         }
       }
-      setExtras(builtExtras);
-
-      setBarbers(barbersData.map(dbToBarber));
 
       const builtDiscounts: Discount[] = [];
       for (const row of discountsData) {
@@ -275,18 +301,33 @@ export function useSupabaseData() {
           builtDiscounts.push(dbToDiscount(row));
         }
       }
+
+      // Un contexto (organización/sucursal) más nuevo ya está seleccionado, o
+      // una llamada más reciente a este mismo contexto ya está en curso:
+      // descartar esta respuesta entera, sin aplicar ningún array.
+      if (!stillCurrent()) return;
+
+      setLines(fetchedLines);
+      setServices(builtServices);
+      setExtras(builtExtras);
+      setBarbers(barbersData.map(dbToBarber));
       setDiscounts(builtDiscounts);
+      setLoadedContextKey(myContextKey);
       console.info('[Data] phase=fetch:success');
     } catch (err: any) {
+      if (!stillCurrent()) return;
       console.error('[Data] phase=fetch:error', {
         table: err?.table ?? 'unknown',
         code: err?.code,
         message: err?.message,
       });
       setError('No pudimos cargar los datos. Reintentá en unos segundos.');
+      setErrorContextKey(myContextKey);
       toast.error('Error al cargar datos');
     } finally {
-      setIsLoading(false);
+      if (stillCurrent()) {
+        setIsLoading(false);
+      }
     }
   }, [sucursalId, user?.id, organization?.id, roles]);
 
@@ -298,6 +339,8 @@ export function useSupabaseData() {
       setBarbers([]);
       setDiscounts([]);
       setError(null);
+      setErrorContextKey(null);
+      setLoadedContextKey(null);
       setIsLoading(false);
       return;
     }
@@ -307,6 +350,19 @@ export function useSupabaseData() {
     }
     fetchData();
   }, [ready, skip, fetchData]);
+
+  // Error "vivo": pertenece al contexto (organización/sucursal) seleccionado
+  // ahora mismo, y ese contexto todavía no tiene una carga exitosa confirmada.
+  // Un error de un contexto anterior, o un refetch fallido de un contexto que
+  // ya tenía datos buenos, nunca cae acá.
+  const blockingError = errorContextKey === contextKey && !hasLoadedCurrentContext ? error : null;
+
+  // Bloquea el shell (loader global de pantalla completa) solo mientras el
+  // contexto actual no tiene ninguna carga exitosa confirmada, no es un
+  // usuario sin acceso (esos se resuelven aparte, vía `hasNoAccess`) y no hay
+  // ya un error bloqueante para mostrar en su lugar. No depende del timing de
+  // `isLoading`: se activa en el mismo render en que cambia `contextKey`.
+  const showBlockingLoader = !skip && !hasLoadedCurrentContext && !blockingError;
 
   // ============= Helpers para resolver sucursalConfigId =============
   const findServicioSucursalId = useCallback(async (servicioId: string): Promise<string | null> => {
@@ -1324,6 +1380,8 @@ export function useSupabaseData() {
   return {
     isLoading,
     error,
+    blockingError,
+    showBlockingLoader,
     refetch: fetchData,
     services: services.filter(s => s.active),
     allServices: services,

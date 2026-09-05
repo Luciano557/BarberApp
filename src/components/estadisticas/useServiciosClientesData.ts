@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Sucursal } from '@/contexts/SucursalContext';
 import { alcanzoLimiteFilas } from './rowLimit';
+import { useReadState, type ReadPhase } from '@/hooks/useReadState';
 
 export interface MixServicioItem {
   servicio: string;
@@ -56,31 +57,32 @@ export interface MonthlyServiciosClientesData {
  * Clientes nuevos y % que eligió barbero siguen leyéndose como filas (volumen bajo), con la
  * salvaguarda de truncado activa.
  */
+interface ServiciosClientesBundle {
+  monthlyStats: MonthlyServiciosClientesData[];
+  ventasAgregadas: VentasAgregadasMes[];
+  datosIncompletos: boolean;
+}
+
+const EMPTY_BUNDLE: ServiciosClientesBundle = { monthlyStats: [], ventasAgregadas: [], datosIncompletos: false };
+
 export function useServiciosClientesData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
 ) {
-  const [monthlyStats, setMonthlyStats] = useState<MonthlyServiciosClientesData[]>([]);
-  const [ventasAgregadas, setVentasAgregadas] = useState<VentasAgregadasMes[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [datosIncompletos, setDatosIncompletos] = useState(false);
+  const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}::${periodoMeses}`;
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, currentSucursal, periodoMeses]);
+  const readState = useReadState<ServiciosClientesBundle>({
+    contextKey,
+    errorMessage: 'No pudimos cargar las métricas de servicios y clientes.',
+    staleErrorMessage: 'No pudimos actualizar las métricas de servicios y clientes.',
+    surfaceId: `estadisticas-servicios-clientes:${organizationId ?? 'none'}`,
+  });
 
-  const fetchData = async () => {
-    if (!organizationId) return;
+  const fetchAll = useCallback(() => {
+    readState.run(async (signal) => {
+      if (!organizationId) return { data: null, error: null };
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
       const meses = parseInt(periodoMeses);
       const endDate = endOfMonth(new Date());
       const startDate = startOfMonth(subMonths(new Date(), meses - 1));
@@ -113,18 +115,17 @@ export function useServiciosClientesData(
       });
 
       const [clientesRes, turnosRes, ventasRes] = await Promise.all([
-        clientesQuery,
-        turnosQuery,
-        ventasRpc,
+        clientesQuery.abortSignal(signal),
+        turnosQuery.abortSignal(signal),
+        ventasRpc.abortSignal(signal),
       ]);
-      if (clientesRes.error) throw clientesRes.error;
-      if (turnosRes.error) throw turnosRes.error;
-      if (ventasRes.error) throw ventasRes.error;
+      const failed = [clientesRes, turnosRes, ventasRes].find((r) => r.error);
+      if (failed) {
+        return { data: null, error: failed.error, status: (failed as { status?: number }).status };
+      }
 
       // Salvaguarda de truncado: solo aplica a las consultas que todavía leen filas crudas.
-      setDatosIncompletos(
-        alcanzoLimiteFilas(clientesRes.data) || alcanzoLimiteFilas(turnosRes.data),
-      );
+      const datosIncompletos = alcanzoLimiteFilas(clientesRes.data) || alcanzoLimiteFilas(turnosRes.data);
 
       const clientes = clientesRes.data || [];
       const turnos = turnosRes.data || [];
@@ -148,9 +149,8 @@ export function useServiciosClientesData(
           tickets: Number(d.tickets) || 0,
         })),
       }));
-      setVentasAgregadas(agregadas);
 
-      const stats: MonthlyServiciosClientesData[] = ventasRows.map((r, idx) => {
+      const monthlyStats: MonthlyServiciosClientesData[] = ventasRows.map((r, idx) => {
         const monthDate = parseISO(`${String(r.mes).slice(0, 10)}T00:00:00`);
         const monthStr = format(monthDate, 'yyyy-MM');
         const monthStart = startOfMonth(monthDate);
@@ -198,14 +198,24 @@ export function useServiciosClientesData(
         };
       });
 
-      setMonthlyStats(stats);
-    } catch (err) {
-      console.error('Error fetching datos de servicios y clientes:', err);
-      setError('No se pudieron cargar las métricas de servicios y clientes');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      return { data: { monthlyStats, ventasAgregadas: agregadas, datosIncompletos }, error: null };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, currentSucursal, periodoMeses, readState.run]);
 
-  return { monthlyStats, ventasAgregadas, isLoading, error, datosIncompletos };
+  useEffect(() => {
+    if (organizationId) fetchAll();
+  }, [organizationId, fetchAll]);
+
+  const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  return {
+    monthlyStats: bundle.monthlyStats,
+    ventasAgregadas: bundle.ventasAgregadas,
+    datosIncompletos: bundle.datosIncompletos,
+    isLoading: readState.phase === 'loading',
+    phase: readState.phase as ReadPhase,
+    error: readState.error,
+    retry: readState.retry,
+  };
 }

@@ -95,6 +95,20 @@
       "description": "Tile cuadrado navy de 40px con radio exclusivo de 10px (--radius-tile). Marca de PageHeader y sidebar.",
       "html": "<div class=\"ds-tile\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"6\" cy=\"6\" r=\"3\"/><circle cx=\"6\" cy=\"18\" r=\"3\"/><line x1=\"20\" y1=\"4\" x2=\"8.12\" y2=\"15.88\"/><line x1=\"14.47\" y1=\"14.48\" x2=\"20\" y2=\"20\"/><line x1=\"8.12\" y1=\"8.12\" x2=\"12\" y2=\"12\"/></svg></div>",
       "css": ".ds-tile { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: hsl(224 43% 20%); color: #fff; }"
+    },
+    {
+      "name": "SkeletonRow",
+      "kind": "custom",
+      "description": "Fila de skeleton para listas de ítems previsibles. Gateada por useDelayedVisible (~180ms) para no parpadear en cargas rápidas.",
+      "html": "<div class=\"ds-sk-row\"><div class=\"ds-sk ds-sk-avatar\"></div><div class=\"ds-sk-lines\"><div class=\"ds-sk ds-sk-l1\"></div><div class=\"ds-sk ds-sk-l2\"></div></div></div>",
+      "css": ".ds-sk-row { display: flex; align-items: center; gap: 12px; } .ds-sk { background: hsl(231 80% 97%); border-radius: 6px; animation: ds-pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; } .ds-sk-avatar { width: 36px; height: 36px; border-radius: 9999px; flex-shrink: 0; } .ds-sk-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; } .ds-sk-l1 { height: 16px; width: 66%; } .ds-sk-l2 { height: 12px; width: 33%; } @keyframes ds-pulse { 50% { opacity: 0.5; } } @media (prefers-reduced-motion: reduce) { .ds-sk { animation: none; } }"
+    },
+    {
+      "name": "EmptyState",
+      "kind": "custom",
+      "description": "Vacío rico de sección/primera vez: ícono circular + título + descripción opcional + acción opcional. No impone contenedor.",
+      "html": "<div class=\"ds-empty\"><div class=\"ds-empty-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18\"/></svg></div><p class=\"ds-empty-title\">No hay tareas activas</p><p class=\"ds-empty-desc\">Creá una tarea para asignarla a un barbero o a todo el equipo.</p></div>",
+      "css": ".ds-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; font-family: Inter, ui-sans-serif, system-ui, sans-serif; } .ds-empty-icon { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 9999px; background: hsl(231 80% 97%); color: hsl(232 20% 38%); } .ds-empty-title { font-size: 14px; font-weight: 500; color: hsl(232 75% 14%); margin: 0; } .ds-empty-desc { font-size: 12px; color: hsl(232 20% 38%); max-width: 20rem; margin: 0; }"
     }
   ],
   "narrative": {
@@ -114,7 +128,10 @@
       { "name": "La regla de los 16px en mobile", "body": "Todo control editable que abra el teclado virtual usa font-size ≥ 16px en mobile (text-base md:text-sm). Prioridad sobre densidad. Nunca resolver con maximum-scale.", "section": "typography" },
       { "name": "La regla del label vs. heading", "body": "Bloque de formulario con un solo control: el título es su FormLabel. Con varios controles: heading real y cada control se nombra por su cuenta.", "section": "typography" },
       { "name": "La regla jerárquica de navegación", "body": "Tabs underline = primer nivel del módulo. SegmentedControl = segundo nivel / navegación contextual dentro de la sección activa. Excepciones documentadas: ProductoDialog, BackfillWizard y NotificationsBell usan Tabs pill fuera del rol de primer nivel; AgendaPanel usa ToggleGroup (selector de modo de vista, no navegación).", "section": "components" },
-      { "name": "Expresividad de hito", "body": "Sobrio por defecto; animación memorable solo en hitos del negocio (cobro, cierre, turno), breve y nunca bloqueante. Feedback reforzado, no decoración.", "section": "components" }
+      { "name": "Expresividad de hito", "body": "Sobrio por defecto; animación memorable solo en hitos del negocio (cobro, cierre, turno), breve y nunca bloqueante. Feedback reforzado, no decoración.", "section": "components" },
+      { "name": "The Delayed-Skeleton Rule", "body": "El skeleton aparece recién tras ~180ms vía useDelayedVisible. Si los datos llegan antes, se pasa directo al contenido. El delay gatea solo la presentación: no retrasa fetch ni impone duración mínima al skeleton.", "section": "components" },
+      { "name": "The Silent-Refetch Rule", "body": "El skeleton pertenece a la primera carga. Si ya hay contenido utilizable, un refetch lo mantiene visible hasta que llegan los datos nuevos — nunca vuelve al skeleton.", "section": "components" },
+      { "name": "Loading en tres clases", "body": "Loading de contenido → Skeleton con geometría fiel. Pending de acción → spinner en el control + texto de progreso, nunca skeleton. Loading global branded → LoadingScreen, exclusivo del arranque.", "section": "components" }
     ],
     "dos": [
       "Do usar focus-visible:ring-2 ring-ring como único patrón de foco.",
@@ -122,7 +139,8 @@
       "Do reservar la expresividad para hitos del negocio: breve, memorable, nunca bloqueante.",
       "Do escribir todo copy en rioplatense con voseo.",
       "Do usar Lucide como único set de íconos.",
-      "Do mantener text-base md:text-sm en todo control editable nuevo."
+      "Do mantener text-base md:text-sm en todo control editable nuevo.",
+      "Do gatear todo skeleton con useDelayedVisible(isLoading) — sin delay, una carga de 80ms produce un parpadeo peor que la espera."
     ],
     "donts": [
       "Don't usar clases de color directas de Tailwind en la app interna — todo estado y neutro sale de tokens.",
@@ -132,6 +150,8 @@
       "Don't montar un segundo sistema de toasts ni duplicar un patrón canónico existente.",
       "Don't usar el empty state rico en vacíos de filtro, ni la línea seca en primeras-veces de sección.",
       "Don't deshabilitar el zoom del navegador para esconder problemas tipográficos.",
+      "Don't volver al skeleton en un refetch cuando ya hay contenido en pantalla, ni escribir un skeleton cuya geometría no corresponda al layout que va a aparecer.",
+      "Don't usar el loader branded (LoadingScreen) dentro de una sección — es exclusivo del arranque global.",
       "Don't usar densidad como excusa para controles difíciles de tocar, ni convertir la metáfora del mostrador en decoración temática."
     ]
   }
