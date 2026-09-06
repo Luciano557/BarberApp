@@ -16,6 +16,7 @@ import {
   getBillingContext,
   isBillingPlanCode,
 } from '../_shared/subscription-billing.ts';
+import { reconcileOwnedPreapproval } from '../_shared/subscription-reconciliation.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -190,15 +191,133 @@ serve(async (req: Request): Promise<Response> => {
       return jsonResponse({ error: 'El plan seleccionado no esta disponible' }, 409);
     }
 
-    if (fromPlan?.code === toPlan.code && !subscription.pending_plan_code) {
-      return jsonResponse({ ok: true, unchanged: true });
-    }
-
     if (!fromPlan) {
       return jsonResponse({
         error: 'No hay un plan activo para cambiar',
         requires_checkout: true,
       }, 409);
+    }
+
+    const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+    const pendingPreapprovalId = typeof metadata.pending_mercadopago_preapproval_id === 'string'
+      ? metadata.pending_mercadopago_preapproval_id
+      : null;
+    const pendingExternalReference = typeof metadata.pending_mercadopago_external_reference === 'string'
+      ? metadata.pending_mercadopago_external_reference
+      : null;
+
+    if (fromPlan.code === toPlan.code) {
+      if (!subscription.pending_plan_code) {
+        return jsonResponse({ ok: true, unchanged: true });
+      }
+
+      const cleanedMetadata = withoutPendingCheckoutMetadata(metadata);
+      delete cleanedMetadata.scheduled_renewal_amount_ars;
+      delete cleanedMetadata.scheduled_renewal_price_version;
+      const hasSeparatePendingCheckout = Boolean(
+        pendingPreapprovalId &&
+        pendingPreapprovalId !== subscription.mercadopago_preapproval_id,
+      );
+
+      if (hasSeparatePendingCheckout && pendingPreapprovalId) {
+        if (!pendingExternalReference) {
+          return jsonResponse({ error: 'El checkout pendiente no tiene una referencia verificable' }, 409);
+        }
+        const cancellationError = await cancelPendingCheckout(
+          pendingPreapprovalId,
+          context.organizationId,
+          pendingExternalReference,
+        );
+        if (cancellationError) return cancellationError;
+
+        const { data: cleared, error: clearError } = await supabaseAdmin.rpc(
+          'subscription_finalize_pending_plan_cancellation',
+          {
+            _organization_id: context.organizationId,
+            _subscription_id: subscription.id,
+            _expected_subscription_updated_at: subscription.updated_at,
+            _expected_current_preapproval_id: subscription.mercadopago_preapproval_id,
+            _expected_pending_preapproval_id: pendingPreapprovalId,
+            _current_plan_code: fromPlan.code,
+            _mode: 'pending_checkout',
+            _expected_billing_amount_ars: subscription.billing_amount_ars,
+            _metadata: cleanedMetadata,
+          },
+        );
+        if (clearError || !cleared) {
+          return jsonResponse({
+            error: 'La suscripcion cambio mientras se invalidaba el checkout. Actualiza y reintenta.',
+          }, 409);
+        }
+
+        return jsonResponse({ ok: true, change_type: 'pending_change_cancelled' });
+      }
+
+      const currentAmount = Number(subscription.billing_amount_ars);
+      if (
+        subscription.provider !== 'mercadopago' ||
+        !subscription.mercadopago_preapproval_id ||
+        !subscription.mercadopago_external_reference ||
+        !Number.isFinite(currentAmount) ||
+        currentAmount <= 0
+      ) {
+        return jsonResponse({ error: 'No se puede restaurar el plan vigente sin un checkout nuevo' }, 409);
+      }
+      const { preapproval: currentPreapproval, error: currentVerificationError } = await loadOwnedPreapproval(
+        subscription.mercadopago_preapproval_id,
+        context.organizationId,
+        subscription.mercadopago_external_reference,
+      );
+      if (currentVerificationError) return currentVerificationError;
+      if (!currentPreapproval || !['authorized', 'active'].includes(currentPreapproval.status)) {
+        return jsonResponse({ error: 'La suscripcion de Mercado Pago ya no esta activa' }, 409);
+      }
+
+      const restoreResponse = await mpPlatformFetch(
+        `/preapproval/${encodeURIComponent(subscription.mercadopago_preapproval_id)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            auto_recurring: { transaction_amount: currentAmount, currency_id: 'ARS' },
+          }),
+        },
+      );
+      if (!restoreResponse.ok) {
+        const providerError = await readMpError(restoreResponse);
+        console.warn('[subscription-change-plan] scheduled cancellation failed:', restoreResponse.status, providerError.code);
+        return jsonResponse({ error: 'No pudimos restaurar el importe del plan vigente' }, 502);
+      }
+
+      const { data: cleared, error: clearError } = await supabaseAdmin.rpc(
+        'subscription_finalize_pending_plan_cancellation',
+        {
+          _organization_id: context.organizationId,
+          _subscription_id: subscription.id,
+          _expected_subscription_updated_at: subscription.updated_at,
+          _expected_current_preapproval_id: subscription.mercadopago_preapproval_id,
+          _expected_pending_preapproval_id: null,
+          _current_plan_code: fromPlan.code,
+          _mode: 'scheduled_downgrade',
+          _expected_billing_amount_ars: currentAmount,
+          _metadata: cleanedMetadata,
+        },
+      );
+      if (clearError || !cleared) {
+        const compensated = await reconcileOwnedPreapproval(supabaseAdmin, {
+          organizationId: context.organizationId,
+          preapprovalId: subscription.mercadopago_preapproval_id,
+          expectedExternalReference: subscription.mercadopago_external_reference,
+          logPrefix: 'subscription-change-plan',
+        });
+        console.error('[subscription-change-plan] scheduled cancellation local conflict:', clearError?.code ?? 'empty_result');
+        return jsonResponse({
+          error: compensated
+            ? 'La suscripcion cambio mientras se restauraba el plan. Actualiza y reintenta.'
+            : 'La suscripcion cambio y Mercado Pago requiere conciliacion manual.',
+        }, compensated ? 409 : 502);
+      }
+
+      return jsonResponse({ ok: true, change_type: 'pending_change_cancelled' });
     }
 
     const isUpgrade = toPlan.sort_order > fromPlan.sort_order;
@@ -209,15 +328,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     if (isDowngrade) {
-      const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
-      const pendingPreapprovalId = typeof metadata.pending_mercadopago_preapproval_id === 'string'
-        ? metadata.pending_mercadopago_preapproval_id
-        : null;
-
       if (pendingPreapprovalId && pendingPreapprovalId !== subscription.mercadopago_preapproval_id) {
-        const pendingExternalReference = typeof metadata.pending_mercadopago_external_reference === 'string'
-          ? metadata.pending_mercadopago_external_reference
-          : null;
         if (!subscription.pending_plan_code || !pendingExternalReference) {
           return jsonResponse({ error: 'El checkout pendiente no tiene una referencia verificable' }, 409);
         }
@@ -302,50 +413,21 @@ serve(async (req: Request): Promise<Response> => {
       );
 
       if (updateError || !updatedSubscription) {
-        const { data: latestSubscription } = await supabaseAdmin
-          .from('organization_subscriptions')
-          .select('mercadopago_preapproval_id,billing_amount_ars,metadata')
-          .eq('id', subscription.id)
-          .eq('organization_id', context.organizationId)
-          .maybeSingle();
-        const latestMetadata = isRecord(latestSubscription?.metadata)
-          ? latestSubscription.metadata
-          : {};
-        const latestScheduledAmount = Number(latestMetadata.scheduled_renewal_amount_ars);
-        const latestBillingAmount = Number(latestSubscription?.billing_amount_ars);
-        const compensationAmount = Number.isFinite(latestScheduledAmount) && latestScheduledAmount > 0
-          ? latestScheduledAmount
-          : latestBillingAmount;
-        if (
-          latestSubscription?.mercadopago_preapproval_id === subscription.mercadopago_preapproval_id &&
-          Number.isFinite(compensationAmount) &&
-          compensationAmount > 0
-        ) {
-          const compensation = await mpPlatformFetch(
-            `/preapproval/${encodeURIComponent(subscription.mercadopago_preapproval_id)}`,
-            {
-              method: 'PUT',
-              body: JSON.stringify({
-                auto_recurring: {
-                  transaction_amount: compensationAmount,
-                  currency_id: 'ARS',
-                },
-              }),
-            },
-          );
-          if (!compensation.ok) {
-            console.error('[subscription-change-plan] provider compensation failed:', compensation.status);
-          }
-        }
+        const compensated = await reconcileOwnedPreapproval(supabaseAdmin, {
+          organizationId: context.organizationId,
+          preapprovalId: subscription.mercadopago_preapproval_id,
+          expectedExternalReference: subscription.mercadopago_external_reference,
+          logPrefix: 'subscription-change-plan',
+        });
         console.error('[subscription-change-plan] downgrade update error:', updateError?.code ?? 'concurrent_change');
         const conflict = updateError?.code === '40001' ||
           updateError?.message?.includes('CATALOG_CONFLICT') ||
           updateError?.message?.includes('SUBSCRIPTION_CONFLICT');
         return jsonResponse({
-          error: conflict
+          error: conflict && compensated
             ? 'El precio o la suscripcion cambiaron mientras se programaba la baja. Actualiza y reintenta.'
-            : 'No se pudo programar la baja de plan',
-        }, conflict ? 409 : 500);
+            : 'No se pudo programar la baja y Mercado Pago requiere conciliacion.',
+        }, conflict && compensated ? 409 : 502);
       }
 
       await supabaseAdmin.from('subscription_plan_changes').insert({

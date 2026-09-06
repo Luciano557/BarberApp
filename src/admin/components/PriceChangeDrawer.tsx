@@ -232,7 +232,7 @@ export function PriceChangeDrawer({
           <DrawerFormSection
             icon={RefreshCw}
             title="Impacto en Mercado Pago"
-            description="Las suscripciones elegibles se actualizan para el próximo débito."
+            description="Las renovaciones se actualizan; los checkouts pendientes se invalidan y deberán regenerarse."
           >
             {isPreviewing ? (
               <div className="grid grid-cols-2 gap-3" aria-label="Calculando impacto">
@@ -258,7 +258,7 @@ export function PriceChangeDrawer({
               <AlertTriangle className="h-4 w-4 text-status-warning-foreground" />
               <AlertTitle className="text-sm text-status-warning-foreground">El catálogo no se revierte ante un éxito parcial</AlertTitle>
               <AlertDescription className="text-xs text-status-warning-foreground">
-                Cada resultado queda auditado. Los fallos permanentes se muestran para reintento manual.
+                Cada resultado queda auditado. Un checkout pendiente anterior deja de reutilizarse al confirmar el cambio.
               </AlertDescription>
             </Alert>
           </DrawerFormSection>

@@ -3540,10 +3540,12 @@ export type Database = {
           attempts: number
           batch_id: string
           claimed_at: string | null
+          compensation_attempts: number
           completed_at: string | null
           created_at: string
           error_code: string | null
           error_message: string | null
+          expected_external_reference: string | null
           id: string
           idempotency_key: string
           item_type: string
@@ -3551,7 +3553,10 @@ export type Database = {
           next_retry_at: string | null
           organization_id: string | null
           preapproval_id: string | null
+          provider_mutation_kind: string | null
+          provider_mutation_started_at: string | null
           provider_response_ref: string | null
+          requires_compensation: boolean
           status: string
           subscription_id: string | null
           updated_at: string
@@ -3560,10 +3565,12 @@ export type Database = {
           attempts?: number
           batch_id: string
           claimed_at?: string | null
+          compensation_attempts?: number
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
           error_message?: string | null
+          expected_external_reference?: string | null
           id?: string
           idempotency_key?: string
           item_type: string
@@ -3571,7 +3578,10 @@ export type Database = {
           next_retry_at?: string | null
           organization_id?: string | null
           preapproval_id?: string | null
+          provider_mutation_kind?: string | null
+          provider_mutation_started_at?: string | null
           provider_response_ref?: string | null
+          requires_compensation?: boolean
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -3580,10 +3590,12 @@ export type Database = {
           attempts?: number
           batch_id?: string
           claimed_at?: string | null
+          compensation_attempts?: number
           completed_at?: string | null
           created_at?: string
           error_code?: string | null
           error_message?: string | null
+          expected_external_reference?: string | null
           id?: string
           idempotency_key?: string
           item_type?: string
@@ -3591,7 +3603,10 @@ export type Database = {
           next_retry_at?: string | null
           organization_id?: string | null
           preapproval_id?: string | null
+          provider_mutation_kind?: string | null
+          provider_mutation_started_at?: string | null
           provider_response_ref?: string | null
+          requires_compensation?: boolean
           status?: string
           subscription_id?: string | null
           updated_at?: string
@@ -5329,10 +5344,12 @@ export type Database = {
           attempts: number
           batch_id: string
           claimed_at: string | null
+          compensation_attempts: number
           completed_at: string | null
           created_at: string
           error_code: string | null
           error_message: string | null
+          expected_external_reference: string | null
           id: string
           idempotency_key: string
           item_type: string
@@ -5340,7 +5357,10 @@ export type Database = {
           next_retry_at: string | null
           organization_id: string | null
           preapproval_id: string | null
+          provider_mutation_kind: string | null
+          provider_mutation_started_at: string | null
           provider_response_ref: string | null
+          requires_compensation: boolean
           status: string
           subscription_id: string | null
           updated_at: string
@@ -5351,6 +5371,21 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      platform_admin_complete_price_change_compensation: {
+        Args: {
+          _compensation_attempts: number
+          _expected_amount_ars: number
+          _expected_claimed_at: string
+          _expected_idempotency_key: string
+          _expected_preapproval_id: string
+          _expected_subscription_id: string
+          _expected_subscription_updated_at: string
+          _http_status: number
+          _item_id: string
+          _should_cancel: boolean
+        }
+        Returns: Json
       }
       platform_admin_complete_price_change_item: {
         Args: {
@@ -5381,9 +5416,29 @@ export type Database = {
         Args: { _batch_id: string }
         Returns: Json
       }
+      platform_admin_require_price_change_compensation: {
+        Args: {
+          _expected_claimed_at: string
+          _expected_idempotency_key: string
+          _expected_preapproval_id: string
+          _item_id: string
+          _reason: string
+        }
+        Returns: Json
+      }
       platform_admin_retry_price_change_items: {
         Args: { _batch_id: string; _item_ids?: string[] }
         Returns: number
+      }
+      platform_admin_start_price_change_provider_mutation: {
+        Args: {
+          _expected_claimed_at: string
+          _expected_idempotency_key: string
+          _expected_preapproval_id: string
+          _item_id: string
+          _mutation_kind: string
+        }
+        Returns: Json
       }
       process_tareas_recurrentes: { Args: never; Returns: number }
       process_vencimientos_tareas: { Args: never; Returns: number }
@@ -5500,6 +5555,28 @@ export type Database = {
         }
       }
       soft_delete_cliente: { Args: { _cliente_id: string }; Returns: undefined }
+      subscription_confirm_provider_reconciliation: {
+        Args: {
+          _expected_amount_ars: number
+          _expected_subscription_id: string
+          _expected_subscription_updated_at: string
+          _organization_id: string
+          _preapproval_id: string
+          _should_cancel: boolean
+        }
+        Returns: boolean
+      }
+      subscription_finalize_cancellation: {
+        Args: {
+          _cancelled_at: string
+          _expected_preapproval_id: string
+          _expected_subscription_updated_at: string
+          _metadata: Json
+          _organization_id: string
+          _subscription_id: string
+        }
+        Returns: Json
+      }
       subscription_finalize_checkout: {
         Args: {
           _existing_subscription_id: string
@@ -5516,6 +5593,20 @@ export type Database = {
           _preapproval_id: string
           _preserve_current_provider: boolean
           _provider_status: string
+        }
+        Returns: Json
+      }
+      subscription_finalize_pending_plan_cancellation: {
+        Args: {
+          _current_plan_code: string
+          _expected_billing_amount_ars: number
+          _expected_current_preapproval_id: string
+          _expected_pending_preapproval_id: string
+          _expected_subscription_updated_at: string
+          _metadata: Json
+          _mode: string
+          _organization_id: string
+          _subscription_id: string
         }
         Returns: Json
       }

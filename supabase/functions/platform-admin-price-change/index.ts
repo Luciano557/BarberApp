@@ -34,16 +34,22 @@ interface PriceBody extends Record<string, unknown> {
 interface WorkItem extends Record<string, unknown> {
   id: string;
   batch_id: string;
-  organization_id: string;
-  subscription_id: string;
+  organization_id: string | null;
+  subscription_id: string | null;
   preapproval_id: string | null;
+  expected_external_reference: string | null;
   item_type: 'active_renewal' | 'pending_checkout';
   status: string;
   attempts: number;
+  compensation_attempts: number;
+  requires_compensation: boolean;
+  provider_mutation_started_at: string | null;
+  provider_mutation_kind: 'set_amount' | 'cancel' | null;
+  provider_mutation_subscription_id: string | null;
+  provider_mutation_subscription_updated_at: string | null;
   idempotency_key: string;
   claimed_at: string;
   plan_code: string;
-  expected_external_reference?: string | null;
 }
 
 interface ProcessResult {
@@ -55,12 +61,25 @@ interface ProcessResult {
 interface RevalidatedTarget {
   current: boolean;
   expectedExternalReference: string | null;
+  subscriptionId: string | null;
+  subscriptionUpdatedAt: string | null;
+}
+
+interface PendingCheckoutState {
+  promoted: boolean;
+  subscriptionId: string | null;
+  subscriptionUpdatedAt: string | null;
 }
 
 type ProviderTargetCheck =
   | { kind: 'ok' }
+  | { kind: 'done'; status: number }
   | { kind: 'skip'; code: string; message: string }
   | { kind: 'fail'; attempts: number; status: number | null; code: string; message: string };
+
+type CompensationResult =
+  | { ok: true; attempts: number; status: number | null; completedPriceChange: boolean }
+  | { ok: false; attempts: number; status: number | null; code: string; message: string };
 
 const ACTIONS: readonly PriceAction[] = ['preview', 'apply', 'process', 'retry'];
 const PLAN_CODES = ['basico', 'profesional', 'premium'] as const;
@@ -429,14 +448,27 @@ async function workItemStillCurrent(
   supabaseAdmin: SupabaseClient,
   item: WorkItem,
 ): Promise<RevalidatedTarget> {
+  if (!item.subscription_id) {
+    return {
+      current: false,
+      expectedExternalReference: item.expected_external_reference,
+      subscriptionId: null,
+      subscriptionUpdatedAt: null,
+    };
+  }
   const { data: subscription, error } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_external_reference,mercadopago_status,metadata')
+    .select('id,updated_at,status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_external_reference,mercadopago_status,metadata')
     .eq('id', item.subscription_id)
     .maybeSingle();
   if (error) throw new Error('SUBSCRIPTION_REVALIDATION_FAILED');
   if (!subscription || subscription.provider !== 'mercadopago') {
-    return { current: false, expectedExternalReference: null };
+    return {
+      current: false,
+      expectedExternalReference: null,
+      subscriptionId: stringValue(subscription?.id),
+      subscriptionUpdatedAt: stringValue(subscription?.updated_at),
+    };
   }
 
   if (item.item_type === 'active_renewal') {
@@ -445,7 +477,10 @@ async function workItemStillCurrent(
       current: subscription.status === 'active' &&
         planCode === item.plan_code &&
         stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id,
-      expectedExternalReference: stringValue(subscription.mercadopago_external_reference),
+      expectedExternalReference:
+        item.expected_external_reference ?? stringValue(subscription.mercadopago_external_reference),
+      subscriptionId: stringValue(subscription.id),
+      subscriptionUpdatedAt: stringValue(subscription.updated_at),
     };
   }
 
@@ -453,15 +488,73 @@ async function workItemStillCurrent(
   return {
     current: subscription.pending_plan_code === item.plan_code &&
       pendingCheckoutPreapprovalId(subscription as Record<string, unknown>) === item.preapproval_id,
-    expectedExternalReference:
+    expectedExternalReference: item.expected_external_reference ??
       stringValue(metadata.pending_mercadopago_external_reference) ??
       (subscription.mercadopago_status === 'pending'
         ? stringValue(subscription.mercadopago_external_reference)
         : null),
+    subscriptionId: stringValue(subscription.id),
+    subscriptionUpdatedAt: stringValue(subscription.updated_at),
   };
 }
 
-async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck> {
+async function pendingCheckoutState(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+): Promise<PendingCheckoutState> {
+  const parsedReference = parseSubscriptionExternalReference(item.expected_external_reference);
+  const organizationId = item.organization_id ?? parsedReference?.organizationId ?? null;
+  if (!organizationId) {
+    return { promoted: false, subscriptionId: null, subscriptionUpdatedAt: null };
+  }
+  const { data: subscription, error } = await supabaseAdmin
+    .from('organization_subscriptions')
+    .select('id,updated_at,status,provider,current_plan_code,effective_plan_code,billing_plan_code,mercadopago_preapproval_id,mercadopago_external_reference')
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (error) throw new Error('SUBSCRIPTION_REVALIDATION_FAILED');
+  if (!subscription) {
+    return { promoted: false, subscriptionId: null, subscriptionUpdatedAt: null };
+  }
+  return {
+    promoted: subscription.status === 'active' &&
+      subscription.provider === 'mercadopago' &&
+      stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id &&
+      stringValue(subscription.mercadopago_external_reference) === item.expected_external_reference &&
+      currentBillingPlanCode(subscription as Record<string, unknown>) === item.plan_code,
+    subscriptionId: stringValue(subscription.id),
+    subscriptionUpdatedAt: stringValue(subscription.updated_at),
+  };
+}
+
+async function bindExpectedExternalReference(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+  externalReference: string,
+): Promise<boolean> {
+  let update = supabaseAdmin
+    .from('subscription_price_change_items')
+    .update({ expected_external_reference: externalReference.slice(0, 250) })
+    .eq('id', item.id)
+    .eq('status', 'processing')
+    .eq('idempotency_key', item.idempotency_key)
+    .eq('claimed_at', item.claimed_at)
+    .is('expected_external_reference', null)
+    .is('provider_mutation_started_at', null);
+  update = item.preapproval_id
+    ? update.eq('preapproval_id', item.preapproval_id)
+    : update.is('preapproval_id', null);
+  const { data, error } = await update.select('id').maybeSingle();
+  if (error || !data) return false;
+  item.expected_external_reference = externalReference;
+  return true;
+}
+
+async function verifyProviderTarget(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+  mutationKind: 'set_amount' | 'cancel',
+): Promise<ProviderTargetCheck> {
   let lastStatus: number | null = null;
   let lastCode = 'provider_verification_failed';
   let lastMessage = 'No se pudo verificar el preapproval antes de actualizarlo.';
@@ -473,6 +566,9 @@ async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck
       );
       lastStatus = response.status;
       if (!response.ok) {
+        if (response.status === 404 && mutationKind === 'cancel') {
+          return { kind: 'done', status: response.status };
+        }
         const providerError = await readMpError(response);
         lastCode = sanitizeMessage(providerError.code, 'provider_verification_failed').slice(0, 120);
         lastMessage = sanitizeMessage(providerError.message, lastMessage);
@@ -488,32 +584,68 @@ async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck
       const providerReference = stringValue(payload.external_reference);
       const parsedReference = parseSubscriptionExternalReference(providerReference);
       const providerStatus = stringValue(payload.status)?.toLowerCase();
-      const expectedStatus = item.item_type === 'pending_checkout' ? 'pending' : 'authorized';
+      const hasFrozenReference = Boolean(item.expected_external_reference);
 
       if (
         String(payload.id ?? '') !== item.preapproval_id ||
         !parsedReference ||
-        parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase() ||
-        !item.expected_external_reference ||
-        providerReference !== item.expected_external_reference
+        (!hasFrozenReference && !item.organization_id) ||
+        (item.organization_id &&
+          parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase()) ||
+        (item.item_type === 'pending_checkout' && parsedReference.planCode !== item.plan_code) ||
+        (hasFrozenReference && providerReference !== item.expected_external_reference)
       ) {
         return {
-          kind: 'skip',
+          kind: 'fail',
+          attempts: attempt,
+          status: response.status,
           code: 'provider_ownership_mismatch',
           message: 'El preapproval no pertenece a la organizacion y plan esperados.',
         };
       }
 
-      if (providerStatus !== expectedStatus) {
+      if (
+        !hasFrozenReference &&
+        providerReference &&
+        !(await bindExpectedExternalReference(supabaseAdmin, item, providerReference))
+      ) {
         return {
-          kind: 'skip',
-          code: 'provider_status_changed',
-          message: 'El preapproval cambio de estado antes de actualizar el precio.',
+          kind: 'fail',
+          attempts: attempt,
+          status: response.status,
+          code: 'external_reference_bind_failed',
+          message: 'La referencia externa cambio durante la verificacion.',
         };
       }
-      if (stringValue(autoRecurring.currency_id) !== 'ARS') {
+
+      if (
+        mutationKind === 'cancel' &&
+        (providerStatus === 'cancelled' || providerStatus === 'canceled')
+      ) {
+        return { kind: 'done', status: response.status };
+      }
+
+      if (
+        mutationKind === 'set_amount' &&
+        providerStatus !== 'authorized' &&
+        providerStatus !== 'active'
+      ) {
         return {
-          kind: 'skip',
+          kind: 'fail',
+          attempts: attempt,
+          status: response.status,
+          code: 'provider_not_active',
+          message: 'El preapproval vigente ya no esta activo en Mercado Pago.',
+        };
+      }
+      if (
+        mutationKind === 'set_amount' &&
+        stringValue(autoRecurring.currency_id) !== 'ARS'
+      ) {
+        return {
+          kind: 'fail',
+          attempts: attempt,
+          status: response.status,
           code: 'provider_currency_mismatch',
           message: 'La moneda del preapproval no coincide con ARS.',
         };
@@ -540,109 +672,421 @@ async function verifyProviderTarget(item: WorkItem): Promise<ProviderTargetCheck
   };
 }
 
-async function compensateProviderAfterLocalChange(
+async function startProviderMutation(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+  mutationKind: 'set_amount' | 'cancel',
+  expectedSubscriptionId: string | null,
+  expectedSubscriptionUpdatedAt: string | null,
+): Promise<'started' | 'subscription_changed' | 'claim_lost'> {
+  const { data, error } = await supabaseAdmin.rpc(
+    'platform_admin_start_price_change_provider_mutation',
+    {
+      _item_id: item.id,
+      _expected_idempotency_key: item.idempotency_key,
+      _expected_preapproval_id: item.preapproval_id,
+      _expected_claimed_at: item.claimed_at,
+      _mutation_kind: mutationKind,
+      _expected_subscription_id: expectedSubscriptionId,
+      _expected_subscription_updated_at: expectedSubscriptionUpdatedAt,
+    },
+  );
+  if (error) {
+    return error.message?.includes('SUBSCRIPTION_CONFLICT')
+      ? 'subscription_changed'
+      : 'claim_lost';
+  }
+  if (!data) return 'claim_lost';
+  item.provider_mutation_started_at = stringValue(
+    isRecord(data) ? data.provider_mutation_started_at : null,
+  );
+  item.provider_mutation_kind = isRecord(data) && data.provider_mutation_kind === 'cancel'
+    ? 'cancel'
+    : 'set_amount';
+  item.provider_mutation_subscription_id = stringValue(
+    isRecord(data) ? data.provider_mutation_subscription_id : null,
+  );
+  item.provider_mutation_subscription_updated_at = stringValue(
+    isRecord(data) ? data.provider_mutation_subscription_updated_at : null,
+  );
+  return item.provider_mutation_started_at ? 'started' : 'claim_lost';
+}
+
+async function requireCompensation(
   supabaseAdmin: SupabaseClient,
   item: WorkItem,
 ): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc(
+    'platform_admin_require_price_change_compensation',
+    {
+      _item_id: item.id,
+      _expected_idempotency_key: item.idempotency_key,
+      _expected_preapproval_id: item.preapproval_id,
+      _expected_claimed_at: item.claimed_at,
+      _reason: 'La suscripcion cambio despues de iniciar la mutacion externa.',
+    },
+  );
+  if (error || !data) return false;
+  item.requires_compensation = true;
+  return true;
+}
+
+async function failCompensation(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+  result: Extract<CompensationResult, { ok: false }>,
+): Promise<ProcessResult> {
+  let update = supabaseAdmin
+    .from('subscription_price_change_items')
+    .update({
+      status: 'failed',
+      requires_compensation: true,
+      compensation_attempts: Math.min(result.attempts, 100),
+      last_http_status: result.status,
+      error_code: result.code.slice(0, 120),
+      error_message: sanitizeMessage(result.message),
+      next_retry_at: null,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', item.id)
+    .eq('status', 'processing')
+    .eq('requires_compensation', true)
+    .eq('idempotency_key', item.idempotency_key)
+    .eq('claimed_at', item.claimed_at);
+  update = item.preapproval_id
+    ? update.eq('preapproval_id', item.preapproval_id)
+    : update.is('preapproval_id', null);
+  const { data, error } = await update.select('id').maybeSingle();
+  if (error) throw new Error('ITEM_COMPENSATION_FAILURE_WRITE_FAILED');
+  if (!data) return { itemId: item.id, succeeded: false, status: 'claim_lost' };
+  return { itemId: item.id, succeeded: false, status: 'failed' };
+}
+
+async function compensationIntent(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+): Promise<{
+  subscriptionId: string | null;
+  subscriptionUpdatedAt: string | null;
+  shouldCancel: boolean;
+  amountArs: number | null;
+  completePriceChange: boolean;
+}> {
+  const parsedReference = parseSubscriptionExternalReference(item.expected_external_reference);
+  const organizationId = item.organization_id ?? parsedReference?.organizationId ?? null;
+  if (!organizationId) {
+    return {
+      subscriptionId: null,
+      subscriptionUpdatedAt: null,
+      shouldCancel: true,
+      amountArs: null,
+      completePriceChange: false,
+    };
+  }
+
   const { data: subscription, error } = await supabaseAdmin
     .from('organization_subscriptions')
-    .select('status,provider,billing_amount_ars,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_status,metadata')
-    .eq('id', item.subscription_id)
+    .select('id,updated_at,status,provider,current_plan_code,effective_plan_code,billing_plan_code,billing_amount_ars,pending_plan_code,pending_checkout_amount_ars,pending_checkout_price_version,mercadopago_preapproval_id,mercadopago_status,metadata')
+    .eq('organization_id', organizationId)
     .maybeSingle();
-  if (error) return false;
+  if (error) throw new Error('COMPENSATION_SUBSCRIPTION_READ_FAILED');
+  if (!subscription) {
+    return {
+      subscriptionId: null,
+      subscriptionUpdatedAt: null,
+      shouldCancel: true,
+      amountArs: null,
+      completePriceChange: false,
+    };
+  }
 
-  let desiredAmount: number | null = null;
-  if (subscription?.provider === 'mercadopago') {
-    const subscriptionRow = subscription as Record<string, unknown>;
-    if (
-      item.item_type === 'active_renewal' &&
-      stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id
-    ) {
-      const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
-      const isScheduledRenewal = Boolean(
-        stringValue(subscription.pending_plan_code) &&
-        !hasPendingCheckoutIntent(subscriptionRow),
+  const sameActiveProvider = subscription.provider === 'mercadopago' &&
+    subscription.status === 'active' &&
+    stringValue(subscription.mercadopago_preapproval_id) === item.preapproval_id;
+  if (!sameActiveProvider) {
+    return {
+      subscriptionId: String(subscription.id),
+      subscriptionUpdatedAt: stringValue(subscription.updated_at),
+      shouldCancel: true,
+      amountArs: null,
+      completePriceChange: false,
+    };
+  }
+
+  const subscriptionRow = subscription as Record<string, unknown>;
+  const remainsPriceChangeTarget = renewalTargetPlanCode(subscriptionRow) === item.plan_code;
+  if (remainsPriceChangeTarget) {
+    const batchAmount = numberValue(item.new_amount_ars);
+    if (!batchAmount || batchAmount <= 0) throw new Error('COMPENSATION_AMOUNT_MISSING');
+    return {
+      subscriptionId: String(subscription.id),
+      subscriptionUpdatedAt: stringValue(subscription.updated_at),
+      shouldCancel: false,
+      amountArs: batchAmount,
+      completePriceChange: true,
+    };
+  }
+
+  const metadata = isRecord(subscription.metadata) ? subscription.metadata : {};
+  const isScheduledRenewal = Boolean(
+    stringValue(subscription.pending_plan_code) &&
+    !hasPendingCheckoutIntent(subscriptionRow),
+  );
+  const amountArs = isScheduledRenewal
+    ? numberValue(metadata.scheduled_renewal_amount_ars)
+    : numberValue(subscription.billing_amount_ars);
+  if (!amountArs || amountArs <= 0) throw new Error('COMPENSATION_AMOUNT_MISSING');
+
+  return {
+    subscriptionId: String(subscription.id),
+    subscriptionUpdatedAt: stringValue(subscription.updated_at),
+    shouldCancel: false,
+    amountArs,
+    completePriceChange: false,
+  };
+}
+
+async function compensateProviderAfterLocalChange(
+  supabaseAdmin: SupabaseClient,
+  item: WorkItem,
+): Promise<CompensationResult> {
+  let lastStatus: number | null = null;
+  let lastCode = 'provider_compensation_failed';
+  let lastMessage = 'No se pudo reconciliar Mercado Pago con la intencion local vigente.';
+  const baseAttempts = Math.max(item.compensation_attempts, 0);
+
+  for (let offset = 1; offset <= MAX_PROVIDER_ATTEMPTS; offset += 1) {
+    const attempts = baseAttempts + offset;
+    let intent: Awaited<ReturnType<typeof compensationIntent>>;
+    try {
+      intent = await compensationIntent(supabaseAdmin, item);
+    } catch (error) {
+      return {
+        ok: false,
+        attempts,
+        status: lastStatus,
+        code: 'compensation_intent_unavailable',
+        message: sanitizeMessage(error),
+      };
+    }
+
+    let providerPayload: Record<string, unknown> | null = null;
+    try {
+      const readResponse = await mpPlatformFetch(
+        `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
       );
-      desiredAmount = isScheduledRenewal
-        ? numberValue(metadata.scheduled_renewal_amount_ars)
-        : numberValue(subscription.billing_amount_ars);
-    } else if (
-      item.item_type === 'pending_checkout' &&
-      pendingCheckoutPreapprovalId(subscriptionRow) === item.preapproval_id
-    ) {
-      desiredAmount = numberValue(subscription.pending_checkout_amount_ars);
+      lastStatus = readResponse.status;
+      if (readResponse.status === 404) {
+        if (!intent.shouldCancel) {
+          return {
+            ok: false,
+            attempts,
+            status: readResponse.status,
+            code: 'provider_preapproval_missing',
+            message: 'El preapproval vigente no existe en Mercado Pago.',
+          };
+        }
+      } else if (!readResponse.ok) {
+        const providerError = await readMpError(readResponse);
+        lastCode = sanitizeMessage(providerError.code, lastCode).slice(0, 120);
+        lastMessage = sanitizeMessage(providerError.message, lastMessage);
+        if (transientStatus(readResponse.status) && offset < MAX_PROVIDER_ATTEMPTS) {
+          await wait(retryDelay(readResponse, offset));
+          continue;
+        }
+        return { ok: false, attempts, status: readResponse.status, code: lastCode, message: lastMessage };
+      } else {
+        providerPayload = await readResponse.json() as Record<string, unknown>;
+      }
+    } catch (error) {
+      lastCode = 'provider_compensation_network_error';
+      lastMessage = sanitizeMessage(error);
+      if (offset < MAX_PROVIDER_ATTEMPTS) {
+        await wait(Math.min(250 * (2 ** Math.max(offset - 1, 0)), 1_500));
+        continue;
+      }
+      return { ok: false, attempts, status: lastStatus, code: lastCode, message: lastMessage };
     }
-  }
 
-  let providerPayload: Record<string, unknown> | null = null;
-  for (let attempt = 1; attempt <= MAX_PROVIDER_ATTEMPTS; attempt += 1) {
-    const response = await mpPlatformFetch(
-      `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
-    );
-    if (response.status === 404) return true;
-    if (response.ok) {
-      providerPayload = await response.json() as Record<string, unknown>;
-      break;
+    if (providerPayload) {
+      const providerReference = stringValue(providerPayload.external_reference);
+      const parsedReference = parseSubscriptionExternalReference(providerReference);
+      const expectedReference = item.expected_external_reference;
+      if (
+        String(providerPayload.id ?? '') !== item.preapproval_id ||
+        !parsedReference ||
+        (item.organization_id &&
+          parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase()) ||
+        !expectedReference ||
+        providerReference !== expectedReference
+      ) {
+        return {
+          ok: false,
+          attempts,
+          status: lastStatus,
+          code: 'provider_compensation_ownership_mismatch',
+          message: 'No se pudo verificar la propiedad del preapproval a reconciliar.',
+        };
+      }
+
+      const providerStatus = stringValue(providerPayload.status)?.toLowerCase();
+      const alreadyDone = intent.shouldCancel &&
+        (providerStatus === 'cancelled' || providerStatus === 'canceled');
+      if (!alreadyDone) {
+        const body = intent.shouldCancel
+          ? { status: 'cancelled' }
+          : {
+            status: 'authorized',
+            auto_recurring: {
+              transaction_amount: intent.amountArs,
+              currency_id: 'ARS',
+            },
+          };
+        const updateResponse = await mpPlatformFetch(
+          `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
+          {
+            method: 'PUT',
+            headers: { 'X-Idempotency-Key': crypto.randomUUID() },
+            body: JSON.stringify(body),
+          },
+        );
+        lastStatus = updateResponse.status;
+        if (updateResponse.status === 404 && !intent.shouldCancel) {
+          return {
+            ok: false,
+            attempts,
+            status: updateResponse.status,
+            code: 'provider_preapproval_missing',
+            message: 'El preapproval vigente desaparecio durante la reconciliacion.',
+          };
+        }
+        if (!updateResponse.ok && !(updateResponse.status === 404 && intent.shouldCancel)) {
+          const providerError = await readMpError(updateResponse);
+          lastCode = sanitizeMessage(providerError.code, lastCode).slice(0, 120);
+          lastMessage = sanitizeMessage(providerError.message, lastMessage);
+          if (transientStatus(updateResponse.status) && offset < MAX_PROVIDER_ATTEMPTS) {
+            await wait(retryDelay(updateResponse, offset));
+            continue;
+          }
+          return { ok: false, attempts, status: updateResponse.status, code: lastCode, message: lastMessage };
+        }
+      }
     }
-    if (!transientStatus(response.status) || attempt >= MAX_PROVIDER_ATTEMPTS) return false;
-    await wait(retryDelay(response, attempt));
-  }
-  if (!providerPayload) return false;
 
-  const parsedReference = parseSubscriptionExternalReference(providerPayload.external_reference);
-  if (
-    String(providerPayload.id ?? '') !== item.preapproval_id ||
-    !parsedReference ||
-    parsedReference.organizationId.toLowerCase() !== item.organization_id.toLowerCase()
-  ) {
-    return false;
-  }
-
-  const providerStatus = stringValue(providerPayload.status)?.toLowerCase();
-  if (!desiredAmount || desiredAmount <= 0) {
-    if (providerStatus === 'cancelled' || providerStatus === 'canceled') return true;
-  }
-
-  const idempotencyKey = crypto.randomUUID();
-  const body = desiredAmount && desiredAmount > 0
-    ? {
-      auto_recurring: {
-        transaction_amount: desiredAmount,
-        currency_id: 'ARS',
-      },
-    }
-    : { status: 'cancelled' };
-
-  for (let attempt = 1; attempt <= MAX_PROVIDER_ATTEMPTS; attempt += 1) {
-    const response = await mpPlatformFetch(
-      `/preapproval/${encodeURIComponent(item.preapproval_id ?? '')}`,
+    const { data: completion, error: completionError } = await supabaseAdmin.rpc(
+      'platform_admin_complete_price_change_compensation',
       {
-        method: 'PUT',
-        headers: { 'X-Idempotency-Key': idempotencyKey },
-        body: JSON.stringify(body),
+        _item_id: item.id,
+        _expected_idempotency_key: item.idempotency_key,
+        _expected_preapproval_id: item.preapproval_id,
+        _expected_claimed_at: item.claimed_at,
+        _expected_subscription_id: intent.subscriptionId,
+        _expected_subscription_updated_at: intent.subscriptionUpdatedAt,
+        _should_cancel: intent.shouldCancel,
+        _expected_amount_ars: intent.amountArs,
+        _complete_price_change: intent.completePriceChange,
+        _compensation_attempts: attempts,
+        _http_status: lastStatus,
       },
     );
-    if (response.ok || response.status === 404) return true;
-    if (!transientStatus(response.status) || attempt >= MAX_PROVIDER_ATTEMPTS) return false;
-    await wait(retryDelay(response, attempt));
+    if (!completionError && completion) {
+      return {
+        ok: true,
+        attempts,
+        status: lastStatus,
+        completedPriceChange: isRecord(completion) && completion.status === 'succeeded',
+      };
+    }
+    if (
+      completionError?.code === '40001' ||
+      completionError?.message?.includes('SUBSCRIPTION_CONFLICT') ||
+      completionError?.message?.includes('COMPENSATION_INTENT_CHANGED')
+    ) {
+      continue;
+    }
+    return {
+      ok: false,
+      attempts,
+      status: lastStatus,
+      code: 'compensation_completion_failed',
+      message: 'No se pudo confirmar localmente la reconciliacion externa.',
+    };
   }
-  return false;
+
+  return {
+    ok: false,
+    attempts: baseAttempts + MAX_PROVIDER_ATTEMPTS,
+    status: lastStatus,
+    code: lastCode,
+    message: lastMessage,
+  };
 }
 
 async function processItem(
   supabaseAdmin: SupabaseClient,
   item: WorkItem,
 ): Promise<ProcessResult> {
-  const localTarget = await workItemStillCurrent(supabaseAdmin, item);
-  if (!localTarget.current) {
-    return skipItem(
-      supabaseAdmin,
-      item,
-      'subscription_changed',
-      'La suscripcion o su preapproval cambiaron antes del procesamiento.',
-    );
+  const reconcile = async (): Promise<ProcessResult> => {
+    if (!item.requires_compensation) {
+      if (!(await requireCompensation(supabaseAdmin, item))) {
+        return { itemId: item.id, succeeded: false, status: 'claim_lost' };
+      }
+    }
+    const compensation = await compensateProviderAfterLocalChange(supabaseAdmin, item);
+    return compensation.ok
+      ? {
+        itemId: item.id,
+        succeeded: compensation.completedPriceChange,
+        status: compensation.completedPriceChange ? 'succeeded' : 'skipped',
+      }
+      : failCompensation(supabaseAdmin, item, compensation);
+  };
+
+  if (item.requires_compensation) return reconcile();
+
+  let mutationKind = item.provider_mutation_kind;
+  let mutationSubscriptionId: string | null = null;
+  let mutationSubscriptionUpdatedAt: string | null = null;
+
+  if (item.item_type === 'active_renewal') {
+    const localTarget = await workItemStillCurrent(supabaseAdmin, item);
+    if (!localTarget.current) {
+      return item.provider_mutation_started_at
+        ? reconcile()
+        : skipItem(
+          supabaseAdmin,
+          item,
+          'subscription_changed',
+          'La suscripcion o su preapproval cambiaron antes del procesamiento.',
+        );
+    }
+    item.expected_external_reference = localTarget.expectedExternalReference;
+    mutationSubscriptionId = localTarget.subscriptionId;
+    mutationSubscriptionUpdatedAt = localTarget.subscriptionUpdatedAt;
+    if (item.provider_mutation_started_at && mutationKind !== 'set_amount') return reconcile();
+    mutationKind = 'set_amount';
+  } else {
+    const pendingState = await pendingCheckoutState(supabaseAdmin, item);
+    const promoted = pendingState.promoted;
+    mutationSubscriptionId = pendingState.subscriptionId;
+    mutationSubscriptionUpdatedAt = pendingState.subscriptionUpdatedAt;
+    if (item.provider_mutation_started_at) {
+      if (
+        (mutationKind === 'set_amount' && !promoted) ||
+        (mutationKind === 'cancel' && promoted) ||
+        !mutationKind
+      ) return reconcile();
+    } else {
+      mutationKind = promoted ? 'set_amount' : 'cancel';
+    }
   }
-  item.expected_external_reference = localTarget.expectedExternalReference;
+
+  if (item.provider_mutation_started_at && (
+    item.provider_mutation_subscription_id !== mutationSubscriptionId ||
+    item.provider_mutation_subscription_updated_at !== mutationSubscriptionUpdatedAt
+  )) {
+    return reconcile();
+  }
 
   if (!item.preapproval_id) {
     return failItem(
@@ -655,7 +1099,7 @@ async function processItem(
     );
   }
 
-  const providerTarget = await verifyProviderTarget(item);
+  const providerTarget = await verifyProviderTarget(supabaseAdmin, item, mutationKind);
   if (providerTarget.kind === 'skip') {
     return skipItem(supabaseAdmin, item, providerTarget.code, providerTarget.message);
   }
@@ -670,6 +1114,27 @@ async function processItem(
     );
   }
 
+  const mutationStart = await startProviderMutation(
+    supabaseAdmin,
+    item,
+    mutationKind,
+    mutationSubscriptionId,
+    mutationSubscriptionUpdatedAt,
+  );
+  if (mutationStart === 'subscription_changed') {
+    return item.provider_mutation_started_at
+      ? reconcile()
+      : skipItem(
+        supabaseAdmin,
+        item,
+        'subscription_changed',
+        'La suscripcion cambio antes de iniciar la mutacion externa.',
+      );
+  }
+  if (mutationStart !== 'started') {
+    return { itemId: item.id, succeeded: false, status: 'claim_lost' };
+  }
+
   let attempts = Math.max(item.attempts, 0);
   let lastStatus: number | null = null;
   let lastCode = 'provider_request_failed';
@@ -678,22 +1143,28 @@ async function processItem(
   while (attempts < MAX_PROVIDER_ATTEMPTS) {
     attempts += 1;
     try {
-      const response = await mpPlatformFetch(
-        `/preapproval/${encodeURIComponent(item.preapproval_id)}`,
-        {
-          method: 'PUT',
-          headers: { 'X-Idempotency-Key': item.idempotency_key },
-          body: JSON.stringify({
-            auto_recurring: {
-              transaction_amount: numberValue(item.new_amount_ars),
-              currency_id: 'ARS',
-            },
-          }),
-        },
-      );
+      const response = providerTarget.kind === 'done'
+        ? new Response(null, { status: providerTarget.status })
+        : await mpPlatformFetch(
+          `/preapproval/${encodeURIComponent(item.preapproval_id)}`,
+          {
+            method: 'PUT',
+            headers: { 'X-Idempotency-Key': item.idempotency_key },
+            body: JSON.stringify(mutationKind === 'cancel'
+              ? { status: 'cancelled' }
+              : {
+                auto_recurring: {
+                  transaction_amount: numberValue(item.new_amount_ars),
+                  currency_id: 'ARS',
+                },
+              }),
+          },
+        );
       lastStatus = response.status;
 
-      if (response.ok) {
+      if (response.ok || providerTarget.kind === 'done' || (
+        mutationKind === 'cancel' && response.status === 404
+      )) {
         let providerReference: string | null = null;
         try {
           const payload = await response.json();
@@ -721,22 +1192,8 @@ async function processItem(
           throw new Error('ITEM_COMPLETION_WRITE_FAILED');
         }
         if (isRecord(completion) && completion.status === 'compensation_required') {
-          const compensated = await compensateProviderAfterLocalChange(supabaseAdmin, item);
-          return compensated
-            ? skipItem(
-              supabaseAdmin,
-              item,
-              'subscription_changed_compensated',
-              'La suscripcion cambio; se restauro el estado vigente en Mercado Pago.',
-            )
-            : failItem(
-              supabaseAdmin,
-              item,
-              attempts,
-              response.status,
-              'provider_compensation_failed',
-              'La suscripcion cambio y no se pudo restaurar Mercado Pago automaticamente.',
-            );
+          item.requires_compensation = true;
+          return reconcile();
         }
         return { itemId: item.id, succeeded: true, status: 'succeeded' };
       }
@@ -781,12 +1238,24 @@ async function processBatch(
     ...row,
     id: String(row.id),
     batch_id: String(row.batch_id),
-    organization_id: String(row.organization_id),
-    subscription_id: String(row.subscription_id),
+    organization_id: stringValue(row.organization_id),
+    subscription_id: stringValue(row.subscription_id),
     preapproval_id: stringValue(row.preapproval_id),
+    expected_external_reference: stringValue(row.expected_external_reference),
     item_type: row.item_type === 'pending_checkout' ? 'pending_checkout' : 'active_renewal',
     status: stringValue(row.status) ?? 'processing',
     attempts: numberValue(row.attempts) ?? 0,
+    compensation_attempts: numberValue(row.compensation_attempts) ?? 0,
+    requires_compensation: row.requires_compensation === true,
+    provider_mutation_started_at: stringValue(row.provider_mutation_started_at),
+    provider_mutation_kind: row.provider_mutation_kind === 'set_amount' ||
+        row.provider_mutation_kind === 'cancel'
+      ? row.provider_mutation_kind
+      : null,
+    provider_mutation_subscription_id: stringValue(row.provider_mutation_subscription_id),
+    provider_mutation_subscription_updated_at: stringValue(
+      row.provider_mutation_subscription_updated_at,
+    ),
     idempotency_key: String(row.idempotency_key),
     claimed_at: String(row.claimed_at),
     plan_code: stringValue(before.batch.plan_code) ?? '',
