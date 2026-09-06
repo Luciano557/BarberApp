@@ -11,6 +11,7 @@ import {
   readMpError,
 } from '../_shared/mp-client.ts';
 import { getBillingContext } from '../_shared/subscription-billing.ts';
+import { reconcileOwnedPreapproval } from '../_shared/subscription-reconciliation.ts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -186,39 +187,21 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     if (updateError || !updatedSubscription) {
-      const { data: latestSubscription } = await supabaseAdmin
-        .from('organization_subscriptions')
-        .select('status,mercadopago_preapproval_id,billing_amount_ars')
-        .eq('id', subscription.id)
-        .eq('organization_id', context.organizationId)
-        .maybeSingle();
-      if (latestSubscription?.mercadopago_preapproval_id === subscription.mercadopago_preapproval_id) {
-        const latestAmount = Number(latestSubscription?.billing_amount_ars);
-        const compensationPayload: Record<string, unknown> = latestSubscription?.status === 'active'
-          ? {
-            status: 'authorized',
-            ...(Number.isFinite(latestAmount) && latestAmount > 0
-              ? { auto_recurring: { transaction_amount: latestAmount, currency_id: 'ARS' } }
-              : {}),
-          }
-          : { status: 'cancelled' };
-        const compensation = await mpPlatformFetch(
-          `/preapproval/${encodeURIComponent(subscription.mercadopago_preapproval_id)}`,
-          { method: 'PUT', body: JSON.stringify(compensationPayload) },
-        );
-        if (!compensation.ok) {
-          console.error('[subscription-reactivate] provider compensation failed:', compensation.status);
-        }
-      }
+      const compensated = await reconcileOwnedPreapproval(supabaseAdmin, {
+        organizationId: context.organizationId,
+        preapprovalId: subscription.mercadopago_preapproval_id,
+        expectedExternalReference: subscription.mercadopago_external_reference,
+        logPrefix: 'subscription-reactivate',
+      });
       const conflict = updateError?.code === '40001' ||
         updateError?.message?.includes('CATALOG_CONFLICT') ||
         updateError?.message?.includes('SUBSCRIPTION_CONFLICT');
       console.error('[subscription-reactivate] finalize error:', updateError?.code ?? 'empty_result');
       return jsonResponse({
-        error: conflict
+        error: conflict && compensated
           ? 'El precio o la suscripcion cambiaron durante la reactivacion. Actualiza y reintenta.'
-          : 'No se pudo reactivar la suscripcion local',
-      }, conflict ? 409 : 500);
+          : 'No se pudo reactivar y Mercado Pago requiere conciliacion.',
+      }, conflict && compensated ? 409 : 502);
     }
 
     await supabaseAdmin.from('subscription_plan_changes').insert({

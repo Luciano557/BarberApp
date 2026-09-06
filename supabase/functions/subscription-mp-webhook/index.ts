@@ -298,7 +298,7 @@ function mapPaymentStatus(mpStatus: string | null | undefined): string {
 
 type PaymentOwnership = {
   organization_id: string;
-  subscription_id: string;
+  subscription_id: string | null;
   mercadopago_preapproval_id: string;
   mercadopago_authorized_payment_id: string;
 };
@@ -339,15 +339,16 @@ async function persistAuthorizedPayment(
       return null;
     }
 
-    const { data, error } = await supabaseAdmin
+    let update = supabaseAdmin
       .from('subscription_payments')
       .update(mutableFields)
       .eq('id', existing.id)
       .eq('organization_id', ownership.organization_id)
-      .eq('subscription_id', ownership.subscription_id)
-      .eq('mercadopago_preapproval_id', ownership.mercadopago_preapproval_id)
-      .select('id')
-      .maybeSingle();
+      .eq('mercadopago_preapproval_id', ownership.mercadopago_preapproval_id);
+    update = ownership.subscription_id
+      ? update.eq('subscription_id', ownership.subscription_id)
+      : update.is('subscription_id', null);
+    const { data, error } = await update.select('id').maybeSingle();
     if (error || !data) {
       console.error('[subscription-mp-webhook] payment update failed:', error?.code ?? 'ownership_changed');
       return null;
@@ -626,13 +627,139 @@ async function syncAuthorizedPayment(
   );
 
   if (!isPendingCheckout && !isCurrentPreapproval) {
-    console.warn('[subscription-mp-webhook] ignored stale authorized payment:', authorizedPaymentId);
+    const { data: tombstone, error: tombstoneError } = await supabaseAdmin
+      .from('subscription_price_change_items')
+      .select('id,batch_id,organization_id,subscription_id,expected_external_reference,created_at')
+      .eq('preapproval_id', String(preapprovalId))
+      .eq('item_type', 'pending_checkout')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (tombstoneError) return false;
+
+    let tombstonePlanCode: string | null = null;
+    if (tombstone?.batch_id) {
+      const { data: tombstoneBatch, error: tombstoneBatchError } = await supabaseAdmin
+        .from('subscription_price_change_batches')
+        .select('plan_code')
+        .eq('id', tombstone.batch_id)
+        .maybeSingle();
+      if (tombstoneBatchError) return false;
+      tombstonePlanCode = asNonEmptyString(tombstoneBatch?.plan_code);
+    }
+
+    const frozenReference = asNonEmptyString(tombstone?.expected_external_reference);
+    const tombstoneOrganizationId = asNonEmptyString(tombstone?.organization_id) ??
+      parsedExternalReference?.organizationId ?? null;
+    const isInvalidatedPriceCheckout = Boolean(
+      tombstone &&
+      frozenReference &&
+      frozenReference === externalReference &&
+      parsedExternalReference &&
+      tombstoneOrganizationId &&
+      parsedExternalReference.organizationId.toLowerCase() === tombstoneOrganizationId.toLowerCase() &&
+      tombstonePlanCode === parsedExternalReference.planCode,
+    );
+
+    if (!isInvalidatedPriceCheckout || !tombstone || !tombstoneOrganizationId) {
+      console.warn('[subscription-mp-webhook] ignored stale authorized payment:', authorizedPaymentId);
+      if (eventRowId) {
+        const { error: ignoredEventError } = await supabaseAdmin
+          .from('mercadopago_subscription_events')
+          .update({
+            organization_id: subscription.organization_id,
+            subscription_id: subscription.id,
+            processed_at: new Date().toISOString(),
+          })
+          .eq('id', eventRowId);
+        if (ignoredEventError) return false;
+      }
+      return true;
+    }
+
+    const stalePaymentStatus = mapPaymentStatus(authorizedPayment.status as string | undefined);
+    const staleAmount = finiteAmount(
+      authorizedPayment.transaction_amount ??
+      authorizedPayment.amount ??
+      authorizedPayment.payment?.transaction_amount ??
+      0,
+    ) ?? 0;
+    const staleCurrencyId = String(authorizedPayment.currency_id ?? 'ARS');
+    const stalePaidAt = stalePaymentStatus === 'approved'
+      ? new Date(
+        authorizedPayment.date_approved ??
+        authorizedPayment.last_modified ??
+        authorizedPayment.date_created ??
+        Date.now(),
+      ).toISOString()
+      : null;
+    const stalePeriodStart = stalePaidAt ? new Date(stalePaidAt) : null;
+    const stalePeriodEnd = stalePeriodStart ? addMonths(stalePeriodStart, 1) : null;
+    const tombstoneSubscriptionId = asNonEmptyString(tombstone.subscription_id);
+    const stalePayment = await persistAuthorizedPayment(
+      supabaseAdmin,
+      {
+        organization_id: tombstoneOrganizationId,
+        subscription_id: tombstoneSubscriptionId,
+        mercadopago_preapproval_id: String(preapprovalId),
+        mercadopago_authorized_payment_id: String(authorizedPaymentId),
+      },
+      {
+        plan_code: tombstonePlanCode,
+        billing_plan_code: tombstonePlanCode,
+        amount_ars: staleAmount,
+        currency_id: staleCurrencyId,
+        status: stalePaymentStatus,
+        provider: 'mercadopago',
+        mercadopago_payment_id: authorizedPayment.payment_id
+          ? String(authorizedPayment.payment_id)
+          : null,
+        period_start: stalePeriodStart?.toISOString() ?? null,
+        period_end: stalePeriodEnd?.toISOString() ?? null,
+        due_at: authorizedPayment.payment_date ?? authorizedPayment.date_created ?? null,
+        paid_at: stalePaidAt,
+        raw_payload: authorizedPayment,
+      },
+    );
+    if (!stalePayment) return false;
+
+    if (
+      (stalePaymentStatus === 'approved' || stalePaymentStatus === 'in_process') &&
+      !(await cancelSupersededPreapproval(String(preapprovalId)))
+    ) {
+      return false;
+    }
+
+    const auditRequestId = eventRowId ?? crypto.randomUUID();
+    const { error: auditError } = await supabaseAdmin
+      .from('platform_admin_audit_log')
+      .insert({
+        actor_user_id: null,
+        actor_alias: 'mercadopago_webhook',
+        action: 'subscription_price_change.invalidated_checkout_payment',
+        target_type: 'subscription_price_change_item',
+        target_id: tombstone.id,
+        reason: 'Mercado Pago informo un cobro para un checkout invalidado por cambio de precio.',
+        previous_state: {},
+        next_state: {
+          batchId: tombstone.batch_id,
+          planCode: tombstonePlanCode,
+          amountArs: staleAmount,
+          status: stalePaymentStatus,
+        },
+        result_status: stalePaymentStatus === 'approved' ? 'failed' : 'partial',
+        result_detail: { paymentId: stalePayment.id },
+        request_id: auditRequestId,
+      });
+    if (auditError && auditError.code !== '23505') return false;
+
     if (eventRowId) {
       const { error: ignoredEventError } = await supabaseAdmin
         .from('mercadopago_subscription_events')
         .update({
-          organization_id: subscription.organization_id,
-          subscription_id: subscription.id,
+          organization_id: tombstoneOrganizationId,
+          subscription_id: tombstoneSubscriptionId,
+          payment_id: stalePayment.id,
           processed_at: new Date().toISOString(),
         })
         .eq('id', eventRowId);
