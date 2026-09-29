@@ -85,7 +85,7 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling, onNav
       <div className="animate-fade-in">
         <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
         <Tabs defaultValue={defaultTab}>
-          <TabsList variant="underline" className="mb-6 flex-wrap">
+          <TabsList variant="underline" className="mb-6">
             <TabsTrigger value="sueldos" variant="underline">
               <Wallet className="h-4 w-4" />
               Sueldos
@@ -133,7 +133,7 @@ export function FinanzasPanel({ barbers, currentPlan, onNavigateToBilling, onNav
     <div className="animate-fade-in">
       <PageHeader title="Finanzas" icon={Wallet} subtitle="Gestioná ingresos, gastos, sueldos e inversiones del negocio." />
       <Tabs defaultValue={defaultTab}>
-        <TabsList variant="underline" className="mb-6 flex-wrap">
+        <TabsList variant="underline" className="mb-6">
           <TabsTrigger value="estadisticas" variant="underline">
             <BarChart3 className="h-4 w-4" />
             Estadisticas

@@ -65,13 +65,15 @@ export function DonutDetailDialog({
           </PieChart>
         </ChartContainer>
 
+        {/* Tabla comparativa (Tipo B): compara monto/porcentaje entre categorías del donut,
+            sin acción propia por fila (DESIGN.md → Registro vs. Tabla comparativa). */}
         <div className="rounded-md border overflow-hidden">
-          <Table>
+          <Table comparative className="min-w-[420px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Porcentaje</TableHead>
+                <TableHead className="min-w-[180px]">Nombre</TableHead>
+                <TableHead className="text-right min-w-[130px]">Monto</TableHead>
+                <TableHead className="text-right min-w-[100px]">Porcentaje</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -85,8 +87,8 @@ export function DonutDetailDialog({
                         {slice.label}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">{formatValue(slice.value)}</TableCell>
-                    <TableCell className="text-right">{pct.toFixed(0)}%</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">{formatValue(slice.value)}</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">{pct.toFixed(0)}%</TableCell>
                   </TableRow>
                 );
               })}

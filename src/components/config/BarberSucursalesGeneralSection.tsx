@@ -384,12 +384,12 @@ function AgregarRecurrenteSheet({
               </FormItem>
             )}
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-wrap gap-3">
             <FormField
               control={form.control}
               name="fechaInicio"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-[140px] flex-1">
                   <FormLabel>Desde (opcional)</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} />
@@ -402,7 +402,7 @@ function AgregarRecurrenteSheet({
               control={form.control}
               name="fechaFin"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="min-w-[140px] flex-1">
                   <FormLabel>Hasta (opcional)</FormLabel>
                   <FormControl>
                     <Input type="date" {...field} min={fechaInicioWatch || undefined} />

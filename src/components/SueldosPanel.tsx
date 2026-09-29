@@ -15,6 +15,8 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import { EmptySelectHint } from '@/components/agenda/EmptySelectHint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { RecordRow } from '@/components/ui/RecordRow';
+import { MetricGroup } from '@/components/ui/MetricGroup';
 import { Badge } from '@/components/ui/badge';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -211,28 +213,34 @@ function BarberDetailRow({
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
-        <div className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors">
-          <div className="flex items-center gap-3">
-            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-            <span className="font-medium">{barber.barberName}</span>
-            <Badge variant={barber.compensationType === 'fijo' ? 'secondary' : 'outline'} className="text-xs">
-              {barber.compensationType === 'fijo' ? 'Fijo' : 'Comisión'}
-            </Badge>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">A pagar</p>
-              <p className="font-medium">{formatCurrency(barber.totalDevengado)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Pagado</p>
-              <p className="font-medium text-status-success-foreground">{formatCurrency(barber.totalPagado)}</p>
-            </div>
-            <div className="text-right min-w-[140px]">
-              <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
-              {getSaldoBadge(barber.saldo)}
-            </div>
-          </div>
+        <div className="rounded-lg border p-4 hover:bg-muted/50 cursor-pointer transition-colors">
+          <RecordRow
+            identity={
+              <div className="flex flex-wrap items-center gap-2">
+                {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                <span className="font-medium">{barber.barberName}</span>
+                <Badge variant={barber.compensationType === 'fijo' ? 'secondary' : 'outline'} className="text-xs">
+                  {barber.compensationType === 'fijo' ? 'Fijo' : 'Comisión'}
+                </Badge>
+              </div>
+            }
+            metrics={
+              <MetricGroup size="metric">
+                <div>
+                  <p className="text-xs text-muted-foreground">A pagar</p>
+                  <p className="font-medium tabular-nums whitespace-nowrap">{formatCurrency(barber.totalDevengado)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Pagado</p>
+                  <p className="font-medium tabular-nums whitespace-nowrap text-status-success-foreground">{formatCurrency(barber.totalPagado)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Saldo (histórico)</p>
+                  {getSaldoBadge(barber.saldo)}
+                </div>
+              </MetricGroup>
+            }
+          />
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -287,31 +295,32 @@ function BarberDetailRow({
               </p>
             </div>
           )}
-          {/* Ingresos Detail */}
+          {/* Ingresos Detail — Tabla comparativa (Tipo B): compara efectivo/MP/facturado/comisión
+              entre cierres, sin acción propia por fila (DESIGN.md → Registro vs. Tabla comparativa). */}
           {barber.detalleIngresos.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">Cierres de Caja</h4>
               <div className="rounded-md border">
-                <Table>
+                <Table comparative>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Día</TableHead>
-                      <TableHead className="text-right">Efectivo</TableHead>
-                      <TableHead className="text-right">MP</TableHead>
-                      <TableHead className="text-right">Total Facturado</TableHead>
-                      <TableHead className="text-right">Comisión</TableHead>
+                      <TableHead className="min-w-[100px]">Fecha</TableHead>
+                      <TableHead className="min-w-[100px]">Día</TableHead>
+                      <TableHead className="text-right min-w-[130px]">Efectivo</TableHead>
+                      <TableHead className="text-right min-w-[130px]">MP</TableHead>
+                      <TableHead className="text-right min-w-[150px]">Total Facturado</TableHead>
+                      <TableHead className="text-right min-w-[130px]">Comisión</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {barber.detalleIngresos.map(ingreso => (
                       <TableRow key={ingreso.id}>
-                        <TableCell>{format(new Date(ingreso.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
-                        <TableCell className="capitalize">{ingreso.dia}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(ingreso.efectivo)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(ingreso.mp)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(ingreso.totalFacturado)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(ingreso.sueldo)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{format(new Date(ingreso.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
+                        <TableCell className="capitalize whitespace-nowrap">{ingreso.dia}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">{formatCurrency(ingreso.efectivo)}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">{formatCurrency(ingreso.mp)}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">{formatCurrency(ingreso.totalFacturado)}</TableCell>
+                        <TableCell className="text-right font-medium tabular-nums whitespace-nowrap">{formatCurrency(ingreso.sueldo)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -320,29 +329,32 @@ function BarberDetailRow({
             </div>
           )}
 
-          {/* Pagos Detail */}
+          {/* Pagos Detail — Registro (Tipo A): cada fila es un pago independiente, mismo patrón
+              que Historial de Pagos más abajo (DESIGN.md → Registro vs. Tabla comparativa). */}
           {barber.detallePagos.length > 0 && (
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-muted-foreground">Pagos Realizados</h4>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Concepto</TableHead>
-                      <TableHead className="text-right">Monto</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {barber.detallePagos.map(pago => (
-                      <TableRow key={pago.id}>
-                        <TableCell>{format(new Date(pago.fecha), "dd/MM/yyyy", { locale: es })}</TableCell>
-                        <TableCell className="text-muted-foreground">{pago.concepto || '-'}</TableCell>
-                        <TableCell className="text-right font-medium text-status-success-foreground">{formatCurrency(pago.monto)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-2">
+                {barber.detallePagos.map(pago => (
+                  <div key={pago.id} className="rounded-md border p-3">
+                    <RecordRow
+                      identity={
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{format(new Date(pago.fecha), "dd/MM/yyyy", { locale: es })}</p>
+                          <p className="text-xs text-muted-foreground">{pago.concepto || '-'}</p>
+                        </div>
+                      }
+                      metrics={
+                        <MetricGroup size="metric">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Monto</p>
+                            <p className="font-medium tabular-nums whitespace-nowrap text-status-success-foreground">{formatCurrency(pago.monto)}</p>
+                          </div>
+                        </MetricGroup>
+                      }
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -925,9 +937,9 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
 
   const getSaldoBadge = (saldo: number) => {
     if (saldo > 0) {
-      return <StatusPill status="error" label={`Debe: ${formatCurrency(saldo)}`} />;
+      return <StatusPill status="error" label={`Debe: ${formatCurrency(saldo)}`} className="whitespace-nowrap tabular-nums" />;
     } else if (saldo < 0) {
-      return <StatusPill status="warning" label={`A favor: ${formatCurrency(Math.abs(saldo))}`} icon={false} />;
+      return <StatusPill status="warning" label={`A favor: ${formatCurrency(Math.abs(saldo))}`} icon={false} className="whitespace-nowrap tabular-nums" />;
     } else {
       return <StatusPill status="neutral" label="Al día" />;
     }
@@ -1236,45 +1248,40 @@ export function SueldosPanel({ barbers }: SueldosPanelProps) {
             </CardContent>
           </Card>
 
-          {/* Payment History */}
+          {/* Payment History — Registro (Tipo A): cada fila es un pago independiente
+              (DESIGN.md → Registro vs. Tabla comparativa). */}
           <Card>
             <CardHeader>
               <CardTitle>Historial de Pagos</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Empleado</TableHead>
-                    <TableHead>Concepto</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagos.map(pago => (
-                    <TableRow key={pago.id}>
-                      <TableCell>
-                        {format(new Date(pago.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
-                      </TableCell>
-                      <TableCell className="font-medium">{pago.barbero_nombre}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {pago.concepto || '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-status-success-foreground">
-                        {formatCurrency(pago.monto)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {pagos.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        No hay pagos registrados
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent className="space-y-2">
+              {pagos.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No hay pagos registrados</p>
+              ) : (
+                pagos.map(pago => (
+                  <div key={pago.id} className="rounded-lg border p-4">
+                    <RecordRow
+                      identity={
+                        <div className="min-w-0">
+                          <p className="font-medium">{pago.barbero_nombre}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(pago.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                            {pago.concepto ? ` · ${pago.concepto}` : ''}
+                          </p>
+                        </div>
+                      }
+                      metrics={
+                        <MetricGroup size="metric">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Monto</p>
+                            <p className="font-medium tabular-nums whitespace-nowrap text-status-success-foreground">{formatCurrency(pago.monto)}</p>
+                          </div>
+                        </MetricGroup>
+                      }
+                    />
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </>

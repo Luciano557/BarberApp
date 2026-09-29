@@ -67,7 +67,11 @@ export function DrawerForm({ open, onOpenChange, title, description, size, child
               "data-[state=closed]:duration-200 data-[state=open]:duration-300",
               "[animation-timing-function:cubic-bezier(0.23,1,0.32,1)]",
               "w-[calc(100%-48px)]",
-              size === "sm" ? "sm:w-[380px]" : size === "md" ? "sm:w-[520px]" : "sm:w-[680px]",
+              size === "sm"
+                ? "sm:w-[min(380px,calc(100%-48px))]"
+                : size === "md"
+                  ? "sm:w-[min(520px,calc(100%-48px))]"
+                  : "sm:w-[min(680px,calc(100%-48px))]",
             )}
           >
             {/* Header — zona de swipe-to-close incondicional (no tiene scroll propio) */}

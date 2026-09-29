@@ -18,7 +18,6 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useSubscriptionAccess } from '@/hooks/useSubscriptionAccess';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { getRequiredPlan, planAllowsFeature, resolveEffectivePlan } from '@/lib/planAccess';
 import { useSucursal } from '@/contexts/SucursalContext';
@@ -29,7 +28,6 @@ import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip';
 import { ResumenMensualStory } from '@/components/resumenMensual/ResumenMensualStory';
 
 const Index = () => {
-  const isMobile = useIsMobile();
   const { user, canManagePayments, canOperarCajaYGastos, canManageConfig, canViewConfig, isOwner, hasNoAccess, canViewResumen, canViewTareas, canViewMiNegocio, canViewFinanzas, canViewTurnosAgenda, canViewClientes, roles, isLoading: authLoading } = useAuth();
   const { organization } = useOrganization();
   usePushNotifications(user?.id, organization?.id);
@@ -210,7 +208,7 @@ const Index = () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex w-full">
+    <div className="h-svh overflow-hidden bg-background flex w-full">
       <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
       <OnboardingOverlay />
       <OnboardingTooltip />
