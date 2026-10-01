@@ -1,5 +1,7 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { DEMO_IDENTITY } from '@/lib/financeDemoData';
 import { useState, useEffect } from 'react';
-import { CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, Lock, Menu, X } from 'lucide-react';
+import { Bell, CreditCard, BarChart3, Wallet, ClipboardList, CalendarClock, Users, Store, Settings, ChevronLeft, Lock, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -55,6 +57,7 @@ const SIZE_EASE = 'var(--ease-out-quint)';
 const RAIL_ICON_SIZE = 'clamp(36px, 3vh + 13px, 40px)';
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
+  const demo = useFinanceDemo();
   // Modo de ventana (DESIGN.md → Layout): solo para las dos decisiones que
   // una media query no puede tomar por sí sola — el valor inicial de
   // `collapsed` y si un tap de navegación debe cerrar el drawer. El ancho,
@@ -108,9 +111,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const principalItems = navItems.filter((i) => !MGMT_IDS.has(i.id));
   const gestionItems = navItems.filter((i) => MGMT_IDS.has(i.id));
 
-  const displayName = profile?.full_name || profile?.email || 'Usuario';
+  const displayName = demo.active ? DEMO_IDENTITY.user : (profile?.full_name || profile?.email || 'Usuario');
   const initials =
-    (profile?.full_name || profile?.email || 'U')
+    (displayName)
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
@@ -294,7 +297,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             <img
               src="/MagotipoBlanco.png"
               alt="Vittro"
-              title={isRailWidth ? organization?.name || 'Barbería' : undefined}
+              title={isRailWidth ? demo.active ? DEMO_IDENTITY.organization : (organization?.name || 'Barbería') : undefined}
               className="h-20 w-20 shrink-0 object-contain"
             />
             <button
@@ -400,10 +403,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               </Avatar>
               {canViewTareas && (
                 <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
-                  <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
+                  {demo.active ? <Button variant="ghost" size="icon" disabled aria-label="Notificaciones pausadas durante la grabación"><Bell className="h-4 w-4" /></Button> : <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />}
                 </div>
               )}
-              {requiresPin && isUnlocked && (
+              {!demo.active && requiresPin && isUnlocked && (
                 <button
                   type="button"
                   onClick={lock}
@@ -433,10 +436,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               <div className="flex shrink-0 items-center gap-1">
                 {canViewTareas && (
                   <div className="[&>button]:h-8 [&>button]:w-8 [&>button]:min-w-0 [&>button]:rounded-lg [&>button]:p-0">
-                    <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />
+                    {demo.active ? <Button variant="ghost" size="icon" disabled aria-label="Notificaciones pausadas durante la grabación"><Bell className="h-4 w-4" /></Button> : <NotificationsBell collapsed onNavigate={() => handleTabChange('tareas')} />}
                   </div>
                 )}
-                {requiresPin && isUnlocked && (
+                {!demo.active && requiresPin && isUnlocked && (
                   <button
                     type="button"
                     onClick={lock}

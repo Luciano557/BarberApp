@@ -1,10 +1,12 @@
-import { Toaster as Sonner } from "@/components/ui/sonner";
+import { FinanceDemoToaster } from "@/components/financeDemo/FinanceDemoToaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { FinanceDemoExitDialog } from '@/components/financeDemo/FinanceDemoExitDialog';
+import { FinanceDemoProvider } from "@/contexts/FinanceDemoContext";
 import { SucursalProvider } from "@/contexts/SucursalContext";
 import { ActionPinGateProvider } from "@/components/ActionPinGate";
 import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
@@ -32,7 +34,7 @@ const PUBLIC_TOP_CENTER_ROUTES = [/^\/$/, /^\/login$/, /^\/[^/]+\/reservar$/];
 function AppToaster() {
   const { pathname } = useLocation();
   const isPublicPage = PUBLIC_TOP_CENTER_ROUTES.some((re) => re.test(pathname));
-  return <Sonner position={isPublicPage ? "top-center" : "bottom-right"} />;
+  return <FinanceDemoToaster position={isPublicPage ? "top-center" : "bottom-right"} />;
 }
 
 function TenantProviders() {
@@ -40,11 +42,14 @@ function TenantProviders() {
     <AuthProvider>
       <OrganizationProvider>
         <SucursalProvider>
-          <ActionPinGateProvider>
-            <OnboardingProvider>
-              <Outlet />
-            </OnboardingProvider>
-          </ActionPinGateProvider>
+          <FinanceDemoProvider>
+            <ActionPinGateProvider>
+              <OnboardingProvider>
+                <Outlet />
+              </OnboardingProvider>
+            </ActionPinGateProvider>
+            <FinanceDemoExitDialog />
+          </FinanceDemoProvider>
         </SucursalProvider>
       </OrganizationProvider>
     </AuthProvider>

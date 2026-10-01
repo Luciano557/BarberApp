@@ -1,3 +1,5 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { DEMO_IDENTITY } from '@/lib/financeDemoData';
 import { useMemo, useState } from 'react';
 import { ArrowRight, BadgeCheck, CreditCard, Crown, Loader2, LogOut, RefreshCw, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,6 +52,7 @@ function gateCopy(access: SubscriptionAccess | null) {
 }
 
 export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
+  const demo = useFinanceDemo();
   const { signOut, isOwner, isGeneralManager } = useAuth();
   const { organization } = useOrganization();
   const {
@@ -115,7 +118,7 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
               </p>
               {organization?.name && (
                 <p className="mt-3 text-sm text-muted-foreground">
-                  Negocio: <span className="font-medium text-foreground">{organization.name}</span>
+                  Negocio: <span className="font-medium text-foreground">{demo.active ? DEMO_IDENTITY.organization : organization.name}</span>
                 </p>
               )}
             </div>
@@ -225,7 +228,7 @@ export function SubscriptionGate({ access, onRetry }: SubscriptionGateProps) {
                         </ul>
                         <Button
                           className="w-full"
-                          onClick={() => startCheckout(plan.code)}
+                          onClick={() => demo.requestExit(() => { void startCheckout(plan.code); })}
                           disabled={isLoading}
                         >
                           {isLoading ? (

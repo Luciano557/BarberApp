@@ -1,3 +1,5 @@
+import { isFinanceDemoActive, runFinanceWrite } from '@/lib/financeDemoRuntime';
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -114,6 +116,7 @@ const getGastoFormDefaults = (): GastoFormValues => ({
 });
 
 export function GastosPanel() {
+  const demo = useFinanceDemo();
   const { gastos, isLoading, selectedMonth, setSelectedMonth, addGasto, anularGasto, totalPeriodo, setSyncRecurrentes } = useGastos();
   const showSkeleton = useDelayedVisible(isLoading);
   const requirePinForAction = useRequirePinForAction();
@@ -128,16 +131,16 @@ export function GastosPanel() {
 
   const handleUnlockGastosView = async () => {
     const gate = await requirePinForAction('ver_gastos', currentSucursal?.id ?? null);
-    if (!gate.ok) return;
+    if (!gate.ok || isFinanceDemoActive()) return;
     setGastosViewUnlocked(true);
     // Notificar visualización (solo cuenta de sucursal; dedupe horario en SQL).
     if (isSucursalAccount && currentSucursal?.id) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).rpc('notif_emit_view_event', {
+        await runFinanceWrite(async () => (supabase as any).rpc('notif_emit_view_event', {
           _module: 'gastos',
           _sucursal_id: currentSucursal.id,
-        });
+        }));
       } catch (e) { console.warn('[notif] view event error', e); }
     }
   };
@@ -186,6 +189,7 @@ export function GastosPanel() {
   const closeForm = () => setIsFormOpen(false);
 
   const onSubmit = async (values: GastoFormValues) => {
+    if (isFinanceDemoActive()) return;
     if (values.esRecurrente && values.tipoCosto === 'fijo') {
       // Create recurring template
       const success = await addRecurrente({
@@ -204,7 +208,7 @@ export function GastosPanel() {
     } else {
       // Normal single gasto
       const gate = await requirePinForAction('registrar_gasto', currentSucursal?.id ?? null);
-      if (!gate.ok) return;
+      if (!gate.ok || isFinanceDemoActive()) return;
       const success = await addGasto({
         categoria: values.categoria,
         monto: parseFloat(values.monto),
@@ -225,7 +229,7 @@ export function GastosPanel() {
         subtitle="Costos fijos, variables y recurrentes del negocio."
         className="pl-0"
         actions={(
-          <Button size="sm" onClick={() => setIsFormOpen(true)}>
+          <Button size="sm" disabled={demo.active} onClick={() => setIsFormOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Registrar gasto
           </Button>
         )}
@@ -239,17 +243,17 @@ export function GastosPanel() {
         isDirty={form.formState.isDirty}
         footer={
           <div className="flex w-full justify-end gap-2">
-            <Button variant="outline" onClick={closeForm} disabled={form.formState.isSubmitting}>
+            <Button variant="outline" onClick={closeForm} disabled={demo.active || form.formState.isSubmitting}>
               Cancelar
             </Button>
-            <Button type="submit" form="gasto-form" disabled={form.formState.isSubmitting}>
+            <Button type="submit" form="gasto-form" disabled={demo.active || form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Registrando...' : esRecurrenteWatch ? 'Crear gasto recurrente' : 'Registrar gasto'}
             </Button>
           </div>
         }
       >
         <Form {...form}>
-          <form id="gasto-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form id="gasto-form" onSubmit={form.handleSubmit(values => runFinanceWrite(() => onSubmit(values)).then(() => {}))} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="tipoCosto"
@@ -381,6 +385,7 @@ export function GastosPanel() {
       {/* Gastos recurrentes list */}
       <GastosRecurrentesList
         recurrentes={recurrentes}
+        readOnly={demo.active}
         onToggle={toggleRecurrente}
         onDelete={deleteRecurrente}
       />
@@ -481,7 +486,7 @@ export function GastosPanel() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive disabled:opacity-30"
-                            disabled={esAutomatico}
+                            disabled={demo.active || esAutomatico}
                             title={esAutomatico ? 'Este gasto se generó automáticamente y no se puede editar desde acá' : undefined}
                             onClick={() => setAnularState({ id: g.id, motivo: '' })}
                           >
@@ -570,7 +575,7 @@ export function GastosPanel() {
                 setAnulando(true);
                 try {
                   const gate = await requirePinForAction('anular_gasto', currentSucursal?.id ?? null);
-                  if (!gate.ok) return;
+                  if (!gate.ok || isFinanceDemoActive()) return;
                   const ok = await anularGasto(anularState.id, anularState.motivo, {
                     validatedByUserId: gate.validatedByUserId ?? null,
                   });

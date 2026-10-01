@@ -42,7 +42,7 @@ la dejó obsoleta.
 - [x] `acceso-tenant.md` — Restauración de sesión, carga del contexto tenant y recuperación de fallos
 - [x] `turnos-agenda.md` — Configuración de reservas, Portal público, Horarios de trabajo
 - [ ] Cobrar
-- [ ] Finanzas
+- [x] Finanzas — `finanzas.md` (modo ficticio implementado, uso, límites y validación; no implica auditoría completa del módulo)
 - [ ] Mi Negocio (general)
 - [ ] Clientes
 - [ ] Estadísticas

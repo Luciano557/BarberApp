@@ -23,11 +23,12 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   recurrentes: GastoRecurrente[];
+  readOnly?: boolean;
   onToggle: (id: string, activo: boolean) => void;
   onDelete: (id: string) => void;
 }
 
-export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props) {
+export function GastosRecurrentesList({ recurrentes, onToggle, onDelete, readOnly = false }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<GastoRecurrente | null>(null);
 
   if (recurrentes.length === 0) return null;
@@ -68,6 +69,7 @@ export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
+                    disabled={readOnly}
                     onClick={() => onToggle(r.id, !r.activo)}
                     title={r.activo ? 'Pausar' : 'Activar'}
                   >
@@ -77,6 +79,8 @@ export function GastosRecurrentesList({ recurrentes, onToggle, onDelete }: Props
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 text-destructive hover:text-destructive"
+                    disabled={readOnly}
+                    aria-label="Eliminar gasto recurrente"
                     onClick={() => setDeleteConfirm(r)}
                   >
                     <Trash2 className="h-4 w-4" />

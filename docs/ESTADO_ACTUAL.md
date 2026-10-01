@@ -1,6 +1,10 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-09-29
+Última actualización: 2026-10-01
+
+## Finanzas — modo ficticio
+
+**Ambos builds implementados y validados localmente — 2026-10-01.** Botón al final de Estadísticas e indicador compartido en las cinco pestañas. Contexto por usuario/organización, persistencia por pestaña, escenarios independientes con dos sucursales/cuatro empleados/doce meses y guardas de lecturas/escrituras. Cuenta, sucursales, tooltips y atributos accesibles de la barra lateral usan la presentación ficticia; notificaciones y avisos globales, onboarding y resumen mensual automático quedan suspendidos. Salidas a otros módulos y facturación requieren confirmación. La URL conserva el slug real, fuera del encuadre acordado. Sueldos carga mediante `useSueldosData`; bonos/gastos recurrentes no se materializan durante el modo. Sin DB/RLS ni despliegue. Evidencia: diff de archivos, build exitoso, **72 pruebas en 17 archivos** y QA local de las cinco pestañas a 375/834/1280 px con acceso/backend simulados. TypeScript conserva cinco errores preexistentes en archivos sin modificar. Detalle y límites: `docs/MODULOS/finanzas.md`.
 
 ## Centro de administración de plataforma
 

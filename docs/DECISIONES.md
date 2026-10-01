@@ -5,6 +5,12 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Datos ficticios independientes para grabar Finanzas — 2026-10-01
+
+Los ejemplos se crean desde una fecha y una sucursal sintética, sin transformar importes o nombres reales. El modo mantiene los contextos reales para autorización, pero suspende lecturas operativas y protege escrituras, incluidas las automáticas al cargar Sueldos/Gastos. `sessionStorage` lo limita a la pestaña y lo vincula a la identidad tenant para evitar arrastrarlo a otra cuenta. Las operaciones reales en curso deben terminar antes de activar. La navegación fuera de Finanzas requiere salida explícita; la URL queda sin cambios porque la grabación acordada cubre solo el contenido de la app.
+
+Se usa una presentación ficticia para la barra lateral, sin alterar la sucursal operativa: modificar el contexto real habría cambiado el alcance de consultas y permisos al volver al uso normal. Al cambiar la fuente se remontan los paneles para impedir que formularios o detalles anteriores reaparezcan. La confirmación vive en el árbol tenant para cubrir también un bloqueo de suscripción sobrevenido, manteniendo el control de acceso y ocultando allí la identidad real. El Toaster global usa la misma guarda mediante suscripción de React porque vive fuera del árbol tenant: así una respuesta tardía de otro módulo no puede insertar un aviso real en la grabación. Los pagos e inversiones del escenario conservan importes/identificadores al filtrar por sucursal; se verificó esta estabilidad durante el segundo build.
+
 ## La sesión tenant se reutiliza, no se prolonga artificialmente
 
 Para reducir logins repetidos se aprovecha la sesión que Supabase ya persiste

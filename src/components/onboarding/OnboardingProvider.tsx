@@ -1,3 +1,4 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { ONBOARDING_STEPS, OnboardingStep, OnboardingSubTab, OnboardingEvent } from './steps';
 import { useOnboardingState } from '@/hooks/useOnboardingState';
@@ -40,6 +41,7 @@ export function useOnboarding() {
 }
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
+  const demo = useFinanceDemo();
   const { row, isLoading, upsert } = useOnboardingState();
   const { isOwner, isGeneralManager } = useAuth();
   // El filtro de pasos es una API que CSS no puede expresar (decide qué
@@ -65,7 +67,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [tooltipFits, setTooltipFits] = useState(true);
 
 
-  const isActive = currentIndex >= 0 && currentIndex < steps.length;
+  const isActive = !demo.active && currentIndex >= 0 && currentIndex < steps.length;
   const currentStep = isActive ? steps[currentIndex] : null;
 
   const next = useCallback(() => {
