@@ -5,6 +5,21 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Recuperación y publicación comercial sin habilitar escrituras — 2026-10-10
+
+El merge `2bda5a7` eliminó la base de Admin y dejó conflictos. El usuario
+autorizó recuperar todo: reversión contra su primer padre `df51109`, con una
+referencia local al merge y sin reescribir historial. Pruebas completas y build
+validaron el estado recuperado antes de publicarlo por el remoto productivo
+confirmado en Vercel. No se restauraron datos ni se repitieron migraciones.
+
+Con autorización separada se desplegaron solo query/organization y frontend;
+`PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED=false` se configuró antes de publicar.
+La verificación Admin real demuestra la entrega de lectura, no autoriza una
+escritura de prueba ni el paso a true. El switch de precios no cambió. Se informó
+el Básico a ARS 1 de un lote previo, sin revertir decisiones comerciales ajenas.
+Evidencia: `docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`.
+
 ## Excepción directa acotada para la migración comercial — 2026-10-10
 
 Al no disponer del propietario de Lovable, el usuario autorizó expresamente

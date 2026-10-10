@@ -138,8 +138,17 @@ en producción con autorización explícita nueva, en una transacción, a las
 13:08:48 UTC del 2026-10-10. Lectura independiente confirmó RLS, cero policies,
 grants solo service_role para API, RPC INVOKER y contenido del archivo; sin
 ejecutar otras migraciones ni alterar conteos/catalogo. Registro y evidencia:
-`docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`. Sin despliegue ni habilitación
-productiva de la ampliación. Evidencia local: 36 pruebas Vitest, 22 Deno y 14 integraciones
+`docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`. Backend y frontend publicados
+posteriormente, con nueva autorización y switch comercial en false. Se recuperó
+el merge `2bda5a7` respecto de `df51109` conservando referencia de seguridad:
+98 Vitest, 22 Deno y 14 SQL locales aprobados. Query v4/organization v1 ACTIVE
+con JWT; Vercel Ready/Production/Current del commit `17450d70`. Sesión Admin real:
+directorio, paginación, búsqueda, fichas manual/trial/vencido, contactos nulos e
+historial a 390/768/1024/1440; acciones comerciales deshabilitadas. Evidencia:
+`docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`. Catálogo observado: Básico ARS 1/v3
+por un lote anterior de las 11:11; Profesional/Premium ARS 30.000/50.000/v2. Sin
+intervenir precios ni ejecutar otras migraciones. Falta prueba comercial acordada,
+concurrencia real y habilitación. Evidencia local original: 36 pruebas Vitest, 22 Deno y 14 integraciones
 PostgreSQL/WASM sintéticas; build, lint focal y chequeo Deno exitosos. TypeScript
 global conserva los cinco errores previos; lint focal tiene dos avisos Fast
 Refresh. Capturas sintéticas a 390/768/1024/1280/1440 px; revisión independiente

@@ -60,7 +60,7 @@ Captura real de Supabase:
 Muestra parte del resultado independiente (RPC, catálogo e historial);
 la tabla anterior registra también los campos leídos fuera del encuadre.
 
-## Pendientes y límites
+## Pendientes al cierre de esta operación (13:10 UTC)
 
 La **base está migrada**, pero el endpoint comercial nuevo y el frontend siguen
 sin desplegar. No se modificaron secrets/kill switches ni se habilitaron
@@ -70,3 +70,8 @@ diferida; la entrega de webhooks no se valida con esta migración.
 
 Seguir `ADMIN_COMERCIAL_ACTIVACION.md` desde el paso 2. No reejecutar esta
 migración ni usar un `supabase db push` general para este rollout.
+
+Actualización posterior, con autorización separada: backend y frontend
+publicados en modo lectura, sin reejecutar esta migración. El switch comercial
+se configuró en false; las escrituras siguen apagadas. Ver
+[evidencia del despliegue y QA](ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).

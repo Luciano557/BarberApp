@@ -122,8 +122,9 @@ Backend comercial (etapa 1), ficha/drawers (etapa 3) e integración tipada de la
 etapa 4 terminados y validados **localmente**, en builds separados. La suspensión
 de etapa 2 sigue diferida. Migración aplicada directamente en producción con
 excepción explícita nueva, en una transacción, el 2026-10-10 a las 13:08:48 UTC;
-endpoint nuevo y frontend comercial sin desplegar. Las escrituras
-quedan apagadas por defecto (`PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED`
+endpoint nuevo y frontend comercial publicados posteriormente con nueva
+autorización y QA autenticado de lectura. Las escrituras
+quedan explícitamente apagadas (`PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED=false`,
 independiente). No se modificó ninguna función `SECURITY DEFINER` existente
 ni contratos MP.
 
@@ -194,14 +195,15 @@ La extensión de trial permite períodos nulos o reflejados exactamente desde
 las fechas originales de trial; rechaza un período distinto o cualquier pago
 aprobado y conserva la proyección al extender el vencimiento.
 
-### Activación pendiente
+### Despliegue en lectura cerrado; activación pendiente
 
-El build local no completa el rollout. Seguir
-[ADMIN_COMERCIAL_ACTIVACION.md](ADMIN_COMERCIAL_ACTIVACION.md) desde el paso 2:
-migración `20261010130000_platform_admin_commercial.sql` aplicada y verificada,
-desplegar backend y
-frontend con el switch apagado, comprobar sesión real/aislamiento y QA responsive
-autenticado, concurrencia con conexiones reales y una prueba comercial acordada
+El backend y frontend se publicaron con nueva autorización, recuperación del
+merge roto y switch comercial apagado. La lectura se verificó con sesión Admin
+real a 390/768/1024/1440 px; ver
+[ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md](ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).
+Seguir [ADMIN_COMERCIAL_ACTIVACION.md](ADMIN_COMERCIAL_ACTIVACION.md) desde el paso 4:
+migración ya aplicada y verificada, pruebas restantes de aislamiento/recuperación,
+concurrencia con conexiones reales y una prueba comercial acordada
 antes de habilitar. El switch habilita contacto/manual/trial conjuntamente;
 no implementa suspensión ni modifica el switch de precios.
 

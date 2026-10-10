@@ -1,7 +1,7 @@
 # Activación de gestión comercial por barbería
 
-Fecha: 2026-10-10. **Migración aplicada en producción; código comercial todavía
-no desplegado ni habilitado**.
+Fecha: 2026-10-10. **Migración, backend y frontend publicados en producción;
+gestión comercial en modo lectura, escrituras deshabilitadas**.
 Esto amplía Admin con ficha, contacto privado, acceso manual y trial. No incluye
 suspensión, credenciales/roles tenant, catálogo ni modificación de contratos MP.
 
@@ -26,6 +26,10 @@ modificaron en esta operación.
 
 ## 2. Mantener el kill switch apagado y desplegar backend
 
+**Completado:** secret configurado en `false`; query v4 y organization v1 ACTIVE,
+con JWT obligatorio. No repetir despliegue si no hay cambios nuevos. Evidencia:
+[ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md](ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).
+
 Configurar en secrets de Supabase, nunca `VITE_*`:
 
 ```text
@@ -48,6 +52,12 @@ Comprobar 401 sin JWT y 403 con usuario tenant/claim inválido; `status` y consu
 autorizadas funcionan con el switch apagado, escrituras devuelven 503 específico.
 
 ## 3. Publicar frontend inicialmente en lectura
+
+**Publicado y comprobado con sesión Admin real:** Vercel Ready/Production/Current,
+commit `17450d70`, directorio y fichas manual/trial/vencido, contacto nulo,
+historial y QA 390/768/1024/1440. Las tres acciones comerciales están deshabilitadas.
+Los casos de error, contrato MP y convivencia tenant siguen teniendo evidencia
+local, no una certificación autenticada productiva de toda la matriz.
 
 Revisar el diff/PR, pasar checks y usar el flujo normal GitHub/Vercel. El build
 incorpora `/admin/barberias/:organizationId`; se abre desde el nombre en tabla
@@ -119,6 +129,8 @@ rollout: requiere auditoría y autorización específica si cambia un DEFINER.
   certificación del rollout ni de la sesión/backend productivos.
 - Migración productiva confirmada con autorización puntual y evidencia separada;
   no reemplaza las pruebas de API/frontend ni habilita escrituras.
-- Pendientes: deploy/activación, QA autenticado real,
-  concurrencia multi-conexión y matriz de webhooks. La verificación sintética
-  no autoriza ni certifica ese rollout.
+- Backend/frontend publicados y QA de lectura real documentados en
+  `ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`; no habilita escrituras.
+- Pendientes: prueba comercial acordada, concurrencia multi-conexión,
+  recuperación/denegación/convivencia autenticadas y matriz de webhooks.
+  La verificación sintética no reemplaza esas pruebas.

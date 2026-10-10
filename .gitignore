@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .gstack/
+
+# Evidencia productiva de Admin: mantener capturas autenticadas solo localmente.
+.impeccable/review/admin-commercial/production-*.jpg

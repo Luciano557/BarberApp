@@ -21,10 +21,12 @@ archivo activo y cualquier otro documento, el activo gana.
 
 Plan aprobado: `docs/PLAN_ADMIN_GESTION_COMERCIAL.md` — gestión por barbería y
 contacto; backend, ficha e integración validados localmente, migración aplicada
-en producción con excepción directa autorizada; despliegue/activación pendientes.
-Evidencia: `docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`. Activación paso a paso:
-`docs/ADMIN_COMERCIAL_ACTIVACION.md` — migración completada, backend, lectura,
-verificación real y kill switch comercial independiente.
+en producción con excepción directa autorizada; backend/frontend publicados y
+QA autenticado de lectura realizado, escrituras comerciales apagadas.
+Evidencia: `docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md` y
+`docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`. Activación paso a paso:
+`docs/ADMIN_COMERCIAL_ACTIVACION.md` — migración/deploy/lectura completados;
+prueba comercial, concurrencia real y habilitación pendientes.
 
 ## Historial — no es instrucción vigente
 

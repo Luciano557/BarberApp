@@ -8,11 +8,13 @@ están aplicados en el entorno productivo. Se verificaron el acceso autenticado,
 los endpoints administrativos y la política CORS para
 `https://www.vittro.com.ar`.
 
-La extensión comercial del 2026-10-10 tiene backend, ficha e integración tipada
-terminados y validados localmente. La migración comercial se aplicó en producción
-con excepción directa autorizada el 2026-10-10, en una sola transacción; la RPC,
-RLS y grants se comprobaron de forma independiente. El endpoint nuevo y frontend
-comercial no se desplegaron; no se habilitaron escrituras.
+La extensión comercial del 2026-10-10 tiene migración, backend y frontend
+publicados en producción, con escrituras comerciales apagadas. La migración
+se aplicó con excepción directa autorizada, en una sola transacción; la RPC,
+RLS y grants se comprobaron de forma independiente. Query v4 y organization v1
+están ACTIVE con JWT obligatorio. Vercel publicó `17450d70`; la lectura se
+comprobó con una sesión Admin real a 390/768/1024/1440 px. Evidencia:
+[ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md](../ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).
 La activación requiere seguir [el runbook comercial](../ADMIN_COMERCIAL_ACTIVACION.md).
 
 `PLATFORM_ADMIN_PRICE_MUTATIONS_ENABLED` está en `true`. El 2026-09-08 se
@@ -21,6 +23,10 @@ Profesional ARS 30.000 y Premium ARS 50.000, todos en `price_version = 2`.
 Homepage y Registro fueron verificados contra esos importes. El caso de Básico
 quedó reconciliado el 2026-10-10. Facturación, `SubscriptionGate` y el webhook
 posterior continúan pendientes de validación.
+
+En el QA posterior del 2026-10-10, catálogo y portada mostraron Básico ARS 1 / v3;
+el lote de 11:11 registraba ARS 20.000 → ARS 1, anterior al despliegue. Se informó
+al usuario y no se alteró. Profesional/Premium permanecían en ARS 30.000/50.000 / v2.
 
 La migración es `supabase/migrations/20260904153000_platform_admin_center.sql`.
 Modifica una función `SECURITY DEFINER` preexistente (`handle_new_user`), por lo
@@ -263,7 +269,8 @@ separada de Auth: RLS activa, sin policies tenant y permisos SELECT/INSERT/UPDAT
 solo para `service_role`. Conserva email comercial privado por organización;
 no contiene datos operativos de sucursal. Aplicada en producción con excepción
 directa autorizada, en una sola transacción, el 2026-10-10. Tabla vacía y grants
-verificados; su API/frontend todavía no están desplegados.
+verificados al aplicar; API/frontend posteriormente publicados en modo lectura,
+sin ejecutar la RPC comercial ni habilitar escrituras.
 
 `subscription_plans.price_version` identifica la versión del precio.
 `organization_subscriptions` conserva `billing_amount_ars`,
@@ -476,11 +483,11 @@ de Mercado Pago sin reconciliar primero el estado de ambos sistemas.
 - Dos cambios concurrentes no pisan el catálogo y los webhooks fuera de orden no
   retroceden el acceso.
 
-## Gestión comercial por barbería — build local cerrado
+## Gestión comercial por barbería — desplegada en lectura
 
-Implementado y validado el 2026-10-10. **Migración aplicada en producción; sin
-despliegue ni activación comercial**. Backend, contratos tipados, ficha, historial y drawers están
-integrados en el código local. Archivos de referencia:
+Implementado, recuperado y publicado el 2026-10-10. **Migración, backend y frontend
+en producción; escrituras comerciales apagadas**. Backend, contratos tipados,
+ficha, historial y drawers están integrados. Archivos de referencia:
 `src/admin/pages/AdminOrganizationDetailPage.tsx`,
 `src/admin/components/OrganizationDetailView.tsx`,
 `OrganizationCommercialDrawer.tsx`, `OrganizationHistory.tsx`,
@@ -521,7 +528,11 @@ RLS, policies y grants. Los conteos de organización/suscripción/pagos/auditor�
 lotes/ítems y el catálogo no cambiaron. No se llamó a la RPC comercial ni a MP.
 Evidencia: [ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md](../ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md).
 
-Pendientes: desplegar backend/frontend con switch comercial apagado, QA autenticado real y
+Recuperación aprobada del merge `2bda5a7` respecto de `df51109`, sin reescribir
+historial: 98 Vitest, 22 Deno, 14 SQL locales, build y lint focal aprobados.
+Publicación productiva y QA autenticado de lectura:
+[evidencia](../ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md). Falta prueba comercial
+acordada, concurrencia real, denegación/recuperación/convivencia autenticadas y
 habilitación controlada según [el runbook](../ADMIN_COMERCIAL_ACTIVACION.md).
 La excepción recibida cubre solo esta migración; no autoriza otras migraciones ni
 habilitación comercial. Suspensión requiere auditoría y build posterior de
