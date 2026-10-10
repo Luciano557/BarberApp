@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.platform-admin-price-change]
 verify_jwt = true
+
+[functions.platform-admin-organization]
+verify_jwt = true

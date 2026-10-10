@@ -18,10 +18,12 @@ import {
   sortItems,
   stringValue,
 } from '../_shared/platform-admin.ts';
+import { CommercialError, commercialEligibility, isUuid, type CommercialSubscription } from '../_shared/admin-organization-domain.ts';
 
 type QueryOperation =
   | 'overview'
   | 'organizations'
+  | 'organization_detail'
   | 'users'
   | 'subscriptions'
   | 'payments'
@@ -142,6 +144,7 @@ interface PriceChangeItemDto extends Record<string, unknown> {
 const OPERATIONS: readonly QueryOperation[] = [
   'overview',
   'organizations',
+  'organization_detail',
   'users',
   'subscriptions',
   'payments',
@@ -180,11 +183,13 @@ function allowedAdminState(value: unknown): Record<string, unknown> {
     'succeeded',
     'failed',
     'skipped',
+    'name', 'phone', 'address', 'contactEmail', 'provider', 'status', 'planCode', 'currentPlanCode', 'billingPlanCode',
+    'accessEndsAt', 'trialEndsAt', 'billingAmountArs', 'billingPriceVersion',
   ];
 
   return Object.fromEntries(
     allowedKeys
-      .filter((key) => value[key] !== undefined)
+      .filter((key) => value[key] === null || ['string', 'number', 'boolean'].includes(typeof value[key]))
       .map((key) => [key, value[key]]),
   );
 }
@@ -638,11 +643,21 @@ async function audit(
   const page = parsePageRequest(body);
   const search = normalizedSearch(body.search);
   const filters = recordFilter(body.filters);
+  const organizationId = filters.organizationId;
+  let targetIds: string[] | null = null;
+  if (organizationId !== undefined) {
+    if (!isUuid(organizationId)) throw new CommercialError('INVALID_INPUT', 400, 'Identificador de barbería inválido.');
+    const { data: subscription, error } = await supabaseAdmin.from('organization_subscriptions')
+      .select('id').eq('organization_id', organizationId).maybeSingle();
+    if (error) throw error;
+    targetIds = [organizationId, ...(subscription ? [String(subscription.id)] : [])];
+  }
   const sort = parseSortRequest(body.sort, ['createdAt', 'action', 'result'], 'createdAt');
   const select = 'id,actor_user_id,actor_alias,action,target_type,target_id,reason,previous_state,next_state,result_status,result,request_id,created_at';
   let query = supabaseAdmin
     .from('platform_admin_audit_v')
     .select(select, { count: 'exact' });
+  if (targetIds) query = query.in('target_id', targetIds);
   if (search) query = query.ilike('search_text', `%${search}%`);
   const actionFilter = stringValue(filters.action);
   const actorFilter = stringValue(filters.actorUserId);
@@ -760,6 +775,51 @@ async function priceChangeStatus(
   };
 }
 
+async function organizationDetail(supabaseAdmin: Parameters<typeof fetchAllRows>[0], body: QueryBody) {
+  const organizationId = recordFilter(body.filters).organizationId;
+  if (!isUuid(organizationId)) throw new CommercialError('INVALID_INPUT', 400, 'Identificador de barbería inválido.');
+  const { data: organization, error: orgError } = await supabaseAdmin.from('organizations')
+    .select('id,name,slug,phone,address,is_active,created_at,updated_at').eq('id', organizationId).maybeSingle();
+  if (orgError) throw orgError;
+  if (!organization) throw new CommercialError('ORGANIZATION_NOT_FOUND', 404, 'No encontramos la barbería.');
+  const [{ data: contact, error: contactError }, { data: subscription, error: subError },
+    { data: approved, error: paymentsError }, { data: counts, error: countsError }, planData] = await Promise.all([
+    supabaseAdmin.from('platform_admin_organization_contacts').select('email').eq('organization_id', organizationId).maybeSingle(),
+    supabaseAdmin.from('organization_subscriptions').select('id,status,provider,current_plan_code,effective_plan_code,billing_plan_code,pending_plan_code,trial_started_at,trial_ends_at,current_period_start,current_period_end,cancel_at_period_end,mercadopago_preapproval_id,mercadopago_external_reference,mercadopago_status,mercadopago_init_point,next_payment_date,last_payment_at,billing_amount_ars,billing_price_version,pending_checkout_amount_ars,pending_checkout_price_version,metadata,updated_at').eq('organization_id', organizationId).maybeSingle(),
+    supabaseAdmin.from('subscription_payments').select('id').eq('organization_id', organizationId).eq('status', 'approved').limit(1),
+    supabaseAdmin.from('platform_admin_organizations_v').select('branches_count,users_count').eq('id', organizationId).single(),
+    supabaseAdmin.from('subscription_plans').select('code,name,description,amount_ars,price_version,billing_period,is_active,sort_order,updated_at').order('sort_order'),
+  ]);
+  if (contactError || subError || paymentsError || countsError || planData.error) throw contactError ?? subError ?? paymentsError ?? countsError ?? planData.error;
+  let inFlight = false;
+  if (subscription) {
+    const { data, error } = await supabaseAdmin.from('subscription_price_change_items').select('id')
+      .eq('subscription_id', subscription.id).or('status.in.(pending,processing),requires_compensation.eq.true').limit(1);
+    if (error) throw error;
+    inFlight = Boolean(data?.length);
+  }
+  const eligibility = commercialEligibility(subscription as CommercialSubscription | null, inFlight, Boolean(approved?.length));
+  return {
+    organization: { id: organization.id, name: organization.name, slug: organization.slug,
+      phone: organization.phone, address: organization.address, contactEmail: contact?.email ?? null,
+      isEnabled: organization.is_active !== false, createdAt: organization.created_at,
+      updatedAt: organization.updated_at, branchesCount: counts?.branches_count ?? 0, usersCount: counts?.users_count ?? 0 },
+    subscription: subscription ? { id: subscription.id, sourceStatus: subscription.status,
+      provider: subscription.provider, effectivePlanCode: subscription.effective_plan_code,
+      currentPlanCode: subscription.current_plan_code, billingPlanCode: subscription.billing_plan_code,
+      pendingPlanCode: subscription.pending_plan_code, billingAmountArs: subscription.billing_amount_ars,
+      billingPriceVersion: subscription.billing_price_version, trialEndsAt: subscription.trial_ends_at,
+      currentPeriodStart: subscription.current_period_start, currentPeriodEnd: subscription.current_period_end,
+      providerStatus: subscription.mercadopago_status, hasPreapproval: Boolean(subscription.mercadopago_preapproval_id),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end, updatedAt: subscription.updated_at } : null,
+    plans: (planData.data ?? []).map(plan => ({ code: plan.code, name: plan.name,
+      description: plan.description, amountArs: plan.amount_ars, priceVersion: plan.price_version,
+      billingPeriod: plan.billing_period, isActive: plan.is_active, sortOrder: plan.sort_order, updatedAt: plan.updated_at })),
+    capabilities: { ...eligibility, mutationsEnabled: Deno.env.get('PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED') === 'true' },
+    hasApprovedPayments: Boolean(approved?.length),
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   const requestId = getRequestId(req);
 
@@ -793,6 +853,9 @@ serve(async (req: Request): Promise<Response> => {
       case 'organizations':
         data = await organizations(auth.supabaseAdmin!, body);
         break;
+      case 'organization_detail':
+        data = await organizationDetail(auth.supabaseAdmin!, body);
+        break;
       case 'users':
         data = await users(auth.supabaseAdmin!, body);
         break;
@@ -812,6 +875,7 @@ serve(async (req: Request): Promise<Response> => {
 
     return jsonResponse(req, { ...isRecord(data) ? data : { data }, requestId }, 200, requestId);
   } catch (error) {
+    if (error instanceof CommercialError) return jsonError(req, error.message, error.status, error.code, requestId);
     console.error(`[platform-admin-query] ${requestId}: ${sanitizeMessage(error)}`);
     return jsonError(req, 'No se pudo cargar la informacion administrativa.', 500, 'ADMIN_QUERY_FAILED', requestId);
   }

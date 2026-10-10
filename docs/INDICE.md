@@ -19,6 +19,13 @@ archivo activo y cualquier otro documento, el activo gana.
 | `docs/ESTADO_ACTUAL.md` | Foto del estado funcional/técnico de cada módulo grande de la app |
 | `docs/MODULOS/` | Un archivo por módulo, con detalle de su funcionamiento actual |
 
+Plan aprobado: `docs/PLAN_ADMIN_GESTION_COMERCIAL.md` — gestión por barbería y
+contacto; backend, ficha e integración validados localmente, migración aplicada
+en producción con excepción directa autorizada; despliegue/activación pendientes.
+Evidencia: `docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`. Activación paso a paso:
+`docs/ADMIN_COMERCIAL_ACTIVACION.md` — migración completada, backend, lectura,
+verificación real y kill switch comercial independiente.
+
 ## Historial — no es instrucción vigente
 
 Documentación de contexto o de auditorías superadas. Útil para entender

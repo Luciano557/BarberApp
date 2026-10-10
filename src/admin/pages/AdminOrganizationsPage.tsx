@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, Search } from 'lucide-react';
 
 import { AdminCollectionCard } from '@/admin/components/AdminCollectionCard';
@@ -80,7 +81,7 @@ export default function AdminOrganizationsPage() {
                 <SelectTrigger aria-label="Filtrar por acceso"><SelectValue placeholder="Todo acceso" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todo acceso</SelectItem>
-                  <SelectItem value="active">Acceso pago</SelectItem>
+                  <SelectItem value="active">Acceso vigente</SelectItem>
                   <SelectItem value="trialing">Trial vigente</SelectItem>
                   <SelectItem value="past_due">Pago pendiente</SelectItem>
                   <SelectItem value="expired">Vencida</SelectItem>
@@ -152,13 +153,13 @@ function OrganizationRow({ item }: { item: PlatformAdminOrganizationDto }) {
   return (
     <TableRow>
       <TableCell>
-        <p className="font-medium text-foreground">{item.name}</p>
+        <Link to={`/admin/barberias/${item.id}`} className="font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link>
         <p className="mt-0.5 text-xs text-muted-foreground">{item.slug ?? 'Sin slug'}</p>
       </TableCell>
       <TableCell>
         <div className="space-y-1.5">
           <StatusPill status={statusTone(item.accessStatus)} label={subscriptionStatusLabel(item.accessStatus)} size="sm" />
-          {!item.isEnabled && <p className="text-[11px] text-status-error-foreground">Organización deshabilitada</p>}
+          {!item.isEnabled && <p className="text-xs text-status-error-foreground">Organización deshabilitada</p>}
         </div>
       </TableCell>
       <TableCell>
@@ -178,7 +179,7 @@ function OrganizationCard({ item }: { item: PlatformAdminOrganizationDto }) {
     <article className="space-y-3 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-medium text-foreground">{item.name}</h3>
+          <h3 className="text-sm font-medium text-foreground"><Link to={`/admin/barberias/${item.id}`} className="break-words underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{item.name}</Link></h3>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.slug ?? 'Sin slug'}</p>
         </div>
         <StatusPill status={statusTone(item.accessStatus)} label={subscriptionStatusLabel(item.accessStatus)} size="sm" />

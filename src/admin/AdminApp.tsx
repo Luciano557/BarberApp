@@ -9,6 +9,7 @@ import { ADMIN_ALIAS, useAdminAuth } from '@/contexts/AdminAuthContext';
 
 const AdminOverviewPage = lazy(() => import('@/admin/pages/AdminOverviewPage'));
 const AdminOrganizationsPage = lazy(() => import('@/admin/pages/AdminOrganizationsPage'));
+const AdminOrganizationDetailPage = lazy(() => import('@/admin/pages/AdminOrganizationDetailPage'));
 const AdminUsersPage = lazy(() => import('@/admin/pages/AdminUsersPage'));
 const AdminSubscriptionsPage = lazy(() => import('@/admin/pages/AdminSubscriptionsPage'));
 const AdminAuditPage = lazy(() => import('@/admin/pages/AdminAuditPage'));
@@ -66,6 +67,7 @@ export default function AdminApp() {
         <Route element={<AdminShellRoute />}>
           <Route index element={<AdminOverviewPage />} />
           <Route path="barberias" element={<AdminOrganizationsPage />} />
+          <Route path="barberias/:organizationId" element={<AdminOrganizationDetailPage />} />
           <Route path="usuarios" element={<AdminUsersPage />} />
           <Route path="suscripciones" element={<AdminSubscriptionsPage />} />
           <Route path="auditoria" element={<AdminAuditPage />} />

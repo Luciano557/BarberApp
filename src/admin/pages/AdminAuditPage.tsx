@@ -77,6 +77,9 @@ export default function AdminAuditPage() {
                   <SelectItem value="subscription_price_change.created">Cambio de precio</SelectItem>
                   <SelectItem value="subscription_price_change.processed">Proceso de lote</SelectItem>
                   <SelectItem value="subscription_price_change.retried">Reintento de lote</SelectItem>
+                  <SelectItem value="organization.details_updated">Datos y contacto</SelectItem>
+                  <SelectItem value="organization.manual_plan_assigned">Acceso manual</SelectItem>
+                  <SelectItem value="organization.trial_extended">Trial extendido</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={resultFilter} onValueChange={setResultFilter}>
@@ -134,7 +137,7 @@ function AuditCard({ item }: { item: PlatformAdminAuditDto }) {
       <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-medium text-foreground">{actionLabel(item.action)}</h3><p className="mt-0.5 text-xs text-muted-foreground">{formatAdminDate(item.createdAt, true)} · {item.actorAlias}</p></div><StatusPill status={item.result === 'partial' ? 'warning' : statusTone(item.result)} label={RESULT_LABELS[item.result]} size="sm" /></div>
       <p className="text-sm text-foreground">{item.reason ?? 'Sin motivo informado'}</p>
       {stateSummary(item) && <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{stateSummary(item)}</p>}
-      <p className="truncate text-[11px] text-muted-foreground">Request: {item.requestId}</p>
+      <p className="truncate text-xs text-muted-foreground">Request: {item.requestId}</p>
     </article>
   );
 }
@@ -144,6 +147,9 @@ function actionLabel(action: string) {
     'subscription_price_change.created': 'Cambio de precio',
     'subscription_price_change.processed': 'Proceso de lote',
     'subscription_price_change.retried': 'Reintento de lote',
+    'organization.details_updated': 'Datos y contacto',
+    'organization.manual_plan_assigned': 'Acceso manual',
+    'organization.trial_extended': 'Trial extendido',
   };
   return labels[action] ?? action;
 }

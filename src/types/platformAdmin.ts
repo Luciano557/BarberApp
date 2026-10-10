@@ -1,6 +1,7 @@
 export type PlatformAdminOperation =
   | 'overview'
   | 'organizations'
+  | 'organization_detail'
   | 'users'
   | 'subscriptions'
   | 'payments'
@@ -108,6 +109,47 @@ export interface PlatformAdminOrganizationDto {
   branchesCount: number;
   usersCount: number;
   mau30: number;
+}
+
+export interface PlatformAdminOrganizationDetail {
+  organization: {
+    id: string; name: string; slug: string | null; phone: string | null;
+    address: string | null; contactEmail: string | null; isEnabled: boolean;
+    createdAt: string; updatedAt: string; branchesCount: number; usersCount: number;
+  };
+  subscription: {
+    id: string; sourceStatus: string; provider: string; effectivePlanCode: string;
+    currentPlanCode: string | null; billingPlanCode: string | null; pendingPlanCode: string | null;
+    billingAmountArs: number | null; billingPriceVersion: number | null; trialEndsAt: string | null;
+    currentPeriodStart: string | null; currentPeriodEnd: string | null; providerStatus: string | null;
+    hasPreapproval: boolean; cancelAtPeriodEnd: boolean; updatedAt: string;
+  } | null;
+  plans: PlatformAdminPlanDto[];
+  capabilities: {
+    mutationsEnabled: boolean; canAssignManualPlan: boolean; canExtendTrial: boolean;
+    blockCode: 'PROVIDER_RECONCILIATION_REQUIRED' | 'OPERATION_IN_PROGRESS' | null;
+  };
+  hasApprovedPayments: boolean;
+}
+
+export type PlatformAdminCommercialAction = 'update_details' | 'assign_manual_plan' | 'extend_trial';
+export interface PlatformAdminCommercialInput {
+  action: PlatformAdminCommercialAction;
+  organizationId: string;
+  expectedOrganizationUpdatedAt: string | null;
+  expectedSubscriptionUpdatedAt: string | null;
+  changes: { name: string; phone: string | null; address: string | null; contactEmail: string | null }
+    | { planCode: 'basico' | 'profesional' | 'premium'; endsAt: string | null }
+    | { endsAt: string };
+  reason: string;
+  password: string;
+}
+export interface PlatformAdminCommercialResult {
+  organizationId: string; requestId: string; action: PlatformAdminCommercialAction; replayed: boolean;
+}
+export interface PlatformAdminCommercialStatus {
+  organizationId: string; requestId: string; status: 'completed' | 'not_found';
+  action: string | null; completedAt: string | null;
 }
 
 export type PlatformAdminTenantRole =
@@ -256,6 +298,7 @@ export interface PlatformAdminSubscriptionsResponse
 export interface PlatformAdminQueryResponseMap {
   overview: PlatformAdminOverviewDto;
   organizations: PlatformAdminListResponse<PlatformAdminOrganizationDto>;
+  organization_detail: PlatformAdminOrganizationDetail;
   users: PlatformAdminListResponse<PlatformAdminUserDto>;
   subscriptions: PlatformAdminSubscriptionsResponse;
   payments: PlatformAdminListResponse<PlatformAdminPaymentDto>;
@@ -291,6 +334,7 @@ export interface PlatformAdminPaymentFilters {
 }
 
 export interface PlatformAdminAuditFilters {
+  organizationId?: string;
   actorUserId?: string;
   action?: string;
   result?: PlatformAdminAuditDto['result'];
@@ -308,6 +352,7 @@ export interface PlatformAdminPriceStatusFilters {
 export interface PlatformAdminQueryFiltersMap {
   overview: Record<string, never>;
   organizations: PlatformAdminOrganizationFilters;
+  organization_detail: { organizationId: string };
   users: PlatformAdminUserFilters;
   subscriptions: PlatformAdminSubscriptionFilters;
   payments: PlatformAdminPaymentFilters;

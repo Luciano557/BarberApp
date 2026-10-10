@@ -1,6 +1,6 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-10-01
+Última actualización: 2026-10-10
 
 ## Finanzas — modo ficticio
 
@@ -8,8 +8,8 @@
 
 ## Centro de administración de plataforma
 
-**Desplegado en producción; tres cambios reales ejecutados y reconciliación
-parcial pendiente — 2026-09-08.** Se incorporó una cuarta superficie en
+**Desplegado en producción; tres cambios reales y caso Básico reconciliado —
+2026-10-10.** Se incorporó una cuarta superficie en
 `/admin`, separada del árbol tenant. Sus rutas no montan
 `OrganizationProvider`, `SucursalProvider`,
 onboarding ni `SubscriptionGate`; usan `AdminAuthProvider`, un cliente Supabase
@@ -103,15 +103,52 @@ Profesional pasó de ARS 60.000 a ARS 30.000 y versión 2 con lote `complete` si
 `complete`: 1 ítem terminó exitosamente y 2 quedaron `skipped` por
 `provider_not_supported`.
 
-El resultado acumulado es de 3 lotes, 30 ítems y 6 eventos de auditoría. No
+El resultado registrado al 2026-09-08 fue de 3 lotes, 30 ítems y 6 eventos de auditoría. No
 quedaron ítems `pending` ni checkouts pendientes reutilizables. Homepage y
-Registro fueron verificados mostrando ARS 20.000 / 30.000 / 50.000. Siguen
-pendientes la reconciliación del lote parcial de Básico y el QA de Facturación,
-`SubscriptionGate` y el webhook posterior; también falta registrar el QA
+Registro fueron verificados mostrando ARS 20.000 / 30.000 / 50.000. Sigue
+pendiente el QA de Facturación, `SubscriptionGate` y el webhook posterior;
+también falta registrar el QA
 responsive autenticado completo. Ante una anomalía, el rollback operativo es
 configurar
 `PLATFORM_ADMIN_PRICE_MUTATIONS_ENABLED=false`: bloquea nuevas acciones de
 mutación, pero no deshace cambios de catálogo ni efectos externos ya confirmados.
+
+**Reconciliación operativa del 2026-10-10:** Mercado Pago confirmó que el vínculo
+de BarberMalza pertenecía a la cuenta/aplicación Vittro esperadas, era un checkout
+pendiente de Premium ARS 100.000 y no tenía facturas. Se canceló ese único vínculo
+(PUT 200, GET `cancelled`, cero facturas) y, con excepción directa autorizada, una
+transacción guardada dejó Básico manual activo sin vencimiento y sin referencias
+de MP. Se conservaron los snapshots históricos y no se crearon cobros. El retry
+canónico acotado y el refresh cerraron Básico con 27 exclusiones y cero fallos;
+cero lotes abiertos de Básico. Catálogo intacto en ARS 20.000 / 30.000 / 50.000,
+versión 2. Dos auditorías nuevas, lectura independiente y segunda ejecución
+idempotente verificadas. Script y request ID en `docs/MODULOS/admin.md`.
+
+Ampliación solicitada: gestión comercial por barbería y datos de contacto, sin
+edición de usuarios/Auth ni catálogo/límites en esta fase. Auditoría y propuesta
+en `docs/PLAN_ADMIN_GESTION_COMERCIAL.md`. Backend, ficha, drawers e integración
+tipada implementados y validados localmente: contacto privado, edición de datos,
+acceso manual y extensión de trials, CAS/idempotencia/auditoría atómica,
+reautenticación y kill switch comercial apagado. La ficha separa fuente del
+acceso de prueba de pago; mantiene el canon Inter/navy, DatePicker/TimePicker,
+tablas/cards y errores de lectura. Recuperación persistida solo por request ID
+y acción, ligada a actor/barbería; ninguna contraseña en caché o storage.
+Migración `20261010130000_platform_admin_commercial.sql` aplicada directamente
+en producción con autorización explícita nueva, en una transacción, a las
+13:08:48 UTC del 2026-10-10. Lectura independiente confirmó RLS, cero policies,
+grants solo service_role para API, RPC INVOKER y contenido del archivo; sin
+ejecutar otras migraciones ni alterar conteos/catalogo. Registro y evidencia:
+`docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`. Sin despliegue ni habilitación
+productiva de la ampliación. Evidencia local: 36 pruebas Vitest, 22 Deno y 14 integraciones
+PostgreSQL/WASM sintéticas; build, lint focal y chequeo Deno exitosos. TypeScript
+global conserva los cinco errores previos; lint focal tiene dos avisos Fast
+Refresh. Capturas sintéticas a 390/768/1024/1280/1440 px; revisión independiente
+con las tres correcciones puntuadas resueltas (no certifica producción).
+Activación: `docs/ADMIN_COMERCIAL_ACTIVACION.md`. QA autenticado, concurrencia
+multi-conexión real y enforcement de suspensión
+permanecen pendientes; no se modificaron funciones `SECURITY DEFINER` existentes.
+La discrepancia entre URL global de webhooks y handler específico sigue abierta:
+no se cambió configuración ni se validó entrega real de eventos firmados.
 
 ## Sistema de diseño — Operate
 

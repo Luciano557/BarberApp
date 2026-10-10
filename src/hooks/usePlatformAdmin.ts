@@ -100,16 +100,18 @@ async function toAdminApiError(error: unknown): Promise<PlatformAdminApiError> {
 }
 
 async function invokeAdminFunction<T>(
-  functionName: 'platform-admin-query' | 'platform-admin-price-change',
+  functionName: 'platform-admin-query' | 'platform-admin-price-change' | 'platform-admin-organization',
   body: unknown,
+  requestId?: string,
 ): Promise<T> {
   const { data, error } = await adminSupabase.functions.invoke<T>(functionName, {
     body,
+    ...(requestId ? { headers: { 'x-request-id': requestId } } : {}),
   });
 
   if (error) {
     const apiError = await toAdminApiError(error);
-    if (apiError.status === 401 || apiError.status === 403) {
+    if (apiError.status === 401 || (apiError.status === 403 && apiError.code !== 'REAUTHENTICATION_FAILED')) {
       try {
         await adminSupabase.auth.signOut({ scope: 'local' });
       } catch {
@@ -192,14 +194,60 @@ export function usePlatformAdminQuery<K extends PlatformAdminOperation>(
     staleTime: options.staleTime ?? DEFAULT_STALE_TIME_MS,
     gcTime: DEFAULT_GC_TIME_MS,
     refetchInterval: options.refetchInterval,
-    placeholderData: keepPreviousData,
+    // Never show the previous organization's detail/CAS while changing IDs.
+    placeholderData: operation === 'organization_detail' ? undefined : keepPreviousData,
     retry(failureCount, error) {
-      if (error.status === 401 || error.status === 403 || error.status === 409) {
+      if (error.status !== null && error.status < 500 && ![408, 429].includes(error.status)) {
         return false;
       }
       return failureCount < 2;
     },
   });
+}
+
+export function usePlatformAdminOrganizationDetail(organizationId: string) {
+  return usePlatformAdminQuery('organization_detail', { filters: { organizationId } }, { enabled: Boolean(organizationId) });
+}
+
+export async function getPlatformAdminCommercialStatus(organizationId: string, operationRequestId: string) {
+  return invokeAdminFunction<import('@/types/platformAdmin').PlatformAdminCommercialStatus>(
+    'platform-admin-organization', { action: 'status', organizationId, operationRequestId },
+  );
+}
+
+/** Confirmation secrets never enter React Query's mutation variables/cache. */
+export function usePlatformAdminCommercialMutation() {
+  type Input = import('@/types/platformAdmin').PlatformAdminCommercialInput;
+  type SafeInput = Omit<Input, 'password'> & { requestId: string };
+  const queryClient = useQueryClient();
+  const passwordRef = useRef<string | null>(null);
+  const busyRef = useRef(false);
+  const mutation = useMutation<import('@/types/platformAdmin').PlatformAdminCommercialResult, PlatformAdminApiError, SafeInput>({
+    mutationFn: ({ requestId, ...input }) => {
+      if (!passwordRef.current) throw new PlatformAdminApiError('Ingresá la contraseña de confirmación.');
+      return invokeAdminFunction('platform-admin-organization', { ...input, password: passwordRef.current }, requestId);
+    },
+    retry: false,
+    gcTime: 0,
+    onSuccess: (result) => {
+      // Cache refresh must not turn a committed write into an apparent failure.
+      void queryClient.invalidateQueries({ predicate: query => query.queryKey[0] === 'platform-admin' && (
+        ['overview', 'organizations', 'subscriptions'].includes(String(query.queryKey[1])) ||
+        (query.queryKey[1] === 'organization_detail' && (query.queryKey[2] as { filters?: { organizationId?: string } })?.filters?.organizationId === result.organizationId) ||
+        query.queryKey[1] === 'audit'
+      ) });
+    },
+  });
+  const mutateAsync = mutation.mutateAsync;
+  const apply = useCallback(async (input: Input, requestId: string) => {
+    if (busyRef.current) throw new PlatformAdminApiError('Ya hay una confirmación en curso.');
+    busyRef.current = true;
+    passwordRef.current = input.password;
+    const { password: _password, ...safeInput } = input;
+    try { return await mutateAsync({ ...safeInput, requestId }); }
+    finally { passwordRef.current = null; busyRef.current = false; }
+  }, [mutateAsync]);
+  return { apply, isPending: mutation.isPending };
 }
 
 export function usePlatformAdminOverview(

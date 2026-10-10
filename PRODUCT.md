@@ -117,6 +117,14 @@ suscripciones, pagos, auditoría y edición auditada de precios. Quedan fuera de
 esta primera versión los datos operativos de las barberías, clientes finales,
 ventas, finanzas internas, impersonación y administración de cuentas.
 
+Ampliación comercial aprobada e implementada localmente (2026-10-10): ficha por
+barbería, edición de nombre/contacto, asignación de acceso manual y extensión de
+trial elegible, con motivo, reautenticación y auditoría. Contacto comercial no
+es identidad Auth; acceso manual no prueba un pago ni modifica contratos Mercado
+Pago. Su migración ya está aplicada en producción con autorización puntual;
+la API/frontend comerciales aún no están desplegados/habilitados. Suspensión efectiva,
+usuarios, roles y edición de límites/catálogo quedan fuera de este rollout.
+
 Terminología: los nombres de módulo actuales (Cobrar, Caja, Turnos, Clientes,
 Finanzas, Tareas, Mi Negocio, Configuración) son el vocabulario vigente, **no
 binding** — pueden evolucionar si hay una mejora justificada de producto o UX.

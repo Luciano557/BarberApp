@@ -5,6 +5,67 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Excepción directa acotada para la migración comercial — 2026-10-10
+
+Al no disponer del propietario de Lovable, el usuario autorizó expresamente
+solo `20261010130000_platform_admin_commercial.sql` en producción y una única
+transacción. Se aplicó el archivo íntegro con guardas y se registró esa versión
+en el historial dentro del mismo commit; no se ejecutaron ni repararon otras
+migraciones. RLS/grants/RPC se comprobaron por lectura independiente posterior.
+La excepción no cambia la regla general de DB/RLS por Lovable ni autoriza
+desplegar o habilitar escrituras. Evidencia y límites:
+`docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md`.
+
+## Gestión comercial separada de facturación y de Auth — 2026-10-10
+
+Plan aprobado para editar barbería/contacto, otorgar acceso manual y extender
+trial. El email comercial es privado e independiente del login; cambiar datos
+no cambia slug, roles ni credenciales. El acceso manual no implica un débito ni
+autoriza cancelar un contrato Mercado Pago. Cualquier vínculo/pending/fence de
+proveedor requiere reconciliación explícita antes de cambiar acceso.
+
+Una RPC nueva `SECURITY INVOKER`, restringida a `service_role`, guarda cambio y
+auditoría en una transacción; CAS conserva microsegundos y un request ID estable
+evita repetir efectos. Reautenticación efímera y kill switch comercial apagado
+son independientes del editor de precios. Se validó en PostgreSQL local
+sintético, no producción. La aprobación del build no concede una excepción para
+aplicar DB fuera de Lovable. Suspensión queda separada hasta demostrar enforcement
+servidor; no se presenta un switch visual como bloqueo efectivo.
+
+La ficha amplía la superficie vigente sin reemplazar su identidad. Separar
+«fuente de acceso», «plan efectivo» y «facturación» evita que una cortesía se
+interprete como suscripción cobrada. Los vencimientos se eligen con los pickers
+canónicos, se interpretan en la zona local y se convierten a UTC al enviar;
+no se redondean minutos. Ante un resultado ambiguo se conserva solo ID/acción,
+no contraseña ni formulario, y se bloquea repetir hasta reconciliar el ID.
+Un `not_found` no acredita que la primera transacción ya terminó. Por eso la
+recuperación exige lectura/auditoría del servidor, no un botón de reenvío ciego.
+
+## Un checkout pendiente no define el contrato vigente — 2026-10-10
+
+BarberMalza conservaba una asignación manual de Básico sin vencimiento, pero su
+proveedor local era Mercado Pago y apuntaba a un checkout pendiente antiguo de
+Premium. El proveedor verificó cuenta/aplicación/referencia y cero facturas;
+no había evidencia de una renovación autorizada ni de pagos locales. Convertir
+ese vínculo en una renovación habría mezclado intenciones comerciales distintas.
+
+Con autorización explícita se canceló únicamente el checkout antiguo y se
+reclasificó la suscripción como manual, preservando acceso, plan, vencimiento y
+snapshots históricos. La excepción directa de DB se ejecutó en una transacción
+con guards y auditoría, sin migraciones ni funciones nuevas. El lote se cerró
+mediante las RPC canónicas, no forzando su estado: completado significa todos
+los objetivos terminales, no todos cobrados/actualizados. Los 26 faltantes de
+preapproval permanecen visibles y el caso manual queda excluido.
+
+La siguiente fase de Admin debe mostrar separadamente acceso manual/trial,
+contrato con Mercado Pago y evidencia de pagos. Una asignación manual no debe
+cancelar o modificar automáticamente un contrato autorizado. Tampoco basta
+cambiar `organizations.is_active` para prometer suspensión efectiva: hay que
+verificar enforcement server-side y sesiones existentes. El alcance confirmado
+por el usuario es barbería/contacto, no gestión de identidades de Supabase Auth.
+
+Evidencia operativa y pendientes de facturación: `docs/MODULOS/admin.md`.
+
 ## Datos ficticios independientes para grabar Finanzas — 2026-10-01
 
 Los ejemplos se crean desde una fecha y una sucursal sintética, sin transformar importes o nombres reales. El modo mantiene los contextos reales para autorización, pero suspende lecturas operativas y protege escrituras, incluidas las automáticas al cargar Sueldos/Gastos. `sessionStorage` lo limita a la pestaña y lo vincula a la identidad tenant para evitar arrastrarlo a otra cuenta. Las operaciones reales en curso deben terminar antes de activar. La navegación fuera de Finanzas requiere salida explícita; la URL queda sin cambios porque la grabación acordada cubre solo el contenido de la app.
