@@ -1,7 +1,7 @@
 # Activación de gestión comercial por barbería
 
 Fecha: 2026-10-10. **Migración, backend y frontend publicados en producción;
-gestión comercial en modo lectura, escrituras deshabilitadas**.
+gestión comercial habilitada, con una edición de contacto real verificada**.
 Esto amplía Admin con ficha, contacto privado, acceso manual y trial. No incluye
 suspensión, credenciales/roles tenant, catálogo ni modificación de contratos MP.
 
@@ -71,7 +71,19 @@ manual temporal/indefinido, MP autorizado/checkout, historial vacío/error,
 refetch conservando datos. Verificar 390, 768/1024 y 1440 px y convivencia con
 la sesión tenant. El QA local sintético no demuestra estas condiciones reales.
 
-## 4. Habilitación controlada y prueba acordada
+## 4. Habilitación controlada y prueba acordada — completada con alcance acotado
+
+**Habilitado el 2026-10-10 a las 13:54 Argentina**, por autorización nueva del
+usuario. Cuenta de prueba identificada, snapshot previo y definiciones reales
+de acceso/proyección contrastados por lectura. Una edición de contacto se
+confirmó con contraseña ingresada por el usuario y una sola auditoría; posteriores
+confirmaciones incorrectas fueron rechazadas sin logout ni cambios nuevos.
+El usuario eligió mantener el trial: no se ejecutaron asignación manual ni
+extensión sobre esa cuenta. Básico quedó a ARS 1/v3 para su prueba de compra.
+Concurrencia real y la matriz ampliada siguen pendientes, no se dan por probadas.
+Evidencia: [ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md](ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md).
+
+Procedimiento para futuras pruebas o reactivaciones:
 
 Antes de habilitar, elegir una barbería de prueba autorizada y guardar sus
 valores/revisiones anteriores; acordar qué cambio comercial se realizará.
@@ -131,6 +143,9 @@ rollout: requiere auditoría y autorización específica si cambia un DEFINER.
   no reemplaza las pruebas de API/frontend ni habilita escrituras.
 - Backend/frontend publicados y QA de lectura real documentados en
   `ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`; no habilita escrituras.
-- Pendientes: prueba comercial acordada, concurrencia multi-conexión,
-  recuperación/denegación/convivencia autenticadas y matriz de webhooks.
+- Habilitación y contacto real comprobados en
+  `ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md`; trial y Básico ARS 1 preservados.
+- Pendientes: mutaciones de acceso sobre otra cuenta/prueba acordada,
+  concurrencia multi-conexión, recuperación/denegación/convivencia autenticadas
+  y matriz de webhooks.
   La verificación sintética no reemplaza esas pruebas.

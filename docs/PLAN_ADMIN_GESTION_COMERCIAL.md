@@ -123,9 +123,10 @@ etapa 4 terminados y validados **localmente**, en builds separados. La suspensi�
 de etapa 2 sigue diferida. Migración aplicada directamente en producción con
 excepción explícita nueva, en una transacción, el 2026-10-10 a las 13:08:48 UTC;
 endpoint nuevo y frontend comercial publicados posteriormente con nueva
-autorización y QA autenticado de lectura. Las escrituras
-quedan explícitamente apagadas (`PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED=false`,
-independiente). No se modificó ninguna función `SECURITY DEFINER` existente
+autorización y QA autenticado de lectura. Posteriormente el usuario autorizó
+habilitarlas: `PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED=true` desde las 13:54 Argentina,
+con contacto real verificado, trial y Básico ARS 1 preservados. El switch es
+independiente. No se modificó ninguna función `SECURITY DEFINER` existente
 ni contratos MP.
 
 ### Artefacto construido
@@ -195,16 +196,18 @@ La extensión de trial permite períodos nulos o reflejados exactamente desde
 las fechas originales de trial; rechaza un período distinto o cualquier pago
 aprobado y conserva la proyección al extender el vencimiento.
 
-### Despliegue en lectura cerrado; activación pendiente
+### Despliegue y habilitación comercial; QA ampliado pendiente
 
 El backend y frontend se publicaron con nueva autorización, recuperación del
 merge roto y switch comercial apagado. La lectura se verificó con sesión Admin
 real a 390/768/1024/1440 px; ver
 [ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md](ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).
-Seguir [ADMIN_COMERCIAL_ACTIVACION.md](ADMIN_COMERCIAL_ACTIVACION.md) desde el paso 4:
-migración ya aplicada y verificada, pruebas restantes de aislamiento/recuperación,
-concurrencia con conexiones reales y una prueba comercial acordada
-antes de habilitar. El switch habilita contacto/manual/trial conjuntamente;
+La habilitación posterior y prueba de contacto acordada quedaron verificadas:
+[ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md](ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md).
+El usuario mantuvo el trial de la cuenta elegida, sin asignación manual/extensión.
+Seguir [ADMIN_COMERCIAL_ACTIVACION.md](ADMIN_COMERCIAL_ACTIVACION.md) para operación
+y QA ampliado pendiente de aislamiento/recuperación, mutaciones de acceso y
+concurrencia con conexiones reales. El switch habilita contacto/manual/trial conjuntamente;
 no implementa suspensión ni modifica el switch de precios.
 
 La aprobación del plan y la excepción de BarberMalza no bastaban para aplicar

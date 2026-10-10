@@ -122,8 +122,10 @@ barbería, edición de nombre/contacto, asignación de acceso manual y extensió
 trial elegible, con motivo, reautenticación y auditoría. Contacto comercial no
 es identidad Auth; acceso manual no prueba un pago ni modifica contratos Mercado
 Pago. Su migración ya está aplicada en producción con autorización puntual;
-la API/frontend comerciales están desplegados y verificados en lectura, con
-escrituras comerciales apagadas. Suspensión efectiva,
+la API/frontend comerciales están desplegados, con escrituras comerciales
+habilitadas por autorización nueva y edición de contacto real verificada.
+Acceso manual/trial conservan guardas y auditoría; no modifican contratos MP.
+Suspensión efectiva,
 usuarios, roles y edición de límites/catálogo quedan fuera de este rollout.
 
 Terminología: los nombres de módulo actuales (Cobrar, Caja, Turnos, Clientes,

@@ -2,6 +2,11 @@
 
 Fecha: 2026-10-10.
 
+**Estado posterior:** gestión comercial habilitada a las 13:54 Argentina con
+autorización nueva, contacto real verificado y trial/Básico ARS 1 preservados.
+Ver [evidencia de habilitación](ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md).
+Este documento conserva la evidencia del despliegue inicial en lectura.
+
 ## Autorización y recuperación
 
 El usuario autorizó desplegar las dos funciones y el frontend manteniendo las
@@ -97,9 +102,10 @@ antes de este despliegue. La UI lo mostró completo, 27/27 finalizados. No puede
 atribuirse a una persona concreta usando una cuenta compartida. Se informó al
 usuario; no se corrigió, reintentó ni aplicó un cambio de precio durante este trabajo.
 
-## Límites pendientes
+## Límites del despliegue inicial en lectura
 
-El despliegue en lectura está verificado; **escrituras comerciales apagadas**.
+En esta primera publicación, el despliegue en lectura estaba verificado y las
+escrituras comerciales estaban apagadas; la activación posterior figura arriba.
 Antes de activarlas faltan barbería de prueba y operación acordadas, concurrencia
 real, pruebas autorizadas de escritura/recuperación, denegación con cuenta tenant
 y convivencia de dos sesiones autenticadas. No se probaron 1.000 usuarios reales,

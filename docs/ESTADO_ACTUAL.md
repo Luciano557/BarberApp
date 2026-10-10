@@ -129,7 +129,7 @@ edición de usuarios/Auth ni catálogo/límites en esta fase. Auditoría y propu
 en `docs/PLAN_ADMIN_GESTION_COMERCIAL.md`. Backend, ficha, drawers e integración
 tipada implementados y validados localmente: contacto privado, edición de datos,
 acceso manual y extensión de trials, CAS/idempotencia/auditoría atómica,
-reautenticación y kill switch comercial apagado. La ficha separa fuente del
+reautenticación y kill switch comercial independiente. La ficha separa fuente del
 acceso de prueba de pago; mantiene el canon Inter/navy, DatePicker/TimePicker,
 tablas/cards y errores de lectura. Recuperación persistida solo por request ID
 y acción, ligada a actor/barbería; ninguna contraseña en caché o storage.
@@ -147,13 +147,21 @@ directorio, paginación, búsqueda, fichas manual/trial/vencido, contactos nulos
 historial a 390/768/1024/1440; acciones comerciales deshabilitadas. Evidencia:
 `docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`. Catálogo observado: Básico ARS 1/v3
 por un lote anterior de las 11:11; Profesional/Premium ARS 30.000/50.000/v2. Sin
-intervenir precios ni ejecutar otras migraciones. Falta prueba comercial acordada,
-concurrencia real y habilitación. Evidencia local original: 36 pruebas Vitest, 22 Deno y 14 integraciones
+intervenir precios ni ejecutar otras migraciones. Posteriormente, con nueva
+autorización, se habilitó `PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED=true` a las 13:54
+Argentina. Edición de contacto en la barbería de prueba confirmada por el usuario,
+una sola auditoría y recarga persistida; contraseña incorrecta rechazada sin
+logout. Trial hasta 25/10 y suscripción intactos, cero pagos, Básico ARS 1/v3
+preservado por pedido explícito. Manual/extensión no ejecutados sobre esa cuenta
+para conservar su trial de compra. Evidencia:
+`docs/ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md`. Se repitieron 98 Vitest, 22 Deno
+y 14 SQL locales, todas aprobadas. Evidencia local original: 36 pruebas Vitest, 22 Deno y 14 integraciones
 PostgreSQL/WASM sintéticas; build, lint focal y chequeo Deno exitosos. TypeScript
 global conserva los cinco errores previos; lint focal tiene dos avisos Fast
 Refresh. Capturas sintéticas a 390/768/1024/1280/1440 px; revisión independiente
 con las tres correcciones puntuadas resueltas (no certifica producción).
-Activación: `docs/ADMIN_COMERCIAL_ACTIVACION.md`. QA autenticado, concurrencia
+Activación: `docs/ADMIN_COMERCIAL_ACTIVACION.md`. Pruebas ampliadas de acceso
+manual/trial, recuperación/denegación/convivencia autenticadas, concurrencia
 multi-conexión real y enforcement de suspensión
 permanecen pendientes; no se modificaron funciones `SECURITY DEFINER` existentes.
 La discrepancia entre URL global de webhooks y handler específico sigue abierta:

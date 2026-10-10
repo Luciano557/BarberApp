@@ -22,11 +22,15 @@ archivo activo y cualquier otro documento, el activo gana.
 Plan aprobado: `docs/PLAN_ADMIN_GESTION_COMERCIAL.md` — gestión por barbería y
 contacto; backend, ficha e integración validados localmente, migración aplicada
 en producción con excepción directa autorizada; backend/frontend publicados y
-QA autenticado de lectura realizado, escrituras comerciales apagadas.
+QA autenticado de lectura realizado, escrituras comerciales habilitadas y una
+edición de contacto real comprobada. El usuario mantuvo el trial de su cuenta
+de prueba y confirmó Básico ARS 1.
 Evidencia: `docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md` y
-`docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md`. Activación paso a paso:
+`docs/ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md` y
+`docs/ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md`. Activación paso a paso:
 `docs/ADMIN_COMERCIAL_ACTIVACION.md` — migración/deploy/lectura completados;
-prueba comercial, concurrencia real y habilitación pendientes.
+habilitación/contacto completados; pruebas ampliadas de concurrencia,
+recuperación, acceso manual/trial y convivencia real siguen pendientes.
 
 ## Historial — no es instrucción vigente
 

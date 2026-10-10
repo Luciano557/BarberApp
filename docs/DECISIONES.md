@@ -5,6 +5,17 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Habilitación comercial sin sustituir una prueba de compra — 2026-10-10
+
+El usuario autorizó habilitar la gestión comercial, confirmó Básico ARS 1 y
+eligió su barbería de prueba. Al distinguir cortesía de contratación, prefirió
+conservar su trial Premium para probar la compra. Se habilitaron las tres
+acciones con el switch independiente y se verificó una edición de contacto
+confirmada personalmente por el usuario, más el rechazo de confirmaciones
+incorrectas. No se ejecutó asignación manual/extensión ni se tocó MP o Auth.
+Concurrencia productiva y pruebas ampliadas siguen sin certificarse.
+Evidencia: `docs/ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md`.
+
 ## Recuperación y publicación comercial sin habilitar escrituras — 2026-10-10
 
 El merge `2bda5a7` eliminó la base de Admin y dejó conflictos. El usuario

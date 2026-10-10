@@ -9,13 +9,17 @@ los endpoints administrativos y la política CORS para
 `https://www.vittro.com.ar`.
 
 La extensión comercial del 2026-10-10 tiene migración, backend y frontend
-publicados en producción, con escrituras comerciales apagadas. La migración
+publicados en producción, con escrituras comerciales habilitadas por nueva
+autorización a las 13:54 Argentina. Contacto real guardado y auditado una sola
+vez; confirmación incorrecta rechazada sin logout. El trial de la cuenta de
+prueba quedó intacto por elección del usuario. La migración
 se aplicó con excepción directa autorizada, en una sola transacción; la RPC,
 RLS y grants se comprobaron de forma independiente. Query v4 y organization v1
 están ACTIVE con JWT obligatorio. Vercel publicó `17450d70`; la lectura se
 comprobó con una sesión Admin real a 390/768/1024/1440 px. Evidencia:
 [ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md](../ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md).
-La activación requiere seguir [el runbook comercial](../ADMIN_COMERCIAL_ACTIVACION.md).
+Evidencia posterior: [habilitación comercial](../ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md).
+Operación/apagado: [runbook comercial](../ADMIN_COMERCIAL_ACTIVACION.md).
 
 `PLATFORM_ADMIN_PRICE_MUTATIONS_ENABLED` está en `true`. El 2026-09-08 se
 ejecutaron tres cambios reales y el catálogo quedó en Básico ARS 20.000,
@@ -26,7 +30,8 @@ posterior continúan pendientes de validación.
 
 En el QA posterior del 2026-10-10, catálogo y portada mostraron Básico ARS 1 / v3;
 el lote de 11:11 registraba ARS 20.000 → ARS 1, anterior al despliegue. Se informó
-al usuario y no se alteró. Profesional/Premium permanecían en ARS 30.000/50.000 / v2.
+al usuario y luego confirmó conservar ARS 1 para una prueba de compra. No se
+aplicó otro cambio de precio. Profesional/Premium permanecían en ARS 30.000/50.000 / v2.
 
 La migración es `supabase/migrations/20260904153000_platform_admin_center.sql`.
 Modifica una función `SECURITY DEFINER` preexistente (`handle_new_user`), por lo
@@ -483,10 +488,10 @@ de Mercado Pago sin reconciliar primero el estado de ambos sistemas.
 - Dos cambios concurrentes no pisan el catálogo y los webhooks fuera de orden no
   retroceden el acceso.
 
-## Gestión comercial por barbería — desplegada en lectura
+## Gestión comercial por barbería — habilitada en producción
 
 Implementado, recuperado y publicado el 2026-10-10. **Migración, backend y frontend
-en producción; escrituras comerciales apagadas**. Backend, contratos tipados,
+en producción; escrituras comerciales habilitadas**. Backend, contratos tipados,
 ficha, historial y drawers están integrados. Archivos de referencia:
 `src/admin/pages/AdminOrganizationDetailPage.tsx`,
 `src/admin/components/OrganizationDetailView.tsx`,
@@ -531,9 +536,12 @@ Evidencia: [ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md](../ADMIN_COMERCIAL_MIGRACIO
 Recuperación aprobada del merge `2bda5a7` respecto de `df51109`, sin reescribir
 historial: 98 Vitest, 22 Deno, 14 SQL locales, build y lint focal aprobados.
 Publicación productiva y QA autenticado de lectura:
-[evidencia](../ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md). Falta prueba comercial
-acordada, concurrencia real, denegación/recuperación/convivencia autenticadas y
-habilitación controlada según [el runbook](../ADMIN_COMERCIAL_ACTIVACION.md).
+[evidencia](../ADMIN_COMERCIAL_DESPLIEGUE_PRODUCCION.md). Activación y contacto
+productivos posteriores verificados con autorización nueva:
+[habilitación](../ADMIN_COMERCIAL_HABILITACION_PRODUCCION.md). Acceso manual/trial
+no mutados sobre la cuenta de prueba por elección del usuario; concurrencia real
+y denegación/recuperación/convivencia autenticadas siguen pendientes según
+[el runbook](../ADMIN_COMERCIAL_ACTIVACION.md).
 La excepción recibida cubre solo esta migración; no autoriza otras migraciones ni
 habilitación comercial. Suspensión requiere auditoría y build posterior de
 enforcement servidor; cualquier cambio `SECURITY DEFINER` necesita autorización
@@ -541,7 +549,7 @@ específica antes de aplicar.
 
 ## Próximas fases posibles
 
-Después de activar la gestión comercial, suspensión efectiva y salud de
+Después de la gestión comercial habilitada, suspensión efectiva y salud de
 webhooks/cron, conciliación de Mercado Pago,
 alertas y exportes. Administradores nominales con MFA deben preceder una expansión
 significativa de permisos. La impersonación requiere una iniciativa separada con
