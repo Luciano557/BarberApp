@@ -29,8 +29,8 @@ const Row = ({ icon, label, value, accent }: RowProps) => (
       <p
         className={
           value
-            ? `truncate text-sm font-medium ${accent ? "text-primary" : "text-foreground"}`
-            : "truncate text-sm text-muted-foreground/70"
+            ? `break-words text-sm font-medium ${accent ? "text-primary" : "text-foreground"}`
+            : "break-words text-sm text-muted-foreground/70"
         }
       >
         {value || "—"}

@@ -50,7 +50,6 @@ verify_jwt = true
 
 [functions.subscription-mp-webhook]
 verify_jwt = false
-<<<<<<< HEAD
 
 [functions.platform-admin-query]
 verify_jwt = true
@@ -60,5 +59,3 @@ verify_jwt = true
 
 [functions.platform-admin-organization]
 verify_jwt = true
-=======
->>>>>>> ae6527928838a5c5d089f7247c2d6a7fd0897d8d

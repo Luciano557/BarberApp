@@ -1,3 +1,5 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import type { OperationalReadOptions } from '@/hooks/useOperationalAccess';
 import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Sucursal } from '@/contexts/SucursalContext';
@@ -27,11 +29,15 @@ export function useOcupacionResumen(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
   periodoMeses: string,
+  options: OperationalReadOptions = {},
 ) {
+  const demo = useFinanceDemo();
+  const enabled = options.enabled !== false && !demo.active;
   const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}::${periodoMeses}`;
 
   const readState = useReadState<OcupacionMonthData[]>({
     contextKey,
+    enabled,
     errorMessage: 'No pudimos cargar la ocupación.',
     staleErrorMessage: 'No pudimos actualizar la ocupación.',
     surfaceId: `estadisticas-ocupacion:${organizationId ?? 'none'}`,
@@ -67,6 +73,8 @@ export function useOcupacionResumen(
   useEffect(() => {
     if (organizationId) fetchAll();
   }, [organizationId, fetchAll]);
+
+  if (demo.active) return { ocupacionPorMes: demo.data.ocupacionPorMes.slice(-parseInt(periodoMeses)), isLoading: false, phase: 'ready' as ReadPhase, error: null, retry: () => {} };
 
   return {
     ocupacionPorMes: readState.data ?? [],

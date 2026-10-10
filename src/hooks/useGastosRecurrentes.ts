@@ -1,3 +1,6 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { useOperationalAccess, type OperationalReadOptions } from '@/hooks/useOperationalAccess';
+import { runFinanceWrite } from '@/lib/financeDemoRuntime';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -37,14 +40,18 @@ export interface GastoRecurrenteInsert {
 }
 
 
-export function useGastosRecurrentes() {
+export function useGastosRecurrentes(options: OperationalReadOptions = {}) {
+  const demo = useFinanceDemo();
+  const enabled = options.enabled !== false && !demo.active;
+  const access = useOperationalAccess(enabled);
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [recurrentes, setRecurrentes] = useState<GastoRecurrente[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchRecurrentes = useCallback(async () => {
-    if (!organization?.id) return;
+    if (!organization?.id || !enabled || !access.allowed()) return;
+    const request = access.start();
     setIsLoading(true);
     try {
       let query = supabase
@@ -57,22 +64,26 @@ export function useGastosRecurrentes() {
         query = query.eq('sucursal_id', currentSucursal.id);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.abortSignal(request.signal);
+      if (!request.current()) return;
       if (error) throw error;
       setRecurrentes((data as GastoRecurrente[]) || []);
     } catch (error) {
+      if (!request.current()) return;
       console.error('Error fetching gastos recurrentes:', error);
     } finally {
-      setIsLoading(false);
+      if (request.current()) setIsLoading(false);
+      request.finish();
     }
-  }, [organization?.id, currentSucursal]);
+  }, [enabled, access, organization?.id, currentSucursal]);
 
   useEffect(() => {
     fetchRecurrentes();
   }, [fetchRecurrentes]);
 
   const syncGastosRecurrentes = useCallback(async () => {
-    if (!organization?.id) return false;
+    if (!organization?.id || !enabled || !access.allowed()) return false;
+    const request = access.start();
     try {
       let query = supabase
         .from('gastos_recurrentes')
@@ -85,7 +96,8 @@ export function useGastosRecurrentes() {
         query = query.eq('sucursal_id', currentSucursal.id);
       }
 
-      const { data: pendientes, error } = await query;
+      const { data: pendientes, error } = await query.abortSignal(request.signal);
+      if (!request.current()) return false;
       if (error || !pendientes?.length) return false;
 
       const today = new Date();
@@ -97,7 +109,8 @@ export function useGastosRecurrentes() {
 
         while (nextDate <= today) {
           // Insert egreso
-          await supabase.from('Egresos').insert({
+          if (!request.current()) return false;
+          await runFinanceWrite(async () => supabase.from('Egresos').insert({
             Categoria: rec.categoria,
             tipo_costo: rec.tipo_costo,
             Monto: rec.monto,
@@ -106,7 +119,7 @@ export function useGastosRecurrentes() {
             organization_id: rec.organization_id,
             sucursal_id: rec.sucursal_id,
             gasto_recurrente_id: rec.id,
-          });
+          }));
           inserted = true;
 
           nextDate = calcNextDate(
@@ -119,21 +132,24 @@ export function useGastosRecurrentes() {
         }
 
         // Update proxima_fecha
-        await supabase
+        if (!request.current()) return false;
+        await runFinanceWrite(async () => supabase
           .from('gastos_recurrentes')
           .update({ proxima_fecha: format(nextDate, 'yyyy-MM-dd') })
-          .eq('id', rec.id);
+          .eq('id', rec.id));
       }
 
       if (inserted) await fetchRecurrentes();
       return inserted;
     } catch (error) {
+      if (!request.current()) return false;
       console.error('Error syncing gastos recurrentes:', error);
       return false;
-    }
-  }, [organization?.id, currentSucursal, fetchRecurrentes]);
+    } finally { request.finish(); }
+  }, [enabled, access, organization?.id, currentSucursal, fetchRecurrentes]);
 
   const addRecurrente = async (data: GastoRecurrenteInsert) => {
+    if (!access.allowed()) return;
     if (!organization?.id) {
       toast.error('No se encontró la organización');
       return false;
@@ -165,6 +181,7 @@ export function useGastosRecurrentes() {
   };
 
   const toggleRecurrente = async (id: string, activo: boolean) => {
+    if (!access.allowed()) return;
     try {
       const { error } = await supabase
         .from('gastos_recurrentes')
@@ -179,6 +196,7 @@ export function useGastosRecurrentes() {
   };
 
   const deleteRecurrente = async (id: string) => {
+    if (!access.allowed()) return;
     try {
       const { error } = await supabase
         .from('gastos_recurrentes')
@@ -196,9 +214,10 @@ export function useGastosRecurrentes() {
     recurrentes,
     isLoading: isLoading,
     syncGastosRecurrentes,
-    addRecurrente,
-    toggleRecurrente,
-    deleteRecurrente,
+    addRecurrente: (...args: Parameters<typeof addRecurrente>) => runFinanceWrite(() => addRecurrente(...args)),
+    toggleRecurrente: (...args: Parameters<typeof toggleRecurrente>) => runFinanceWrite(() => toggleRecurrente(...args)),
+    deleteRecurrente: (...args: Parameters<typeof deleteRecurrente>) => runFinanceWrite(() => deleteRecurrente(...args)),
     refetch: fetchRecurrentes,
+    ...(demo.active ? { recurrentes: demo.data.recurrentes, isLoading: false } : {}),
   };
 }

@@ -1,3 +1,5 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { isFinanceDemoActive } from '@/lib/financeDemoRuntime';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PinGateDialog } from '@/components/PinGateDialog';
@@ -33,8 +35,10 @@ interface PendingState {
 }
 
 export function ActionPinGateProvider({ children }: { children: ReactNode }) {
+  const demo = useFinanceDemo();
   const [pending, setPending] = useState<PendingState | null>(null);
   const pendingRef = useRef<PendingState | null>(null);
+  const modeRevisionRef = useRef(0);
 
   // Bypass: el PIN solo aplica a cuentas de sucursal. El resto de cuentas personales
   // (owner, general_manager, manager, barber) nunca pasa por el flujo de PIN.
@@ -51,6 +55,9 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
   }, [authLoading]);
 
   const requirePinForAction = useCallback<RequireFn>(async (actionKey, sucursalId, organizationId) => {
+    const revision = modeRevisionRef.current;
+    const cancelled = () => isFinanceDemoActive() || modeRevisionRef.current !== revision;
+    if (cancelled()) return { ok: false, cancelled: true };
     // Tiempo máximo de espera a que AuthContext termine de cargar antes de decidir
     // si aplicar bypass o pedir PIN. NO es el tiempo del usuario para tipear el PIN.
     const AUTH_READY_TIMEOUT_MS = 90_000;
@@ -69,7 +76,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
     }
 
     // Si auth sigue sin estar listo, fail-safe: no autorizar.
-    if (!authReadyRef.current) {
+    if (!authReadyRef.current || cancelled()) {
       return { ok: false, cancelled: true };
     }
 
@@ -82,12 +89,14 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
     let orgId = organizationId ?? null;
     if (!orgId) {
       const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled()) return { ok: false, cancelled: true };
       if (user) {
         const { data: prof } = await supabase
           .from('profiles')
           .select('organization_id')
           .eq('id', user.id)
           .maybeSingle();
+        if (cancelled()) return { ok: false, cancelled: true };
         orgId = prof?.organization_id ?? null;
       }
     }
@@ -103,6 +112,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
         _sucursal_id: sucursalId ?? null,
         _action_key: actionKey,
       });
+      if (cancelled()) return { ok: false, cancelled: true };
       if (error) throw error;
       if (!requires) {
         return { ok: true, validatedByRole: null, validatedByUserId: null, userName: null };
@@ -112,6 +122,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
       // Fail-safe: si falla la consulta, pedir PIN.
     }
 
+    if (cancelled()) return { ok: false, cancelled: true };
     // 3. Pedir PIN vía dialog global
     return new Promise<ActionPinResult>((resolve) => {
       const state: PendingState = {
@@ -127,7 +138,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
 
   const handleValidate = useCallback(async (pin: string) => {
     const cur = pendingRef.current;
-    if (!cur) return { success: false } as any;
+    if (!cur || isFinanceDemoActive()) return { success: false } as any;
     try {
       const { data, error } = await supabase.functions.invoke('validate-pin', {
         body: {
@@ -136,6 +147,7 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
           action_key: cur.actionKey,
         },
       });
+      if (isFinanceDemoActive() || pendingRef.current !== cur) return { success: false };
       if (error) throw error;
       if (data?.valid) {
         const result: ActionPinResult = {
@@ -163,11 +175,16 @@ export function ActionPinGateProvider({ children }: { children: ReactNode }) {
     if (cur) cur.resolve({ ok: false, cancelled: true });
   }, []);
 
+  useEffect(() => {
+    modeRevisionRef.current += 1;
+    if (demo.active) handleClose();
+  }, [demo.active, handleClose]);
+
   return (
     <ActionPinGateContext.Provider value={{ requirePinForAction }}>
       {children}
       <PinGateDialog
-        open={pending !== null}
+        open={!demo.active && pending !== null}
         onValidate={handleValidate}
         onClose={handleClose}
         sectionName={pending ? SUCURSAL_ACTION_LABELS[pending.actionKey] : 'esta acción'}

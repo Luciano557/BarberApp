@@ -1,3 +1,5 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { useOperationalAccess, type OperationalReadOptions } from '@/hooks/useOperationalAccess';
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Service, Extra, Barber, Discount, Line, TeamRole } from '@/types/barbershop';
@@ -30,8 +32,9 @@ function safeBarberPhone(input: unknown): string | null {
 }
 
 // Helper: ejecuta una query y, si falla, anota la tabla en el error para diagnóstico.
-async function runQuery<T>(table: string, p: PromiseLike<{ data: T; error: any }>): Promise<T> {
-  const { data, error } = await p;
+async function runQuery<T>(table: string, p: PromiseLike<{ data: T; error: any }>, signal?: AbortSignal): Promise<T> {
+  const cancellable = p as typeof p & { abortSignal?: (signal: AbortSignal) => typeof p };
+  const { data, error } = await (signal && cancellable.abortSignal ? cancellable.abortSignal(signal) : p);
   if (error) {
     const tagged: any = new Error(error.message || `Error consultando ${table}`);
     tagged.code = error.code;
@@ -161,7 +164,10 @@ function dbToDiscount(row: any, branchRow?: DescuentoSucursalRow): Discount {
   };
 }
 
-export function useSupabaseData() {
+export function useSupabaseData(options: OperationalReadOptions = {}) {
+  const demo = useFinanceDemo();
+  const enabled = options.enabled !== false && !demo.active;
+  const access = useOperationalAccess(enabled);
   const { organization, isLoading: orgLoading } = useOrganization();
   const { currentSucursal } = useSucursal();
   const { user, isLoading: authLoading, roles, hasNoAccess } = useAuth();
@@ -183,7 +189,7 @@ export function useSupabaseData() {
 
   // Gating: hasta que auth y org no terminen de hidratar, o si el usuario no tiene cargo,
   // NO disparamos fetch (no hay datos que cargar).
-  const ready = !authLoading && !orgLoading && !!user && !!organization && roles.length > 0 && !hasNoAccess;
+  const ready = enabled && !authLoading && !orgLoading && !!user && !!organization && roles.length > 0 && !hasNoAccess;
   const skip = !authLoading && !orgLoading && (hasNoAccess || roles.length === 0);
 
   // Clave estable del contexto de datos actual. Cambia de inmediato (mismo
@@ -208,10 +214,12 @@ export function useSupabaseData() {
 
   // Fetch all data
   const fetchData = useCallback(async () => {
+    if (!enabled || !access.allowed()) return;
+    const request = access.start();
     const myRequestId = ++requestIdRef.current;
     const myContextKey = `${organization?.id ?? 'none'}::${sucursalId ?? 'all'}`;
     const stillCurrent = () =>
-      myContextKey === currentContextKeyRef.current && myRequestId === requestIdRef.current;
+      request.current() && myContextKey === currentContextKeyRef.current && myRequestId === requestIdRef.current;
 
     setIsLoading(true);
     setError(null);
@@ -224,8 +232,9 @@ export function useSupabaseData() {
     try {
       const linesData = await runQuery<any[]>(
         'lineas',
-        supabase.from('lineas').select('*').eq('eliminado', false).order('orden', { ascending: true }).order('nombre', { ascending: true }) as any
+        supabase.from('lineas').select('*').eq('eliminado', false).order('orden', { ascending: true }).order('nombre', { ascending: true }) as any, request.signal
       );
+      if (!request.current()) return;
       const fetchedLines = linesData.map(dbToLine);
 
       let barbersQuery = supabase.from('barberos').select('*').order('nombre');
@@ -244,13 +253,13 @@ export function useSupabaseData() {
         : Promise.resolve({ data: [] as DescuentoSucursalRow[], error: null as any });
 
       const [servicesData, extrasData, barbersData, discountsData, servSucData, extSucData, descSucData] = await Promise.all([
-        runQuery<any[]>('servicios', supabase.from('servicios').select('*').eq('eliminado', false).order('nombre') as any),
-        runQuery<any[]>('extras', supabase.from('extras').select('*').eq('eliminado', false).order('nombre') as any),
-        runQuery<any[]>('barberos', barbersQuery as any),
-        runQuery<any[]>('descuentos', supabase.from('descuentos').select('*').eq('eliminado', false).order('valor') as any),
-        runQuery<ServicioSucursalRow[]>('servicios_sucursales', servSucPromise as any),
-        runQuery<ExtraSucursalRow[]>('extras_sucursales', extSucPromise as any),
-        runQuery<DescuentoSucursalRow[]>('descuentos_sucursales', descSucPromise as any),
+        runQuery<any[]>('servicios', supabase.from('servicios').select('*').eq('eliminado', false).order('nombre') as any, request.signal),
+        runQuery<any[]>('extras', supabase.from('extras').select('*').eq('eliminado', false).order('nombre') as any, request.signal),
+        runQuery<any[]>('barberos', barbersQuery as any, request.signal),
+        runQuery<any[]>('descuentos', supabase.from('descuentos').select('*').eq('eliminado', false).order('valor') as any, request.signal),
+        runQuery<ServicioSucursalRow[]>('servicios_sucursales', servSucPromise as any, request.signal),
+        runQuery<ExtraSucursalRow[]>('extras_sucursales', extSucPromise as any, request.signal),
+        runQuery<DescuentoSucursalRow[]>('descuentos_sucursales', descSucPromise as any, request.signal),
       ]);
 
       const servSucMap = new Map<string, ServicioSucursalRow>();
@@ -325,13 +334,15 @@ export function useSupabaseData() {
       setErrorContextKey(myContextKey);
       toast.error('Error al cargar datos');
     } finally {
+      request.finish();
       if (stillCurrent()) {
         setIsLoading(false);
       }
     }
-  }, [sucursalId, user?.id, organization?.id, roles]);
+  }, [enabled, access, sucursalId, user?.id, organization?.id, roles]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (skip) {
       setLines([]);
       setServices([]);
@@ -349,7 +360,7 @@ export function useSupabaseData() {
       return;
     }
     fetchData();
-  }, [ready, skip, fetchData]);
+  }, [enabled, ready, skip, fetchData]);
 
   // Error "vivo": pertenece al contexto (organización/sucursal) seleccionado
   // ahora mismo, y ese contexto todavía no tiene una carga exitosa confirmada.
@@ -362,7 +373,7 @@ export function useSupabaseData() {
   // usuario sin acceso (esos se resuelven aparte, vía `hasNoAccess`) y no hay
   // ya un error bloqueante para mostrar en su lugar. No depende del timing de
   // `isLoading`: se activa en el mismo render en que cambia `contextKey`.
-  const showBlockingLoader = !skip && !hasLoadedCurrentContext && !blockingError;
+  const showBlockingLoader = enabled && !skip && !hasLoadedCurrentContext && !blockingError;
 
   // ============= Helpers para resolver sucursalConfigId =============
   const findServicioSucursalId = useCallback(async (servicioId: string): Promise<string | null> => {
@@ -1380,14 +1391,14 @@ export function useSupabaseData() {
   return {
     isLoading,
     error,
-    blockingError,
+    blockingError: enabled ? blockingError : null,
     showBlockingLoader,
     refetch: fetchData,
     services: services.filter(s => s.active),
     allServices: services,
     extras: extras.filter(e => e.active),
     allExtras: extras,
-    barbers: barbers.filter(b => b.active),
+    barbers: demo.active ? demo.data.barbers : barbers.filter(b => b.active),
     allBarbers: barbers,
     discounts,
     cobrarDiscounts,

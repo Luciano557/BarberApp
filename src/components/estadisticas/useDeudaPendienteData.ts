@@ -1,3 +1,5 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import type { OperationalReadOptions } from '@/hooks/useOperationalAccess';
 import { useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Sucursal } from '@/contexts/SucursalContext';
@@ -31,11 +33,15 @@ const EMPTY_BUNDLE: DeudaBundle = { saldoPendiente: 0, proximaCuota: null };
 export function useDeudaPendienteData(
   organizationId: string | undefined,
   currentSucursal: Sucursal | null,
+  options: OperationalReadOptions = {},
 ) {
+  const demo = useFinanceDemo();
+  const enabled = options.enabled !== false && !demo.active;
   const contextKey = `${organizationId ?? 'none'}::${currentSucursal?.id ?? 'all'}`;
 
   const readState = useReadState<DeudaBundle>({
     contextKey,
+    enabled,
     errorMessage: 'No pudimos cargar la deuda pendiente.',
     staleErrorMessage: 'No pudimos actualizar la deuda pendiente.',
     surfaceId: `estadisticas-deuda:${organizationId ?? 'none'}`,
@@ -84,6 +90,8 @@ export function useDeudaPendienteData(
   }, [organizationId, fetchAll]);
 
   const bundle = readState.data ?? EMPTY_BUNDLE;
+
+  if (demo.active) return { saldoPendiente: demo.data.saldoPendiente, proximaCuota: demo.data.proximaCuota, isLoading: false, phase: 'ready' as ReadPhase, error: null, retry: () => {} };
 
   return {
     saldoPendiente: bundle.saldoPendiente,

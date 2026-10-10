@@ -1,3 +1,6 @@
+import { useFinanceDemo } from '@/contexts/FinanceDemoContext';
+import { useOperationalAccess, type OperationalReadOptions } from '@/hooks/useOperationalAccess';
+import { runFinanceWrite } from '@/lib/financeDemoRuntime';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -21,7 +24,10 @@ export interface Gasto {
   pago_sueldo_id?: string | null;
 }
 
-export function useGastos() {
+export function useGastos(options: OperationalReadOptions = {}) {
+  const demo = useFinanceDemo();
+  const enabled = options.enabled !== false && !demo.active;
+  const access = useOperationalAccess(enabled);
   const { organization } = useOrganization();
   const { currentSucursal } = useSucursal();
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -29,7 +35,8 @@ export function useGastos() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
   const fetchGastos = useCallback(async () => {
-    if (!organization?.id) return;
+    if (!organization?.id || !enabled || !access.allowed()) return;
+    const request = access.start();
     setIsLoading(true);
     try {
       const start = format(startOfMonth(selectedMonth), 'yyyy-MM-dd');
@@ -48,17 +55,20 @@ export function useGastos() {
         query = query.eq('sucursal_id', currentSucursal.id);
       }
 
-      const { data, error } = await query;
+      const { data, error } = await query.abortSignal(request.signal);
+      if (!request.current()) return;
 
       if (error) throw error;
       setGastos((data as Gasto[]) || []);
     } catch (error: any) {
+      if (!request.current()) return;
       console.error('Error fetching gastos:', error);
       toast.error('Error al cargar gastos');
     } finally {
-      setIsLoading(false);
+      if (request.current()) setIsLoading(false);
+      request.finish();
     }
-  }, [organization?.id, selectedMonth, currentSucursal]);
+  }, [enabled, access, organization?.id, selectedMonth, currentSucursal]);
 
 
   const hasSynced = useRef<string>('');
@@ -70,6 +80,7 @@ export function useGastos() {
   }, []);
 
   useEffect(() => {
+    if (!enabled || !access.allowed()) return;
     const key = `${organization?.id}-${format(selectedMonth, 'yyyy-MM')}-${currentSucursal?.id || 'all'}`;
     if (hasSynced.current === key) return;
 
@@ -78,11 +89,12 @@ export function useGastos() {
       if (syncRecurrentesRef.current) {
         await syncRecurrentesRef.current();
       }
+      if (!access.allowed()) return;
       await fetchGastos();
       hasSynced.current = key;
     };
     run();
-  }, [fetchGastos]);
+  }, [enabled, access.allowed, fetchGastos]);
 
   const addGasto = async (data: {
     categoria: string;
@@ -91,6 +103,7 @@ export function useGastos() {
     fecha: Date;
     tipoCosto: TipoCosto;
   }) => {
+    if (!access.allowed()) return;
     if (!organization?.id) {
       toast.error('No se encontró la organización');
       return false;
@@ -123,6 +136,7 @@ export function useGastos() {
     motivo: string,
     audit?: { validatedByUserId?: string | null }
   ) => {
+    if (!access.allowed()) return;
     const motivoLimpio = (motivo || '').trim().slice(0, 240);
     if (!motivoLimpio) {
       toast.error('Indicá un motivo de anulación');
@@ -158,10 +172,11 @@ export function useGastos() {
     isLoading,
     selectedMonth,
     setSelectedMonth,
-    addGasto,
-    anularGasto,
+    addGasto: (...args: Parameters<typeof addGasto>) => runFinanceWrite(() => addGasto(...args)),
+    anularGasto: (...args: Parameters<typeof anularGasto>) => runFinanceWrite(() => anularGasto(...args)),
     totalPeriodo,
     refetch: fetchGastos,
     setSyncRecurrentes,
+    ...(demo.active ? { gastos: demo.data.gastos.filter(row => row.Fecha?.startsWith(format(selectedMonth, 'yyyy-MM'))), isLoading: false, totalPeriodo: demo.data.gastos.filter(row => row.Fecha?.startsWith(format(selectedMonth, 'yyyy-MM'))).reduce((sum, row) => sum + (row.Monto ?? 0), 0) } : {}),
   };
 }
