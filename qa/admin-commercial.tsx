@@ -16,8 +16,9 @@ function Preview() {
   const params = new URLSearchParams(location.search);
   const detail = structuredClone(adminCommercialFixture);
   if (params.get('state') === 'trial') {
-    Object.assign(detail.subscription!, { provider: 'mercadopago', sourceStatus: 'expired', currentPlanCode: null, effectivePlanCode: 'premium', trialEndsAt: '2026-01-16T00:00:00Z' });
+    Object.assign(detail.subscription!, { provider: 'mercadopago', sourceStatus: 'trialing', currentPlanCode: null, effectivePlanCode: 'premium', trialEndsAt: '2026-10-25T14:12:00Z' });
     detail.capabilities.canExtendTrial = true;
+    detail.capabilities.canChangeTrialEnd = true;
   }
   if (params.get('state') === 'mp') {
     Object.assign(detail.subscription!, { provider: 'mercadopago', providerStatus: 'authorized', hasPreapproval: true, billingAmountArs: 99999999 });

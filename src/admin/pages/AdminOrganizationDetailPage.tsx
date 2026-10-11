@@ -38,6 +38,7 @@ function OrganizationDetailController({ organizationId, actorId }: { organizatio
     try {
       const result = await getPlatformAdminCommercialStatus(organizationId, pending.requestId);
       if (result.status === 'completed') { clear(); refresh(); feedback.success('Operación confirmada en auditoría.'); }
+      else if (result.status === 'failed') { clear(); refresh(); feedback.error(result.message ?? 'El servidor confirmó el rechazo. No se aplicó el cambio; podés iniciar una nueva operación.'); }
       else feedback.info('Aún no hay confirmación. Conservá el identificador y no repitas el cambio.');
     } catch { feedback.error('No pudimos consultar el resultado. Reintentá esta consulta.'); }
     finally { setChecking(false); }

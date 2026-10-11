@@ -12,5 +12,5 @@ export const adminCommercialFixture: PlatformAdminOrganizationDetail = {
     currentPeriodEnd: null, providerStatus: null, hasPreapproval: false, cancelAtPeriodEnd: false, updatedAt: '2026-09-01T00:00:00.380602Z' },
   plans: ['basico', 'profesional', 'premium'].map((code, i) => ({ code, name: code, description: null,
     amountArs: (i + 1) * 10000, priceVersion: 1, billingPeriod: 'monthly', isActive: true, sortOrder: i, updatedAt: '2026-09-01T00:00:00Z' })),
-  capabilities: { mutationsEnabled: true, canAssignManualPlan: true, canExtendTrial: false, blockCode: null }, hasApprovedPayments: false,
+  capabilities: { mutationsEnabled: true, canAssignManualPlan: true, canExtendTrial: false, canChangeTrialEnd: false, blockCode: null }, hasApprovedPayments: false,
 };

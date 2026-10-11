@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { StatusPill } from '@/components/ui/StatusPill';
 import type { PlatformAdminAuditDto, PlatformAdminListResponse } from '@/types/platformAdmin';
 
-const labels: Record<string, string> = { 'organization.details_updated': 'Datos y contacto', 'organization.manual_plan_assigned': 'Acceso manual', 'organization.trial_extended': 'Trial extendido' };
+const labels: Record<string, string> = { 'organization.details_updated': 'Datos y contacto', 'organization.manual_plan_assigned': 'Acceso manual', 'organization.trial_extended': 'Trial extendido', 'organization.trial_end_changed': 'Vencimiento de trial' };
 const fields: Record<string, string> = { name: 'Nombre', phone: 'Teléfono', address: 'Dirección', contactEmail: 'Email comercial', planCode: 'Plan', currentPlanCode: 'Plan seleccionado', billingPlanCode: 'Plan de cobro', provider: 'Proveedor', status: 'Estado', accessEndsAt: 'Vencimiento', trialEndsAt: 'Fin de trial', billingAmountArs: 'Importe configurado', billingPriceVersion: 'Versión de precio' };
 function changes(item: PlatformAdminAuditDto) {
   return Object.keys(item.nextState ?? {}).filter(key => fields[key] && item.nextState?.[key] !== item.previousState?.[key]).map(key => `${fields[key]}: ${item.previousState?.[key] ?? '—'} → ${item.nextState?.[key] ?? '—'}`).join(' · ');

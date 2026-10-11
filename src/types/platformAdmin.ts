@@ -126,13 +126,13 @@ export interface PlatformAdminOrganizationDetail {
   } | null;
   plans: PlatformAdminPlanDto[];
   capabilities: {
-    mutationsEnabled: boolean; canAssignManualPlan: boolean; canExtendTrial: boolean;
+    mutationsEnabled: boolean; canAssignManualPlan: boolean; canExtendTrial: boolean; canChangeTrialEnd?: boolean;
     blockCode: 'PROVIDER_RECONCILIATION_REQUIRED' | 'OPERATION_IN_PROGRESS' | null;
   };
   hasApprovedPayments: boolean;
 }
 
-export type PlatformAdminCommercialAction = 'update_details' | 'assign_manual_plan' | 'extend_trial';
+export type PlatformAdminCommercialAction = 'update_details' | 'assign_manual_plan' | 'extend_trial' | 'set_trial_end';
 export interface PlatformAdminCommercialInput {
   action: PlatformAdminCommercialAction;
   organizationId: string;
@@ -148,7 +148,8 @@ export interface PlatformAdminCommercialResult {
   organizationId: string; requestId: string; action: PlatformAdminCommercialAction; replayed: boolean;
 }
 export interface PlatformAdminCommercialStatus {
-  organizationId: string; requestId: string; status: 'completed' | 'not_found';
+  organizationId: string; requestId: string; status: 'completed' | 'failed' | 'not_found';
+  code?: string | null; message?: string | null;
   action: string | null; completedAt: string | null;
 }
 

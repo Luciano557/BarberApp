@@ -26,7 +26,7 @@ function localDeadline(date: string, time: string): Date | null {
   const parsed = parse(value, 'yyyy-MM-dd HH:mm', new Date());
   return isValid(parsed) && format(parsed, 'yyyy-MM-dd HH:mm') === value ? parsed : null;
 }
-export function commercialFormSchema(action: PlatformAdminCommercialAction) {
+export function commercialFormSchema(action: PlatformAdminCommercialAction, currentTrialEnd?: string | null) {
   return z.object({
     name: z.string().trim().max(120, 'Máximo 120 caracteres.'), phone: z.string().trim().max(40),
     address: z.string().trim().max(300), contactEmail: z.string().trim().max(254).refine(value => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), 'Ingresá un email válido.'),
@@ -40,12 +40,15 @@ export function commercialFormSchema(action: PlatformAdminCommercialAction) {
       const deadline = localDeadline(value.date, value.time);
       if (!value.date) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Elegí la fecha de vencimiento.' });
       if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value.time)) ctx.addIssue({ code: 'custom', path: ['time'], message: 'Ingresá una hora válida (HH:MM).' });
-      if (!deadline || deadline.getTime() <= Date.now()) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Elegí un vencimiento futuro.' });
+      if (!deadline) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Elegí una fecha y hora válidas.' });
+      else if (action !== 'set_trial_end' && deadline.getTime() <= Date.now()) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Elegí un vencimiento futuro.' });
+      else if (action === 'extend_trial' && currentTrialEnd && deadline.getTime() <= Date.parse(currentTrialEnd)) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Para extender el trial, elegí una fecha posterior al vencimiento actual.' });
+      else if (action === 'set_trial_end' && currentTrialEnd && deadline.getTime() === Date.parse(currentTrialEnd)) ctx.addIssue({ code: 'custom', path: ['date'], message: 'Elegí un vencimiento distinto del actual.' });
     }
   });
 }
 type Values = z.infer<ReturnType<typeof commercialFormSchema>>;
-const titles: Record<PlatformAdminCommercialAction, string> = { update_details: 'Editar barbería y contacto', assign_manual_plan: 'Asignar acceso manual', extend_trial: 'Extender trial' };
+const titles: Record<PlatformAdminCommercialAction, string> = { update_details: 'Editar barbería y contacto', assign_manual_plan: 'Asignar acceso manual', extend_trial: 'Extender trial', set_trial_end: 'Cambiar vencimiento del trial' };
 interface Props {
   action: PlatformAdminCommercialAction; detail: PlatformAdminOrganizationDetail;
   onClose(): void;
@@ -61,7 +64,8 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const form = useForm<Values>({ resolver: zodResolver(commercialFormSchema(action)), defaultValues: {
+  const [failure, setFailure] = useState<string | null>(null);
+  const form = useForm<Values>({ resolver: zodResolver(commercialFormSchema(action, detail.subscription?.trialEndsAt)), defaultValues: {
     name: detail.organization.name, phone: detail.organization.phone ?? '', address: detail.organization.address ?? '',
     contactEmail: detail.organization.contactEmail ?? '', planCode: (['basico', 'profesional', 'premium'].includes(detail.subscription?.effectivePlanCode ?? '') ? detail.subscription!.effectivePlanCode : 'basico') as Values['planCode'],
     date: '', time: '', indefinite: false, reason: '', password: '', confirmed: false,
@@ -73,6 +77,7 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
   const submit = form.handleSubmit(async values => {
     if (submitting.current || busy || uncertain || conflict || !detail.capabilities.mutationsEnabled) return;
     submitting.current = true;
+    setFailure(null);
     const changes = action === 'update_details'
       ? { name: values.name, phone: values.phone || null, address: values.address || null, contactEmail: values.contactEmail || null }
       : action === 'assign_manual_plan'
@@ -89,7 +94,8 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
     } catch (error) {
       const issue = error as { status?: number | null; code?: string | null };
       const ambiguous = started && (!issue.status || issue.status >= 500 && issue.code !== 'COMMERCIAL_MUTATIONS_DISABLED');
-      if (ambiguous) setUncertain(true); else onResolved();
+      if (ambiguous) setUncertain(true);
+      else { onResolved(); requestId.current = crypto.randomUUID(); }
       if (issue.status === 409) setConflict(true);
       const messages: Record<string, string> = {
         REAUTHENTICATION_FAILED: 'La contraseña no coincide. Ingresala nuevamente.',
@@ -99,8 +105,11 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
         PROVIDER_RECONCILIATION_REQUIRED: 'Primero hay que reconciliar el vínculo con Mercado Pago.',
         OPERATION_IN_PROGRESS: 'Hay una operación de facturación pendiente. Resolvela primero.',
         TRIAL_EXTENSION_NOT_ALLOWED: 'Este acceso ya no admite extensión de trial. Actualizá la ficha.',
+        TRIAL_CHANGE_NOT_ALLOWED: 'No se puede cambiar esta fecha. Verificá que sea distinta y que no haya acceso pago, manual o un checkout.',
+        INVALID_INPUT: 'Revisá los datos de la operación. No se aplicó el cambio.',
       };
-      feedback.error(!started ? 'No pudimos guardar el identificador de recuperación en este navegador. No se envió ningún cambio.' : messages[issue.code ?? ''] ?? 'No pudimos confirmar el cambio. Consultá el resultado antes de repetirlo.');
+      const message = !started ? 'No pudimos guardar el identificador de recuperación en este navegador. No se envió ningún cambio.' : messages[issue.code ?? ''] ?? 'No pudimos confirmar el cambio. Consultá el resultado antes de repetirlo.';
+      setFailure(message); feedback.error(message);
     } finally { form.setValue('password', ''); setBusy(false); submitting.current = false; }
   });
   const check = async () => {
@@ -108,6 +117,11 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
     try {
       const result = await onCheck(requestId.current);
       if (result.status === 'completed') { onResolved(); feedback.success('El cambio quedó confirmado en auditoría.'); onApplied(); }
+      else if (result.status === 'failed') {
+        onResolved(); setUncertain(false); setConflict(true);
+        setFailure(result.message ?? 'El servidor confirmó el rechazo. No se aplicó el cambio. Cerrá el panel y actualizá la ficha.');
+        feedback.error('El cambio fue rechazado. La ficha ya puede recuperarse.');
+      }
       else feedback.info('Todavía no hay confirmación. No repitas el cambio; conservá el identificador.');
     } catch { feedback.error('No pudimos consultar el resultado. Reintentá la consulta, no el cambio.'); }
     finally { setBusy(false); }
@@ -133,28 +147,37 @@ export function OrganizationCommercialDrawer({ action, detail, onClose, onApply,
                 ))}
               </> : <>
                 {action === 'assign_manual_plan' && <>
-                  <FormField control={form.control} name="planCode" render={({ field }) => <FormItem><FormLabel>Plan de acceso</FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={busy || uncertain || conflict}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{detail.plans.filter(p => p.isActive).map(p => <SelectItem key={p.code} value={p.code}>{planLabel(p.code)}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
-                  <FormField control={form.control} name="indefinite" render={({ field }) => <FormItem className="flex items-start gap-3 space-y-0 py-2"><FormControl><Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} className="mt-0.5" /></FormControl><div><FormLabel>Otorgar acceso sin vencimiento</FormLabel><FormDescription>Es una cortesía indefinida, no una suscripción paga.</FormDescription></div></FormItem>} />
+                  <FormField control={form.control} name="planCode" render={({ field }) => <FormItem><FormLabel>Plan de acceso</FormLabel><Select value={field.value} onValueChange={value => { field.onChange(value); form.setValue('confirmed', false); }} disabled={busy || uncertain || conflict}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{detail.plans.filter(p => p.isActive).map(p => <SelectItem key={p.code} value={p.code}>{planLabel(p.code)}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>} />
+                  <FormField control={form.control} name="indefinite" render={({ field }) => <FormItem className="flex items-start gap-3 space-y-0 py-2"><FormControl><Checkbox checked={field.value} onCheckedChange={value => { field.onChange(value === true); form.setValue('confirmed', false); }} className="mt-0.5" /></FormControl><div><FormLabel>Otorgar acceso sin vencimiento</FormLabel><FormDescription>Es una cortesía indefinida, no una suscripción paga.</FormDescription></div></FormItem>} />
                 </>}
                 {!(action === 'assign_manual_plan' && indefinite) && <div className="space-y-2">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField control={form.control} name="date" render={({ field }) => <FormItem><FormLabel>Fecha de vencimiento</FormLabel><FormControl><DatePicker ref={field.ref} value={field.value || null} onChange={value => field.onChange(value ?? '')} fromDate={format(new Date(), 'yyyy-MM-dd')} disabled={busy || uncertain || conflict} /></FormControl><FormMessage /></FormItem>} />
-                    <FormField control={form.control} name="time" render={({ field }) => <FormItem><FormLabel>Hora de vencimiento</FormLabel><FormControl><TimePicker ref={field.ref} value={field.value} onChange={field.onChange} disabled={busy || uncertain || conflict} /></FormControl><FormMessage /></FormItem>} />
+                    <FormField control={form.control} name="date" render={({ field }) => <FormItem><FormLabel>Fecha de vencimiento</FormLabel><FormControl><DatePicker ref={field.ref} value={field.value || null} onChange={value => { field.onChange(value ?? ''); form.setValue('confirmed', false); }} fromDate={action === 'set_trial_end' ? undefined : format(new Date(), 'yyyy-MM-dd')} disabled={busy || uncertain || conflict} /></FormControl><FormMessage /></FormItem>} />
+                    <FormField control={form.control} name="time" render={({ field }) => <FormItem><FormLabel>Hora de vencimiento</FormLabel><FormControl><TimePicker ref={field.ref} value={field.value} onChange={value => { field.onChange(value); form.setValue('confirmed', false); }} disabled={busy || uncertain || conflict} /></FormControl><FormMessage /></FormItem>} />
                   </div>
-                  <p className="text-xs text-muted-foreground">Hora local de este navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}).{action === 'extend_trial' && ` Trial actual: ${formatAdminDate(detail.subscription?.trialEndsAt, true)}.`}</p>
+                  <p className="text-xs text-muted-foreground">Hora local de este navegador ({Intl.DateTimeFormat().resolvedOptions().timeZone}).{(action === 'extend_trial' || action === 'set_trial_end') && ` Trial actual: ${formatAdminDate(detail.subscription?.trialEndsAt, true)}.`}</p>
+                  {action === 'set_trial_end' && <Button type="button" variant="outline" size="sm" onClick={() => {
+                    const now = new Date();
+                    form.setValue('date', format(now, 'yyyy-MM-dd'), { shouldDirty: true });
+                    form.setValue('time', format(now, 'HH:mm'), { shouldDirty: true });
+                    form.setValue('confirmed', false);
+                  }}>Vencer ahora</Button>}
                 </div>}
                 <p className="rounded-lg bg-muted p-3 text-sm leading-relaxed text-foreground">{action === 'assign_manual_plan'
                   ? `${planLabel(detail.subscription?.effectivePlanCode)} → ${planLabel(plan)} · ${indefinite ? 'sin vencimiento' : deadline ? formatAdminDate(deadline.toISOString(), true) : 'elegí el vencimiento'}. No genera cobros, no cancela contratos y no cambia el catálogo.`
-                  : 'Extiende el acceso Premium de prueba. No crea pagos ni reemplaza acceso pago o manual.'}</p>
+                  : action === 'set_trial_end'
+                    ? `${formatAdminDate(detail.subscription?.trialEndsAt, true)} → ${deadline ? formatAdminDate(deadline.toISOString(), true) : 'elegí el vencimiento'}. ${deadline && deadline.getTime() <= Date.now() ? 'El trial quedará vencido al guardar y la barbería perderá el acceso de prueba.' : deadline && detail.subscription?.trialEndsAt && deadline.getTime() < Date.parse(detail.subscription.trialEndsAt) ? 'Acorta el acceso de prueba.' : 'Podés extender o acortar el acceso de prueba.'} No genera cobros ni modifica Mercado Pago.`
+                    : 'Extiende el acceso Premium de prueba. No crea pagos ni reemplaza acceso pago o manual.'}</p>
               </>}
             </DrawerFormSection>
             <DrawerFormSection icon={ShieldCheck} title="Confirmación administrativa" description="El cambio y su motivo quedan auditados. La contraseña no se registra.">
               <FormField control={form.control} name="reason" render={({ field }) => <FormItem><FormLabel>Motivo</FormLabel><FormControl><Textarea {...field} maxLength={500} placeholder="Explicá la decisión comercial…" /></FormControl><FormMessage /></FormItem>} />
               <FormField control={form.control} name="password" render={({ field }) => <FormItem><FormLabel>Contraseña administrativa</FormLabel><FormControl><Input {...field} type="password" autoComplete="current-password" maxLength={1024} /></FormControl><FormMessage /></FormItem>} />
-              <FormField control={form.control} name="confirmed" render={({ field }) => <FormItem className="space-y-2"><div className="flex items-start gap-3"><FormControl><Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} className="mt-0.5" /></FormControl><FormLabel className="leading-relaxed">Revisé la barbería, el cambio y sus consecuencias.</FormLabel></div><FormMessage /></FormItem>} />
+              <FormField control={form.control} name="confirmed" render={({ field }) => <FormItem className="space-y-2"><div className="flex items-start gap-3"><FormControl><Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} className="mt-0.5" /></FormControl><FormLabel className="leading-relaxed">{action === 'set_trial_end' && deadline && deadline.getTime() <= Date.now() ? 'Confirmo que el trial vencerá y la barbería perderá el acceso de prueba al guardar.' : 'Revisé la barbería, el cambio y sus consecuencias.'}</FormLabel></div><FormMessage /></FormItem>} />
             </DrawerFormSection>
           </fieldset>
           {conflict && <p role="alert" className="text-sm text-status-warning-foreground">La ficha ya no está vigente para esta operación. Cerrá este panel y actualizá los datos.</p>}
+          {failure && !uncertain && <p role="alert" className="text-sm text-status-error-foreground">{failure}</p>}
           {uncertain && <div role="alert" className="space-y-3 rounded-lg border border-status-warning bg-status-warning-bg p-3 text-sm text-status-warning-foreground"><p>No tenemos confirmación. Consultá el resultado antes de repetir el cambio.</p><p className="break-all text-xs">Identificador: {requestId.current}</p><Button type="button" variant="outline" onClick={() => void check()} disabled={busy}>Consultar resultado</Button></div>}
         </form>
       </Form>

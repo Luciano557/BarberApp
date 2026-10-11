@@ -1,4 +1,4 @@
-import { commercialEligibility, parseCommercialMutation, type CommercialSubscription } from '../functions/_shared/admin-organization-domain.ts';
+import { commercialEligibility, commercialError, commercialAuditOutcome, parseCommercialMutation, type CommercialSubscription } from '../functions/_shared/admin-organization-domain.ts';
 import { createCommercialHandler, type CommercialHandlerDependencies } from '../functions/_shared/admin-organization-handler.ts';
 
 function assert(value: unknown, message = 'Assertion failed'): asserts value { if (!value) throw new Error(message); }
@@ -45,6 +45,25 @@ export function registerCommercialTests(test: (name: string, task: () => void | 
     rejects(() => parseCommercialMutation({ ...base, changes: { planCode: 'basico' } }));
     rejects(() => parseCommercialMutation({ ...base, changes: { planCode: 'basico', endsAt: '2020-01-01T00:00:00Z' } }));
     rejects(() => parseCommercialMutation({ ...base, action: 'extend_trial', changes: { endsAt: null } }));
+  });
+  test('commercial: explicit trial date action allows shorter or past deadlines, never null', () => {
+    const base = { ...input(), action: 'set_trial_end', changes: { endsAt: '2020-01-01T00:00:00Z' } };
+    assert(parseCommercialMutation(base).action === 'set_trial_end');
+    assert('endsAt' in parseCommercialMutation({ ...base, changes: { endsAt: '2099-01-01T00:00:00Z' } }).changes);
+    rejects(() => parseCommercialMutation({ ...base, changes: { endsAt: null } }));
+    rejects(() => parseCommercialMutation({ ...base, changes: { endsAt: 'infinity' } }));
+    assert(commercialError('TRIAL_CHANGE_NOT_ALLOWED').status === 409);
+    assert(commercialEligibility(trial(), false, false).canChangeTrialEnd);
+    assert(!commercialEligibility(trial(), false, true).canChangeTrialEnd);
+  });
+  test('commercial: status distinguishes known failure from success and never exposes audit metadata', () => {
+    assert(commercialAuditOutcome({ result_status: 'succeeded' }).status === 'completed');
+    const failure = commercialAuditOutcome({ result_status: 'failed', result_detail: { errorCode: 'TRIAL_CHANGE_NOT_ALLOWED', password: 'must-not-appear', inputFingerprint: 'private' } });
+    assert(failure.status === 'failed' && failure.code === 'TRIAL_CHANGE_NOT_ALLOWED');
+    assert(!JSON.stringify(failure).includes('must-not-appear') && !JSON.stringify(failure).includes('private'));
+    assert(commercialAuditOutcome(null).status === 'not_found');
+    assert(commercialAuditOutcome({ result_status: 'pending' }).status === 'not_found');
+    assert(commercialAuditOutcome({ result_status: 'failed', result_detail: { errorCode: 'raw secret database error' } }).status === 'not_found');
   });
   test('commercial: legacy and clean manual subscriptions can receive a manual plan', () => {
     assert(commercialEligibility(null, false, false).canAssignManualPlan);

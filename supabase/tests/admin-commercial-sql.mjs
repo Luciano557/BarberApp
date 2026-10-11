@@ -11,6 +11,7 @@ const db = await PGlite.create();
 const foundation = await readFile('supabase/migrations/20260624120000_subscription_billing_foundation.sql', 'utf8');
 const admin = await readFile('supabase/migrations/20260904153000_platform_admin_center.sql', 'utf8');
 const migration = await readFile('supabase/migrations/20261010130000_platform_admin_commercial.sql', 'utf8');
+const trialDates = await readFile('supabase/migrations/20261011090000_platform_admin_trial_dates.sql', 'utf8');
 function table(source, name) {
   const result = source.match(new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${name} \\([\\s\\S]*?\\n\\);`));
   assert(result, `Missing real schema: ${name}`);
@@ -45,13 +46,28 @@ async function mutate(input, role = 'service_role') {
   return db.transaction(async tx => {
     await tx.exec(`SET LOCAL ROLE ${role}`);
     const { rows } = await tx.query(`SELECT public.platform_admin_manage_organization($1,$2,$3,$4,$5::jsonb,$6,$7::timestamptz,$8::timestamptz) AS result`, [input.id, input.actor, input.request, input.action, JSON.stringify(input.changes), 'Motivo comercial sintético', input.revision.org, input.revision.sub]);
+    const httpStatus = (await tx.query(`SELECT current_setting('response.status', true) AS status`)).rows[0].status;
+    if (rows[0].result.status === 'failed') {
+      const expectedStatus = rows[0].result.code === 'INVALID_INPUT'
+        ? '400' : rows[0].result.code === 'ORGANIZATION_NOT_FOUND' ? '404' : '409';
+      assert.equal(httpStatus, expectedStatus, 'A failed receipt must never look successful to an older Edge');
+      assert.equal(rows[0].result.message, rows[0].result.code);
+    } else {
+      assert(!httpStatus || httpStatus === '200', 'Error status must not leak across transactions');
+    }
     return rows[0].result;
   });
 }
 async function failure(input, message, role = 'service_role') {
-  await assert.rejects(mutate(input, role), err => err.message.includes(message));
-  const { rows } = await db.query('SELECT count(*)::integer AS n FROM platform_admin_audit_log WHERE request_id=$1', [input.request]);
-  assert.equal(rows[0].n, 0);
+  if (role !== 'service_role') {
+    await assert.rejects(mutate(input, role), err => err.message.includes(message));
+    return;
+  }
+  const result = await mutate(input);
+  assert.equal(result.status, 'failed'); assert.equal(result.code, message);
+  const { rows } = await db.query('SELECT result_status,result_detail FROM platform_admin_audit_log WHERE request_id=$1', [input.request]);
+  assert.equal(rows.length, 1); assert.equal(rows[0].result_status, 'failed');
+  assert.equal(rows[0].result_detail.errorCode, message);
 }
 async function subscription(id) { return (await db.query('SELECT to_jsonb(s) AS data FROM organization_subscriptions s WHERE organization_id=$1', [id])).rows[0]?.data; }
 const future = '2099-01-01T00:00:00Z';
@@ -92,6 +108,7 @@ try {
   `);
   await db.query('INSERT INTO auth.users(id) VALUES ($1)', [actor]);
   await db.transaction(tx => tx.exec(migration));
+  await db.transaction(tx => tx.exec(trialDates));
   await test('migration is invoker, contacts have RLS and zero tenant policies', async () => {
     const { rows } = await db.query(`SELECT p.prosecdef FROM pg_proc p WHERE p.proname='platform_admin_manage_organization'`);
     assert.equal(rows[0].prosecdef, false);
@@ -126,6 +143,14 @@ try {
     const audit = (await db.query('SELECT previous_state FROM platform_admin_audit_log WHERE request_id=$1', [input.request])).rows[0].previous_state;
     assert.equal(audit.billingAmountArs, 30000); assert.equal(audit.billingPriceVersion, 1); assert.equal(audit.billingPlanCode, 'basico');
   });
+  await test('manual courtesy expiry can be shortened without touching catalog or charging', async () => {
+    const id = await seed({ provider: 'manual', status: 'active', current_plan_code: 'basico',
+      effective_plan_code: 'basico', current_period_end: '2100-01-01T00:00:00Z' });
+    await mutate(await command(id, 'assign_manual_plan', { planCode: 'basico', endsAt: future }));
+    const sub = await subscription(id); assert(sub.current_period_end.startsWith('2099-01-01'));
+    assert.equal(sub.provider, 'manual'); assert.equal(sub.current_plan_code, 'basico');
+    assert.equal((await db.query('SELECT count(*)::integer n FROM subscription_payments')).rows[0].n, 0);
+  });
   await test('same request is a no-op replay despite old CAS; changed payload/key is refused', async () => {
     const id = await seed(); const input = await command(id, 'assign_manual_plan', { planCode: 'basico', endsAt: null });
     assert.equal((await mutate(input)).replayed, false); const original = await subscription(id);
@@ -147,6 +172,51 @@ try {
   await test('unmirrored trial accepts extension but keeps nullable periods nullable', async () => {
     const id = await seed({ ...trial, current_period_start: null, current_period_end: null });
     await mutate(await command(id, 'extend_trial', { endsAt: future })); assert.equal((await subscription(id)).current_period_end, null);
+  });
+  await test('trial date can shorten, extend, expire immediately and reactivate without billing', async () => {
+    const id = await seed({ ...trial, status: 'trialing', trial_ends_at: future, current_period_end: future });
+    const shorter = await command(id, 'set_trial_end', { endsAt: '2098-01-01T00:00:00Z' });
+    await mutate(shorter);
+    let sub = await subscription(id);
+    assert(sub.trial_ends_at.startsWith('2098-01-01')); assert.equal(sub.current_period_end, sub.trial_ends_at);
+    assert.equal(sub.current_plan_code, null); assert.equal(sub.provider, 'mercadopago');
+    const endNow = await command(id, 'set_trial_end', { endsAt: '2026-10-01T00:00:00Z' });
+    await mutate(endNow); sub = await subscription(id);
+    assert.equal(sub.status, 'expired'); assert(sub.trial_ends_at.startsWith('2026-10-01'));
+    assert.equal(sub.current_period_end, sub.trial_ends_at);
+    assert((await db.query('SELECT plan_expires_at::text expiry FROM organizations WHERE id=$1', [id])).rows[0].expiry.startsWith('2026-10-01'));
+    await mutate(await command(id, 'set_trial_end', { endsAt: future }));
+    assert.equal((await subscription(id)).status, 'trialing');
+    const receipt = (await db.query('SELECT action,previous_state,next_state FROM platform_admin_audit_log WHERE request_id=$1', [endNow.request])).rows[0];
+    assert.equal(receipt.action, 'organization.trial_end_changed');
+    assert.equal(receipt.previous_state.status, 'trialing'); assert.equal(receipt.next_state.status, 'expired');
+    assert.equal((await db.query('SELECT count(*)::integer n FROM subscription_payments')).rows[0].n, 0);
+  });
+  await test('failed request is terminal and idempotent; a changed payload needs a new key', async () => {
+    const id = await seed({ ...trial, trial_ends_at: future, current_period_end: future });
+    const input = await command(id, 'extend_trial', { endsAt: '2098-01-01T00:00:00Z' });
+    const original = await subscription(id);
+    await failure(input, 'TRIAL_EXTENSION_NOT_ALLOWED');
+    const result = await mutate(input);
+    assert.equal(result.status, 'failed'); assert.equal(result.replayed, true);
+    assert.deepEqual(await subscription(id), original);
+    assert.equal((await db.query('SELECT count(*)::integer n FROM platform_admin_audit_log WHERE request_id=$1', [input.request])).rows[0].n, 1);
+    await assert.rejects(mutate({ ...input, changes: { endsAt: '2100-01-01T00:00:00Z' } }), err => err.code === 'PT409');
+    const source = (await db.query("SELECT prosrc FROM pg_proc WHERE proname='platform_admin_manage_organization'")).rows[0].prosrc;
+    assert(!source.includes("ERRCODE = '40001'"));
+  });
+  await test('new date action rejects unchanged dates, paid access and provider references', async () => {
+    for (const overrides of [{ current_plan_code: 'basico' }, { status: 'active', provider: 'manual' }]) {
+      const id = await seed({ ...trial, ...overrides });
+      await failure(await command(id, 'set_trial_end', { endsAt: future }), 'TRIAL_CHANGE_NOT_ALLOWED');
+    }
+    const id = await seed({ ...trial, trial_ends_at: future, current_period_end: future });
+    await failure(await command(id, 'set_trial_end', { endsAt: future }), 'TRIAL_CHANGE_NOT_ALLOWED');
+    const linked = await seed({ ...trial, mercadopago_preapproval_id: 'synthetic-provider' });
+    await failure(await command(linked, 'set_trial_end', { endsAt: '2026-10-01T00:00:00Z' }), 'PROVIDER_RECONCILIATION_REQUIRED');
+    const paid = await seed({ ...trial });
+    await db.query("INSERT INTO subscription_payments(organization_id,status,amount_ars) VALUES ($1,'approved',1)", [paid]);
+    await failure(await command(paid, 'set_trial_end', { endsAt: future }), 'TRIAL_CHANGE_NOT_ALLOWED');
   });
   await test('trial cannot shorten or replace paid/manual access or an approved payment', async () => {
     for (const overrides of [{ status: 'active' }, { current_plan_code: 'basico' }, { last_payment_at: '2026-01-02T00:00:00Z' }, { current_period_end: future }]) {
@@ -171,10 +241,13 @@ try {
       await failure(await command(id, 'assign_manual_plan', { planCode: 'basico', endsAt: null }), 'OPERATION_IN_PROGRESS');
     }
   });
-  await test('strict SQL rejects extra keys, invalid contact, missing dates and infinity', async () => {
+  await test('strict SQL rejects invalid input, missing organizations and unavailable plans with HTTP 400/404/409', async () => {
     const id = await seed();
     for (const changes of [{ name: 'Fixture', phone: null, address: null, contactEmail: 'invalid' }, { name: 'Fixture', phone: null, address: null, contactEmail: null, slug: 'new' }]) await failure(await command(id, 'update_details', changes), 'INVALID_INPUT');
     for (const changes of [{ planCode: 'basico' }, { planCode: 'basico', endsAt: 'infinity' }, { planCode: 'basico', endsAt: 'bad-date' }]) await failure(await command(id, 'assign_manual_plan', changes), 'INVALID_INPUT');
+    await failure(await command(id, 'assign_manual_plan', { planCode: 'unavailable', endsAt: null }), 'PLAN_NOT_AVAILABLE');
+    await failure({ id: randomUUID(), action: 'update_details', changes: { name: 'Fixture', phone: null,
+      address: null, contactEmail: null }, revision: { org: null, sub: null }, request: randomUUID(), actor }, 'ORGANIZATION_NOT_FOUND');
   });
   await test('audit failure rolls back organization and private contact together', async () => {
     const id = await seed(); const input = await command(id, 'update_details', { name: 'Must rollback', phone: null, address: null, contactEmail: 'fixture@example.com' });

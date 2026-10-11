@@ -80,6 +80,7 @@ export default function AdminAuditPage() {
                   <SelectItem value="organization.details_updated">Datos y contacto</SelectItem>
                   <SelectItem value="organization.manual_plan_assigned">Acceso manual</SelectItem>
                   <SelectItem value="organization.trial_extended">Trial extendido</SelectItem>
+                  <SelectItem value="organization.trial_end_changed">Vencimiento de trial</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={resultFilter} onValueChange={setResultFilter}>
@@ -150,6 +151,7 @@ function actionLabel(action: string) {
     'organization.details_updated': 'Datos y contacto',
     'organization.manual_plan_assigned': 'Acceso manual',
     'organization.trial_extended': 'Trial extendido',
+    'organization.trial_end_changed': 'Vencimiento de trial',
   };
   return labels[action] ?? action;
 }

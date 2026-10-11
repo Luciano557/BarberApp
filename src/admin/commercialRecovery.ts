@@ -7,7 +7,7 @@ const key = (actor: string, organization: string) => `vittro:admin-commercial:${
 export function readCommercialRecovery(actor: string, organization: string): PendingCommercialOperation | null {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(key(actor, organization)) ?? 'null');
-    return parsed && uuid.test(parsed.requestId) && ['update_details', 'assign_manual_plan', 'extend_trial'].includes(parsed.action) ? parsed : null;
+    return parsed && uuid.test(parsed.requestId) && ['update_details', 'assign_manual_plan', 'extend_trial', 'set_trial_end'].includes(parsed.action) ? parsed : null;
   } catch { return null; }
 }
 export function rememberCommercialOperation(actor: string, organization: string, operation: PendingCommercialOperation) {
