@@ -125,6 +125,9 @@ Pago. Su migración ya está aplicada en producción con autorización puntual;
 la API/frontend comerciales están desplegados, con escrituras comerciales
 habilitadas por autorización nueva y edición de contacto real verificada.
 Acceso manual/trial conservan guardas y auditoría; no modifican contratos MP.
+Ampliación de vencimientos publicada y habilitada (2026-10-11):
+extender, acortar o vencer un trial elegible con una fecha pasada,
+motivo, reautenticación y auditoría. No cancela un contrato de Mercado Pago.
 Suspensión efectiva,
 usuarios, roles y edición de límites/catálogo quedan fuera de este rollout.
 

@@ -5,6 +5,21 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Fechas de trial y rechazos no reintentables — 2026-10-11
+
+El usuario aprobó acortar/extender trials y confirmó vencimiento inmediato.
+Se agrega una acción explícita; extend_trial conserva su contrato anterior.
+Acortar no cancela Mercado Pago y exige revisar la pérdida de acceso.
+Tras el incidente 40001, conflictos de negocio usan PT409 y recibos fallidos
+atómicos, manteniendo el advisory lock fuera del savepoint. Se puede recuperar
+un fallo confirmado sin asumir que not_found significa fracaso ni reenviar
+una escritura incierta. El usuario autorizó la excepción DB exacta y la
+reconciliación de un solo request: migration INVOKER en BEGIN/COMMIT y recibo
+fallido separado, sin cambiar datos comerciales. Publicación verificada y
+switch restaurado. response.status mantiene el rechazo HTTP durante despliegues
+mixtos sin revertir el recibo. No se ejecutó un vencimiento real como prueba.
+Evidencia: ADMIN_TRIAL_FECHAS_RECUPERACION.md.
+
 ## Habilitación comercial sin sustituir una prueba de compra — 2026-10-10
 
 El usuario autorizó habilitar la gestión comercial, confirmó Básico ARS 1 y

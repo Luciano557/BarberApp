@@ -167,6 +167,23 @@ permanecen pendientes; no se modificaron funciones `SECURITY DEFINER` existentes
 La discrepancia entre URL global de webhooks y handler específico sigue abierta:
 no se cambió configuración ni se validó entrega real de eventos firmados.
 
+**Admin — vencimientos y recuperación (2026-10-11): publicado y habilitado.**
+Incidente diagnosticado por SQL/logs: acortamiento rechazado con 40001,
+reintentos PostgREST y POST 500, sin cambio guardado. Nueva acción permite
+acortar/extender/vencer un trial elegible, con confirmación contextual.
+Rechazos conocidos dejan recibos failed recuperables; not_found sigue incierto.
+Migración INVOKER `20261011090000_platform_admin_trial_dates.sql` aplicada
+con excepción directa autorizada a las 04:47 Argentina, una transacción y sin
+otras migraciones. Query v8/organization v5 ACTIVE con JWT; frontend a2d301da
+Ready / Production / Current. Recibo antiguo reconciliado como fallido, consulta
+autenticada quitó el bloqueo sin reenviar. Switch comercial restaurado a true
+a las 04:53 Argentina. 106 Vitest, 24 Deno y 18 SQL locales aprobados; build/lint
+focal correctos y cinco errores TS globales previos conservados.
+Trial real hasta 25/10 y Básico ARS 1/v3 conservados. Vencer ahora se preparó
+y canceló en el dominio real, no se guardó. Sin nueva mutación de fechas,
+prueba HTTP real de rechazo RPC ni concurrencia multi-conexión.
+Detalle: `docs/ADMIN_TRIAL_FECHAS_RECUPERACION.md`.
+
 ## Sistema de diseño — Operate
 
 **C7.10 — Navegación horizontal accesible con chevrons ✅ técnicamente cerrado — 2026-09-28.**

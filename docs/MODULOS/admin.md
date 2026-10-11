@@ -2,6 +2,15 @@
 
 ## Estado de rollout
 
+**Corrección publicada y habilitada — 2026-10-11:** set_trial_end permite
+extender/acortar/vencer un trial elegible con confirmación de pérdida de acceso.
+Rechazos conocidos dejan recibos failed y permiten recuperar el formulario
+sin reenviar; not_found sigue incierto. Migración INVOKER aplicada con excepción
+puntual autorizada, query v8/organization v5 ACTIVE con JWT, frontend a2d301da
+Ready en Vercel. Request del incidente reconciliado como fallido y marcador
+recuperado con sesión real; no se cambiaron fechas reales o precios.
+[Incidente y evidencia](../ADMIN_TRIAL_FECHAS_RECUPERACION.md).
+
 **Desplegado en producción y con mutaciones de precio habilitadas desde el
 2026-09-08.** La migración, la cuenta técnica, el frontend y las Edge Functions
 están aplicados en el entorno productivo. Se verificaron el acceso autenticado,

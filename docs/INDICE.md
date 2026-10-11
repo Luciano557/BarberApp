@@ -32,6 +32,11 @@ Evidencia: `docs/ADMIN_COMERCIAL_MIGRACION_PRODUCCION.md` y
 habilitación/contacto completados; pruebas ampliadas de concurrencia,
 recuperación, acceso manual/trial y convivencia real siguen pendientes.
 
+Corrección de vencimientos/rechazos del 2026-10-11, publicada y habilitada:
+[ADMIN_TRIAL_FECHAS_RECUPERACION.md](ADMIN_TRIAL_FECHAS_RECUPERACION.md).
+Incluye excepción de migración, recibo puntual autorizado y recuperación
+autenticada; complementa la evidencia del rollout anterior, sin cambiar el trial.
+
 ## Historial — no es instrucción vigente
 
 Documentación de contexto o de auditorías superadas. Útil para entender
