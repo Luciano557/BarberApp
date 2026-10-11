@@ -18,6 +18,7 @@ archivo activo y cualquier otro documento, el activo gana.
 | `docs/DECISIONES.md` | Contexto y razones históricas de decisiones todavía vigentes — no repite la especificación normativa, que vive en `DESIGN.md` |
 | `docs/ESTADO_ACTUAL.md` | Foto del estado funcional/técnico de cada módulo grande de la app |
 | `docs/MODULOS/` | Un archivo por módulo, con detalle de su funcionamiento actual |
+| `docs/FLUJO_PUBLICACION.md` | Publicación de código: original primero, sincronización del fork después y verificación de Vercel |
 
 Plan aprobado: `docs/PLAN_ADMIN_GESTION_COMERCIAL.md` — gestión por barbería y
 contacto; backend, ficha e integración validados localmente, migración aplicada

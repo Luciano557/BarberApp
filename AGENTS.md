@@ -51,6 +51,19 @@ de aplicar — no es una decisión que se tome sola.
 DB/RLS van por Lovable. Excepciones puntuales requieren autorización
 explícita y quedan documentadas como tales cuando ocurren.
 
+## Publicación de código — original primero, fork después
+
+- Repositorio principal (`origin`): `tellosebastian-git/pixel-perfect-replica`.
+  Los cambios se suben primero aquí.
+- Fork existente (`production`): `Luciano557/BarberApp`. Solo después de
+  actualizar el original se sincroniza este fork; no se crea otro repositorio.
+- Vercel publica `main` de `BarberApp`. No publicar directamente al fork
+  saltándose el original. Verificar los SHA remotos tras cada paso.
+- No usar force push ni reemplazar cambios ajenos para igualar repositorios.
+  Ante divergencia, revisar y resolver antes de continuar.
+- La sincronización Git no autoriza migraciones ni otros cambios de producción.
+  Ver `docs/FLUJO_PUBLICACION.md`.
+
 ## Proceso de trabajo
 
 Todo cambio sigue: idea → auditoría (solo lectura, sin proponer cambios) →

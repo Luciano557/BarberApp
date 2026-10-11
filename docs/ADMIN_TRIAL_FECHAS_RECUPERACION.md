@@ -143,6 +143,11 @@ vacía final de git diff --check al incorporarla; sin efecto SQL y sin reeditarl
 
 ## Procedimiento aplicado / recuperación ante incidentes
 
+**Orden Git vigente:** el usuario corrigió el flujo después de este despliegue:
+primero origin/pixel-perfect-replica y luego el fork production/BarberApp.
+La publicación directa al fork registrada arriba es evidencia histórica, no
+el procedimiento futuro. Ver [FLUJO_PUBLICACION.md](FLUJO_PUBLICACION.md).
+
 1. Revisar diff/hash y estado productivo; mantener alcance exacto. Tras autoridad
    de publicación, apagar temporalmente PLATFORM_ADMIN_ORG_MUTATIONS_ENABLED
    durante el despliegue para dejar el panel comercial en lectura. No apagar
@@ -151,8 +156,10 @@ vacía final de git diff --check al incorporarla; sin efecto SQL y sin reeditarl
    sin mutar una barbería.
 3. Publicar platform-admin-organization y platform-admin-query, JWT obligatorio.
    No publicar checkout/precios/webhooks.
-4. Publicar frontend por remoto de producción BarberApp; no traer merge roto
-   del otro remoto. Mantener Básico ARS 1 y trial real.
+4. Publicar primero en el original pixel-perfect-replica y verificar su SHA;
+   luego sincronizar el fork BarberApp y verificar Vercel. Resolver divergencias
+   antes de publicar, sin traer un merge defectuoso a ciegas. Mantener Básico
+   ARS 1 y trial real.
 5. Reconciliar request viejo solo con autorización/evidencia renovada.
 6. QA autenticado de lectura/status/historial y restaurar el switch comercial
    solo tras verificar las versiones desplegadas. Una prueba real de vencimiento

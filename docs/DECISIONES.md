@@ -5,6 +5,16 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Repositorio principal antes del fork productivo — 2026-10-11
+
+El usuario estableció pixel-perfect-replica como origen de los cambios y
+BarberApp como fork de distribución, en ese orden. GitHub confirmó esa relación.
+La recuperación previa se había publicado directamente al fork y dejó cinco
+commits fuera del original. Se corrige por avance normal, conservando la
+recuperación y el historial; no se reescribe ni se recrea el fork. Vercel sigue
+consumiendo main de BarberApp. Un push no autoriza operaciones de base de datos.
+Regla activa: AGENTS.md y FLUJO_PUBLICACION.md.
+
 ## Fechas de trial y rechazos no reintentables — 2026-10-11
 
 El usuario aprobó acortar/extender trials y confirmó vencimiento inmediato.
