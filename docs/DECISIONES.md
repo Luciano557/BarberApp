@@ -5,6 +5,62 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Notificaciones: la entrega es la fuente de verdad — 2026-10-12
+
+La campana ya leía solo `notification_deliveries`, pero la base permitía a
+cualquier miembro de la organización leer, crear y reescribir `notifications`,
+y los helpers `_notif_*` eran ejecutables por `anon` (inyección entre
+organizaciones, lectura de emails). La protección estaba solo en pantalla. Se
+decidió que **leer un evento exige una entrega propia**: los destinatarios ya se
+calculan al emitir por cargo, sucursal y preferencia, así que la entrega es la
+representación exacta de “esto te corresponde”. No se creó el concepto de
+notificación “visible para toda la organización”; un aviso institucional se reparte
+con entregas explícitas.
+
+- **Historial preservado (D1).** Perder un cargo o una sucursal no borra lo recibido
+  legítimamente ni se revoca retroactivamente: eso exigiría duplicar en SQL las reglas
+  por categoría del catálogo del frontend. Las emisiones nuevas usan los permisos
+  vigentes; salir de la organización sí corta el acceso por el control de organización.
+- **`DROP` de `upsert_notification` y `upsert_notification_delivery`.** Sin
+  consumidores en `src/` ni `supabase/functions/`, Vittro no está lanzado y ambas
+  permitían fabricar/sobrescribir avisos y autosuscribirse a cualquiera de la
+  organización. Reduce superficie; se pueden reconstruir desde las migraciones históricas.
+- **`REVOKE` explícito y por firma, no global.** Los helpers `_notif_*` pierden
+  `EXECUTE` incluso para `service_role` (nada del backend los llama). Los helpers de
+  RLS (`has_role`, `get_user_organization_id`…) no se tocan: revocar `authenticated`
+  rompería cientos de políticas. Tampoco se usó `ALTER DEFAULT PRIVILEGES` global,
+  que rompería funciones futuras legítimas; en su lugar, una prueba de catálogo.
+- **Inmutabilidad de entregas por trigger `SECURITY INVOKER`**, no por privilegios
+  de columna, que Supabase documenta como avanzados y que rompen `select *`.
+- **`notif_emit_view_event` sigue `SECURITY DEFINER`** (escribe tablas cerradas al
+  cliente): `search_path = ''`, valida usuario, organización y que la sucursal sea la
+  de la cuenta que llama, y solo `authenticated` la ejecuta. Es la única función
+  privilegiada de notificaciones que queda expuesta; AGENTS.md exige reportar cada
+  `SECURITY DEFINER` nuevo o reescrito y este se reportó antes de construir.
+- **Zona horaria (SEG-05): solo la ruta de escritura.** Un trigger rechaza nombres no
+  IANA al insertar/actualizar `organizations.timezone` (acepta `NULL`). No limpia datos
+  existentes ni cambia los cron, y no dispara en actualizaciones que no mencionan la
+  columna, para no bloquear organizaciones con un valor histórico malo. Aislar fallos
+  por organización dentro de los cron y limpiar datos queda para la Etapa 2.
+- **Las migraciones se protegen a sí mismas:** abortan si hay dueños distintos entre
+  helpers y llamadores, funciones `SECURITY INVOKER` que llamen a los helpers, jobs de
+  pg_cron que perderían `EXECUTE`, o políticas inesperadas que anularían el modelo.
+
+Detalle del modelo, productores y cómo agregar eventos: `docs/MODULOS/notificaciones.md`.
+
+## Excepción directa acotada para la Etapa 1 de seguridad de Notificaciones — 2026-10-12
+
+AGENTS.md establece que la base de datos y RLS van por Lovable y que las excepciones
+requieren autorización explícita. El usuario autorizó ejecutar **solo este build** con
+Claude Code: `20261012100000_notifications_security_functions.sql`,
+`20261012100100_notifications_security_rls.sql`,
+`20261012100200_organizations_timezone_validation.sql`, la prueba
+`supabase/tests/notifications-security-sql.mjs`, el ajuste de tipos generados y la
+documentación asociada. La excepción **no cambia la regla general** de AGENTS.md, no
+cubre otras migraciones ni la Etapa 2, y no autoriza aplicar las migraciones en ningún
+proyecto Supabase: este build las validó únicamente contra PostgreSQL local sintético.
+Un `push` de Git tampoco las aplica (ver `docs/FLUJO_PUBLICACION.md`).
+
 ## Repositorio principal antes del fork productivo — 2026-10-11
 
 El usuario estableció pixel-perfect-replica como origen de los cambios y

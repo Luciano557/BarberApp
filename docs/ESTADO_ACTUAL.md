@@ -1,6 +1,43 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-10-10
+Última actualización: 2026-10-12
+
+## Notificaciones — Etapa 1 de seguridad
+
+**Implementada y validada localmente — 2026-10-12. No aplicada a ningún proyecto
+Supabase.** Excepción de DB/RLS vía Claude Code autorizada solo para este build
+(`docs/DECISIONES.md`). Tres migraciones nuevas, sin editar históricas:
+`20261012100000_notifications_security_functions.sql` (M1),
+`20261012100100_notifications_security_rls.sql` (M2),
+`20261012100200_organizations_timezone_validation.sql` (M3). Sin cambios de UI ni de
+frontend: la campana ya leía solo entregas propias.
+
+Resuelto en código: **SEG-01** (cualquier miembro leía, creaba y reescribía `notifications`: ahora
+solo lee con una entrega propia, sin escritura de clientes); **SEG-01b** (una entrega
+podía reapuntarse a otra notificación: ahora solo `read_at`/`hidden_at` son mutables);
+**SEG-02** (helpers `_notif_*` ejecutables por `anon`: inyección entre organizaciones,
+lectura de emails, enumeración de admins; ahora sin `EXECUTE` para ningún cliente);
+**SEG-03/04** (`upsert_notification_delivery` y `upsert_notification` eliminadas);
+**SEG-05, solo la ruta de escritura** (`organizations.timezone` rechaza valores no IANA);
+**SEG-06** (`process_vencimientos_tareas` sin `EXECUTE` para `anon`/`authenticated`).
+`notif_emit_view_event` ahora valida que la sucursal sea la de la cuenta que llama.
+Historial preservado (D1): perder cargo o sucursal no revoca lo ya entregado.
+
+Evidencia: `supabase/tests/notifications-security-sql.mjs`, **44 pruebas** sobre
+PostgreSQL local sintético con el esquema real de HEAD: reproduce las vulnerabilidades,
+aplica M1–M3, comprueba que quedan cerradas y que los **22 escenarios de productores**
+(triggers, cron y RPC) emiten exactamente las mismas entregas que antes; las migraciones
+abortan ante dueños distintos, llamadores `SECURITY INVOKER`, jobs de cron sin acceso o
+políticas inesperadas; verificado por mutación. Vitest 106/21 archivos, `tsc` raíz exit 0,
+`tsc -p tsconfig.app.json` con los mismos 5 errores preexistentes (`abortSignal`,
+`readRetry.test`), ESLint 378 errores + 54 warnings sin cambios por archivo, build OK.
+
+**Pendiente (no resuelto):** aplicar M1–M3 en Supabase; regenerar
+`src/integrations/supabase/types.ts` (se retiraron a mano las dos RPC eliminadas porque
+no había base para `supabase gen types`); QA manual autenticado con usuarios sintéticos de
+dos organizaciones. Fuera de esta etapa y sigue abierto: RLS de Finanzas, helpers
+generales de RLS, aislamiento de fallos por organización en cron y limpieza de zonas
+horarias históricas, recurrencias y fechas, push. Detalle: `docs/MODULOS/notificaciones.md`.
 
 ## Finanzas — modo ficticio
 
@@ -1070,7 +1107,10 @@ Estadísticas, Finanzas) que no se trasladaron todavía a este formato.
 
 - 187 issues del linter de seguridad de Supabase (RLS gaps, SECURITY DEFINER
   views, funciones con search_path mutable) — pendiente de sesión de auditoría
-  dedicada.
+  dedicada. La Etapa 1 de Notificaciones (2026-10-12) cierra en el repo las
+  funciones `_notif_*`, `notif_*` y `upsert_notification*` y las tablas de
+  notificaciones, pero no se midió el efecto sobre ese conteo porque no está
+  aplicada en Supabase; el resto de las funciones y vistas sigue pendiente.
 - Bug de notificaciones leídas que reaparecen (hipótesis: `notification_reads`
   legacy huérfano al cambiar `notifications.type`) — sin fix.
 - Bug post-login intermitente — corrección de cliente implementada y validada

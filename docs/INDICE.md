@@ -60,13 +60,13 @@ la dejó obsoleta.
 - [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
 - [x] `acceso-tenant.md` — Restauración de sesión, carga del contexto tenant y recuperación de fallos
 - [x] `turnos-agenda.md` — Configuración de reservas, Portal público, Horarios de trabajo
+- [x] `notificaciones.md` — Modelo evento/entrega, autorización, productores, permisos de funciones y cómo agregar eventos (Etapa 1 de seguridad, aplicada solo en repo)
 - [ ] Cobrar
 - [x] Finanzas — `finanzas.md` (modo ficticio implementado, uso, límites y validación; no implica auditoría completa del módulo)
 - [ ] Mi Negocio (general)
 - [ ] Clientes
 - [ ] Estadísticas
 - [ ] Tareas
-- [ ] Notificaciones
 
 Los módulos sin marcar no tienen documentación propia todavía — no auditados
 a fondo. No asumir que están al día con el canon de diseño solo porque no
