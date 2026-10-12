@@ -141,7 +141,7 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
         )}
 
         <SegmentedControl
-          ariaLabel="Estado de recurrencias"
+          ariaLabel="Estado de las tareas automáticas"
           className="sm:ml-auto sm:max-w-xs"
           options={[
             { value: 'active', label: 'Activas', count: activas.length },
@@ -153,21 +153,21 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
       </div>
 
       {activeSubTab === 'active' ? (
-        <div role="tabpanel" aria-label="Recurrencias activas" className="mt-4">
+        <div role="tabpanel" aria-label="Tareas automáticas activas" className="mt-4">
           {renderList(
             activas,
-            'No hay recurrencias activas',
+            'No hay tareas automáticas activas',
             canManageTareas
-              ? 'Creá una recurrencia para generar tareas automáticamente.'
-              : 'Cuando se creen recurrencias, vas a poder verlas y gestionarlas acá.',
+              ? 'Para crear una, usá "Nueva tarea" y elegí una repetición: la tarea se genera sola en cada fecha.'
+              : 'Cuando se creen tareas automáticas, vas a poder verlas acá.',
           )}
         </div>
       ) : (
-        <div role="tabpanel" aria-label="Recurrencias pausadas" className="mt-4">
+        <div role="tabpanel" aria-label="Tareas automáticas pausadas" className="mt-4">
           {renderList(
             pausadas,
-            'No hay recurrencias pausadas',
-            'Las recurrencias pausadas dejan de generar tareas hasta que las reactives.',
+            'No hay tareas automáticas pausadas',
+            'Las tareas automáticas pausadas dejan de generar tareas hasta que se reanuden.',
           )}
         </div>
       )}
@@ -186,8 +186,8 @@ export function RecurrentesPanel({ barbers, onClose }: Props) {
         open={!!confirmDelete}
         onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}
         onConfirm={confirmDeleteAction}
-        title="Eliminar recurrencia"
-        description="Se eliminará la recurrencia y todas las tareas futuras pendientes asociadas. Las tareas ya generadas en el pasado no se tocan. Esta acción no se puede deshacer."
+        title="Eliminar tarea automática"
+        description="Se eliminará la tarea automática y todas las tareas futuras pendientes asociadas. Las tareas ya generadas en el pasado no se tocan. Esta acción no se puede deshacer."
       />
     </div>
   );

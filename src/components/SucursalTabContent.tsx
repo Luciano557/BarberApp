@@ -25,6 +25,8 @@ import { Barber, Service, Extra, Discount, Line } from '@/types/barbershop';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EquipoSucursalPanel } from './config/EquipoSucursalPanel';
+import { TareasAutomaticasPausaAviso } from './tareas/TareasAutomaticasPausaAviso';
+import { contarTareasAutomaticasActivas } from '@/lib/tareasAutomaticas';
 import { HorariosAtencionCard } from './config/horarios/HorariosAtencionCard';
 import { CobrarConfig } from './config/CobrarConfig';
 import { DiscountsConfig } from './config/DiscountsConfig';
@@ -117,6 +119,8 @@ export function SucursalTabContent({
   const [isTogglingActive, setIsTogglingActive] = useState(false);
   const [fechaDesactivacion, setFechaDesactivacion] = useState<string | null>(null);
   const [futureTurnosCount, setFutureTurnosCount] = useState<number | null>(null);
+  // Tareas automáticas activas de esta sucursal que se pausarán al desactivarla (undefined = consultando, null = no se pudo).
+  const [tareasAutoCount, setTareasAutoCount] = useState<number | null | undefined>(undefined);
   const [showToggleDialog, setShowToggleDialog] = useState(false);
 
   useEffect(() => {
@@ -173,7 +177,11 @@ export function SucursalTabContent({
 
   const openToggleDialog = async () => {
     setFutureTurnosCount(null);
+    setTareasAutoCount(undefined);
     setShowToggleDialog(true);
+    if (sucursal.activa && organization?.id) {
+      void contarTareasAutomaticasActivas({ organizationId: organization.id, sucursalId: sucursal.id }).then(setTareasAutoCount);
+    }
     if (sucursal.activa) {
       const today = new Date().toISOString().slice(0, 10);
       const { count } = await supabase
@@ -400,6 +408,8 @@ export function SucursalTabContent({
               </p>
             </div>
           )}
+
+          {!isInactive && <TareasAutomaticasPausaAviso tipo="sucursal" cantidad={tareasAutoCount} size="md" />}
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isTogglingActive}>Cancelar</AlertDialogCancel>

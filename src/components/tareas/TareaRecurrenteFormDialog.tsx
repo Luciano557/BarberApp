@@ -193,7 +193,7 @@ export function TareaRecurrenteFormDialog({
       ? getCustomRepeatLabel(repeatFrequency, repeatInterval, repeatByweekday)
       : getRepeatLabel(repeatPreset);
 
-  const headerTitle = isEdit ? 'Editar recurrencia' : 'Nueva recurrencia';
+  const headerTitle = isEdit ? 'Editar tarea automática' : 'Nueva tarea automática';
   const headerSubtitle = 'Definí qué hay que hacer, quién lo hace y cada cuánto se repite.';
 
   return (
@@ -280,7 +280,7 @@ export function TareaRecurrenteFormDialog({
             <div className="rounded-lg border border-border p-3 space-y-3">
               <div className="space-y-0.5">
                 <p className="text-sm font-medium">Fecha de inicio</p>
-                <p className="text-xs text-muted-foreground">Desde cuándo empieza a generarse esta recurrencia.</p>
+                <p className="text-xs text-muted-foreground">Desde cuándo empieza a generarse esta tarea automática.</p>
               </div>
               <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
@@ -346,7 +346,7 @@ export function TareaRecurrenteFormDialog({
           <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button onClick={handleConfirm} disabled={!isValid || isPending}>
-              {isEdit ? 'Guardar cambios' : 'Crear recurrencia'}
+              {isEdit ? 'Guardar cambios' : 'Crear tarea automática'}
             </Button>
           </div>
         </SheetContent>

@@ -26,6 +26,8 @@ import { StaffPinDialog } from '@/components/StaffPinDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { BarberSucursalesGeneralSection } from './BarberSucursalesGeneralSection';
+import { TareasAutomaticasPausaAviso } from '@/components/tareas/TareasAutomaticasPausaAviso';
+import { contarTareasAutomaticasActivas } from '@/lib/tareasAutomaticas';
 import { DrawerForm } from '@/components/ui/drawer-form';
 
 // --- Role utilities ---
@@ -272,6 +274,8 @@ export function EquipoUnificado({
     barber: Barber;
     motivo: string;
     futureTurnos: number | null;
+    /** Tareas automáticas activas asignadas a esta persona que se pausarán (null = no se pudo consultar). */
+    tareasAuto: number | null;
     loading: boolean;
     submitting: boolean;
   } | null>(null);
@@ -834,7 +838,9 @@ export function EquipoUnificado({
 
   // --- Finalizar actividad: abre dialog y consulta turnos futuros ---
   const openFinalizarDialog = async (barber: Barber) => {
-    setFinalizarTarget({ barber, motivo: '', futureTurnos: null, loading: true, submitting: false });
+    setFinalizarTarget({ barber, motivo: '', futureTurnos: null, tareasAuto: null, loading: true, submitting: false });
+    void contarTareasAutomaticasActivas({ organizationId, barberoId: barber.id }).then(tareasAuto =>
+      setFinalizarTarget(prev => prev && prev.barber.id === barber.id ? { ...prev, tareasAuto } : prev));
     try {
       const today = new Date().toISOString().slice(0, 10);
       const { count } = await supabase
@@ -1396,6 +1402,9 @@ export function EquipoUnificado({
                     </span>
                   </div>
                 ) : null}
+                {finalizarTarget && !finalizarTarget.loading && (
+                  <TareasAutomaticasPausaAviso tipo="barbero" cantidad={finalizarTarget.tareasAuto} />
+                )}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">Motivo (opcional)</label>
                   <Textarea

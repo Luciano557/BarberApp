@@ -11,6 +11,7 @@ import { getRepeatLabel } from './RepeatPicker';
 import { getCustomRepeatLabel } from './CustomRepeatSheet';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
 import type { TareaRecurrente } from '@/hooks/useTareasRecurrentes';
+import { describePausa } from '@/lib/tareasAutomaticas';
 
 interface Props {
   receta: TareaRecurrente;
@@ -35,6 +36,8 @@ export function RecurrenteCard({
 }: Props) {
   const requirePinForAction = useRequirePinForAction();
   const isTeam = receta.assignment_scope === 'team' || !receta.asignado_a;
+  // Si está pausada: por qué, y si se reanuda sola (pausa automática) o solo cuando alguien la reanude (manual).
+  const pausa = receta.activo ? null : describePausa(receta.pausa_motivo);
   const repeatLabel =
     receta.repeat_preset === 'custom'
       ? getCustomRepeatLabel(receta.repeat_frequency, receta.repeat_interval, receta.repeat_byweekday)
@@ -71,6 +74,13 @@ export function RecurrenteCard({
           <p className="text-xs text-muted-foreground line-clamp-2">{receta.descripcion}</p>
         )}
 
+        {pausa && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Pause className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span><span className="font-medium text-foreground">{pausa.label}.</span> {pausa.hint}</span>
+          </p>
+        )}
+
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground mt-auto">
           <span className="inline-flex items-center gap-1">
             {isTeam ? <Users className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
@@ -95,12 +105,13 @@ export function RecurrenteCard({
 
         {(canManage || canDelete) && (
           <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
-            {canManage && (
+            {/* Una pausa automática no se reanuda a mano: se reanuda sola cuando desaparece la causa. */}
+            {canManage && !pausa?.automatica && (
               <Button size="sm" variant="ghost" onClick={() => gated(() => onToggle(receta))}>
                 {receta.activo ? (
                   <><Pause className="h-4 w-4 mr-1" />Pausar</>
                 ) : (
-                  <><Play className="h-4 w-4 mr-1" />Activar</>
+                  <><Play className="h-4 w-4 mr-1" />Reanudar</>
                 )}
               </Button>
             )}

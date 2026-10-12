@@ -1,10 +1,16 @@
 # Notificaciones
 
-Estado: **Etapa 1 de seguridad implementada y validada localmente — 2026-10-12.**
-Las tres migraciones están en el repositorio y pasan 44 pruebas SQL sobre
-PostgreSQL local sintético (PGlite). **No se aplicaron a ningún proyecto Supabase
-desde este build**; aplicarlas, regenerar tipos y hacer el QA autenticado son
-pasos pendientes (ver “Pendiente”).
+Estado: **Etapa 1 de seguridad implementada, validada localmente y APLICADA en el proyecto
+Supabase operativo — 2026-10-12.** Las tres migraciones pasan 44 pruebas SQL sobre PostgreSQL
+local sintético (PGlite) y figuran en `list_migrations` (nombres `notifications_security_functions`,
+`notifications_security_rls`, `organizations_timezone_validation`; el conector les asignó las versiones
+`20261012145524`, `…145549` y `…145604`, distintas del prefijo de los archivos del repo). Los tipos de
+`src/integrations/supabase/types.ts` se regeneraron desde la base real el 2026-10-12 y no incluyen las dos
+RPC eliminadas. Falta el QA manual autenticado de la campana (ver “Pendiente”).
+
+**Etapa 2 (Tareas automáticas, 2026-10-12):** agrega el helper `_notif_barbero_users`, el evento
+`tarea_automatica_pausada` y corrige tres productores que trataban `barberos.id` como id de usuario.
+Ver la tabla de productores y `docs/MODULOS/tareas.md`.
 
 - **Ubicación en la app:** barra lateral → campana de Notificaciones → No leídas / Leídas.
 - **Archivos técnicos:** `src/components/notifications/NotificationsBell.tsx`,
@@ -65,6 +71,8 @@ organización, el control por organización le corta el acceso a sus avisos.
 | Gasto, cierre/anulación de caja, transacción anulada, cambio de acceso | Sí | Sí | No | No | No | No | No |
 | Tarea de equipo / vencida | Sí | Sí | No | Sí (de esa sucursal) | Sí (esa sucursal) | No | No |
 | Turno propio | — | — | — | Sí (el asignado) | — | No | No |
+| Tarea asignada a una persona (individual) | Sí | Sí (de esa sucursal) | No | Sí, **los usuarios de ese barbero** (`profiles.barbero_id`) | No | No | No |
+| Tarea automática pausada (sucursal o persona inactiva) | Sí | Sí (de esa sucursal) | No | No | No | No | No |
 
 ## Productores
 
@@ -72,15 +80,16 @@ Todos son `SECURITY DEFINER`, crean el evento y sus entregas, y dependen de los 
 
 | Ubicación funcional | Función / migración | Eventos |
 |---|---|---|
-| Tareas → crear tarea o petición | `trg_tareas_after_insert_notif` (`20260515220322`) | `tarea_asignada`, `tarea_equipo_asignada`, `peticion_nueva` |
+| Tareas → crear tarea o petición (también las que genera el motor) | `trg_tareas_after_insert_notif` (`20260515220322`; reescrita en E2-M3) | `tarea_asignada` (destinatario individual = usuarios del barbero vía `_notif_barbero_users`, antes se usaba `barberos.id`), `tarea_equipo_asignada`, `peticion_nueva` |
+| Tareas → Tareas automáticas (pausa por sucursal o persona inactiva) | `_tareas_auto_reconciliar` / `_tareas_auto_generar` → `_tareas_auto_notificar_pausa` (E2-M2) | `tarea_automatica_pausada` (a dueño, encargado general y encargados de la sucursal; **no** avisa la pérdida de asignación ni la disponibilidad diaria; ese caso solo tiene aviso previo en la acción) |
 | Tareas → aprobar / rechazar petición | `trg_tareas_after_update_notif` (`20260515220322`) | `peticion_aprobada`, `peticion_rechazada` |
-| Tareas (cron horario) | `process_vencimientos_tareas()` (`20260602052143`) | `tarea_vencida`, `peticion_vencida` |
+| Tareas (cron horario) | `process_vencimientos_tareas()` (`20260602052143`; reescrita en E2-M3: aislamiento por fila, usuarios del barbero, y una tarea `en_progreso` también vence con `vencida_at`) | `tarea_vencida`, `peticion_vencida` |
 | Turnos → crear, reprogramar, cancelar | `trg_turnos_after_*_notif` → `_notif_turno_dispatch` (`20260515220322`) | `turno_*` (propio / compañero / gestión) |
 | Caja → cierre, anulación de cierre, transacción anulada | `trg_ingresos_*`, `trg_anulaciones_cierre_*`, `trg_venta_*` (`20260515222233`) | `cierre_caja_*`, `anulacion_cierre`, `transaccion_anulada` |
 | Finanzas → Gastos | `trg_egresos_after_*_notif` (`20260515222233`) | `gasto_registrado`, `gasto_editado`, `gasto_anulado` |
 | Finanzas → Sueldos / Inversiones / Deudas | `trg_pagos_sueldos_*`, `trg_inversiones_*`, `trg_deudas_*` (`20260515222233`) | `pago_sueldo_registrado`, `inversion_creada`, `deuda_creada` |
 | Configuración → cargos, accesos, PIN | `trg_user_roles_*`, `trg_user_sucursales_*`, `trg_pin_config_*` (`20260515222233`) | `cambio_roles`, `cambio_permisos`, `cambio_configuracion_critica` |
-| Equipo → barbero deshabilitado en sucursal | `trg_barberos_sucursales_after_disponible_off_notif` (`20260608120225`) | `barbero_removido_sucursal` |
+| Equipo → barbero deshabilitado en sucursal | `trg_barberos_sucursales_after_disponible_off_notif` (`20260608120225`; reescrita en E2-M3: excluye a los **usuarios** del barbero, antes comparaba contra `barberos.id`) | `barbero_removido_sucursal` |
 | Finanzas → Gastos / Sueldos (cuenta de sucursal desbloquea la vista) | RPC `notif_emit_view_event` (`GastosPanel.tsx`, `SueldosPanel.tsx`) | `visualizacion_gastos`, `visualizacion_sueldos` |
 
 ## Permisos de funciones
@@ -88,9 +97,11 @@ Todos son `SECURITY DEFINER`, crean el evento y sus entregas, y dependen de los 
 | Función | `EXECUTE` | Nota |
 |---|---|---|
 | `_notif_emit`, `_notif_emit_sensitive`, `_notif_org_admins`, `_notif_sucursal_managers`, `_notif_sucursal_barbers`, `_notif_sucursal_account`, `_notif_actor_name`, `_notif_actor_account_type`, `_notif_pref_mode`, `_notif_turno_dispatch`, `_notif_turno_metadata`, `_notif_turno_title` | Nadie salvo el dueño (revocado a `PUBLIC`, `anon`, `authenticated`, `service_role`) | Llamables solo desde otras funciones `SECURITY DEFINER` del mismo dueño |
+| `_notif_barbero_users(uuid, uuid)` (E2-M3) | Nadie salvo el dueño (revocado a `PUBLIC`, `anon`, `authenticated`, `service_role`) | `SECURITY INVOKER`, `search_path = ''`. Devuelve `profiles.id` de los usuarios vinculados a un barbero de esa organización |
 | `notif_emit_view_event(text, uuid)` | `authenticated` | `SECURITY DEFINER`, `search_path = ''`. Valida usuario, organización, rol de cuenta de sucursal y que `_sucursal_id` sea la de **esa** cuenta. |
 | `notif_emit_login_sucursal_account`, `notif_emit_action_blocked`, `notif_emit_pin_authorized` | Nadie salvo el dueño (revocado a `PUBLIC`, `anon`, `authenticated` y `service_role`) | Nada las invoca todavía; se conservan para su futura implementación |
-| `process_vencimientos_tareas()` | Dueño (cron) y `service_role` | Sin exposición a clientes |
+| `process_vencimientos_tareas()`, `process_tareas_recurrentes()` | Dueño (cron) y `service_role` | Sin exposición a clientes. Ahora `search_path = ''` |
+| `_tareas_auto_*` y los triggers `trg_tareas_recurrentes_*`, `trg_tareas_auto_sync_*`, `trg_tareas_tipo_guard` (Etapa 2) | Nadie desde un cliente | Ver `docs/MODULOS/tareas.md`; llaman a `_notif_*` siendo `SECURITY DEFINER` del mismo dueño (las migraciones lo verifican) |
 | `upsert_notification`, `upsert_notification_delivery` | — | **Eliminadas.** Permitían fabricar/sobrescribir avisos y autosuscribirse |
 
 ## Cómo agregar una notificación nueva
@@ -116,6 +127,7 @@ Todos son `SECURITY DEFINER`, crean el evento y sus entregas, y dependen de los 
 ```bash
 npm install --prefix node_modules/.admin-sql-test --no-package-lock --no-save @electric-sql/pglite@0.5.8
 node supabase/tests/notifications-security-sql.mjs
+node supabase/tests/tareas-automaticas-sql.mjs   # Etapa 2: destinatarios, pausas, aislamiento y permisos (72 pruebas)
 ```
 
 `supabase/tests/notifications-security-sql.mjs` carga las migraciones históricas reales sobre
@@ -130,18 +142,16 @@ debilita cada migración.
 
 ## Pendiente y límites
 
-- **Aplicar M1–M3 en Supabase** por el canal que se decida. Un `push` de Git no las aplica.
-  Antes de M1: confirmar en la base destino que todas las funciones
-  tienen el mismo dueño y que los jobs de `cron.job` corren como ese dueño (M1 lo
-  comprueba y aborta si no).
-- **Tipos generados:** se retiraron a mano las dos RPC eliminadas de
-  `src/integrations/supabase/types.ts` porque no hay base disponible para
-  `supabase gen types`. Regenerarlos al aplicar las migraciones.
-- **QA manual autenticado** de la campana con usuarios sintéticos de dos organizaciones.
+- **Aplicadas (M1–M3):** el 2026-10-12, en el proyecto operativo. Un `push` de Git no las aplica
+  (ver `docs/FLUJO_PUBLICACION.md`). Cada migración comprueba antes que las funciones tengan el mismo
+  dueño y que los jobs de `cron.job` corran como ese dueño, y aborta si no.
+- **Tipos generados:** regenerados el 2026-10-12 desde la base real (no incluyen las RPC eliminadas).
+- **QA manual autenticado** de la campana con usuarios sintéticos de dos organizaciones: pendiente.
 - Fuera de esta etapa: RLS de Finanzas (los managers leen todos los `Egresos` de la
   organización); helpers generales de RLS (`has_role`, `get_user_organization_id`… aceptan un
-  `user_id` arbitrario); aislar fallos por organización dentro de los cron y limpiar
-  zonas horarias históricas (Etapa 2); recurrencias, `tipo='admin'` y semántica de fechas;
+  `user_id` arbitrario); aislar fallos por organización dentro de los demás cron (los de Tareas ya lo hacen desde la Etapa 2) y limpiar
+  zonas horarias históricas; el saneamiento de las tareas `tipo='admin'` históricas y de las Tareas
+  automáticas heredadas (Etapa 3; el motor nuevo ya no genera `admin` ni usa `barberos.id` como usuario);
   push (`send-push-notification` solo acepta la clave `service_role`); el bug legado de
   lecturas que reaparecen (`notification_reads`); las funciones `trg_*` siguen siendo
   `SECURITY DEFINER` con `EXECUTE` por defecto (no son invocables como RPC); tres eventos del

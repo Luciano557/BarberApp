@@ -5,6 +5,64 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Tareas automáticas: el servidor es dueño del calendario, de la pausa y de la recuperación — 2026-10-12
+
+Qué se decidió y por qué (Etapa 2; modelo y permisos en `docs/MODULOS/tareas.md`):
+
+- **Una sola semántica de calendario, en la base, anclada en `fecha_inicio`.** Había tres cálculos
+  distintos (SQL, TypeScript del cliente y el que usa Gastos) y el SQL trataba weekly, biweekly, quarterly,
+  semiannual y yearly como “+1 día”. Encadenar “fecha anterior + intervalo” acumula drift (31 → 28 → 28 …);
+  desde el ancla, un mensual del 31 vuelve al 31 en los meses que lo tienen. El cliente ya no calcula `proxima_fecha`: envía solo un
+  marcador (el tipo generado exige el campo) y la base lo reemplaza siempre. `calcNextDate` se mantiene intacta porque la usan los Gastos recurrentes.
+- **“Hoy” es el día de `organizations.timezone`.** No el navegador, no la zona de la sucursal, no `CURRENT_DATE`.
+- **Ocurrencia vigente y recuperación excepcional.** Cada ejecución genera como máximo la última fecha de la serie
+  ≤ hoy y avanza a la primera posterior a hoy. Si el motor estuvo detenido no reconstruye lo perdido, y si la ocurrencia
+  vigente ya habría nacido vencida **no se crea** (evita tareas que nacen vencidas y su aviso de vencimiento). La falla no se
+  esconde: queda un contador y la última fecha perdida en la propia Tarea automática (`recuperaciones`,
+  `recuperacion_*`) y un `WARNING` con identificadores. No se creó una tabla de log: no existe una infraestructura de
+  auditoría adecuada para el cron y esto basta para detectarlo con una consulta.
+- **Pausas: un motivo, no un segundo sistema.** `activo` sigue significando “¿genera?” y `pausa_motivo` dice por qué
+  (`manual`, `sucursal_inactiva`, `barbero_inactivo`, `barbero_sin_asignacion`). Las automáticas se reanudan solas cuando
+  desaparece la causa; **la manual jamás** y una automática nunca la pisa. Con varias causas manda la más fuerte.
+  Los triggers sobre barberos, sucursales y `barberos_sucursales` reaccionan al instante y el motor repite la
+  sincronización cada hora (red de seguridad contra un trigger que no corrió).
+- **Pertenencia estructural, no disponibilidad diaria (corrige BUILD 2, E2-M5).** BUILD 2 había leído `barberos_sucursales.disponible=false`
+  como “el barbero dejó la sucursal”, pero ese campo lo recalcula solo el cron diario (una sola fila disponible por barbero): un barbero en
+  dos sucursales habría pausado y reanudado sus Tareas automáticas todos los días. Decisión de producto: una Tarea automática individual
+  se pausa solo cuando no queda **ninguna asignación vigente** del par organización+barbero+sucursal. `principal` y `recurrente` cuentan
+  mientras exista la fila (la recurrente no depende del día de hoy); `temporal` solo dentro de su rango (futura: todavía no; vencida: ya no,
+  sin borrar la fila). Motivo `barbero_sin_asignacion`. No se inventó una columna: la señal ya existía. El paso del tiempo lo resuelve la
+  sincronización horaria del motor (demora de hasta una hora) en vez de un segundo cron. Sin notificación nueva en la campana: solo el aviso
+  previo dentro de la acción que provoca la pausa, y únicamente si era la última asignación vigente.
+- **Aviso antes de confirmar.** Finalizar actividad de un barbero, desactivar una sucursal y quitar la última asignación vigente (eliminar asignación,
+  eliminar recurrente, cambiar la principal) muestran cuántas Tareas automáticas activas se pausarán, dentro de los diálogos de confirmación que ya existían. Si no se puede consultar, el aviso lo dice.
+- **Identidad.** `tareas.asignado_a_id` y `tareas_recurrentes.asignado_a` son `barberos.id`. El usuario es `profiles.id` vía
+  `profiles.barbero_id` (0..n). Tres productores usaban `barberos.id` como id de usuario y se corrigieron con `_notif_barbero_users`.
+- **`en_progreso` también vence.** “Empezada” y “atrasada” son independientes: se marca `vencida_at` y el estado sigue siendo
+  `en_progreso` (no se inventó un estado nuevo; la tarjeta muestra ambos).
+- **`tipo` por trigger y no por CHECK.** Existen 141 filas `tipo='admin'` vinculadas a Tareas automáticas y `recurrencia_id` es
+  `ON DELETE SET NULL`: un CHECK, incluso `NOT VALID`, rechazaría ese `UPDATE` y bloquearía el borrado de una Tarea automática. El trigger
+  impide crear `admin` nuevas sin tocar las viejas. El CHECK definitivo llega con la Etapa 3 (saneamiento), que **no** se ejecutó.
+- **`SECURITY DEFINER` nuevos o reescritos (AGENTS.md exige reportarlos):** los triggers `trg_tareas_recurrentes_prepare`,
+  `trg_tareas_recurrentes_generar`, `trg_tareas_auto_sync_barberos`, `…_sucursales`, `…_barberos_sucursales`; `process_tareas_recurrentes`
+  y `process_vencimientos_tareas` (ya lo eran) y los dos triggers de notificación reescritos. Son necesarios porque quien desactiva una sucursal
+  o a una persona puede no tener `UPDATE` sobre las Tareas automáticas ni acceso a los helpers cerrados en la Etapa 1. Todos con `search_path = ''`,
+  nombres calificados, filtro por `organization_id` y sin `EXECUTE` para clientes. Las funciones auxiliares y el motor interno son `SECURITY INVOKER`.
+  `_notif_barbero_users` quedó `INVOKER` (el plan aprobado la preveía `DEFINER`): todos sus llamadores son `DEFINER` del mismo dueño, así que no necesita más privilegios.
+
+## Excepción directa y aplicación en el proyecto operativo para la Etapa 2 de Tareas automáticas — 2026-10-12
+
+Igual que en la Etapa 1, AGENTS.md manda DB/RLS por Lovable y las excepciones requieren autorización explícita. El usuario autorizó
+construir la Etapa 2 con Claude Code **y aplicar las cuatro migraciones directamente en el único proyecto Supabase operativo**
+(`azqpyfoobpovqosbayvz`), condicionado a: verificar el SQL, correr el preflight, confirmar que no contenían saneamiento ni borrado histórico,
+revisar la seguridad y confirmar que no debilitaban la Etapa 1. Se cumplió y se aplicó en orden E2-M1 → E2-M4, verificando cada una. **No se
+crearon ramas ni entornos de desarrollo.** La excepción no cambia la regla general, no cubre la Etapa 3 (saneamiento / reset) y no autoriza otras
+migraciones. El conector registra su propia versión (timestamp de aplicación) con el mismo nombre que el archivo del repo; el prefijo del archivo
+no coincide con la versión remota (ya ocurría con la Etapa 1).
+
+Actualización sobre la Etapa 1: sus tres migraciones **ya están aplicadas** en el proyecto operativo (confirmado con `list_migrations` el 2026-10-12),
+por lo que el texto de la entrada siguiente (“no autoriza aplicar las migraciones…”) describe lo que cubría ese build, no el estado actual.
+
 ## Notificaciones: la entrega es la fuente de verdad — 2026-10-12
 
 La campana ya leía solo `notification_deliveries`, pero la base permitía a
@@ -59,7 +117,7 @@ Claude Code: `20261012100000_notifications_security_functions.sql`,
 documentación asociada. La excepción **no cambia la regla general** de AGENTS.md, no
 cubre otras migraciones ni la Etapa 2, y no autoriza aplicar las migraciones en ningún
 proyecto Supabase: este build las validó únicamente contra PostgreSQL local sintético.
-Un `push` de Git tampoco las aplica (ver `docs/FLUJO_PUBLICACION.md`).
+Un `push` de Git tampoco las aplica (ver `docs/FLUJO_PUBLICACION.md`). *(Posteriormente el usuario las aplicó en el proyecto operativo; ver la entrada de la Etapa 2.)*
 
 ## Repositorio principal antes del fork productivo — 2026-10-11
 

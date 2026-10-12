@@ -19,8 +19,6 @@ import { es } from 'date-fns/locale';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
 import { TareaFormDialog } from './tareas/TareaFormDialog';
 import { RecurrentesPanel } from './tareas/RecurrentesPanel';
-import { getRepeatLabel } from './tareas/RepeatPicker';
-import { getCustomRepeatLabel } from './tareas/CustomRepeatSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRequirePinForAction } from '@/components/ActionPinGate';
@@ -97,6 +95,13 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
   const getTareaVencimiento = (t: TareaItem) =>
     getTareaVencHelper(t, tareasDiasDefault);
 
+  // "Empezada" (en progreso) y "atrasada" son conceptos independientes: una tarea en progreso también puede estar vencida.
+  const isTareaVencida = (t: TareaItem) =>
+    t.tipo === 'tarea' && (
+      t.estado === 'vencida'
+      || ((t.estado === 'pendiente' || t.estado === 'en_progreso') && (!!t.vencida_at || getTareaVencimiento(t).vencida))
+    );
+
   const matchesFecha = (t: TareaItem) => {
     if (filtroFecha === 'todas') return true;
     const fechaRef = t.fecha_inicio ?? t.fecha_limite;
@@ -107,8 +112,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
       if (t.tipo === 'peticion' && t.estado === 'pendiente') {
         return getPeticionVencimiento(t).vencida;
       }
-      if (t.tipo === 'tarea' && t.estado === 'pendiente') {
-        return getTareaVencimiento(t).vencida;
+      if (t.tipo === 'tarea') {
+        return isTareaVencida(t);
       }
       return false;
     }
@@ -140,8 +145,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
           // ok
         } else {
           const peticionVencida = t.tipo === 'peticion' && t.estado === 'pendiente' && getPeticionVencimiento(t).vencida;
-          const tareaVencida = t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida;
-          if (!peticionVencida && !tareaVencida) return false;
+          if (!peticionVencida && !isTareaVencida(t)) return false;
         }
       } else if (t.estado !== filtroEstado) return false;
     }
@@ -156,14 +160,8 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     return matchesSucursal(t) && matchesResp(t);
   }), [tareas, filtroResp, filtroSucursal]);
 
-  const getRepeatDisplay = (t: TareaItem) => {
-    if (!t.recurrente) return null;
-    if (t.repeat_preset === 'custom') {
-      return getCustomRepeatLabel(t.repeat_frequency, t.repeat_interval, t.repeat_byweekday);
-    }
-    if (t.repeat_preset) return getRepeatLabel(t.repeat_preset);
-    return 'Recurrente';
-  };
+  // La programación vive en la Tarea automática; la tarea generada solo indica de dónde viene.
+  const getRepeatDisplay = (t: TareaItem) => (t.recurrencia_id ? 'Automática' : null);
 
   const sucursalNombre = (id: string | null) =>
     id ? (sucursales.find(s => s.id === id)?.nombre ?? null) : null;
@@ -180,6 +178,15 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
     }
     if (t.tipo === 'tarea' && t.estado === 'pendiente' && getTareaVencimiento(t).vencida) {
       return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>;
+    }
+    // En progreso y vencida a la vez: se muestran las dos cosas, no una sola.
+    if (t.tipo === 'tarea' && t.estado === 'en_progreso' && isTareaVencida(t)) {
+      return (
+        <span className="flex flex-wrap items-center justify-end gap-1">
+          <Badge variant="outline" className="text-status-info-foreground border-status-info bg-status-info-bg gap-1"><RefreshCw className="w-3 h-3" />En progreso</Badge>
+          <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><AlertTriangle className="w-3 h-3" />Vencida</Badge>
+        </span>
+      );
     }
     switch (t.estado) {
       case 'pendiente': return <Badge variant="outline" className="text-status-warning-foreground border-status-warning bg-status-warning-bg gap-1"><Clock className="w-3 h-3" />Pendiente</Badge>;
@@ -565,7 +572,7 @@ export function TareasPanel({ barbers }: TareasPanelProps) {
               className="h-9"
               onClick={() => setShowRecurrencias(v => !v)}
             >
-              <Repeat className="h-4 w-4 mr-2" />Recurrencias
+              <Repeat className="h-4 w-4 mr-2" />Tareas automáticas
             </Button>
           )}
         </div>

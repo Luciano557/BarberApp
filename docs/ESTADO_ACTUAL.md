@@ -4,8 +4,9 @@
 
 ## Notificaciones — Etapa 1 de seguridad
 
-**Implementada y validada localmente — 2026-10-12. No aplicada a ningún proyecto
-Supabase.** Excepción de DB/RLS vía Claude Code autorizada solo para este build
+**Implementada, validada localmente y APLICADA en el proyecto Supabase operativo — 2026-10-12**
+(confirmado con `list_migrations`; el conector registró las versiones `20261012145524`,
+`20261012145549` y `20261012145604`). Excepción de DB/RLS vía Claude Code autorizada solo para este build
 (`docs/DECISIONES.md`). Tres migraciones nuevas, sin editar históricas:
 `20261012100000_notifications_security_functions.sql` (M1),
 `20261012100100_notifications_security_rls.sql` (M2),
@@ -32,12 +33,45 @@ políticas inesperadas; verificado por mutación. Vitest 106/21 archivos, `tsc` 
 `tsc -p tsconfig.app.json` con los mismos 5 errores preexistentes (`abortSignal`,
 `readRetry.test`), ESLint 378 errores + 54 warnings sin cambios por archivo, build OK.
 
-**Pendiente (no resuelto):** aplicar M1–M3 en Supabase; regenerar
-`src/integrations/supabase/types.ts` (se retiraron a mano las dos RPC eliminadas porque
-no había base para `supabase gen types`); QA manual autenticado con usuarios sintéticos de
-dos organizaciones. Fuera de esta etapa y sigue abierto: RLS de Finanzas, helpers
-generales de RLS, aislamiento de fallos por organización en cron y limpieza de zonas
-horarias históricas, recurrencias y fechas, push. Detalle: `docs/MODULOS/notificaciones.md`.
+**Pendiente (no resuelto):** QA manual autenticado con usuarios sintéticos de dos
+organizaciones. `src/integrations/supabase/types.ts` se regeneró desde la base real el 2026-10-12
+(sin las dos RPC eliminadas). Fuera de esta etapa y sigue abierto: RLS de Finanzas, helpers
+generales de RLS, aislamiento de fallos por organización en los cron que no son de Tareas y
+limpieza de zonas horarias históricas, push. Detalle: `docs/MODULOS/notificaciones.md`.
+
+## Tareas automáticas — Etapa 2 (motor)
+
+**Implementada, aplicada en el proyecto Supabase operativo y verificada — 2026-10-12.** Excepción de
+DB/RLS vía Claude Code autorizada para este build (`docs/DECISIONES.md`). Cinco migraciones nuevas (la quinta, E2-M5 `20261012120400…`, corrige la pertenencia estructural; remota `20261012220833`), sin
+editar históricas: `20261012120000_tareas_automaticas_calendario.sql`, `…120100_tareas_automaticas_pausa_integridad.sql`,
+`…120200_tareas_automaticas_motor.sql`, `…120300_tareas_tipo_estado_integridad.sql` (versiones remotas
+`20261012190213`, `…190408`, `…190548`, `…190623`). Detalle del modelo, pausas, recuperación y permisos:
+`docs/MODULOS/tareas.md`.
+
+Lo que cambia: el motor genera `tipo='tarea'` (antes `admin`, invisible para los barberos); un calendario canónico
+calculado en la base desde `fecha_inicio` (sin drift; semanal, cada N semanas, varios días, mensual 29/30/31,
+febrero, bisiesto, 29-feb); “hoy” según `organizations.timezone`; como máximo una ocurrencia por ejecución y, ante un
+fallo del motor, **no reconstruye ni crea tareas que nacerían vencidas** (deja `recuperaciones` / `recuperacion_*`);
+idempotente (`ON CONFLICT` + `SKIP LOCKED`) y aislado por Tarea automática; pausa automática y reanudación
+automática por sucursal inactiva, barbero inactivo o **barbero sin asignación vigente** a la sucursal (E2-M5: principal,
+recurrente o temporal vigente; la disponibilidad diaria `disponible` no pausa nada; la pausa manual nunca se reanuda sola); la próxima fecha solo se recalcula si cambia la programación; una tarea `en_progreso` también puede
+vencer; los destinatarios individuales son los **usuarios** del barbero (`profiles.barbero_id`), no `barberos.id`. En la
+app: copy “Tareas automáticas” / “Automática”, motivo de pausa en la tarjeta y aviso previo con la cantidad de Tareas
+automáticas que se pausarán al finalizar la actividad de un barbero, desactivar una sucursal o quitar la última asignación
+vigente de un barbero en una sucursal (eliminar asignación, eliminar recurrente, cambiar la principal).
+
+Evidencia: `supabase/tests/tareas-automaticas-sql.mjs` (**72 pruebas** sobre la forma real de producción, **18
+mutaciones detectadas**), suite de Etapa 1 **44/44**, Vitest 132/25 archivos, `tsc` raíz exit 0, `tsc -p
+tsconfig.app.json` con los mismos 5 errores preexistentes, ESLint sin cambios por archivo (47 errores + 3 avisos en los
+archivos tocados, igual que en HEAD), build OK, `impeccable detect` 0 anti-patrones. En producción se verificaron
+funciones, permisos, triggers, constraints y cron, y una **prueba de humo dentro de una transacción revertida**
+(motor, idempotencia, pausa por sucursal, camino de un dueño real y aislamiento con otra organización). Security
+Advisors: sin hallazgos nuevos de este build (solo los `trg_*` heredados con `EXECUTE` por defecto).
+
+**Pendiente / abierto:** QA manual de Sebastián (`docs/MODULOS/tareas.md`); **Etapa 3** (saneamiento: 141 tareas
+`tipo='admin'` históricas y Tareas automáticas heredadas con `proxima_fecha` fuera de calendario, **sin tocar**); **Etapa 4**
+(rediseño de la pantalla); `deleteReceta` usa la fecha del navegador y `useTareas` no pagina; una temporal que empieza o
+vence sin ningún cambio se refleja en las Tareas automáticas con hasta una hora de demora (sincronización horaria).
 
 ## Finanzas — modo ficticio
 
@@ -1099,7 +1133,7 @@ Turnos conserva un acceso directo.
 
 ## Resto de módulos
 
-No relevados a fondo en el sistema de documentación actual. Ver
+Tareas documentado en `docs/MODULOS/tareas.md` (Etapa 2). El resto no está relevado a fondo en el sistema de documentación actual. Ver
 `CRITERIOS_DISEÑO.md` para auditorías puntuales previas (Mi Negocio,
 Estadísticas, Finanzas) que no se trasladaron todavía a este formato.
 
@@ -1107,10 +1141,12 @@ Estadísticas, Finanzas) que no se trasladaron todavía a este formato.
 
 - 187 issues del linter de seguridad de Supabase (RLS gaps, SECURITY DEFINER
   views, funciones con search_path mutable) — pendiente de sesión de auditoría
-  dedicada. La Etapa 1 de Notificaciones (2026-10-12) cierra en el repo las
+  dedicada. La Etapa 1 de Notificaciones (2026-10-12) cerró las
   funciones `_notif_*`, `notif_*` y `upsert_notification*` y las tablas de
-  notificaciones, pero no se midió el efecto sobre ese conteo porque no está
-  aplicada en Supabase; el resto de las funciones y vistas sigue pendiente.
+  notificaciones y ya está aplicada en Supabase; tras la Etapa 2 el conector devuelve 7 hallazgos
+  agrupados (2 listan funciones `SECURITY DEFINER` ejecutables, entre ellas cuatro `trg_*` heredados de
+  Tareas/Equipo). No es comparable con los 187 anteriores y no se midió la reducción; el resto de las
+  funciones y vistas sigue pendiente.
 - Bug de notificaciones leídas que reaparecen (hipótesis: `notification_reads`
   legacy huérfano al cambiar `notifications.type`) — sin fix.
 - Bug post-login intermitente — corrección de cliente implementada y validada

@@ -148,7 +148,8 @@ await test('baseline fidelity: the historic files loaded here are the only defin
   const loaded = new Set([...HISTORY.map(([p]) => p), '20260602052818', '20260724121341', '20260724123919']);
   const relevant = /(?:CREATE(?: OR REPLACE)? FUNCTION|DROP FUNCTION(?: IF EXISTS)?) public\.(_notif_\w+|notif_emit_\w+|upsert_notification\w*|process_vencimientos_tareas|trg_\w*notif\w*)\(/gi;
   for (const name of files) {
-    if (name === M1 || name === M2 || name === M3) continue;
+    // Etapa 1 itself and everything after it (e.g. Etapa 2) is not part of the pre-hardening baseline.
+    if (name === M1 || name === M2 || name === M3 || name > M3) continue;
     const hits = [...(await read(name)).matchAll(relevant)].map(m => m[1]);
     if (hits.length) assert(loaded.has(name.slice(0, 14)), `${name} redefines ${hits.join(', ')} but is not part of the baseline`);
   }
@@ -447,8 +448,9 @@ await test('migrations M1, M2, M3 apply cleanly in order on the baseline', async
   for (const name of [M1, M2, M3]) await asOwner(db, migrationSql[name]);
 });
 await test('no historic migration was edited: M1-M3 are new files, later than every existing one', async () => {
+  // Nothing may sit between or before-and-after M1-M3 except migrations that were added AFTER them (Etapa 2 onwards).
   const others = files.filter(f => ![M1, M2, M3].includes(f));
-  assert(others.every(f => f < M1), 'a migration newer than M1 exists');
+  assert(others.every(f => f < M1 || f > M3), 'a migration was slotted in between M1 and M3');
 });
 
 // ---------------------------------------------------------------------------------------------------------

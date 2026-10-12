@@ -34,6 +34,8 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useBarberosSucursalesRealtime } from '@/hooks/useBarberosSucursalesRealtime';
+import { TareasAutomaticasPausaAviso } from '@/components/tareas/TareasAutomaticasPausaAviso';
+import { contarTareasAutomaticasActivas, pierdePertenenciaAlQuitar } from '@/lib/tareasAutomaticas';
 
 interface Props {
   sucursalId: string;
@@ -296,7 +298,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                 {r.fecha_fin && ` · hasta ${formatShortDate(r.fecha_fin)}`}
               </span>
               {canDeleteRecurrente && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Eliminar asignación" onClick={() => openDelete(r)}>
                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
                 </Button>
               )}
@@ -307,7 +309,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
               <span>
                 Temporal · {formatShortDate(r.fecha_inicio)} → {formatShortDate(r.fecha_fin)}
               </span>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDelete(r)}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Eliminar asignación" onClick={() => openDelete(r)}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             </div>
@@ -336,11 +338,20 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   // --- Delete confirmation (con check de turnos futuros) ---
   const [deleteTarget, setDeleteTarget] = useState<BarberoSucursalRow | null>(null);
   const [deleteFutureCount, setDeleteFutureCount] = useState<number | null>(null);
+  // Solo si borrar esta asignación deja a la persona SIN ninguna asignación vigente en esta sucursal
+  // (principal / recurrente / temporal vigente). La disponibilidad diaria no cuenta.
+  const [deleteTareasAuto, setDeleteTareasAuto] = useState<number | null | undefined>(undefined);
   const [deleting, setDeleting] = useState(false);
 
   const openDelete = async (row: BarberoSucursalRow) => {
     setDeleteTarget(row);
     setDeleteFutureCount(null);
+    if (pierdePertenenciaAlQuitar(grouped[row.barbero_id] ?? [], row.id, todayLocalIso())) {
+      setDeleteTareasAuto(undefined);
+      void contarTareasAutomaticasActivas({ organizationId, sucursalId, barberoId: row.barbero_id }).then(setDeleteTareasAuto);
+    } else {
+      setDeleteTareasAuto(0);
+    }
     // Chequear turnos futuros del barbero en esta sucursal.
     try {
       const today = todayLocalIso();
@@ -475,6 +486,7 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
                   ? `Este barbero tiene ${deleteFutureCount} turno${deleteFutureCount === 1 ? '' : 's'} futuro${deleteFutureCount === 1 ? '' : 's'} en esta sucursal. Si eliminás esta asignación, esos turnos pueden quedar sin barbero disponible. ¿Querés continuar?`
                   : 'No hay turnos futuros que dependan de esta asignación. ¿Confirmás eliminar?'}
             </AlertDialogDescription>
+            <TareasAutomaticasPausaAviso tipo="asignacion" cantidad={deleteTareasAuto} />
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>

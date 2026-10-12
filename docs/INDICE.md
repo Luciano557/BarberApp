@@ -60,13 +60,13 @@ la dejó obsoleta.
 - [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
 - [x] `acceso-tenant.md` — Restauración de sesión, carga del contexto tenant y recuperación de fallos
 - [x] `turnos-agenda.md` — Configuración de reservas, Portal público, Horarios de trabajo
-- [x] `notificaciones.md` — Modelo evento/entrega, autorización, productores, permisos de funciones y cómo agregar eventos (Etapa 1 de seguridad, aplicada solo en repo)
+- [x] `notificaciones.md` — Modelo evento/entrega, autorización, productores, permisos de funciones y cómo agregar eventos (Etapa 1 de seguridad, aplicada en Supabase el 2026-10-12; Etapa 2 suma `_notif_barbero_users` y el evento `tarea_automatica_pausada`)
 - [ ] Cobrar
 - [x] Finanzas — `finanzas.md` (modo ficticio implementado, uso, límites y validación; no implica auditoría completa del módulo)
 - [ ] Mi Negocio (general)
 - [ ] Clientes
 - [ ] Estadísticas
-- [ ] Tareas
+- [x] `tareas.md` — Tareas y Tareas automáticas: modelo, calendario canónico, motor/cron, recuperación, pausas, vencimientos, permisos y pruebas (Etapa 2, 2026-10-12; el saneamiento histórico es la Etapa 3)
 
 Los módulos sin marcar no tienen documentación propia todavía — no auditados
 a fondo. No asumir que están al día con el canon de diseño solo porque no

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Bell, ClipboardList, AlertTriangle, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare, Wallet, Receipt, Banknote, ShieldAlert, KeyRound, Eye, LogIn, Lock, FileEdit, Settings2 } from 'lucide-react';
+import { Bell, ClipboardList, AlertTriangle, Pause, Inbox, CheckCheck, Check, Undo2, ChevronDown, Filter, Calendar, CalendarX, CalendarClock, MessageSquare, Wallet, Receipt, Banknote, ShieldAlert, KeyRound, Eye, LogIn, Lock, FileEdit, Settings2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -31,6 +31,7 @@ const TYPE_META: Record<string, { label: string; icon: typeof ClipboardList; ton
   tarea_asignada: { label: 'Tarea asignada', icon: ClipboardList, tone: 'text-status-info-foreground' },
   tarea_equipo_asignada: { label: 'Tarea de equipo', icon: ClipboardList, tone: 'text-status-info-foreground' },
   tarea_vencida: { label: 'Tarea vencida', icon: AlertTriangle, tone: 'text-status-warning-foreground' },
+  tarea_automatica_pausada: { label: 'Tarea automática pausada', icon: Pause, tone: 'text-status-warning-foreground' },
   peticion_nueva: { label: 'Petición nueva', icon: MessageSquare, tone: 'text-status-info-foreground' },
   peticion_aprobada: { label: 'Petición aprobada', icon: MessageSquare, tone: 'text-status-success-foreground' },
   peticion_rechazada: { label: 'Petición rechazada', icon: MessageSquare, tone: 'text-status-warning-foreground' },

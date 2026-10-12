@@ -31,6 +31,10 @@ export interface Tarea {
   completada_por_id: string | null;
   completada_por_nombre: string | null;
   completada_at: string | null;
+  /** Si viene de una Tarea automática, su id. La programación vive en la Tarea automática, no en esta tarea. */
+  recurrencia_id: string | null;
+  /** Cuándo pasó su fecha límite (una tarea `en_progreso` también puede quedar vencida). */
+  vencida_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -104,15 +108,15 @@ export function useTareas() {
       }
 
       const isRecurrente = !!tarea.repeat_preset && tarea.repeat_preset !== 'never';
-      const todayStr = new Date().toISOString().slice(0, 10);
 
-      let recurrenciaId: string | null = null;
-
+      // Una tarea con repetición es una Tarea automática: se crea SOLO la Tarea automática. La base calcula
+      // la próxima fecha (calendario y zona horaria de la organización) y genera la tarea de hoy si corresponde.
       if (isRecurrente && tarea.tipo === 'tarea') {
-        if (!sucursal_id) throw new Error('Seleccioná una sucursal para crear la recurrencia.');
-        const fechaInicio = rest.fecha_inicio && rest.fecha_inicio.length > 0 ? rest.fecha_inicio : todayStr;
+        if (!sucursal_id) throw new Error('Seleccioná una sucursal para crear la tarea automática.');
+        const fechaInicio = rest.fecha_inicio && rest.fecha_inicio.length > 0 ? rest.fecha_inicio : null;
+        if (!fechaInicio) throw new Error('Elegí la fecha de inicio de la tarea automática.');
 
-        const { data: receta, error: recetaErr } = await supabase
+        const { error: recetaErr } = await supabase
           .from('tareas_recurrentes')
           .insert({
             organization_id: organization.id,
@@ -128,19 +132,13 @@ export function useTareas() {
             repeat_interval: rest.repeat_interval ?? null,
             repeat_byweekday: rest.repeat_byweekday ?? null,
             fecha_inicio: fechaInicio,
+            // Marcador: el servidor lo reemplaza por la próxima fecha real de la serie.
             proxima_fecha: fechaInicio,
             activo: true,
             created_by: user.id,
-          })
-          .select('id')
-          .single();
+          });
         if (recetaErr) throw recetaErr;
-        recurrenciaId = receta.id;
-
-        // Solo materializar la tarea de hoy si fecha_inicio es hoy.
-        if (fechaInicio !== todayStr) {
-          return;
-        }
+        return { automatica: true };
       }
 
       const { error } = await supabase.from('tareas').insert({
@@ -152,15 +150,16 @@ export function useTareas() {
         assignment_scope,
         creado_por_id: user.id,
         creado_por_nombre: creado_por_nombre || profile?.full_name || profile?.email || '',
-        recurrente: isRecurrente,
-        ...(recurrenciaId ? { recurrencia_id: recurrenciaId } : {}),
+        // Una tarea común no repite: la repetición solo existe en las Tareas automáticas.
+        recurrente: false,
       });
       if (error) throw error;
+      return { automatica: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
       queryClient.invalidateQueries({ queryKey: ['tareas_recurrentes'] });
-      toast.success('Tarea creada');
+      toast.success(result?.automatica ? 'Tarea automática creada' : 'Tarea creada');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -176,11 +175,6 @@ export function useTareas() {
     fecha_inicio?: string | null;
     fecha_limite?: string | null;
     hora?: string | null;
-    repeat_preset?: string | null;
-    repeat_frequency?: string | null;
-    repeat_interval?: number | null;
-    repeat_byweekday?: number[] | null;
-    recurrente?: boolean;
   };
 
   const updateTarea = useMutation({

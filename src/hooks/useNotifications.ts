@@ -157,8 +157,9 @@ export function useNotifications() {
         if (!enabled) continue;
       }
 
-      // Filtrado activo: por ahora solo modulo tareas
-      if (n.source_module === 'tareas' && n.source_id) {
+      // Filtrado activo de eventos que apuntan a una tarea/petición (source_table = 'tareas').
+      // Los avisos de una Tarea automática (source_table = 'tareas_recurrentes') no dependen de una tarea visible.
+      if (n.source_module === 'tareas' && n.source_id && n.source_table === 'tareas') {
         const t = tareasById.get(n.source_id);
         if (!t) continue; // no visible para el usuario o eliminada
         if (t.estado === 'completada') continue;

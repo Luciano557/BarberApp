@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSucursal } from '@/contexts/SucursalContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { calcNextDate } from '@/lib/recurrence';
+import type { PausaMotivo } from '@/lib/tareasAutomaticas';
 import { toast } from 'sonner';
 
 export interface TareaRecurrente {
@@ -24,6 +24,9 @@ export interface TareaRecurrente {
   fecha_inicio: string;
   proxima_fecha: string;
   activo: boolean;
+  /** `null` = activa. Si está pausada, indica por qué (la pausa automática se reanuda sola; la manual no). */
+  pausa_motivo: PausaMotivo | null;
+  pausada_at: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -58,34 +61,6 @@ export interface TareaRecurrenteUpdate {
   repeat_byweekday?: number[] | null;
   fecha_inicio?: string;
   activo?: boolean;
-}
-
-const RECURRENCE_KEYS: Array<keyof TareaRecurrenteUpdate> = [
-  'repeat_preset',
-  'repeat_frequency',
-  'repeat_interval',
-  'repeat_byweekday',
-  'fecha_inicio',
-];
-
-function computeProximaFecha(
-  fechaInicio: string,
-  preset: string,
-  frequency: string | null | undefined,
-  interval: number | null | undefined,
-  byweekday: number[] | null | undefined,
-): string {
-  // Avanza desde fecha_inicio hasta superar (o igualar) hoy.
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let cursor = new Date(fechaInicio + 'T12:00:00');
-  // Guard contra loops infinitos.
-  let safety = 0;
-  while (cursor < today && safety < 5000) {
-    cursor = calcNextDate(cursor, preset, frequency ?? null, interval ?? null, byweekday ?? null);
-    safety += 1;
-  }
-  return format(cursor, 'yyyy-MM-dd');
 }
 
 export function useTareasRecurrentes() {
@@ -124,7 +99,7 @@ export function useTareasRecurrentes() {
     mutationFn: async (receta: TareaRecurrenteInsert) => {
       if (!organization?.id || !user?.id) throw new Error('Falta organización o usuario');
       const sucursal_id = receta.sucursal_id ?? currentSucursal?.id ?? null;
-      if (!sucursal_id) throw new Error('Seleccioná una sucursal para crear la recurrencia.');
+      if (!sucursal_id) throw new Error('Seleccioná una sucursal para crear la tarea automática.');
 
       const payload = {
         organization_id: organization.id,
@@ -140,6 +115,7 @@ export function useTareasRecurrentes() {
         repeat_interval: receta.repeat_interval ?? null,
         repeat_byweekday: receta.repeat_byweekday ?? null,
         fecha_inicio: receta.fecha_inicio,
+        // Marcador: la base calcula la próxima fecha real desde `fecha_inicio` y la zona horaria de la organización.
         proxima_fecha: receta.fecha_inicio,
         activo: true,
         created_by: user.id,
@@ -150,7 +126,7 @@ export function useTareasRecurrentes() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Recurrencia creada');
+      toast.success('Tarea automática creada');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -159,34 +135,17 @@ export function useTareasRecurrentes() {
     mutationFn: async (patch: TareaRecurrenteUpdate) => {
       const { id, ...updates } = patch;
 
-      // Si cambió algún campo que afecta la recurrencia, recalcular proxima_fecha.
-      const recurrenceChanged = RECURRENCE_KEYS.some(k => k in updates);
-      let nextProxima: string | undefined;
-      if (recurrenceChanged) {
-        const current = recetas.find(r => r.id === id);
-        if (!current) throw new Error('No se encontró la recurrencia');
-        const merged = { ...current, ...updates } as TareaRecurrente;
-        nextProxima = computeProximaFecha(
-          merged.fecha_inicio,
-          merged.repeat_preset,
-          merged.repeat_frequency,
-          merged.repeat_interval,
-          merged.repeat_byweekday,
-        );
-      }
-
-      const payload: Record<string, unknown> = { ...updates };
-      if (nextProxima) payload.proxima_fecha = nextProxima;
-
+      // La próxima fecha NO se calcula acá: la base la recalcula solo cuando cambia la programación
+      // (inicio, repetición, intervalo o días). Editar título, descripción u hora no la mueve.
       const { error } = await supabase
         .from('tareas_recurrentes')
-        .update(payload)
+        .update(updates)
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Recurrencia actualizada');
+      toast.success('Tarea automática actualizada');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -202,7 +161,7 @@ export function useTareasRecurrentes() {
     },
     onSuccess: (activo) => {
       invalidateAll();
-      toast.success(activo ? 'Recurrencia activada' : 'Recurrencia pausada');
+      toast.success(activo ? 'Tarea automática reanudada' : 'Tarea automática pausada');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -228,7 +187,7 @@ export function useTareasRecurrentes() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Recurrencia eliminada');
+      toast.success('Tarea automática eliminada');
     },
     onError: (e: Error) => toast.error(e.message),
   });

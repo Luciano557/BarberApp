@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import { X, CalendarIcon, ChevronRight, Users } from 'lucide-react';
+import { X, CalendarIcon, ChevronRight, Users, Info } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Barber, getBarberDisplayName } from '@/types/barbershop';
@@ -115,10 +115,11 @@ export function TareaFormDialog({
         setHasTime(false);
         setSelectedTime('09:00');
       }
-      setRepeatPreset(tarea.repeat_preset ?? (tarea.recurrente ? 'custom' : 'never'));
-      setRepeatFrequency(tarea.repeat_frequency ?? 'weekly');
-      setRepeatInterval(tarea.repeat_interval ?? 1);
-      setRepeatByweekday(tarea.repeat_byweekday ?? []);
+      // Al editar una tarea no se configura repetición: la repetición vive en las Tareas automáticas.
+      setRepeatPreset('never');
+      setRepeatFrequency('weekly');
+      setRepeatInterval(1);
+      setRepeatByweekday([]);
       setVencimientoDias(tarea.vencimiento_dias ?? 60);
       setSubmitted(false);
     } else {
@@ -176,11 +177,6 @@ export function TareaFormDialog({
           assignment_scope: isTeam ? 'team' : 'individual',
           fecha_inicio,
           hora,
-          repeat_preset,
-          repeat_frequency,
-          repeat_interval,
-          repeat_byweekday,
-          recurrente,
         } as Partial<Tarea> & { id: string });
       } else {
         const payload: TareaInsert = {
@@ -370,21 +366,38 @@ export function TareaFormDialog({
                   )}
                 </div>
 
-                {/* Repetición */}
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-between rounded-lg border border-border px-3 py-3 hover:bg-muted/50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => setShowRepeatPicker(true)}
-                  disabled={!hasDate}
-                >
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-medium">Repetición</p>
-                    <p className="text-xs text-muted-foreground">
-                      {hasDate ? repeatLabel : 'Activá la fecha de inicio para configurar repetición.'}
-                    </p>
+                {/* Repetición: solo al crear. Una tarea con repetición se crea como Tarea automática. */}
+                {!isEdit && (
+                  <>
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between rounded-lg border border-border px-3 py-3 hover:bg-muted/50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => setShowRepeatPicker(true)}
+                      disabled={!hasDate}
+                    >
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">Repetición</p>
+                        <p className="text-xs text-muted-foreground">
+                          {hasDate ? repeatLabel : 'Activá la fecha de inicio para configurar repetición.'}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                    {hasDate && repeatPreset !== 'never' && (
+                      <p className="text-xs text-muted-foreground">
+                        Se va a crear una Tarea automática: el sistema genera esta tarea solo, en cada fecha.
+                      </p>
+                    )}
+                  </>
+                )}
+                {isEdit && tarea?.recurrencia_id && (
+                  <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Esta tarea la generó una Tarea automática. Para cambiar cada cuánto se repite, editá la Tarea automática en Tareas → Tareas automáticas.
+                    </span>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </button>
+                )}
 
                 {isEdit && tarea && (
                   <div className="text-xs text-muted-foreground border-t border-border pt-4">
@@ -441,7 +454,7 @@ export function TareaFormDialog({
         </SheetContent>
       </Sheet>
 
-      {!isPeticion && (
+      {!isPeticion && !isEdit && (
         <>
           <RepeatPicker
             open={showRepeatPicker}

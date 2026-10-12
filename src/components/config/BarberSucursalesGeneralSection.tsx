@@ -25,6 +25,9 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useAuth } from '@/contexts/AuthContext';
+import { TareasAutomaticasPausaAviso } from '@/components/tareas/TareasAutomaticasPausaAviso';
+import { contarTareasAutomaticasActivas, pierdePertenenciaAlMoverPrincipal, pierdePertenenciaAlQuitar } from '@/lib/tareasAutomaticas';
+import { todayLocalIso } from '@/hooks/useBarberosSucursales';
 
 interface Props {
   barberoId: string;
@@ -55,6 +58,10 @@ export function BarberSucursalesGeneralSection({
   const [savingPrincipal, setSavingPrincipal] = useState(false);
   const [recurrenteOpen, setRecurrenteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<BarberoSucursalRow | null>(null);
+  // Aviso previo de Tareas automáticas (undefined = consultando / no aplica, null = no se pudo consultar).
+  const [deleteTareasAuto, setDeleteTareasAuto] = useState<number | null | undefined>(undefined);
+  const [moveTarget, setMoveTarget] = useState<string | null>(null);
+  const [moveTareasAuto, setMoveTareasAuto] = useState<number | null | undefined>(undefined);
 
   const fetchRows = useCallback(async () => {
     if (!organizationId || !barberoId) return;
@@ -80,6 +87,31 @@ export function BarberSucursalesGeneralSection({
   const recurrentesVigentes = recurrentes.filter(r =>
     !r.fecha_fin || new Date(r.fecha_fin) >= hoy
   );
+
+  /** Pide confirmar solo si mover la principal deja al barbero sin ninguna asignación vigente en la sucursal que deja. */
+  const requestChangePrincipal = (newSucursalId: string) => {
+    if (!newSucursalId || newSucursalId === principal?.sucursal_id) return;
+    if (principal && pierdePertenenciaAlMoverPrincipal(rows, principal.sucursal_id, todayLocalIso())) {
+      void contarTareasAutomaticasActivas({ organizationId, sucursalId: principal.sucursal_id, barberoId }).then(n => {
+        if (n === 0) { void handleChangePrincipal(newSucursalId); return; }
+        setMoveTareasAuto(n);
+        setMoveTarget(newSucursalId);
+      });
+      return;
+    }
+    void handleChangePrincipal(newSucursalId);
+  };
+
+  const requestDelete = (row: BarberoSucursalRow) => {
+    setDeleteTarget(row);
+    const delPar = rows.filter(r => r.sucursal_id === row.sucursal_id);
+    if (pierdePertenenciaAlQuitar(delPar, row.id, todayLocalIso())) {
+      setDeleteTareasAuto(undefined);
+      void contarTareasAutomaticasActivas({ organizationId, sucursalId: row.sucursal_id, barberoId }).then(setDeleteTareasAuto);
+    } else {
+      setDeleteTareasAuto(0);
+    }
+  };
 
   const handleChangePrincipal = async (newSucursalId: string) => {
     if (!newSucursalId || newSucursalId === principal?.sucursal_id) return;
@@ -140,7 +172,7 @@ export function BarberSucursalesGeneralSection({
             <Label className="text-xs text-muted-foreground">Sucursal principal</Label>
             <Select
               value={principal?.sucursal_id ?? ''}
-              onValueChange={handleChangePrincipal}
+              onValueChange={requestChangePrincipal}
               disabled={savingPrincipal}
             >
               <SelectTrigger className="h-8 text-xs">
@@ -210,8 +242,8 @@ export function BarberSucursalesGeneralSection({
                     </div>
                     {canManageRecurrentes && (
                       <Button
-                        variant="ghost" size="icon" className="h-7 w-7"
-                        onClick={() => setDeleteTarget(r)}
+                        variant="ghost" size="icon" className="h-7 w-7" aria-label="Eliminar asignación"
+                        onClick={() => requestDelete(r)}
                       >
                         <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
@@ -245,10 +277,32 @@ export function BarberSucursalesGeneralSection({
             <AlertDialogDescription>
               Se quitará la asignación recurrente a {deleteTarget ? sucursalName(deleteTarget.sucursal_id) : ''}.
             </AlertDialogDescription>
+            <TareasAutomaticasPausaAviso tipo="asignacion" cantidad={deleteTareasAuto} />
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mover la sucursal principal: solo se confirma si deja al barbero sin asignación vigente en la anterior */}
+      <AlertDialog open={!!moveTarget} onOpenChange={(o) => { if (!o) setMoveTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cambiar sucursal principal</AlertDialogTitle>
+            <AlertDialogDescription>
+              La sucursal principal pasa de {principal ? sucursalName(principal.sucursal_id) : ''} a {moveTarget ? sucursalName(moveTarget) : ''}.
+            </AlertDialogDescription>
+            <TareasAutomaticasPausaAviso tipo="asignacion" cantidad={moveTareasAuto} />
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { const destino = moveTarget; setMoveTarget(null); if (destino) void handleChangePrincipal(destino); }}
+            >
+              Cambiar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
