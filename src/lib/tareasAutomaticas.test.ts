@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { todayLocalIso } from '@/hooks/useBarberosSucursales';
+import { resetBrowserClock, setBrowserClock } from '@/test/browserClock';
+import { todayInTimezoneIso } from './dateUtils';
 import { describePausa, pierdePertenenciaAlMoverPrincipal, pierdePertenenciaAlQuitar, sostienePertenencia, textoAvisoPausa, type AsignacionBarbero } from './tareasAutomaticas';
 
 describe('describePausa', () => {
@@ -80,5 +83,51 @@ describe('pierdePertenenciaAlMoverPrincipal (aviso al cambiar la sucursal princi
   });
   it('las asignaciones de otras sucursales no cuentan para la que se deja', () => {
     expect(pierdePertenenciaAlMoverPrincipal([fila('p', 'principal', 'S1'), fila('r', 'recurrente', 'S2')], 'S1', HOY)).toBe(true);
+  });
+});
+
+describe('vigencia de temporales con el "hoy" de la organización (coincide con la base, no con el navegador)', () => {
+  afterEach(resetBrowserClock);
+
+  const BA = 'America/Argentina/Buenos_Aires'; // UTC-3
+  const AUCKLAND = 'Pacific/Auckland'; // UTC+13 en octubre
+  // 2026-10-13T02:00Z = 12/10 23:00 en Buenos Aires y 13/10 15:00 en Auckland.
+  // 2026-10-12T20:00Z = 12/10 17:00 en Buenos Aires y 13/10 09:00 en Auckland.
+  const casos: Array<[string, string, string, string, string | null, string | null, boolean]> = [
+    // descripción, zona de la organización, zona del navegador, instante, inicio, fin, ¿sostiene la pertenencia?
+    ['vence en el límite: hoy es su último día en la organización', BA, AUCKLAND, '2026-10-13T02:00:00Z', null, '2026-10-12', true],
+    ['venció ayer en la organización aunque el navegador todavía esté en ese día', AUCKLAND, BA, '2026-10-12T20:00:00Z', null, '2026-10-12', false],
+    ['empieza en el límite: hoy es su primer día en la organización', AUCKLAND, BA, '2026-10-12T20:00:00Z', '2026-10-13', '2026-10-20', true],
+    ['empieza mañana en la organización aunque el navegador ya esté en ese día', BA, AUCKLAND, '2026-10-13T02:00:00Z', '2026-10-13', '2026-10-20', false],
+  ];
+
+  it.each(casos)('%s', (_desc, zonaOrg, zonaNavegador, instante, ini, fin, esperado) => {
+    setBrowserClock(zonaNavegador, instante);
+    const hoyOrg = todayInTimezoneIso(zonaOrg);
+    const hoyNavegador = todayLocalIso();
+    expect(hoyOrg).not.toBe(hoyNavegador); // el navegador y la organización están en días distintos
+    const temporal = fila('t', 'temporal', 'S1', ini, fin);
+    expect(sostienePertenencia(temporal, hoyOrg)).toBe(esperado);
+    // Con la fecha del navegador la respuesta sería la contraria: el aviso tiene que usar la de la organización.
+    expect(sostienePertenencia(temporal, hoyNavegador)).toBe(!esperado);
+  });
+
+  it('principal y recurrente dan lo mismo con cualquiera de los dos días', () => {
+    setBrowserClock(AUCKLAND, '2026-10-13T02:00:00Z');
+    for (const hoy of [todayInTimezoneIso(BA), todayLocalIso()]) {
+      expect(sostienePertenencia(fila('p', 'principal'), hoy)).toBe(true);
+      expect(sostienePertenencia(fila('r', 'recurrente'), hoy)).toBe(true);
+    }
+  });
+
+  it('los avisos de quitar y de mover la principal usan el día de la organización', () => {
+    setBrowserClock(AUCKLAND, '2026-10-13T02:00:00Z');
+    const hoyOrg = todayInTimezoneIso(BA); // 2026-10-12; el navegador diría 2026-10-13
+    // La temporal vence hoy en la organización: sigue sosteniendo la pertenencia.
+    const venceHoy = fila('t', 'temporal', 'S1', null, '2026-10-12');
+    expect(pierdePertenenciaAlQuitar([fila('r', 'recurrente'), venceHoy], 'r', hoyOrg)).toBe(false);
+    expect(pierdePertenenciaAlQuitar([fila('r', 'recurrente'), venceHoy], 'r', todayLocalIso())).toBe(true);
+    expect(pierdePertenenciaAlMoverPrincipal([fila('p', 'principal', 'S1'), venceHoy], 'S1', hoyOrg)).toBe(false);
+    expect(pierdePertenenciaAlMoverPrincipal([fila('p', 'principal', 'S1'), venceHoy], 'S1', todayLocalIso())).toBe(true);
   });
 });

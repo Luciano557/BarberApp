@@ -25,9 +25,10 @@ import {
 } from '@/hooks/useBarberosSucursales';
 import { WeekdayPicker, formatDiasSemana } from './WeekdayPicker';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { todayInTimezoneIso } from '@/lib/dateUtils';
 import { TareasAutomaticasPausaAviso } from '@/components/tareas/TareasAutomaticasPausaAviso';
 import { contarTareasAutomaticasActivas, pierdePertenenciaAlMoverPrincipal, pierdePertenenciaAlQuitar } from '@/lib/tareasAutomaticas';
-import { todayLocalIso } from '@/hooks/useBarberosSucursales';
 
 interface Props {
   barberoId: string;
@@ -48,6 +49,7 @@ export function BarberSucursalesGeneralSection({
   barberoId, organizationId, sucursales, onPrincipalChanged, onVerConfig,
 }: Props) {
   const { isOwner, isGeneralManager } = useAuth();
+  const { organization } = useOrganization();
   const canManageRecurrentes = isOwner || isGeneralManager;
   const bs = useBarberosSucursales(organizationId);
 
@@ -88,10 +90,13 @@ export function BarberSucursalesGeneralSection({
     !r.fecha_fin || new Date(r.fecha_fin) >= hoy
   );
 
+  /** "Hoy" de la organización (igual que la base), no el del navegador: decide qué temporales cuentan como vigentes. */
+  const hoyOrganizacion = () => todayInTimezoneIso(organization?.timezone);
+
   /** Pide confirmar solo si mover la principal deja al barbero sin ninguna asignación vigente en la sucursal que deja. */
   const requestChangePrincipal = (newSucursalId: string) => {
     if (!newSucursalId || newSucursalId === principal?.sucursal_id) return;
-    if (principal && pierdePertenenciaAlMoverPrincipal(rows, principal.sucursal_id, todayLocalIso())) {
+    if (principal && pierdePertenenciaAlMoverPrincipal(rows, principal.sucursal_id, hoyOrganizacion())) {
       void contarTareasAutomaticasActivas({ organizationId, sucursalId: principal.sucursal_id, barberoId }).then(n => {
         if (n === 0) { void handleChangePrincipal(newSucursalId); return; }
         setMoveTareasAuto(n);
@@ -105,7 +110,7 @@ export function BarberSucursalesGeneralSection({
   const requestDelete = (row: BarberoSucursalRow) => {
     setDeleteTarget(row);
     const delPar = rows.filter(r => r.sucursal_id === row.sucursal_id);
-    if (pierdePertenenciaAlQuitar(delPar, row.id, todayLocalIso())) {
+    if (pierdePertenenciaAlQuitar(delPar, row.id, hoyOrganizacion())) {
       setDeleteTareasAuto(undefined);
       void contarTareasAutomaticasActivas({ organizationId, sucursalId: row.sucursal_id, barberoId }).then(setDeleteTareasAuto);
     } else {

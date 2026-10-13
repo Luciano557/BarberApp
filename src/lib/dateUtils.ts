@@ -127,6 +127,29 @@ export function formatDateForQuery(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Mismo respaldo que usa la base cuando `organizations.timezone` falta o no es válida (`_tareas_auto_hoy`). */
+const TIMEZONE_RESPALDO = 'America/Argentina/Buenos_Aires';
+
+/**
+ * "Hoy" (YYYY-MM-DD) en la zona horaria de la organización, NO en la del navegador.
+ * Es el mismo día que calcula la base con `organizations.timezone` para Tareas automáticas
+ * (`_tareas_auto_hoy`): si la zona falta o no es válida, usa Buenos Aires como ella.
+ */
+export function todayInTimezoneIso(timezone?: string | null, now: Date = new Date()): string {
+  for (const tz of [timezone, TIMEZONE_RESPALDO]) {
+    if (!tz) continue;
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
+      const get = (type: string) => parts.find(p => p.type === type)?.value;
+      const y = get('year'), m = get('month'), d = get('day');
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch {
+      // zona inválida: probar el respaldo
+    }
+  }
+  return now.toISOString().slice(0, 10);
+}
+
 /**
  * Convierte "2026-04-15" → "Martes 15 de abril"
  */

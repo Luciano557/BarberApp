@@ -24,6 +24,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { todayInTimezoneIso } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -70,6 +72,7 @@ const ROLE_LABELS: Record<string, string> = {
  */
 export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId, highlightBarberoId }: Props) {
   const { isOwner, isGeneralManager, isManager } = useAuth();
+  const { organization } = useOrganization();
   const canCreateRecurrente = isOwner || isGeneralManager;
   const canCreateTemporal = isOwner || isGeneralManager || isManager;
   const canDeleteRecurrente = isOwner || isGeneralManager;
@@ -346,7 +349,8 @@ export function EquipoSucursalPanel({ sucursalId, sucursalNombre, organizationId
   const openDelete = async (row: BarberoSucursalRow) => {
     setDeleteTarget(row);
     setDeleteFutureCount(null);
-    if (pierdePertenenciaAlQuitar(grouped[row.barbero_id] ?? [], row.id, todayLocalIso())) {
+    // La vigencia de una temporal la decide el "hoy" de la organización (igual que la base), no el del navegador.
+    if (pierdePertenenciaAlQuitar(grouped[row.barbero_id] ?? [], row.id, todayInTimezoneIso(organization?.timezone))) {
       setDeleteTareasAuto(undefined);
       void contarTareasAutomaticasActivas({ organizationId, sucursalId, barberoId: row.barbero_id }).then(setDeleteTareasAuto);
     } else {
