@@ -140,6 +140,16 @@ Vercel `barber-app` confirmó **Ready / Production / Current**, main, dominio
 corrección de identidad detectada después se validó, aplicó y redeplegó en
 partner-program v3; su código/documentación se publican con el mismo orden.
 
+Cierre funcional verificado: `d3439ec8e13c891fa146cade6e649c066d49fcc6` en
+origin/main y production/main, comprobando el original antes del fork. Vercel
+deployment `D2tfeeKbPzB47HqL4N81v52RZD6X`: **Ready / Production / Current**, ese
+commit, main y www.vittro.com.ar (build de 30 segundos). El cierre documental
+posterior conserva el mismo código. Inspección final: cinco migraciones,
+readiness habilitado, Vault sin SELECT para anon/authenticated y worker 200.
+Los archivos temporales de rollout con claves se retiraron del workspace;
+no se añadieron a Git. El cambio preexistente de supabase/.temp/cli-latest
+se preservó fuera de los commits.
+
 QA sobre el dominio real: /aliados muestra condiciones y niveles; “Soy creador”
 abre el formulario habilitado; Homepage “Crear mi código” enlaza /aliados sin
 errores de consola. Formulario a 390px sin overflow. /admin/aliados sin sesión
