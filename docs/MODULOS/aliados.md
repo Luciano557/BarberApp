@@ -25,6 +25,11 @@ Deshabilitar altas conservando billing permite terminar obligaciones existentes.
 
 ## Interfaces y recorrido
 
+Build visual independiente del motor: superficies integradas con los DTO aprobados,
+con DESIGN.md, DrawerForm y primitives existentes. QA sintético de las tres
+superficies y sus drawers completado antes de publicar; reporte versionado,
+capturas locales. La validación financiera continúa en la etapa de lógica.
+
 Homepage enlaza `/aliados`, que explica beneficios y condiciones versión
 2026-10-14-v1. `/aliados/panel` se monta fuera de TenantProviders: usa la sesión
 Auth compartida para owners, pero no exige organización a creadores externos.
