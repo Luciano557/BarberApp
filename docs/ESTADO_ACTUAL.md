@@ -1,6 +1,40 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-10-12
+Última actualización: 2026-10-14
+
+## Programa de aliados — backend aplicado, frontend preparado
+
+Implementados localmente: entrada “Crear mi código” en Homepage, `/aliados`,
+`/aliados/panel` sin providers tenant, ingreso/alta/recuperación, código en signup,
+datos de cobro, niveles/progreso/comisiones, y `/admin/aliados` con convenios,
+verificación de titularidad, liquidaciones, comprobantes e incidencias.
+
+Motor: centavos exactos, snapshot de cotización para intro 10%, comisiones
+10/20/30% o convenio hasta 100%, calificación acumulada por dos ciclos, hold
+30 días y ajustes por reversión. Checkout tiene ruta promocional separada;
+webhook reanuda la etapa del aliado en duplicados ya procesados por billing.
+Worker: outbox durable, renovación al catálogo vigente con reconciliador CAS
+actual, lectura del pago real para devoluciones, liberación y refresh Instagram.
+OAuth: state consumible, métricas oficiales, token AES-GCM, default deshabilitado.
+
+Excepción directa de DB/RLS y producción autorizada por el usuario. Cuatro
+migraciones propias aplicadas; 19 tablas con RLS sin lectura cliente directa,
+funciones propias INVOKER, trigger Auth adaptado tras reportarlo y guard de hash.
+Cinco Edge Functions publicadas; cron periódico con Vault/HMAC y Auth allowlist
+configurados. Backend probado con rollback: cero fixtures persistentes. Alta
+cerrada hasta publicar frontend; Instagram requiere cuenta externa real.
+No hubo cargos ni transferencias. Evidencia: `docs/ALIADOS_PRODUCCION.md`.
+
+Evidencia local: 34 pruebas de dominio + 3 de acceso/recuperación UI, seis pruebas
+de barreras HTTP Deno sin permiso de red; build, lint focal y chequeo Deno de las
+cinco funciones involucradas.
+Regresión final aprobada: 200 Vitest, 32 Deno y 26 PostgreSQL/PGlite, incluidos los casos existentes.
+QA Playwright con tráfico remoto interceptado:
+9 escenarios a 390/768/1440px, landing/panel/Admin y drawers, importes de
+$99.999.999 y $1.234.567.890 sin scroll horizontal ni errores de página. Artefactos
+en `.impeccable/review/partners/`, ejecutor `supabase/tests/partners-ui-qa.cjs`.
+TypeScript de app conserva cinco errores preexistentes documentados, sin errores
+nuevos de Aliados. Detalle y pendientes: `docs/MODULOS/aliados.md`.
 
 ## Notificaciones — Etapa 1 de seguridad
 

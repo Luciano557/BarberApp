@@ -57,6 +57,12 @@ la dejó obsoleta.
 
 ## Módulos documentados en `MODULOS/`
 
+- [x] `aliados.md` — programa, motor, portal público, panel y Admin. DB/RLS y
+  backend aplicados por excepción autorizada; estado de publicación y habilitación
+  en `docs/ALIADOS_PRODUCCION.md`. Contrato: `docs/ALIADOS_LOVABLE_ENTREGA.md`.
+  Instagram y recepción financiera real pendientes; no confundir QA sintético
+  con pagos reales.
+
 - [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
 - [x] `acceso-tenant.md` — Restauración de sesión, carga del contexto tenant y recuperación de fallos
 - [x] `turnos-agenda.md` — Configuración de reservas, Portal público, Horarios de trabajo

@@ -1,5 +1,32 @@
 # Decisiones de arquitectura y criterio — Vittro
 
+## Aliados: altas automáticas y liquidación humana — 2026-10-14
+
+Plan aprobado: cliente owner y creador externo comparten el programa; la identidad
+externa no crea tenant ni roles operativos. Instagram aporta un nivel inicial
+verificado, mientras 5/20 barberías con dos pagos distintos aportan progreso
+acumulativo. Un contador declarado por el creador no puede mejorar su comisión.
+
+La comunidad recibe 10% en el primer mes pagado; la comisión es 10/20/30% del
+importe cobrado después del descuento, antes de costos del procesador, o convenio
+vigente hasta 100%. Tasa y términos se congelan al primer checkout. Código solo
+en signup evita atribución retrospectiva. Hold 30 días y libro de ajustes cubren
+reversiones; transferencia mensual humana evita introducir pagos automáticos
+antes de verificar titularidad y confiabilidad del circuito.
+
+La entrega comenzó como contrato para Lovable. El usuario autorizó después la
+excepción puntual de DB/RLS y producción: «podemos ir a produccion directamente».
+Se aplicaron solo cuatro migraciones del programa, sin reordenar el historial
+anterior. Se reportó handle_new_user antes de modificar su SECURITY DEFINER;
+un guard de hash asegura que el original sea el revisado. Las funciones propias
+nuevas son INVOKER, solo service_role, y vuelven a validar identidad/scope.
+Un bloqueo por identidad sustituye FOR UPDATE sobre Auth, evitando ampliar
+los permisos de esa tabla. La extensión oficial pg_net fue reportada antes de
+habilitarla; cron consulta Vault y envía HMAC de vida corta, no el secreto fijo.
+SQL sintético y rollback productivo complementan las pruebas TS; no equivalen
+a pagos reales de Mercado Pago. Instagram requiere una verificación oficial
+externa real. Detalle y evidencia: `docs/MODULOS/aliados.md` y `docs/ALIADOS_PRODUCCION.md`.
+
 Registro del "por qué", no del "qué". Para el estado actual de cada módulo,
 ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el

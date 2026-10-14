@@ -98,6 +98,14 @@ Cuatro superficies con objetivos distintos, que no deben contaminarse entre sí:
 
 ## Capabilities and Constraints
 
+Programa de aliados (2026-10-14): motor y datos/RLS publicados en producción
+con excepción autorizada; frontend pendiente de publicar. Admite owners
+existentes y creadores con identidad Auth de plataforma sin tenant. Suma una
+entrada pública Persuade, un panel Operate propio y control de convenios/
+liquidaciones en Admin; conserva el núcleo visual y no agrega roles tenant.
+El beneficio se atribuye solo al alta de una barbería nueva, con comisión por
+primer cobro y pago mensual humano. Estado y detalle: `docs/MODULOS/aliados.md`.
+
 Capacidades principales: Cobrar (registro de cobros), Caja (resumen diario y
 cierres), Turnos/Agenda (incluye el portal público de reservas), Clientes,
 Finanzas (sueldos, gastos, inversiones, deudas, estadísticas), Tareas, Mi
