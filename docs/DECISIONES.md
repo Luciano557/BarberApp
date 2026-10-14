@@ -16,14 +16,19 @@ antes de verificar titularidad y confiabilidad del circuito.
 
 La entrega comenzó como contrato para Lovable. El usuario autorizó después la
 excepción puntual de DB/RLS y producción: «podemos ir a produccion directamente».
-Se aplicaron solo cuatro migraciones del programa, sin reordenar el historial
+Se aplicaron solo cinco migraciones del programa, sin reordenar el historial
 anterior. Se reportó handle_new_user antes de modificar su SECURITY DEFINER;
 un guard de hash asegura que el original sea el revisado. Las funciones propias
 nuevas son INVOKER, solo service_role, y vuelven a validar identidad/scope.
 Un bloqueo por identidad sustituye FOR UPDATE sobre Auth, evitando ampliar
 los permisos de esa tabla. La extensión oficial pg_net fue reportada antes de
 habilitarla; cron consulta Vault y envía HMAC de vida corta, no el secreto fijo.
-SQL sintético y rollback productivo complementan las pruebas TS; no equivalen
+GoTrue aplica app_metadata después de insertar el usuario. La prueba de API real
+detectó ese orden; el alta externa ahora reserva una intención privada de un uso
+que el trigger consume por email/nonce, antes de crear cualquier tenant. Un dato
+de user_metadata sin esa intención no puede saltar el aprovisionamiento ni
+asignar account_kind. Se agregó regresión del orden INSERT/UPDATE.
+SQL sintético, rollback y prueba Auth/API productiva complementan las pruebas TS; no equivalen
 a pagos reales de Mercado Pago. Instagram requiere una verificación oficial
 externa real. Detalle y evidencia: `docs/MODULOS/aliados.md` y `docs/ALIADOS_PRODUCCION.md`.
 

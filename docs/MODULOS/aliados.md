@@ -1,8 +1,8 @@
 # Programa de aliados
 
-Estado 2026-10-14: motor y datos/RLS aplicados al proyecto operativo con excepción
-directa autorizada; frontend validado localmente, pendiente de publicar. Alta
-cerrada hasta verificar frontend. Instagram deshabilitado. Evidencia y estado
+Estado 2026-10-14: motor, datos/RLS y frontend publicados y habilitados en el
+proyecto operativo con excepción directa autorizada. Alta abierta y worker
+periódico activo. Instagram deshabilitado. Evidencia y estado
 de rollout: [ALIADOS_PRODUCCION.md](../ALIADOS_PRODUCCION.md).
 
 Reglas: 10/20/30% del primer cobro después del descuento, antes de costos de
@@ -33,7 +33,9 @@ capturas locales. La validación financiera continúa en la etapa de lógica.
 Homepage enlaza `/aliados`, que explica beneficios y condiciones versión
 2026-10-14-v1. `/aliados/panel` se monta fuera de TenantProviders: usa la sesión
 Auth compartida para owners, pero no exige organización a creadores externos.
-Alta externa pasa por Edge y Auth admin con account_kind protegido; el email
+Alta externa pasa por Edge y Auth admin con account_kind protegido; una intención
+privada de un uso permite al trigger reconocerla antes de que GoTrue actualice
+app_metadata. El cliente no puede fabricar esa intención. El email
 se confirma mediante un enlace nativo de Supabase. El código se crea después
 de email confirmado y aceptación autenticada. Recuperación de contraseña usa
 la identidad del enlace, sin pedir un email nuevo. Callback/login generales
@@ -66,11 +68,15 @@ Regresión final: 200 pruebas Vitest en 28 archivos y 32 Deno (24 de Admin
 existentes, seis del nuevo handler HTTP y dos de firmas del worker), aprobadas. `tsc -p
 tsconfig.app.json --noEmit` conserva los cinco errores preexistentes de
 abortSignal/readRetry documentados, sin errores en las superficies nuevas.
-Las cuatro migraciones pasan 26 pruebas PostgreSQL/PGlite: RLS, ACL, unicidad,
+Las cinco migraciones pasan 27 pruebas PostgreSQL/PGlite: RLS, ACL, unicidad,
 snapshot, efectos recalculados, leases, reversiones, lotes y Storage restrictivo.
-Se ajustó el permiso del entorno sintético para reflejar que service_role solo
+Se agregó el orden real de GoTrue (INSERT y después app_metadata), nonce
+no falsificable/expiración/consumo, y se ajustó el entorno para que service_role solo
 lee Auth. La prueba productiva con rollback comprobó alta externa sin tenant,
 signup referido con trial intacto, cotización y privacidad; no dejó fixtures.
+Prueba real Auth/API con cuenta temporal: login nativo, alta sin organización
+ni sucursal/trial, adhesión idempotente, 10% inicial, código normalizado, resumen
+y rechazo a Admin/datos bancarios crudos. Cuenta y datos temporales eliminados.
 
 Worker y cron productivos verificados; comprobantes privados y Auth allowlist
 configurados. Pendientes: recepción financiera real de primer/segundo cobro y

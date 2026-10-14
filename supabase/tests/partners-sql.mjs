@@ -100,15 +100,15 @@ try {
     REVOKE UPDATE ON auth.users FROM service_role;
     INSERT INTO subscription_plans(code,name,amount_ars,sort_order) VALUES('basico','Basico',30000,1),('premium','Premium',50000,2);
   `);
-  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql']) {
+  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql','20261014130400_partner_identity_intent.sql']) {
     await db.transaction(tx=>read(`supabase/migrations/${file}`).then(sql=>tx.exec(sql)));
   }
-  await test('new functions are invoker and all 19 tables have RLS',async()=>{
+  await test('new functions are invoker and all 20 tables have RLS',async()=>{
     assert.equal((await scalar(`SELECT count(*)::int n FROM pg_proc WHERE proname LIKE 'partner_%' AND prosecdef`)).n,0);
     assert.equal((await scalar(`SELECT count(*)::int n FROM pg_class WHERE relname IN ('partners','partner_program_config','partner_agreements',
       'partner_instagram_accounts','partner_instagram_credentials','partner_oauth_states','partner_payout_accounts','partner_referrals',
       'partner_checkout_quotes','partner_payment_receipts','partner_commissions','partner_adjustments','partner_payout_batches',
-      'partner_payout_items','partner_payout_entries','partner_incidents','partner_jobs','partner_public_limits','partner_operations') AND relrowsecurity`)).n,19);
+      'partner_payout_items','partner_payout_entries','partner_incidents','partner_jobs','partner_public_limits','partner_operations','partner_identity_intents') AND relrowsecurity`)).n,20);
   });
   await test('anon and tenant roles cannot execute any privileged partner helper',async()=>{
     for(const role of ['anon','authenticated']) await db.transaction(async tx=>{
@@ -124,6 +124,22 @@ try {
     assert.equal((await scalar('SELECT organization_id FROM profiles WHERE id=$1',[creator])).organization_id,null);
     assert.equal((await scalar('SELECT count(*)::int n FROM user_roles WHERE user_id=$1',[creator])).n,0);
     assert.equal((await scalar('SELECT count(*)::int n FROM organizations')).n,0);
+  });
+  await test('one-use identity intent survives GoTrue INSERT-before-app-metadata order without provisioning a tenant',async()=>{
+    const id=randomUUID();const email=`${id}@synthetic.invalid`;
+    const nonce=await db.transaction(async tx=>{await tx.exec('SET LOCAL ROLE service_role');return (await tx.query(
+      'SELECT partner_begin_identity($1) AS nonce',[email])).rows[0].nonce;});
+    await db.query(`INSERT INTO auth.users(id,email,raw_app_meta_data,raw_user_meta_data) VALUES($1,$2,'{"provider":"email"}',$3)`,
+      [id,email,JSON.stringify({full_name:'Native Order Fixture',partner_signup_nonce:nonce})]);
+    await db.query(`UPDATE auth.users SET raw_app_meta_data=raw_app_meta_data||'{"account_kind":"partner"}',email_confirmed_at=now() WHERE id=$1`,[id]);
+    const profile=await scalar('SELECT organization_id,default_sucursal_id FROM profiles WHERE id=$1',[id]);
+    assert.equal(profile.organization_id,null); assert.equal(profile.default_sucursal_id,null);
+    assert.equal((await scalar('SELECT count(*)::int n FROM organizations')).n,0);
+    assert.equal((await scalar('SELECT count(*)::int n FROM partner_identity_intents WHERE nonce=$1',[nonce])).n,0);
+    await denied(user('owner',{partner_signup_nonce:nonce}),'INVALID_PARTNER_IDENTITY_INTENT');
+    await denied(user('owner',{partner_signup_nonce:randomUUID()}),'INVALID_PARTNER_IDENTITY_INTENT');
+    await db.transaction(async tx=>{await tx.exec('SET LOCAL ROLE authenticated');await assert.rejects(
+      tx.query('SELECT partner_begin_identity($1)',[email]),/permission denied/);});
   });
   await test('code uniqueness and actor identity are enforced',async()=>{
     await denied(enroll(second,'CREADOR1'),'ALREADY_ENROLLED');

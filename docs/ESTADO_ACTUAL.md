@@ -2,9 +2,9 @@
 
 Última actualización: 2026-10-14
 
-## Programa de aliados — backend aplicado, frontend preparado
+## Programa de aliados — publicado y habilitado
 
-Implementados localmente: entrada “Crear mi código” en Homepage, `/aliados`,
+Publicados: entrada “Crear mi código” en Homepage, `/aliados`,
 `/aliados/panel` sin providers tenant, ingreso/alta/recuperación, código en signup,
 datos de cobro, niveles/progreso/comisiones, y `/admin/aliados` con convenios,
 verificación de titularidad, liquidaciones, comprobantes e incidencias.
@@ -17,18 +17,21 @@ Worker: outbox durable, renovación al catálogo vigente con reconciliador CAS
 actual, lectura del pago real para devoluciones, liberación y refresh Instagram.
 OAuth: state consumible, métricas oficiales, token AES-GCM, default deshabilitado.
 
-Excepción directa de DB/RLS y producción autorizada por el usuario. Cuatro
-migraciones propias aplicadas; 19 tablas con RLS sin lectura cliente directa,
+Excepción directa de DB/RLS y producción autorizada por el usuario. Cinco
+migraciones propias aplicadas; 20 tablas con RLS sin lectura cliente directa,
 funciones propias INVOKER, trigger Auth adaptado tras reportarlo y guard de hash.
 Cinco Edge Functions publicadas; cron periódico con Vault/HMAC y Auth allowlist
-configurados. Backend probado con rollback: cero fixtures persistentes. Alta
-cerrada hasta publicar frontend; Instagram requiere cuenta externa real.
+configurados. Backend probado con rollback y Auth/API reales: cero fixtures
+persistentes, creador sin tenant/trial, código y panel funcionales. Alta abierta;
+Vercel Ready / Production / Current y Git original/fork sincronizados por avance
+normal. Instagram requiere cuenta externa real. Se corrigió el orden real de
+GoTrue con una intención privada de un uso, sin confiar en metadata de navegador.
 No hubo cargos ni transferencias. Evidencia: `docs/ALIADOS_PRODUCCION.md`.
 
 Evidencia local: 34 pruebas de dominio + 3 de acceso/recuperación UI, seis pruebas
 de barreras HTTP Deno sin permiso de red; build, lint focal y chequeo Deno de las
 cinco funciones involucradas.
-Regresión final aprobada: 200 Vitest, 32 Deno y 26 PostgreSQL/PGlite, incluidos los casos existentes.
+Regresión final aprobada: 200 Vitest, 32 Deno y 27 PostgreSQL/PGlite, incluidos los casos existentes.
 QA Playwright con tráfico remoto interceptado:
 9 escenarios a 390/768/1440px, landing/panel/Admin y drawers, importes de
 $99.999.999 y $1.234.567.890 sin scroll horizontal ni errores de página. Artefactos

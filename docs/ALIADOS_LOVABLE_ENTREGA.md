@@ -16,6 +16,13 @@ antes de aplicarlo. El cambio se reportó antes de aplicar y se comprobó el has
 del cuerpo anterior para abortar ante drift. Todas las funciones propias nuevas
 son SECURITY INVOKER.
 
+Implementación productiva: GoTrue aplica app_metadata después de INSERT. Edge
+reserva una intención privada (`partner_identity_intents`, nonce/email/expiración
+10 minutos) antes de crear la identidad y envía su nonce en user_metadata. El
+trigger solo omite tenant si consume una intención válida de ese email; un nonce
+inventado/repetido aborta signup. No se confía en un account_kind declarado por
+el usuario. La quinta migración y pruebas reproducen el orden real de Auth.
+
 Crear el perfil sin tenant para poder reutilizar Auth, confirmación nativa por
 magic link y recuperación de contraseña. Las cuentas existentes owner conservan
 su organización y perfil. No aceptar account_kind desde user_metadata ni

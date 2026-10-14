@@ -182,15 +182,25 @@ export async function handlePartnerRequest(req: Request): Promise<Response> {
         ) {
           throw new PartnerError('INVALID_REQUEST', 400);
         }
-        const { error } = await client.auth.admin.createUser({
-          email,
-          password: input.password,
-          email_confirm: false,
-          app_metadata: { account_kind: 'partner' },
-          user_metadata: { full_name: name, country: 'AR' },
-        });
-        if (error && !['email_exists', 'user_already_exists'].includes(error.code ?? ''))
-          throw new PartnerError('REGISTRATION_FAILED', 503);
+        // GoTrue writes app_metadata after INSERT; the Auth trigger needs a
+        // server-issued one-use intent BEFORE it provisions any tenant.
+        const intent = await client.rpc('partner_begin_identity', { _email: email });
+        if (intent.error || typeof intent.data !== 'string') throw new PartnerError('REGISTRATION_FAILED', 503);
+        try {
+          const { error } = await client.auth.admin.createUser({
+            email,
+            password: input.password,
+            email_confirm: false,
+            app_metadata: { account_kind: 'partner' },
+            user_metadata: { full_name: name, country: 'AR', partner_signup_nonce: intent.data },
+          });
+          if (error && !['email_exists', 'user_already_exists'].includes(error.code ?? ''))
+            throw new PartnerError('REGISTRATION_FAILED', 503);
+        } finally {
+          // Successful INSERT already consumed it. Failed/duplicate attempts
+          // are discarded; an interrupted cleanup expires automatically.
+          await client.rpc('partner_cancel_identity', { _nonce: intent.data });
+        }
       }
       // Native Auth sends the email; no access token or confirmation link reaches this response.
       const { error } = await anonClient().auth.signInWithOtp({

@@ -98,8 +98,8 @@ Cuatro superficies con objetivos distintos, que no deben contaminarse entre sí:
 
 ## Capabilities and Constraints
 
-Programa de aliados (2026-10-14): motor y datos/RLS publicados en producción
-con excepción autorizada; frontend pendiente de publicar. Admite owners
+Programa de aliados (2026-10-14): publicado y habilitado en producción
+con excepción autorizada de DB/RLS. Admite owners
 existentes y creadores con identidad Auth de plataforma sin tenant. Suma una
 entrada pública Persuade, un panel Operate propio y control de convenios/
 liquidaciones en Admin; conserva el núcleo visual y no agrega roles tenant.

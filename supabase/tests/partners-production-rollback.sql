@@ -5,17 +5,21 @@ SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s';
 UPDATE public.partner_program_config SET enrollment_enabled=true,billing_ready=true;
 DO $test$
 DECLARE _external uuid:=gen_random_uuid(); _other uuid:=gen_random_uuid(); _owner uuid:=gen_random_uuid();
-  _tenant uuid; _branch uuid; _result jsonb; _plan subscription_plans%ROWTYPE;
+  _tenant uuid; _branch uuid; _result jsonb; _plan subscription_plans%ROWTYPE; _nonce uuid;
   _code text:='QA'||upper(left(replace(_external::text,'-',''),16)); _before bigint;
 BEGIN
   SELECT count(*) INTO _before FROM organizations;
+  PERFORM set_config('role','service_role',true);
+  _nonce:=partner_begin_identity(_external||'@synthetic.invalid');
+  PERFORM set_config('role','postgres',true);
   INSERT INTO auth.users(id,instance_id,aud,role,email,email_confirmed_at,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
     VALUES(_external,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',_external||'@synthetic.invalid',now(),
-      '{"account_kind":"partner"}','{"full_name":"QA Rollback Partner","country":"AR"}',now(),now()),
+      '{"provider":"email"}',jsonb_build_object('full_name','QA Rollback Partner','country','AR','partner_signup_nonce',_nonce),now(),now()),
       (_other,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',_other||'@synthetic.invalid',now(),
       '{"account_kind":"partner"}','{"full_name":"QA Rollback Other","country":"AR"}',now(),now());
+  UPDATE auth.users SET raw_app_meta_data=raw_app_meta_data||'{"account_kind":"partner"}' WHERE id=_external;
   IF (SELECT count(*) FROM organizations)<>_before
-    OR EXISTS(SELECT 1 FROM profiles WHERE id IN (_external,_other) AND organization_id IS NOT NULL)
+    OR EXISTS(SELECT 1 FROM profiles WHERE id IN (_external,_other) AND (organization_id IS NOT NULL OR default_sucursal_id IS NOT NULL))
     OR EXISTS(SELECT 1 FROM user_roles WHERE user_id IN (_external,_other)) THEN RAISE EXCEPTION 'external_created_tenant'; END IF;
   PERFORM set_config('role','service_role',true);
   _result:=partner_program_command(1,'enroll',_external,jsonb_build_object('code',_code,'country','AR','termsVersion','2026-10-14-v1'));
