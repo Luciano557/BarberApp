@@ -101,7 +101,7 @@ Todos son `SECURITY DEFINER`, crean el evento y sus entregas, y dependen de los 
 | `notif_emit_view_event(text, uuid)` | `authenticated` | `SECURITY DEFINER`, `search_path = ''`. Valida usuario, organización, rol de cuenta de sucursal y que `_sucursal_id` sea la de **esa** cuenta. |
 | `notif_emit_login_sucursal_account`, `notif_emit_action_blocked`, `notif_emit_pin_authorized` | Nadie salvo el dueño (revocado a `PUBLIC`, `anon`, `authenticated` y `service_role`) | Nada las invoca todavía; se conservan para su futura implementación |
 | `process_vencimientos_tareas()`, `process_tareas_recurrentes()` | Dueño (cron) y `service_role` | Sin exposición a clientes. Ahora `search_path = ''` |
-| `_tareas_auto_*` y los triggers `trg_tareas_recurrentes_*`, `trg_tareas_auto_sync_*`, `trg_tareas_tipo_guard` (Etapa 2) | Nadie desde un cliente | Ver `docs/MODULOS/tareas.md`; llaman a `_notif_*` siendo `SECURITY DEFINER` del mismo dueño (las migraciones lo verifican) |
+| `_tareas_auto_*` y los triggers `trg_tareas_recurrentes_*`, `trg_tareas_auto_sync_*` (Etapa 2; `trg_tareas_tipo_guard` se eliminó en la Etapa 3) | Nadie desde un cliente | Ver `docs/MODULOS/tareas.md`; llaman a `_notif_*` siendo `SECURITY DEFINER` del mismo dueño (las migraciones lo verifican) |
 | `upsert_notification`, `upsert_notification_delivery` | — | **Eliminadas.** Permitían fabricar/sobrescribir avisos y autosuscribirse |
 
 ## Cómo agregar una notificación nueva
@@ -127,7 +127,7 @@ Todos son `SECURITY DEFINER`, crean el evento y sus entregas, y dependen de los 
 ```bash
 npm install --prefix node_modules/.admin-sql-test --no-package-lock --no-save @electric-sql/pglite@0.5.8
 node supabase/tests/notifications-security-sql.mjs
-node supabase/tests/tareas-automaticas-sql.mjs   # Etapa 2: destinatarios, pausas, aislamiento y permisos (72 pruebas)
+node supabase/tests/tareas-automaticas-sql.mjs   # Etapas 2 y 3: destinatarios, pausas, aislamiento, permisos y reset (82 pruebas)
 ```
 
 `supabase/tests/notifications-security-sql.mjs` carga las migraciones históricas reales sobre
@@ -150,8 +150,9 @@ debilita cada migración.
 - Fuera de esta etapa: RLS de Finanzas (los managers leen todos los `Egresos` de la
   organización); helpers generales de RLS (`has_role`, `get_user_organization_id`… aceptan un
   `user_id` arbitrario); aislar fallos por organización dentro de los demás cron (los de Tareas ya lo hacen desde la Etapa 2) y limpiar
-  zonas horarias históricas; el saneamiento de las tareas `tipo='admin'` históricas y de las Tareas
-  automáticas heredadas (Etapa 3; el motor nuevo ya no genera `admin` ni usa `barberos.id` como usuario);
+  zonas horarias históricas; (el saneamiento de las Tareas legacy ya se hizo en la Etapa 3, 2026-10-13: se borraron
+  las notificaciones de Tareas —incluidas las huérfanas— con sus entregas y lecturas; las `peticion_*` y las de otros módulos
+  quedaron intactas; ver `docs/MODULOS/tareas.md`);
   push (`send-push-notification` solo acepta la clave `service_role`); el bug legado de
   lecturas que reaparecen (`notification_reads`); las funciones `trg_*` siguen siendo
   `SECURITY DEFINER` con `EXECUTE` por defecto (no son invocables como RPC); tres eventos del

@@ -45,6 +45,12 @@ const MUTATIONS = [
   { name: 'day is computed in UTC instead of the organization timezone', file: E2[0], from: `(SELECT o.timezone\n               FROM public.organizations o`, to: `(SELECT 'UTC'::text\n               FROM public.organizations o` },
   { name: 'calendar ignores the N weeks interval', file: E2[0], from: `/ 7) % p_paso = 0`, to: `/ 7) % 1 = 0` },
   { name: 'recipient is the barbero id instead of the barbero users', file: E2[2], from: `SELECT bu AS u FROM public._notif_barbero_users(NEW.organization_id, NEW.asignado_a_id) AS bu`, to: `SELECT NEW.asignado_a_id AS u` },
+  { name: 'Etapa 3 reset selects peticiones too', file: 'supabase/diagnostics/20261013_etapa3_reset_tareas/01_backup.sql', from: "SELECT t.* FROM public.tareas t WHERE t.tipo IN ('admin', 'tarea')\n$f$;", to: "SELECT t.* FROM public.tareas t WHERE t.tipo IN ('admin', 'tarea', 'peticion')\n$f$;" },
+  { name: 'Etapa 3 notification scope accepts an orphan peticion event', file: 'supabase/diagnostics/20261013_etapa3_reset_tareas/01_backup.sql', from: "AND n.type IN ('tarea_pendiente', 'tarea_asignada', 'tarea_equipo_asignada', 'tarea_vencida')\n           AND NOT EXISTS", to: "AND n.type IN ('tarea_pendiente', 'tarea_asignada', 'tarea_equipo_asignada', 'tarea_vencida', 'peticion_vencida')\n           AND NOT EXISTS" },
+  { name: 'Etapa 3 reset does not revalidate against the backup under lock', file: 'supabase/diagnostics/20261013_etapa3_reset_tareas/01_backup.sql', from: "  IF EXISTS (SELECT 1 FROM etapa3_backup.verificar() v WHERE NOT v.ok) THEN\n    RAISE EXCEPTION 'ETAPA3_ABORT: el alcance vivo", to: "  IF false THEN\n    RAISE EXCEPTION 'ETAPA3_ABORT: el alcance vivo" },
+  { name: 'Etapa 3 restore leaves the triggers disabled', file: 'supabase/diagnostics/20261013_etapa3_reset_tareas/01_backup.sql', from: "  ALTER TABLE public.tareas ENABLE TRIGGER USER;\n  ALTER TABLE public.tareas_recurrentes ENABLE TRIGGER USER;\n", to: "" },
+  { name: 'Etapa 3 backup ignores orphan Tareas notifications', file: 'supabase/diagnostics/20261013_etapa3_reset_tareas/01_backup.sql', from: "   WHERE n.source_module = 'tareas'\n     AND n.source_id IS NOT NULL\n", to: "   WHERE n.source_module = 'tareas'\n     AND n.source_id IS NOT NULL\n     AND (EXISTS (SELECT 1 FROM public.tareas t0 WHERE t0.id = n.source_id) OR EXISTS (SELECT 1 FROM public.tareas_recurrentes r0 WHERE r0.id = n.source_id))\n" },
+  { name: '3B keeps admin as a valid tipo', file: '20261013120000_tareas_integridad_post_reset.sql', from: "CHECK (tipo IN ('tarea', 'peticion'));", to: "CHECK (tipo IN ('tarea', 'peticion', 'admin'));" },
   { name: 'in-progress tasks never become overdue', file: E2[2], from: `((t.estado = 'pendiente') OR (t.estado = 'en_progreso' AND t.vencida_at IS NULL))`, to: `(t.estado = 'pendiente')` },
 ];
 const MUT = process.env.MUTATION !== undefined ? MUTATIONS[Number(process.env.MUTATION)] : null;
@@ -65,7 +71,7 @@ const files = (await readdir(DIR)).filter(f => f.endsWith('.sql')).sort();
 const cache = new Map();
 async function read(name) {
   if (!cache.has(name)) {
-    let sql = (await readFile(`${DIR}/${name}`, 'utf8')).replace(/\r/g, '');
+    let sql = (await readFile(name.includes('/') ? name : `${DIR}/${name}`, 'utf8')).replace(/\r/g, '');
     if (MUT && MUT.file === name) {
       const pairs = [[MUT.from, MUT.to], ...(MUT.also ?? [])];
       for (const [from, to] of pairs) {
@@ -1331,6 +1337,216 @@ await test('E2-M5 migrates a pause that carries the old motive to barbero_sin_as
   assert.equal((await fresh.query(`SELECT count(*)::int AS n FROM pg_trigger WHERE tgname='trg_tareas_auto_sync_upd' AND pg_get_triggerdef(oid) ILIKE '%disponible%'`)).rows[0].n, 0, 'no trigger reacts to disponible any more');
   await fresh.close();
 });
+
+// ---------------------------------------------------------------------------------------------------------
+// Etapa 3: backup + reset controlado (supabase/diagnostics/20261013_etapa3_reset_tareas) y migración 3B.
+// Runs the operation scripts exactly as shipped, as the NON-superuser owner, on a dedicated database.
+// ---------------------------------------------------------------------------------------------------------
+const E3_DIR = 'supabase/diagnostics/20261013_etapa3_reset_tareas';
+const E3 = { backup: `${E3_DIR}/01_backup.sql`, verificar: `${E3_DIR}/02_verificar_backup.sql`, ensayo: `${E3_DIR}/03_ensayo_restore.sql`,
+  reset: `${E3_DIR}/04_reset.sql`, post: `${E3_DIR}/05_postcondiciones.sql` };
+const E3B = '20261013120000_tareas_integridad_post_reset.sql';
+/** Runs a whole operation script (it carries its own BEGIN/COMMIT) as the owner; returns the rows of its last SELECT. */
+async function e3run(edb, path) {
+  await edb.exec('SET ROLE app_owner');
+  try {
+    const results = await edb.exec(await read(path));
+    return results.filter(r => r.rows?.length).at(-1)?.rows ?? [];
+  } catch (error) {
+    try { await edb.exec('ROLLBACK'); } catch { /* no open transaction */ }
+    throw error;
+  } finally {
+    await edb.exec('RESET ROLE');
+  }
+}
+const ids = async (edb, sql) => (await edb.query(sql)).rows.map(r => r.id).sort();
+const sorted = list => [...list].sort();
+const disabledTriggers = async q => (await q.query(`SELECT count(*)::int AS n FROM pg_trigger WHERE NOT tgisinternal
+  AND tgrelid IN ('tareas'::regclass,'tareas_recurrentes'::regclass) AND tgenabled <> 'O'`)).rows[0].n;
+
+const X = { R1: id(), R2: id(), RB: id(), A1: id(), A2: id(), A3: id(), TG: id(), TM: id(), P1: id(), P2: id(), TB: id(), PB: id(),
+  N1: id(), N2: id(), N3: id(), N4: id(), N5: id(), N6: id(), N7: id(), PN: id(), PV: id(), O1: id(), O2: id() };
+/** Legacy data like production: admin occurrences, a generated and a manual tarea, peticiones, two organizations,
+ *  Tareas notifications (some orphans), a peticion_* event, another module and a "tarea" word in foreign metadata. */
+async function seedLegacy(edb) {
+  await edb.exec(`SET session_replication_role = replica`);
+  const q = (sql, params) => edb.query(sql, params);
+  await q(`INSERT INTO tareas_recurrentes(id,organization_id,sucursal_id,titulo,assignment_scope,asignado_a,repeat_preset,fecha_inicio,proxima_fecha)
+    VALUES ($1,$4,$5,'R1','team',NULL,'biweekly','2026-05-12','2026-10-13'), ($2,$4,$5,'R2','individual',$7,'daily','2026-05-12','2026-10-13'),
+           ($3,$6,$8,'RB','team',NULL,'weekly','2026-05-12','2026-10-13')`, [X.R1, X.R2, X.RB, W.orgA, W.S1, W.orgB, W.bar1, W.SB1]);
+  const t = `INSERT INTO tareas(id,organization_id,sucursal_id,tipo,titulo,estado,assignment_scope,asignado_a_id,recurrencia_id,fecha_inicio,creado_por_id) VALUES `;
+  await q(t + `($1,$9,$10,'admin','A1','pendiente','team',NULL,$11,'2026-10-01',NULL), ($2,$9,$10,'admin','A2','pendiente','team',NULL,$11,'2026-10-02',NULL),
+    ($3,$9,$10,'admin','A3','pendiente','team',NULL,$11,'2026-10-03',NULL), ($4,$9,$10,'tarea','TG','completada','individual',$12,$13,'2026-10-05',NULL),
+    ($5,$9,$10,'tarea','TM','pendiente','individual',$12,NULL,NULL,NULL), ($6,$9,$10,'peticion','P1','pendiente','individual',NULL,NULL,NULL,$14),
+    ($7,$9,$10,'peticion','P2','aprobada','individual',NULL,NULL,NULL,$14), ($8,$15,$16,'tarea','TB','pendiente','team',NULL,$17,'2026-10-06',NULL)`,
+  [X.A1, X.A2, X.A3, X.TG, X.TM, X.P1, X.P2, X.TB, W.orgA, W.S1, X.R1, W.bar1, X.R2, W.mgrS1, W.orgB, W.SB1, X.RB]);
+  await q(t + `($1,$2,$3,'peticion','PB','pendiente','individual',NULL,NULL,NULL,$4)`, [X.PB, W.orgB, W.SB1, W.ownerB]);
+  const n = `INSERT INTO notifications(id,organization_id,event_key,type,source_module,source_table,source_id,title,metadata) VALUES `;
+  await q(n + `($1,$12,'k1','tarea_asignada','tareas','tareas',$13,'n','{}'), ($2,$12,'k2','tarea_vencida','tareas','tareas',$14,'n','{}'),
+    ($3,$12,'k3','tarea_pendiente','tareas','tareas',$15,'n','{}'), ($4,$12,'k4','tarea_equipo_asignada','tareas','tareas',$16,'n','{}'),
+    ($5,$12,'k5','tarea_automatica_pausada','tareas','tareas_recurrentes',$17,'n','{}'), ($6,$12,'k6','tarea_automatica_pausada','tareas','tareas_recurrentes',$18,'n','{}'),
+    ($7,$19,'k7','tarea_asignada','tareas','tareas',$20,'n','{}'), ($8,$12,'k8','peticion_nueva','tareas','tareas',$21,'n','{}'),
+    ($9,$12,'k9','peticion_vencida','tareas','tareas',$22,'n','{}'), ($10,$12,'k10','turno_nuevo','turnos','turnos',$23,'una tarea de agenda','{}'),
+    ($11,$12,'k11','pin_cambiado','seguridad','sucursal_action_pin_config',NULL,'tarea','{"accion":"tareas.borrar","nota":"tarea_asignada"}')`,
+  [X.N1, X.N2, X.N3, X.N4, X.N5, X.N6, X.N7, X.PN, X.PV, X.O1, X.O2, W.orgA, X.TM, id(), id(), X.TG, X.R2, id(), W.orgB, X.TB, X.P1, id(), id()]);
+  await q(`INSERT INTO notification_deliveries(notification_id,organization_id,user_id)
+    VALUES ($1,$7,$9),($1,$7,$10),($2,$7,$9),($3,$7,$9),($4,$8,$11),($5,$7,$9),($6,$7,$9)`,
+  [X.N1, X.N2, X.N5, X.N7, X.PN, X.O1, W.orgA, W.orgB, W.ownerA, W.mgrS1, W.ownerB]);
+  await q(`INSERT INTO notification_reads(organization_id,user_id,source_type,source_id,notification_id)
+    VALUES ($1,$2,'tarea_asignada',$3,$4),($1,$2,'peticion_nueva',$5,$6),($1,$2,'turno_nuevo',$7,$8)`,
+  [W.orgA, W.ownerA, X.TM, X.N1, X.P1, X.PN, id(), X.O1]);
+  await edb.exec(`SET session_replication_role = origin`);
+}
+const e3 = await build('m5');
+await seedWorld(e3);
+await e3.exec(`DO $g$ BEGIN EXECUTE format('GRANT CREATE ON DATABASE %I TO app_owner', current_database()); END $g$`);
+await seedLegacy(e3);
+const before = {
+  notifications: await ids(e3, `SELECT id FROM notifications`),
+  deliveries: await ids(e3, `SELECT id FROM notification_deliveries`),
+  peticiones: (await e3.query(`SELECT * FROM tareas WHERE tipo='peticion' ORDER BY id`)).rows,
+  barberos_sucursales: (await e3.query(`SELECT * FROM barberos_sucursales ORDER BY id`)).rows,
+};
+const KEEP_NOTIFS = sorted([X.PN, X.PV, X.O1, X.O2]);
+const SCOPE = { notifications: 7, notification_deliveries: 5, notification_reads: 1, tareas: 6, tareas_recurrentes: 3 };
+
+await test('Etapa 3B: the integrity migration refuses to run while legacy admin rows exist (and changes nothing)', async () => {
+  await assert.rejects(asOwner(e3, await read(E3B)), /E3B/);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM pg_constraint WHERE conname='tareas_tipo_check'`)).rows[0].n, 0);
+  assert.equal((await e3.query(`SELECT to_regprocedure('public.trg_tareas_tipo_guard()') IS NOT NULL AS ok`)).rows[0].ok, true);
+});
+await test('Etapa 3 backup: copies exactly the scope (admin and tarea in, peticion out; Tareas events incl. structural orphans in; peticion_*, other modules and "tarea" in metadata out)', async () => {
+  await e3run(e3, E3.backup);
+  assert.deepEqual(await ids(e3, `SELECT id FROM etapa3_backup.tareas`), sorted([X.A1, X.A2, X.A3, X.TG, X.TM, X.TB]));
+  assert.deepEqual(await ids(e3, `SELECT id FROM etapa3_backup.tareas_recurrentes`), sorted([X.R1, X.R2, X.RB]));
+  assert.deepEqual(await ids(e3, `SELECT id FROM etapa3_backup.notifications`), sorted([X.N1, X.N2, X.N3, X.N4, X.N5, X.N6, X.N7]));
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM etapa3_backup.notification_deliveries`)).rows[0].n, 5);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM etapa3_backup.notification_reads`)).rows[0].n, 1);
+  const full = (await e3.query(`SELECT ROW(b.*) IS NOT DISTINCT FROM ROW(t.*) AS same FROM etapa3_backup.tareas b JOIN tareas t USING (id)`)).rows;
+  assert(full.length === 6 && full.every(r => r.same), 'complete rows, not a column subset');
+  const m = Object.fromEntries((await e3.query(`SELECT clave, cantidad, detalle FROM etapa3_backup.manifest`)).rows.map(r => [r.clave, r]));
+  assert.equal(Number(m.tareas.cantidad), 6);
+  assert.deepEqual(m.tareas.detalle.por_tipo, { admin: 3, tarea: 3 });
+  assert.equal(Number(m.notifications.detalle.huerfanas), 3);
+  assert.equal(Number(m.control_peticiones.cantidad), 3);
+  for (const k of ['control_organizations', 'control_barberos', 'control_sucursales', 'control_barberos_sucursales', 'motor_etapa2', 'meta']) assert(m[k], k);
+  const check = await e3run(e3, E3.verificar);
+  assert(check.length >= 20 && check.every(r => r.ok), JSON.stringify(check.filter(r => !r.ok)));
+});
+await test('Etapa 3 backup: the schema is closed to clients and is never overwritten', async () => {
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    for (const sql of ['SELECT * FROM etapa3_backup.tareas', 'SELECT * FROM etapa3_backup.manifest', 'SELECT etapa3_backup.reset()']) {
+      await e3.exec(`SET ROLE ${role}`);
+      try { await assert.rejects(e3.query(sql), /permission denied/, `${role}: ${sql}`); } finally { await e3.exec('RESET ROLE'); }
+    }
+  }
+  await assert.rejects(e3run(e3, E3.backup), /ya existe/);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM etapa3_backup.tareas`)).rows[0].n, 6, 'the first backup is intact');
+});
+await test('Etapa 3 restore rehearsal: deletes and restores inside a sub-block that is always rolled back; nothing changes and triggers stay enabled', async () => {
+  const [{ resultado }] = await e3run(e3, E3.ensayo);
+  assert.equal(resultado.ensayo, 'ok');
+  assert.deepEqual(resultado.borrado_simulado, SCOPE);
+  assert.deepEqual(resultado.restaurado, SCOPE);
+  assert.deepEqual(await ids(e3, `SELECT id FROM notifications`), before.notifications);
+  assert.deepEqual(await ids(e3, `SELECT id FROM notification_deliveries`), before.deliveries);
+  assert.equal(await disabledTriggers(e3), 0);
+  assert((await e3run(e3, E3.verificar)).every(r => r.ok));
+});
+await test('Etapa 3 reset: aborts without deleting anything when a new row appeared after the backup, or when a notification cannot be classified', async () => {
+  const tareasAntes = await ids(e3, `SELECT id FROM tareas`);
+  const intrusos = [
+    ['tareas', `INSERT INTO tareas(id,organization_id,sucursal_id,tipo,titulo,estado,assignment_scope) VALUES ($1,$2,$3,'tarea','Nueva','pendiente','team')`, i => [i, W.orgA, W.S1]],
+    ['notifications', `INSERT INTO notifications(id,organization_id,event_key,type,source_module,source_table,source_id,title) VALUES ($1,$2,'kx','tarea_reasignada','tareas','tareas',$3,'n')`, i => [i, W.orgA, X.TM]],
+    ['notifications', `INSERT INTO notifications(id,organization_id,event_key,type,source_module,source_table,source_id,title) VALUES ($1,$2,'ky','tarea_asignada','tareas','tareas',$3,'n')`, i => [i, W.orgA, X.P1]],
+    ['notification_deliveries', `INSERT INTO notification_deliveries(id,notification_id,organization_id,user_id) VALUES ($1,$2,$3,$4)`, i => [i, X.N3, W.orgA, W.gmA]],
+  ];
+  for (const [table, sql, params] of intrusos) {
+    const intruso = id();
+    await e3.exec('SET session_replication_role = replica');
+    await e3.query(sql, params(intruso));
+    await e3.exec('SET session_replication_role = origin');
+    await assert.rejects(e3run(e3, E3.reset), /ya no coincide/, table);
+    assert.deepEqual(await ids(e3, `SELECT id FROM tareas WHERE id <> '${intruso}'`), tareasAntes);
+    assert.deepEqual(await ids(e3, `SELECT id FROM notifications WHERE id <> '${intruso}'`), before.notifications);
+    await e3.query(`DELETE FROM ${table} WHERE id=$1`, [intruso]);
+  }
+  assert((await e3run(e3, E3.verificar)).every(r => r.ok), 'back to the verified state');
+});
+await test('Etapa 3 reset: deletes only the scope (notifications → tareas → Tareas automáticas), cascades deliveries/reads, keeps peticiones, other modules and protected data, and notifies nobody', async () => {
+  const [{ resultado }] = await e3run(e3, E3.reset);
+  assert.deepEqual(resultado, SCOPE);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM tareas WHERE tipo IN ('admin','tarea')`)).rows[0].n, 0);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM tareas_recurrentes`)).rows[0].n, 0);
+  assert.deepEqual((await e3.query(`SELECT * FROM tareas WHERE tipo='peticion' ORDER BY id`)).rows, before.peticiones, 'peticiones identical');
+  assert.deepEqual(await ids(e3, `SELECT id FROM notifications`), KEEP_NOTIFS, 'only the Tareas notifications are gone; no new ones');
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM notification_deliveries`)).rows[0].n, 2, 'PN and O1 deliveries remain');
+  assert.deepEqual((await e3.query(`SELECT source_type FROM notification_reads ORDER BY 1`)).rows.map(r => r.source_type), ['peticion_nueva', 'turno_nuevo']);
+  assert.deepEqual((await e3.query(`SELECT * FROM barberos_sucursales ORDER BY id`)).rows, before.barberos_sucursales);
+  const post = await e3run(e3, E3.post);
+  assert(post.length >= 15 && post.every(r => r.ok), JSON.stringify(post.filter(r => !r.ok)));
+});
+await test('Etapa 3 reset: a second run changes nothing (0 rows, no error)', async () => {
+  const [{ resultado }] = await e3run(e3, E3.reset);
+  assert.deepEqual(resultado, { ya_aplicado: true, borradas: 0 });
+  assert.deepEqual(await ids(e3, `SELECT id FROM notifications`), KEEP_NOTIFS);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM tareas`)).rows[0].n, 3);
+});
+await test('Etapa 3 restore: brings back every row with its ids, recurrencia_id, source_id and timestamps (identical checksums), and leaves triggers enabled', async () => {
+  try {
+    await e3.transaction(async tx => {
+      await tx.exec('SET LOCAL ROLE app_owner');
+      await tx.query(`SELECT etapa3_backup.restaurar()`);
+      const cmp = (await tx.query(`SELECT * FROM etapa3_backup.comparar_con_vivo()`)).rows;
+      assert(cmp.length === 5 && cmp.every(r => r.coincide), JSON.stringify(cmp));
+      assert.equal((await tx.query(`SELECT recurrencia_id FROM tareas WHERE id=$1`, [X.TG])).rows[0].recurrencia_id, X.R2);
+      assert.equal((await tx.query(`SELECT source_id FROM notifications WHERE id=$1`, [X.N5])).rows[0].source_id, X.R2);
+      assert.equal(await disabledTriggers(tx), 0);
+      assert.equal((await tx.query(`SELECT count(*)::int AS n FROM tareas WHERE recurrencia_id = $1`, [X.R1])).rows[0].n, 3, 'restoring a recipe did not generate occurrences');
+      throw ROLLBACK;
+    });
+  } catch (error) { if (error !== ROLLBACK) throw error; }
+});
+await test('Etapa 3B: the CHECK rejects admin and accepts tarea/peticion, replaces the temporary trigger, and the engine keeps generating', async () => {
+  await asOwner(e3, await read(E3B));
+  assert.equal((await e3.query(`SELECT to_regprocedure('public.trg_tareas_tipo_guard()') IS NULL AS gone`)).rows[0].gone, true);
+  try {
+    await e3.transaction(async tx => {
+      await tx.exec('SET LOCAL ROLE app_owner');
+      const ins = tipo => `INSERT INTO tareas(organization_id,sucursal_id,tipo,titulo,assignment_scope) VALUES ('${W.orgA}','${W.S1}','${tipo}','x','team') RETURNING id`;
+      await fails(tx, ins('admin'), [], /tareas_tipo_check/);
+      await fails(tx, ins('otro'), [], /tareas_tipo_check/);
+      const ok = (await tx.query(ins('tarea'))).rows[0].id;
+      await tx.query(ins('peticion'));
+      await fails(tx, `UPDATE tareas SET tipo='admin' WHERE id='${ok}'`, [], /tareas_tipo_check/);
+      // The engine still generates tipo 'tarea' occurrences under the new constraints. The recipe trigger fixes
+      // proxima_fecha from the organization's real "today", so the date is derived from it (never hardcoded).
+      const hoy = (await tx.query(`SELECT public._tareas_auto_hoy($1::uuid)::text AS hoy`, [W.orgA])).rows[0].hoy;
+      const mediodia = (await tx.query(`SELECT (($2::date + time '12:00') AT TIME ZONE COALESCE(o.timezone, 'America/Argentina/Buenos_Aires'))::text AS ts
+        FROM organizations o WHERE o.id = $1`, [W.orgA, hoy])).rows[0].ts;
+      await tx.exec(`SELECT set_config('vittro.tareas_auto', 'on', true)`);
+      const rid = (await tx.query(`INSERT INTO tareas_recurrentes(organization_id,sucursal_id,titulo,assignment_scope,repeat_preset,fecha_inicio,proxima_fecha)
+        VALUES ($1,$2,'Post reset','team','daily',$3::date,$3::date) RETURNING id`, [W.orgA, W.S1, hoy])).rows[0].id;
+      await tx.exec(`SELECT set_config('vittro.tareas_auto', '', true)`);
+      assert.equal(Number((await tx.query(`SELECT public._tareas_auto_procesar($1::timestamptz) AS n`, [mediodia])).rows[0].n), 1);
+      assert.equal((await tx.query(`SELECT tipo FROM tareas WHERE recurrencia_id=$1`, [rid])).rows[0].tipo, 'tarea');
+      // Occurrence integrity: always 'tarea' and dated; deleting the recipe still detaches its occurrences.
+      await fails(tx, `INSERT INTO tareas(organization_id,sucursal_id,tipo,titulo,assignment_scope,recurrencia_id,fecha_inicio) VALUES ('${W.orgA}','${W.S1}','peticion','x','team','${rid}','2026-10-20')`, [], /tareas_recurrencia_check/);
+      await fails(tx, `INSERT INTO tareas(organization_id,sucursal_id,tipo,titulo,assignment_scope,recurrencia_id) VALUES ('${W.orgA}','${W.S1}','tarea','x','team','${rid}')`, [], /tareas_recurrencia_check/);
+      await tx.query(`DELETE FROM tareas_recurrentes WHERE id=$1`, [rid]);
+      assert.equal((await tx.query(`SELECT count(*)::int AS n FROM tareas WHERE titulo='Post reset' AND recurrencia_id IS NULL`)).rows[0].n, 1);
+      throw ROLLBACK;
+    });
+  } catch (error) { if (error !== ROLLBACK) throw error; }
+  const post = await e3run(e3, E3.post);
+  assert(post.every(r => r.ok), JSON.stringify(post.filter(r => !r.ok)));
+});
+await test('Etapa 3B: after the CHECK, restoring admin rows fails safely (nothing restored, triggers enabled)', async () => {
+  await assert.rejects(e3.transaction(async tx => { await tx.exec('SET LOCAL ROLE app_owner'); await tx.query(`SELECT etapa3_backup.restaurar()`); }), /tareas_tipo_check|tareas_recurrencia_check/);
+  assert.equal((await e3.query(`SELECT count(*)::int AS n FROM tareas_recurrentes`)).rows[0].n, 0);
+  assert.equal(await disabledTriggers(e3), 0);
+});
+await e3.close();
 
 console.log(`${passed} SQL integration tests passed (local synthetic PostgreSQL, no production access).`);
 await db.close();

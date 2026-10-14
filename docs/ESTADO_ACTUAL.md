@@ -68,10 +68,36 @@ funciones, permisos, triggers, constraints y cron, y una **prueba de humo dentro
 (motor, idempotencia, pausa por sucursal, camino de un dueño real y aislamiento con otra organización). Security
 Advisors: sin hallazgos nuevos de este build (solo los `trg_*` heredados con `EXECUTE` por defecto).
 
-**Pendiente / abierto:** QA manual de Sebastián (`docs/MODULOS/tareas.md`); **Etapa 3** (saneamiento: 141 tareas
-`tipo='admin'` históricas y Tareas automáticas heredadas con `proxima_fecha` fuera de calendario, **sin tocar**); **Etapa 4**
+**Pendiente / abierto:** QA manual de Sebastián (`docs/MODULOS/tareas.md`); **Etapa 4**
 (rediseño de la pantalla); `deleteReceta` usa la fecha del navegador y `useTareas` no pagina; una temporal que empieza o
 vence sin ningún cambio se refleja en las Tareas automáticas con hasta una hora de demora (sincronización horaria).
+La **Etapa 3** (saneamiento) ya se ejecutó: ver la sección siguiente.
+
+## Tareas automáticas — Etapa 3 (reset pre-lanzamiento e integridad)
+
+**Ejecutada y verificada en el proyecto Supabase operativo — 2026-10-13.** Backup interno verificado → ensayo de
+restauración → reset → integridad definitiva. Detalle, alcance y límites: `docs/MODULOS/tareas.md` (“Reset
+pre-lanzamiento”) y `supabase/diagnostics/20261013_etapa3_reset_tareas/README.md`.
+
+Lo que cambió en producción: se borraron las Tareas legacy (144 tareas `tipo` `admin`/`tarea`, **todas** las 5 Tareas
+automáticas y las 11 notificaciones de Tareas —8 huérfanas— con sus 18 entregas y 1 lectura). **Intactos**: las
+peticiones (hoy no hay ninguna), el resto de las notificaciones (3.099 y 2.918 entregas), organizaciones, barberos,
+sucursales, `barberos_sucursales` y todo lo de las Etapas 1 y 2 (funciones, triggers, grants, RLS, crons). La segunda
+ejecución del reset no encuentra nada. Después, la migración 3B (`20261013120000_tareas_integridad_post_reset.sql`;
+remota `20261013234522`): `tareas_tipo_check` (solo `tarea` y `peticion`; `admin` ya no es un valor válido y se rechaza al
+insertar o actualizar), `tareas_recurrencia_check` (una ocurrencia automática es siempre `tarea` y tiene fecha) y la
+eliminación del trigger temporal `trg_tareas_tipo_guard` y su función. No se tocaron las columnas de repetición heredadas.
+
+**Consecuencias:** la lista de Tareas quedó vacía y las 5 Tareas automáticas hay que volver a crearlas desde la app (no
+se restauran solas; el motor no genera nada hasta entonces). **No existe una copia fuera de la base**: el único respaldo es
+el schema `etapa3_backup` del mismo proyecto (datos reales, sin acceso para roles de cliente). Decisión pendiente de Sebastián:
+conservarlo o eliminarlo (`DROP SCHEMA etapa3_backup CASCADE`).
+
+Evidencia: SQL **82/82** (incluye 10 pruebas de la Etapa 3 sobre datos legacy sintéticos con dos organizaciones, huérfanas y un
+evento `peticion_*`), **24/24 mutaciones detectadas**, Etapa 1 **44/44**, Vitest **163/163** (26 archivos), `tsc` raíz exit 0, `tsc -p
+tsconfig.app.json` con los mismos 5 errores preexistentes (`abortSignal`), build OK, ESLint sin problemas en el archivo tocado. En
+producción: 27 verificaciones del backup, ensayo de restauración, 20 post-condiciones antes y después del `COMMIT`, prueba de
+los CHECK en una transacción revertida y Security Advisors sin hallazgos nuevos (los mismos 7 de antes).
 
 ## Finanzas — modo ficticio
 

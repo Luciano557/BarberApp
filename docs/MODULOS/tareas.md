@@ -1,8 +1,10 @@
 # Tareas y Tareas automáticas
 
 Estado: **Etapa 2 (motor de Tareas automáticas) implementada, aplicada en el proyecto Supabase
-operativo y verificada — 2026-10-12.** Falta el QA manual de Sebastián (ver `ESTADO_ACTUAL.md`).
-**No** incluye el saneamiento del historial ni el reset (Etapa 3) ni el rediseño de la pantalla (Etapa 4).
+operativo y verificada — 2026-10-12.** **Etapa 3 (backup, reset pre-lanzamiento e integridad definitiva) ejecutada
+y verificada — 2026-10-13**: las Tareas legacy se borraron con un backup interno verificado (ver “Reset
+pre-lanzamiento” al final). Falta el QA manual de Sebastián (ver `ESTADO_ACTUAL.md`).
+**No** incluye el rediseño de la pantalla (Etapa 4).
 
 - **Ubicación en la app:** barra lateral → Principal → Tareas (`src/components/TareasPanel.tsx`).
   Pestañas Tareas / Peticiones; el botón **Tareas automáticas** abre su panel dentro de Tareas.
@@ -159,7 +161,7 @@ helper `_notif_barbero_users(org, barbero_id)` devuelve esos usuarios (exige que
 | `_tareas_auto_*` (calendario, motivo, reconciliar, generar, procesar), `_notif_barbero_users` | `SECURITY INVOKER`, `search_path=''` | Nadie desde un cliente (`anon`, `authenticated`, `service_role` sin `EXECUTE`) |
 | `process_tareas_recurrentes()`, `process_vencimientos_tareas()` | `SECURITY DEFINER`, `search_path=''` | Solo `service_role` y el dueño (cron) |
 | `trg_tareas_recurrentes_prepare`, `trg_tareas_recurrentes_generar`, `trg_tareas_auto_sync_*` (barberos / sucursales / barberos_sucursales) | `SECURITY DEFINER`, `search_path=''`, filtran por `organization_id` | Solo como trigger; sin `EXECUTE` para clientes |
-| `trg_tareas_tipo_guard` | `SECURITY INVOKER` | Solo como trigger |
+| ~~`trg_tareas_tipo_guard`~~ | — | **Eliminado** el 2026-10-13 (3B): lo reemplaza `tareas_tipo_check` |
 
 El trigger de preparación distingue una escritura de cliente (`auth.uid()` presente y sin la marca interna
 `vittro.tareas_auto`) de las internas (motor, sincronización, cron, `service_role`). Las funciones DEFINER son
@@ -171,9 +173,12 @@ ni acceso a los helpers de notificaciones cerrados en la Etapa 1.
 CHECKs en `tareas_recurrentes` (validados): preset permitido, custom con frecuencia válida, intervalo 1–99, días
 0–6 solo en custom semanal, `pausa_motivo` y `recuperacion_tipo` en su conjunto, `activo ⇔ sin motivo`.
 `tareas.estado` queda limitado a `pendiente, en_progreso, completada, vencida, rechazada, aprobada` (CHECK validado).
-`tareas.tipo` solo admite `tarea` y `peticion` en filas **nuevas** o al cambiar el tipo (**trigger**, no CHECK: un
-CHECK, aunque sea `NOT VALID`, rechazaría el `UPDATE` que hace la clave foránea `ON DELETE SET NULL` sobre los
-`tipo='admin'` históricos y bloquearía el borrado de una Tarea automática). El CHECK definitivo llega con la Etapa 3.
+`tareas.tipo` solo admite `tarea` y `peticion`: CHECK `tareas_tipo_check` **validado** (3B, 2026-10-13). `admin` dejó de
+ser un valor válido; el trigger temporal `trg_tareas_tipo_guard` (E2-M4) y su función se eliminaron porque el CHECK lo
+reemplaza por completo (era un trigger y no un CHECK solo porque existían 141 filas `admin` históricas que el `UPDATE` de la
+clave foránea `ON DELETE SET NULL` habría hecho rechazar). Además `tareas_recurrencia_check` (validado): una ocurrencia
+de Tarea automática (`recurrencia_id` no nulo) es siempre `tipo='tarea'` y tiene `fecha_inicio`, de modo que
+`uq_tareas_recurrencia_fecha` las cubre a todas; el `ON DELETE SET NULL` de la receta sigue funcionando.
 
 ## Migraciones (aplicadas 2026-10-12 en el proyecto operativo)
 
@@ -184,12 +189,17 @@ y la versión que asignó el conector (`20261012190213`, `…190408`, `…190548
 Cada una trae su preflight (aborta si falta la Etapa 1, hay dueños distintos, un job de cron perdería acceso o una
 Tarea automática apunta a otra organización) y verifica sus permisos al final.
 
+Etapa 3 (2026-10-13): `20261013120000_tareas_integridad_post_reset.sql` (3B; remota `20261013234522`,
+`tareas_integridad_post_reset`). Su preflight aborta, sin tocar nada, si queda alguna fila con un tipo fuera de
+`tarea`/`peticion` o una ocurrencia automática inválida; no modifica datos, RLS, grants, crons ni el motor. El reset en sí **no es una
+migración**: es una operación única con scripts en `supabase/diagnostics/20261013_etapa3_reset_tareas/`.
+
 ## Pruebas
 
 ```bash
 npm install --prefix node_modules/.admin-sql-test --no-package-lock --no-save @electric-sql/pglite@0.5.8
-node supabase/tests/tareas-automaticas-sql.mjs                    # 72 pruebas SQL
-node supabase/tests/tareas-automaticas-sql.mjs --mutation-check   # 18 mutaciones, todas detectadas
+node supabase/tests/tareas-automaticas-sql.mjs                    # 82 pruebas SQL (72 de la Etapa 2 + 10 de la Etapa 3)
+node supabase/tests/tareas-automaticas-sql.mjs --mutation-check   # 24 mutaciones, todas detectadas
 node supabase/tests/notifications-security-sql.mjs                # Etapa 1: 44 pruebas, siguen pasando
 bunx vitest run src/lib/tareasAutomaticas.test.ts src/components/tareas
 ```
@@ -205,11 +215,37 @@ del barbero, nunca `barberos.id`), aislamiento entre organizaciones, aislamiento
 concurrencia real entre dos sesiones (PGlite tiene una sola conexión); `FOR UPDATE SKIP LOCKED` se verifica en
 el código entregado.
 
-## Datos históricos y deuda (no es esta etapa)
+## Reset pre-lanzamiento (Etapa 3) — ejecutado 2026-10-13
 
-- 141 tareas `tipo='admin'` generadas por el motor anterior siguen en la base (invisibles para los barberos y sin
-  vencimiento) y las Tareas automáticas existentes pueden tener `proxima_fecha` fuera de calendario (el motor nuevo
-  la corrige sin generar). **No se tocó nada**: el saneamiento / reset controlado es la **Etapa 3**.
+Decisión de producto: antes del lanzamiento se descartó el historial de Tareas generado por el motor anterior (141
+tareas `tipo='admin'` invisibles para los barberos y Tareas automáticas con `proxima_fecha` fuera de calendario), en vez
+de sanearlo fila por fila. No es una migración: es una operación única, con scripts reproducibles y verificables en
+`supabase/diagnostics/20261013_etapa3_reset_tareas/` (ver su `README.md`).
+
+- **Alcance borrado** (calculado en el momento, no con cifras fijas): las tareas con `tipo IN ('admin','tarea')`, **todas**
+  las Tareas automáticas y las notificaciones de Tareas identificadas solo por columnas estructurales
+  (`source_module='tareas'` + `source_table` + evento + `source_id`; incluidas las huérfanas). Sus entregas y lecturas
+  cayeron por `ON DELETE CASCADE`. Cantidades reales: 144 tareas (141 `admin` + 3 `tarea`), 5 Tareas automáticas
+  (todas activas), 11 notificaciones (8 huérfanas), 18 entregas y 1 lectura.
+- **Intacto:** las peticiones (`tipo='peticion'`, hoy no hay ninguna) y las notificaciones `peticion_*`; 3.099
+  notificaciones y 2.918 entregas de otros módulos; organizaciones, barberos, sucursales y `barberos_sucursales` (mismas
+  cantidades, ids y último `updated_at`); funciones, triggers, grants, RLS y crons de las Etapas 1 y 2.
+- **Cómo:** (1) schema `etapa3_backup` fuera de `public`, sin acceso para `anon`, `authenticated` ni `service_role`
+  (solo el dueño), con copias completas, `manifest` (cantidades, md5 de filas completas, md5 de ids) e ids de control;
+  (2) 27 verificaciones, backup = vivo en ambos sentidos; (3) ensayo de restauración dentro de un bloque que siempre se
+  revierte (R → T → N → entregas → lecturas, mismos ids y checksums, triggers de usuario deshabilitados solo durante el
+  `INSERT` y vueltos a habilitar; sin `session_replication_role`); (4) reset en una sola transacción bajo `LOCK`, que
+  recalcula el alcance, lo compara con el backup, borra en orden notificaciones → tareas → Tareas automáticas y comprueba
+  20 post-condiciones antes del `COMMIT`; (5) segunda ejecución: `{"ya_aplicado": true, "borradas": 0}`.
+- **Copia de seguridad:** la única es el schema `etapa3_backup` **dentro del mismo proyecto Supabase** (no hay una copia
+  fuera de la base). Contiene datos reales de las organizaciones y sigue ahí; qué se hace con él (conservarlo o eliminarlo
+  con `DROP SCHEMA etapa3_backup CASCADE`) es una decisión pendiente de Sebastián. Restaurar:
+  `06_restaurar_SOLO_SI_SE_DECIDE.sql`; tras 3B las filas `admin` no pueden volver sin quitar antes `tareas_tipo_check`.
+- **Lo que se ve:** la lista de Tareas quedó vacía y las 5 Tareas automáticas **hay que volver a crearlas**: no se
+  restauran solas, y el motor no genera nada hasta entonces.
+
+## Deuda (no es esta etapa)
+
 - `deleteReceta` (`useTareasRecurrentes.ts`) calcula “hoy” con la fecha del navegador para borrar las tareas
   futuras pendientes; `useTareas` lee sin paginar (tope de 1000 filas de PostgREST); rediseño de la pantalla: Etapa 4.
 - No hay vista previa de próximas fechas ni equivalente TypeScript del calendario: la base es la única fuente.

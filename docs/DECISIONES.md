@@ -5,6 +5,37 @@ ver `ESTADO_ACTUAL.md`. Para la especificación normativa vigente del sistema
 visual, ver `DESIGN.md` — este archivo no repite esa especificación, solo el
 contexto y el razonamiento detrás de cada decisión.
 
+## Tareas: reset pre-lanzamiento con backup interno verificado (Etapa 3) — 2026-10-13
+
+Qué se decidió y por qué (operación y resultados en `docs/MODULOS/tareas.md`; scripts en
+`supabase/diagnostics/20261013_etapa3_reset_tareas/`):
+
+- **Descartar el historial en vez de sanearlo.** Antes del lanzamiento, las 141 tareas `tipo='admin'` del motor anterior
+  (invisibles para los barberos) y las Tareas automáticas con calendario viejo no valen el costo de migrarlas fila por fila. Se
+  borraron las tareas `admin`/`tarea`, **todas** las Tareas automáticas y sus notificaciones. Las peticiones no se tocan nunca.
+- **Alcance por estructura, nunca por texto.** Una notificación es “de Tareas” solo por `source_module`, `source_table`, tipo de
+  evento y `source_id` (las huérfanas incluidas); jamás por título, cuerpo, fecha aproximada o nombre. Cualquier cosa que no se
+  pueda clasificar sin adivinar (evento nuevo, tipo de tarea desconocido, FK nueva, trigger de `DELETE`, cruce de organización)
+  **aborta** el proceso (`etapa3_backup.ambiguedades()`). Las cifras se recalculan en el momento: entre el preflight y el reset el
+  motor generó dos tareas más (142 → 144) y el procedimiento las respaldó y borró igual, porque compara el alcance vivo con el backup.
+- **Backup interno obligatorio; copia externa no realizada.** El respaldo es el schema `etapa3_backup` (fuera de `public`, sin acceso
+  para `anon`, `authenticated` ni `service_role`), verificado contra lo vivo con cantidades, conjuntos de ids en ambos sentidos y
+  md5 de filas completas, más un ensayo de restauración que siempre se revierte. Se intentó una copia externa con `pg_dump` 17
+  (herramientas instaladas solo para el usuario, conexión *Session pooler*); exigía la contraseña de la base de datos y **Sebastián
+  decidió continuar sin ella**. Consecuencia aceptada: el único respaldo vive en el mismo proyecto, así que cubre un error del
+  reset pero no la pérdida del proyecto.
+- **Triggers: `DISABLE TRIGGER USER`, no `session_replication_role`.** El rol `postgres` de Supabase no es superusuario y no puede
+  cambiar `session_replication_role`. Restaurar deshabilita solo los triggers de usuario de `tareas` y `tareas_recurrentes`, durante
+  el `INSERT`, y el ensayo comprueba que quedan habilitados.
+- **Reset atómico e idempotente.** Una transacción con `LOCK` (`SHARE ROW EXCLUSIVE`), revalidación contra el backup, borrado en
+  orden notificaciones → tareas → Tareas automáticas (entregas y lecturas caen por `ON DELETE CASCADE`), post-condiciones antes del
+  `COMMIT`. Se ejecuta lejos del minuto 00 (crons horarios). Una segunda ejecución devuelve `ya_aplicado` y no borra nada.
+- **Integridad definitiva (3B).** CHECK validado `tipo IN ('tarea','peticion')`: `admin` deja de ser un valor válido y el trigger
+  temporal `trg_tareas_tipo_guard` se elimina con su función. CHECK de ocurrencias: `recurrencia_id` no nulo ⇒ `tipo='tarea'` y
+  `fecha_inicio` presente. No se eliminaron las columnas de repetición heredadas de `tareas` (fuera de alcance).
+- **Excepción directa.** Como en las Etapas 1 y 2, AGENTS.md manda DB por Lovable; el usuario autorizó expresamente ejecutar esta
+  operación y la migración 3B en el único proyecto operativo. No es una autorización general.
+
 ## Tareas automáticas: el servidor es dueño del calendario, de la pausa y de la recuperación — 2026-10-12
 
 Qué se decidió y por qué (Etapa 2; modelo y permisos en `docs/MODULOS/tareas.md`):
@@ -40,9 +71,9 @@ Qué se decidió y por qué (Etapa 2; modelo y permisos en `docs/MODULOS/tareas.
   `profiles.barbero_id` (0..n). Tres productores usaban `barberos.id` como id de usuario y se corrigieron con `_notif_barbero_users`.
 - **`en_progreso` también vence.** “Empezada” y “atrasada” son independientes: se marca `vencida_at` y el estado sigue siendo
   `en_progreso` (no se inventó un estado nuevo; la tarjeta muestra ambos).
-- **`tipo` por trigger y no por CHECK.** Existen 141 filas `tipo='admin'` vinculadas a Tareas automáticas y `recurrencia_id` es
-  `ON DELETE SET NULL`: un CHECK, incluso `NOT VALID`, rechazaría ese `UPDATE` y bloquearía el borrado de una Tarea automática. El trigger
-  impide crear `admin` nuevas sin tocar las viejas. El CHECK definitivo llega con la Etapa 3 (saneamiento), que **no** se ejecutó.
+- **`tipo` por trigger y no por CHECK (transitorio; reemplazado el 2026-10-13).** Existían 141 filas `tipo='admin'` vinculadas a Tareas automáticas y `recurrencia_id` es
+  `ON DELETE SET NULL`: un CHECK, incluso `NOT VALID`, habría rechazado ese `UPDATE` y bloqueado el borrado de una Tarea automática. El trigger
+  impedía crear `admin` nuevas sin tocar las viejas. Con el reset de la Etapa 3 (ver la entrada siguiente) el CHECK definitivo ya está y el trigger se eliminó.
 - **`SECURITY DEFINER` nuevos o reescritos (AGENTS.md exige reportarlos):** los triggers `trg_tareas_recurrentes_prepare`,
   `trg_tareas_recurrentes_generar`, `trg_tareas_auto_sync_barberos`, `…_sucursales`, `…_barberos_sucursales`; `process_tareas_recurrentes`
   y `process_vencimientos_tareas` (ya lo eran) y los dos triggers de notificación reescritos. Son necesarios porque quien desactiva una sucursal
