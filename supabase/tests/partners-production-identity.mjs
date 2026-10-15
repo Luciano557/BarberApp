@@ -48,9 +48,9 @@ try {
   const sessionHeaders={apikey:anon,authorization:`Bearer ${login.access_token}`,'content-type':'application/json',origin:'https://www.vittro.com.ar'};
   const command=(action,input={})=>request(`${backend}/functions/v1/partner-program`,{method:'POST',headers:sessionHeaders,
     body:JSON.stringify({action,input})},action);
-  const enrolled=await command('enroll',{code,country:'AR',termsVersion:'2026-10-14-v1',accepted:true});
+  const enrolled=await command('enroll',{code,country:'AR',termsVersion:'2026-10-14-v2',accepted:true});
   assert.equal(enrolled.code,code);
-  const retry=await command('enroll',{code,country:'AR',termsVersion:'2026-10-14-v1',accepted:true});
+  const retry=await command('enroll',{code,country:'AR',termsVersion:'2026-10-14-v2',accepted:true});
   assert.equal(retry.id,enrolled.id);
   const summary=await command('summary');
   assert.equal(summary.summary.code,code); assert.equal(summary.summary.registrations,0);

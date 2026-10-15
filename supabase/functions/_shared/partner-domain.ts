@@ -1,5 +1,5 @@
 /** Environment-free rules shared by the API and its executable contract tests. */
-export const PARTNER_TERMS_VERSION = '2026-10-14-v1';
+export const PARTNER_TERMS_VERSION = '2026-10-14-v2';
 export const PARTNER_CONTRACT_VERSION = 1;
 export const PARTNER_HOLD_MS = 30 * 24 * 60 * 60 * 1000;
 export type PartnerRate = 10 | 20 | 30;
@@ -11,15 +11,9 @@ export interface PartnerAgreement {
   endsAt: string;
   suspended: boolean;
 }
-export interface InstagramVerification {
-  accountId: string;
-  followers: number;
-  verifiedAt: string;
-  connected: boolean;
-}
 export interface PartnerTier {
   percent: number;
-  source: 'initial' | 'results' | 'instagram' | 'agreement';
+  source: 'initial' | 'results' | 'agreement';
   qualifiedOrganizations: number;
   nextGoal: number | null;
 }
@@ -89,7 +83,8 @@ export function normalizePartnerCode(value: unknown): string {
 export function partnerTier(
   input: {
     qualifiedOrganizations: number;
-    instagram?: InstagramVerification | null;
+    /** Legacy metadata is ignored; automatic levels depend only on referrals. */
+    instagram?: unknown;
     agreement?: PartnerAgreement | null;
   },
   nowMs: number,
@@ -98,18 +93,6 @@ export function partnerTier(
   if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(nowMs))
     throw new Error('INVALID_TIER_INPUT');
   const results: PartnerRate = count >= 20 ? 30 : count >= 5 ? 20 : 10;
-  const ig = input.instagram;
-  const checkedAt = ig ? Date.parse(ig.verifiedAt) : NaN;
-  const verified = Boolean(
-    ig?.connected &&
-    ig.accountId &&
-    Number.isSafeInteger(ig.followers) &&
-    ig.followers >= 0 &&
-    checkedAt <= nowMs &&
-    nowMs - checkedAt < PARTNER_HOLD_MS,
-  );
-  const audience: PartnerRate =
-    verified && ig!.followers >= 50_000 ? 30 : verified && ig!.followers >= 10_000 ? 20 : 10;
   const agreement = input.agreement;
   if (
     agreement &&
@@ -127,10 +110,10 @@ export function partnerTier(
       nextGoal: null,
     };
   }
-  const percent = Math.max(results, audience);
+  const percent = results;
   return {
     percent,
-    source: audience > results ? 'instagram' : count >= 5 ? 'results' : 'initial',
+    source: count >= 5 ? 'results' : 'initial',
     qualifiedOrganizations: count,
     nextGoal: percent >= 30 ? null : percent === 20 ? 20 : 5,
   };

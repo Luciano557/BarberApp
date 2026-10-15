@@ -28,7 +28,7 @@ async function command(action,actor=null,input={}) {
   });
 }
 const mutate = (action, actor, input) => command(action,actor,{requestId:randomUUID(),reason:'Motivo de prueba sintético',...input});
-async function enroll(actor,code){ return command('enroll',actor,{code,country:'AR',termsVersion:'2026-10-14-v1'}); }
+async function enroll(actor,code){ return command('enroll',actor,{code,country:'AR',termsVersion:'2026-10-14-v2'}); }
 const denied = (promise,code) => assert.rejects(promise,error=>error.message.includes(code));
 async function quoteFor(actor,plan='basico'){
   const {organization_id:organizationId}=await scalar('SELECT organization_id FROM profiles WHERE id=$1',[actor]);
@@ -100,7 +100,7 @@ try {
     REVOKE UPDATE ON auth.users FROM service_role;
     INSERT INTO subscription_plans(code,name,amount_ars,sort_order) VALUES('basico','Basico',30000,1),('premium','Premium',50000,2);
   `);
-  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql','20261014130400_partner_identity_intent.sql']) {
+  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql','20261014130400_partner_identity_intent.sql','20261014230000_partner_referral_levels.sql']) {
     await db.transaction(tx=>read(`supabase/migrations/${file}`).then(sql=>tx.exec(sql)));
   }
   await test('new functions are invoker and all 20 tables have RLS',async()=>{
@@ -257,11 +257,16 @@ try {
     await command('retry_job',null,{jobId:job.id,lease:job.lease});
     assert.equal((await scalar('SELECT status FROM partner_jobs WHERE id=$1',[job.id])).status,'pending');
   });
-  await test('OAuth states are one use and disconnect clears credentials',async()=>{
-    const hash='a'.repeat(44);await command('instagram_state',creator,{hash});assert.equal((await command('instagram_consume_state',null,{hash})).actorId,creator);
-    await denied(command('instagram_consume_state',null,{hash}),'INVALID_OAUTH_STATE');
-    await command('instagram_verified',creator,{accountId:'1789001',username:'fixture',followers:50000,encryptedToken:'v1.synthetic.ciphertext',expiresAt:'2099-01-01'});
-    assert.equal(await scalar('SELECT partner_rate($1) rate',[partner.id]).then(r=>r.rate),30);
+  await test('retired Instagram cannot connect, verify, improve the rate or schedule refresh work',async()=>{
+    const hash='a'.repeat(44);
+    await denied(command('instagram_state',creator,{hash}),'INSTAGRAM_RETIRED');
+    await denied(command('instagram_verified',creator,{accountId:'1789001',followers:50000}),'INSTAGRAM_RETIRED');
+    await db.query(`INSERT INTO partner_instagram_accounts(partner_id,account_id,username,followers,verified_at)
+      VALUES($1,'1789001','historical-fixture',50000,now())`,[partner.id]);
+    assert.equal((await scalar('SELECT partner_rate($1) rate',[partner.id])).rate,10);
+    assert.equal((await scalar('SELECT partner_tier_input($1) input',[partner.id])).input.instagram,undefined);
+    await command('claim_jobs',null,{limit:25});
+    assert.equal((await scalar("SELECT count(*)::int n FROM partner_jobs WHERE kind='instagram'")).n,0);
     await command('instagram_disconnect',creator,{});
     assert.equal((await scalar('SELECT count(*)::int n FROM partner_instagram_credentials WHERE partner_id=$1',[partner.id])).n,0);
     assert.equal((await scalar('SELECT partner_rate($1) rate',[partner.id])).rate,10);

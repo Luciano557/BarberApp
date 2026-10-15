@@ -22,7 +22,7 @@ BEGIN
     OR EXISTS(SELECT 1 FROM profiles WHERE id IN (_external,_other) AND (organization_id IS NOT NULL OR default_sucursal_id IS NOT NULL))
     OR EXISTS(SELECT 1 FROM user_roles WHERE user_id IN (_external,_other)) THEN RAISE EXCEPTION 'external_created_tenant'; END IF;
   PERFORM set_config('role','service_role',true);
-  _result:=partner_program_command(1,'enroll',_external,jsonb_build_object('code',_code,'country','AR','termsVersion','2026-10-14-v1'));
+  _result:=partner_program_command(1,'enroll',_external,jsonb_build_object('code',_code,'country','AR','termsVersion','2026-10-14-v2'));
   IF _result->>'code' IS DISTINCT FROM _code THEN RAISE EXCEPTION 'wrong_code'; END IF;
   _result:=partner_program_command(1,'validate_code',NULL,jsonb_build_object('code',lower(_code)));
   IF _result->>'valid' IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'case_insensitive_code_failed'; END IF;

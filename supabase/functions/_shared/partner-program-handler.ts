@@ -86,12 +86,9 @@ function ownSummary(value: PartnerSummary, tier: ReturnType<typeof partnerTier>)
     availableCents: value.availableCents,
     paidCents: value.paidCents,
     adjustmentsCents: value.adjustmentsCents,
-    instagram: {
-      connected: value.instagram.connected,
-      username: value.instagram.username,
-      followers: value.instagram.followers,
-      verifiedAt: value.instagram.verifiedAt,
-    },
+    // Backwards compatible shape for older cached clients; never expose
+    // audience metrics after retiring follower-based levels.
+    instagram: { connected: false, username: null, followers: null, verifiedAt: null },
     payout: {
       configured: value.payout.configured,
       verified: value.payout.verified,

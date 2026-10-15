@@ -1,5 +1,14 @@
 # Decisiones de arquitectura y criterio — Vittro
 
+## Aliados: niveles solo por referidos — 2026-10-14
+
+El usuario retiró la vía de seguidores y pidió una misma propuesta de ingresos
+para amigos y comunidades. Los niveles automáticos dependen exclusivamente de
+barberías calificadas (0/5/20); el convenio conserva prioridad y los snapshots
+anteriores no se recalculan. La metáfora del frasco es un indicador de progreso
+solicitado, con datos y umbrales legibles, no decoración de la app operativa.
+Detalle y evidencia por etapa: `docs/ALIADOS_NIVELES_REFERIDOS.md`.
+
 ## Aliados: altas automáticas y liquidación humana — 2026-10-14
 
 Plan aprobado: cliente owner y creador externo comparten el programa; la identidad

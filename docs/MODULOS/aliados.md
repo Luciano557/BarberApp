@@ -1,5 +1,9 @@
 # Programa de aliados
 
+Modificación solicitada: niveles exclusivamente por referidos y comunicación
+para cualquier recomendador. Motor local validado; publicación de esta revisión
+pendiente. Seguimiento: [ALIADOS_NIVELES_REFERIDOS.md](../ALIADOS_NIVELES_REFERIDOS.md).
+
 Estado 2026-10-14: motor, datos/RLS y frontend publicados y habilitados en el
 proyecto operativo con excepción directa autorizada. Alta abierta y worker
 periódico activo. Instagram deshabilitado. Evidencia y estado

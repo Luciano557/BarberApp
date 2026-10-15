@@ -77,15 +77,15 @@ describe('partner tier rules', () => {
   });
   it.each([
     [9999, 10],
-    [10000, 20],
-    [49999, 20],
-    [50000, 30],
-  ])('qualifies %s verified followers at %s%%', (followers, percent) => {
+    [10000, 10],
+    [49999, 10],
+    [50000, 10],
+  ])('ignores %s verified followers and keeps the referral rate at %s%%', (followers, percent) => {
     expect(
       partnerTier({ qualifiedOrganizations: 0, instagram: instagram(followers) }, now).percent,
     ).toBe(percent);
   });
-  it('expires audience after 30 days, preserving the earned results tier', () => {
+  it('preserves the earned referral tier regardless of audience age', () => {
     expect(
       partnerTier({ qualifiedOrganizations: 5, instagram: instagram(50_000, PARTNER_HOLD_MS) }, now)
         .percent,
@@ -95,7 +95,7 @@ describe('partner tier rules', () => {
         { qualifiedOrganizations: 0, instagram: instagram(50_000, PARTNER_HOLD_MS - 1) },
         now,
       ).percent,
-    ).toBe(30);
+    ).toBe(10);
   });
   it('ignores disconnected, future and invalid audience metrics', () => {
     for (const ig of [

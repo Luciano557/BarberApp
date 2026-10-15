@@ -32,16 +32,9 @@ async function unseal(value: string) {
   return new TextDecoder().decode(decrypted);
 }
 export function instagramEnabled() {
-  return (
-    Deno.env.get('PARTNER_INSTAGRAM_ENABLED') === 'true' &&
-    Deno.env.get('PARTNER_INSTAGRAM_VERIFIED') === 'true' &&
-    Boolean(
-      Deno.env.get('INSTAGRAM_APP_ID') &&
-      Deno.env.get('INSTAGRAM_APP_SECRET') &&
-      Deno.env.get('PARTNER_TOKEN_ENCRYPTION_KEY') &&
-      /^v\d+\.\d+$/.test(Deno.env.get('INSTAGRAM_API_VERSION') ?? ''),
-    )
-  );
+  // Retired by the program owner: changing an environment switch cannot
+  // restore follower-based levels or connect a new account.
+  return false;
 }
 function callbackUrl() {
   const url = Deno.env.get('SUPABASE_URL');
