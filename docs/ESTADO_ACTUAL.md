@@ -14,8 +14,8 @@ Motor: centavos exactos, snapshot de cotización para intro 10%, comisiones
 30 días y ajustes por reversión. Checkout tiene ruta promocional separada;
 webhook reanuda la etapa del aliado en duplicados ya procesados por billing.
 Worker: outbox durable, renovación al catálogo vigente con reconciliador CAS
-actual, lectura del pago real para devoluciones, liberación y refresh Instagram.
-OAuth: state consumible, métricas oficiales, token AES-GCM, default deshabilitado.
+actual, lectura del pago real para devoluciones y liberación. Instagram retirado:
+sin conexión, niveles por audiencia ni refresh; datos antiguos privados.
 
 Excepción directa de DB/RLS y producción autorizada por el usuario. Cinco
 migraciones propias del primer rollout; revisión v2 suma una sexta migración
@@ -27,16 +27,18 @@ persistentes, creador sin tenant/trial, código y panel funcionales. Alta abiert
 Vercel Ready / Production / Current y Git original/fork sincronizados por avance
 normal. Instagram está retirado: niveles 1/2/3 por 0/5/20 barberías calificadas,
 con frasco de progreso, comunicación de ingresos para amigos/comunidades y
-condiciones desplegables. Correo de acceso en español y con marca Vittro. Se corrigió el orden real de
+condiciones desplegables. Correo Magic Link en español y con marca Vittro. Se corrigió el orden real de
 GoTrue con una intención privada de un uso, sin confiar en metadata de navegador.
-No hubo cargos ni transferencias. Evidencia: `docs/ALIADOS_PRODUCCION.md`.
+No hubo cargos ni transferencias. Evidencia vigente de la revisión:
+`docs/ALIADOS_NIVELES_REFERIDOS.md`; primer rollout: `docs/ALIADOS_PRODUCCION.md`.
 
 Evidencia local: 34 pruebas de dominio + 3 de acceso/recuperación UI, seis pruebas
 de barreras HTTP Deno sin permiso de red; build, lint focal y chequeo Deno de las
 cinco funciones involucradas.
 Regresión de la revisión aprobada: 207 Vitest, 32 Deno y 27 PostgreSQL/PGlite, incluidos los casos existentes.
 QA Playwright con tráfico remoto interceptado:
-9 escenarios a 390/768/1440px, landing/panel/Admin y drawers, importes de
+11 escenarios: landing/panel/Admin a 390/768/1440px y correo a 390/680px,
+drawers e importes de
 $99.999.999 y $1.234.567.890 sin scroll horizontal ni errores de página. Artefactos
 en `.impeccable/review/partners/`, ejecutor `supabase/tests/partners-ui-qa.cjs`.
 TypeScript de app conserva cinco errores preexistentes documentados, sin errores

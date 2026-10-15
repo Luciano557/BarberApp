@@ -60,7 +60,7 @@ inline styles para clientes de correo, logo público, fallback de fuente y enlac
 de respaldo. Tiene dos ConfirmationURL nativas y ningún enlace de autenticación
 fabricado. El preview usa preview.invalid. Auditoría Auth real: subject “Your Magic
 Link”, body de 105 caracteres, sin template URL externo; coincide con la captura.
-PATCH previsto solo sobre subject/content de Magic Link, conservando los demás
+PATCH aplicado solo sobre subject/content de Magic Link, conservando los demás
 campos de Auth. [Referencia oficial](https://supabase.com/docs/guides/auth/auth-email-templates).
 
 ## Integración productiva
@@ -82,5 +82,26 @@ subscription-create-checkout v28 y subscription-mp-webhook v27. Se redeplegaron
 solo esas cinco por compartir las reglas del programa. Verificación global:
 207 Vitest/29 archivos, 32 Deno y 27 SQL aprobadas, más 11 escenarios de UI/correo.
 
-Pendiente para cerrar integración: publicación de frontend, verificación Vercel,
-reapertura del alta y prueba de identidad/API con cuenta temporal sin email.
+Frontend publicado primero en el original y después en el fork, sin divergencia
+ni force push. SHA funcional/documental verificado en ambos main:
+`3d83397ac1745e7270974d9661050a539a7b5bab`. Vercel deployment
+`9hWi4P3geAMojg6wBwsmmeZonEhn`: Ready / Production / Current, dominio
+www.vittro.com.ar y source de ese SHA. La página pública muestra el mensaje de
+ingresos, niveles por barberías y condiciones cerradas; sin Instagram.
+
+Alta reabierta con billing_ready conservado y términos v2. Nueve probes reales
+aprobados: status habilitado, código inexistente 409, sesión/Admin no autenticados
+401, origen ajeno 403, credencial worker inválida 401 y CORS exacto. Prueba nativa
+Auth/API: identidad externa sin tenant/trial, login, código único normalizado,
+adhesión idempotente, 10% inicial, panel y rechazo a Admin/lectura bancaria cruda.
+Cuenta, perfil e intención temporales eliminados; no se enviaron emails.
+
+Comprobación final de datos: un miembro real con aceptación v1 conservada, cero
+fixtures/intenciones de QA, 20 tablas con RLS, cero funciones propias DEFINER,
+cero cuentas/jobs activos de Instagram. Cron activo y cinco respuestas worker
+200 sin fallos en los últimos cinco minutos. Se conserva la validación financiera
+real pendiente del primer rollout; esta revisión no realizó cobros ni transferencias.
+
+El commit de cierre posterior actualiza únicamente documentación y conserva este
+código validado. Los correos Magic Link futuros usan la plantilla nueva; mensajes
+ya recibidos no se modifican. Entrega SMTP real no se probó enviando un correo.

@@ -65,8 +65,9 @@ consultar la operación. No se realizan transferencias desde el software.
 `src/test/partner-domain.test.ts`: 34 casos aprobados; acceso/recuperación UI:
 3 casos; `partner-program/index_test.ts`: 6 pruebas HTTP sin permisos de red.
 Build y lint focal aprobados; chequeo Deno de API, callback, worker, checkout y
-webhook. QA visual/interacción: 9 escenarios sintéticos en 390/768/1440px,
-drawers, códigos largos, cifras de 8 y 10 dígitos y cero errores de página/
+webhook. QA visual/interacción: 11 escenarios sintéticos (landing/panel/Admin en
+390/768/1440px y correo en 390/680px), drawers, códigos largos, cifras de 8 y
+10 dígitos y cero errores de página/
 overflow; `.impeccable/review/partners/report.json` y PNGs.
 Regresión de la revisión: 207 pruebas Vitest en 29 archivos y 32 Deno (24 de Admin
 existentes, seis del nuevo handler HTTP y dos de firmas del worker), aprobadas. `tsc -p
@@ -94,3 +95,7 @@ La landing permite explorar niveles; el panel muestra progreso de calificaciones
 reales y separa el convenio del nivel automático. El alta externa se comunica
 como cuenta de referidos, sin exigir ser creador. El correo Magic Link compartido
 tiene asunto “Tu acceso a Vittro”, diseño de marca y ConfirmationURL nativa.
+La revisión v2 está publicada en Vercel Ready / Production / Current, con alta
+reabierta y Auth/API nativos comprobados sin enviar correos de prueba.
+Evidencia de publicación, migración dirigida y configuración de Auth:
+[ALIADOS_NIVELES_REFERIDOS.md](../ALIADOS_NIVELES_REFERIDOS.md).
