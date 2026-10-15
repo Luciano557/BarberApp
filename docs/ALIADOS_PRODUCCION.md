@@ -1,5 +1,8 @@
 # Programa de aliados — evidencia de producción
 
+Este registro conserva el rollout inicial v1. Revisión vigente v2 (niveles solo
+por referidos, comunicación y correo): [ALIADOS_NIVELES_REFERIDOS.md](ALIADOS_NIVELES_REFERIDOS.md).
+
 Fecha: 2026-10-14. Proyecto Supabase: `azqpyfoobpovqosbayvz` (Vittro).
 Estado: backend/frontend publicados y programa habilitado. Alta pública abierta,
 worker periódico activo e Instagram deshabilitado. La habilitación se comprobó

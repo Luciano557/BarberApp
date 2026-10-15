@@ -1,5 +1,8 @@
 # Programa de aliados — entrega de datos a Lovable
 
+Contrato inicial v1 conservado como antecedente. La vía Instagram fue retirada
+por el usuario; reglas y rollout v2 en [ALIADOS_NIVELES_REFERIDOS.md](ALIADOS_NIVELES_REFERIDOS.md).
+
 Estado: contrato implementado y aplicado al proyecto operativo el 2026-10-14,
 con excepción explícita del usuario: «podemos ir a produccion directamente».
 El nombre del documento conserva la entrega originalmente prevista para Lovable.

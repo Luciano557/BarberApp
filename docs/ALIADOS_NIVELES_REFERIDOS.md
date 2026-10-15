@@ -63,5 +63,24 @@ Link”, body de 105 caracteres, sin template URL externo; coincide con la captu
 PATCH previsto solo sobre subject/content de Magic Link, conservando los demás
 campos de Auth. [Referencia oficial](https://supabase.com/docs/guides/auth/auth-email-templates).
 
-Pendiente de integración: aplicación dirigida de SQL/Auth template, deploy de
-funciones/frontend y verificación productiva. No se envían emails a terceros.
+## Integración productiva
+
+Aplicado solo `20261014230000_partner_referral_levels.sql`, en transacción y con
+guard de hash del RPC anterior. No se ejecutó db push ni se modificó el DEFINER
+de Auth. Nueva versión registrada en schema_migrations. Alta pausada durante
+rollout, manteniendo billing y worker para obligaciones existentes. Rollback
+productivo pasó con términos v2 y cero fixtures persistentes.
+
+Magic Link: PATCH exacto de mailer_subjects_magic_link y
+mailer_templates_magic_link_content; lectura posterior coincide con el HTML
+versionado (5848 caracteres), subject “Tu acceso a Vittro”. Comparación de todos
+los demás campos Auth: sin cambios. Remitente, SMTP, redirects, política de
+confirmación y otras plantillas conservados. No se envían emails a terceros.
+
+Funciones ACTIVE observadas: partner-program v4, worker v3, callback retirado v3,
+subscription-create-checkout v28 y subscription-mp-webhook v27. Se redeplegaron
+solo esas cinco por compartir las reglas del programa. Verificación global:
+207 Vitest/29 archivos, 32 Deno y 27 SQL aprobadas, más 11 escenarios de UI/correo.
+
+Pendiente para cerrar integración: publicación de frontend, verificación Vercel,
+reapertura del alta y prueba de identidad/API con cuenta temporal sin email.

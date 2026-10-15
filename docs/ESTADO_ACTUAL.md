@@ -18,20 +18,23 @@ actual, lectura del pago real para devoluciones, liberación y refresh Instagram
 OAuth: state consumible, métricas oficiales, token AES-GCM, default deshabilitado.
 
 Excepción directa de DB/RLS y producción autorizada por el usuario. Cinco
-migraciones propias aplicadas; 20 tablas con RLS sin lectura cliente directa,
+migraciones propias del primer rollout; revisión v2 suma una sexta migración
+de niveles por referidos. 20 tablas con RLS sin lectura cliente directa,
 funciones propias INVOKER, trigger Auth adaptado tras reportarlo y guard de hash.
 Cinco Edge Functions publicadas; cron periódico con Vault/HMAC y Auth allowlist
 configurados. Backend probado con rollback y Auth/API reales: cero fixtures
 persistentes, creador sin tenant/trial, código y panel funcionales. Alta abierta;
 Vercel Ready / Production / Current y Git original/fork sincronizados por avance
-normal. Instagram requiere cuenta externa real. Se corrigió el orden real de
+normal. Instagram está retirado: niveles 1/2/3 por 0/5/20 barberías calificadas,
+con frasco de progreso, comunicación de ingresos para amigos/comunidades y
+condiciones desplegables. Correo de acceso en español y con marca Vittro. Se corrigió el orden real de
 GoTrue con una intención privada de un uso, sin confiar en metadata de navegador.
 No hubo cargos ni transferencias. Evidencia: `docs/ALIADOS_PRODUCCION.md`.
 
 Evidencia local: 34 pruebas de dominio + 3 de acceso/recuperación UI, seis pruebas
 de barreras HTTP Deno sin permiso de red; build, lint focal y chequeo Deno de las
 cinco funciones involucradas.
-Regresión final aprobada: 200 Vitest, 32 Deno y 27 PostgreSQL/PGlite, incluidos los casos existentes.
+Regresión de la revisión aprobada: 207 Vitest, 32 Deno y 27 PostgreSQL/PGlite, incluidos los casos existentes.
 QA Playwright con tráfico remoto interceptado:
 9 escenarios a 390/768/1440px, landing/panel/Admin y drawers, importes de
 $99.999.999 y $1.234.567.890 sin scroll horizontal ni errores de página. Artefactos
