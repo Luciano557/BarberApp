@@ -24,14 +24,14 @@ describe('partner access', () => {
   });
   it('does not permit creator registration while the program is closed', () => {
     render(<PartnerAuthForm initialMode="register" enabled={false} />);
-    expect(screen.getByRole('button', { name: 'Crear cuenta de creador' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Crear mi cuenta' })).toBeDisabled();
   });
   it('requires acceptance and a strong password before contacting registration', async () => {
     render(<PartnerAuthForm initialMode="register" enabled />);
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Test Creator' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'creator@example.com' } });
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'short' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta de creador' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear mi cuenta' }));
     await screen.findByText('Aceptá las condiciones para registrarte.');
     expect(mock.call).not.toHaveBeenCalled();
   });

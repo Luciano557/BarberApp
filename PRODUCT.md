@@ -100,7 +100,9 @@ Cuatro superficies con objetivos distintos, que no deben contaminarse entre sí:
 
 Programa de aliados (2026-10-14): publicado y habilitado en producción
 con excepción autorizada de DB/RLS. Admite owners
-existentes y creadores con identidad Auth de plataforma sin tenant. Suma una
+existentes y personas externas que recomiendan a amigos o a su comunidad, con
+identidad Auth de plataforma sin tenant. Los niveles 10/20/30% dependen solo de
+barberías calificadas; los seguidores de redes no intervienen. Suma una
 entrada pública Persuade, un panel Operate propio y control de convenios/
 liquidaciones en Admin; conserva el núcleo visual y no agrega roles tenant.
 El beneficio se atribuye solo al alta de una barbería nueva, con comisión por

@@ -1,9 +1,24 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { PARTNER_TERMS_VERSION } from '../../supabase/functions/_shared/partner-domain';
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PartnerLevelExplorer } from "@/components/partners/PartnerLevels";
+import { PARTNER_TERMS_VERSION } from "../../supabase/functions/_shared/partner-domain";
 
 export default function Partners() {
+  const location = useLocation();
+  const [conditionsOpen, setConditionsOpen] = useState(
+    location.hash === "#condiciones",
+  );
+  const conditions = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    if (location.hash !== "#condiciones") return;
+    setConditionsOpen(true);
+    const frame = requestAnimationFrame(() =>
+      conditions.current?.scrollIntoView({ block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [location.hash]);
   return (
     <div className="min-h-[100svh] bg-background text-foreground">
       <header className="border-b">
@@ -29,112 +44,157 @@ export default function Partners() {
         <section className="grid items-start gap-12 lg:grid-cols-[1.15fr_1fr]">
           <div>
             <h1 className="max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-              Tu recomendación hace crecer a las barberías.
+              Generá ingresos con tu código de referidos.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
-              Con el Programa de aliados Vittro, tu comunidad obtiene un descuento y vos recibís una
-              comisión por cada barbería que empieza a pagar.
+              Compartí Vittro con amigos que tengan una barbería o con tu
+              comunidad. Por cada barbería que se registra con tu código y
+              empieza a pagar, recibís una comisión.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" asChild>
                 <Link to="/aliados/panel?mode=register">
-                  Soy creador <ArrowRight className="h-4 w-4" />
+                  Crear mi código <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <Link to="/aliados/panel">Ya uso Vittro</Link>
+                <Link to="/aliados/panel">Ya tengo cuenta</Link>
               </Button>
             </div>
             <p className="mt-4 text-sm text-muted-foreground">
-              Podés empezar sin conectar Instagram. Disponible para aliados de Argentina.
+              Programa de aliados Vittro. Disponible en Argentina, con pagos en
+              pesos.
             </p>
           </div>
           <div className="rounded-container border">
             <div className="border-b p-6">
               <h2 className="text-lg font-medium">
-                Una recomendación. Un beneficio para cada uno.
+                Vos ganás. La barbería ahorra.
               </h2>
             </div>
             <dl className="divide-y">
               <div className="p-6">
-                <dt className="text-sm text-muted-foreground">Para la barbería</dt>
-                <dd className="mt-2 text-3xl font-semibold tabular-nums">10% de descuento</dd>
+                <dt className="text-sm text-muted-foreground">
+                  Tu ingreso por cada referido
+                </dt>
+                <dd className="mt-2 text-3xl font-semibold tabular-nums">
+                  10% a 30% de comisión
+                </dd>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  En el primer mes pagado, después de sus 15 días de prueba.
+                  Del primer pago después del descuento. Subís de nivel a medida
+                  que más barberías se califican.
                 </p>
               </div>
               <div className="p-6">
-                <dt className="text-sm text-muted-foreground">Para vos</dt>
-                <dd className="mt-2 text-3xl font-semibold tabular-nums">Del 10% al 30%</dd>
+                <dt className="text-sm text-muted-foreground">
+                  El beneficio que compartís
+                </dt>
+                <dd className="mt-2 text-3xl font-semibold tabular-nums">
+                  10% de descuento
+                </dd>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Del primer pago después del descuento. Los convenios personalizados pueden llegar
-                  al 100%.
+                  En el primer mes pagado de la barbería, después de sus 15 días
+                  de prueba.
                 </p>
               </div>
             </dl>
           </div>
         </section>
         <section className="mt-16 border-t pt-10">
-          <h2 className="text-2xl font-semibold">Tu código crece con vos</h2>
+          <h2 className="text-2xl font-semibold">
+            Subí de nivel. Ganá más por cada referido.
+          </h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Contamos cada barbería que pagó dos meses distintos una sola vez. El progreso es
-            acumulativo. También podés alcanzar un nivel por tu audiencia verificada en Instagram.
+            Tu nivel depende de las barberías que traés. Cada una cuenta una
+            vez, cuando pagó dos mensualidades distintas sin devoluciones. El
+            progreso es acumulativo.
           </p>
-          <div className="mt-6 divide-y border-y">
+          <PartnerLevelExplorer />
+        </section>
+        <section className="mt-12 border-t pt-8">
+          <h2 className="text-2xl font-semibold">
+            De tu recomendación a tu ingreso
+          </h2>
+          <ol className="mt-6 grid gap-6 sm:grid-cols-3">
             {[
-              [10, 'Al crear tu código', 'No necesitás una audiencia mínima.'],
               [
-                20,
-                '5 barberías o 10.000 seguidores',
-                'Barberías con dos meses pagados o seguidores verificados.',
+                "Creá tu código",
+                "Confirmá tu email y elegí un código personal para compartir.",
               ],
-              [30, '20 barberías o 50.000 seguidores', 'El mayor nivel del programa automático.'],
-            ].map(([percent, title, text]) => (
-              <div key={percent} className="grid gap-2 py-5 sm:grid-cols-[5rem_1fr_1fr]">
-                <p className="text-2xl font-semibold tabular-nums">{percent}%</p>
-                <h3 className="text-base font-medium">{title}</h3>
-                <p className="text-sm text-muted-foreground">{text}</p>
-              </div>
+              [
+                "Compartilo con tu gente",
+                "Tus amigos o tu comunidad lo usan al registrar una barbería nueva.",
+              ],
+              [
+                "Recibí tu comisión",
+                "El primer pago genera tu comisión. Vittro revisa y liquida los saldos disponibles cada mes.",
+              ],
+            ].map(([title, description], index) => (
+              <li key={title}>
+                <h3 className="text-lg font-medium">
+                  <span className="mr-2 text-muted-foreground">
+                    {index + 1}.
+                  </span>
+                  {title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {description}
+                </p>
+              </li>
             ))}
+          </ol>
+        </section>
+        <details
+          ref={conditions}
+          id="condiciones"
+          open={conditionsOpen}
+          onToggle={(event) => setConditionsOpen(event.currentTarget.open)}
+          className="group mt-12 scroll-mt-6 rounded-container border"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            Condiciones del programa
+            <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+          </summary>
+          <div className="border-t p-5">
+            <ul className="max-w-3xl list-disc space-y-3 pl-5 text-sm leading-relaxed text-muted-foreground">
+              <li>
+                El código se incorpora únicamente al registrar una barbería
+                nueva. No se aplica a altas anteriores ni a tu propia barbería.
+              </li>
+              <li>
+                El descuento es del 10% en la primera mensualidad pagada. Las
+                siguientes se cobran al precio vigente del plan.
+              </li>
+              <li>
+                Los niveles automáticos son 10% al crear tu código, 20% con 5
+                barberías calificadas y 30% con 20. Se califica cada barbería
+                una sola vez tras dos mensualidades distintas pagadas, sin
+                reversión. El progreso se conserva salvo fraude o reversión.
+              </li>
+              <li>
+                Tu porcentaje se fija al crear el primer checkout y se calcula
+                sobre ese primer pago después del descuento, antes de los costos
+                del procesador. No es una comisión recurrente.
+              </li>
+              <li>
+                La comisión queda disponible 30 días después del cobro, si no
+                hay devolución, contracargo o incidencia pendiente. Las
+                devoluciones posteriores se ajustan en el saldo.
+              </li>
+              <li>
+                Los pagos son mensuales, revisados por Vittro y en pesos
+                argentinos a una cuenta de titularidad comprobada.
+              </li>
+              <li>
+                Los convenios personalizados pueden llegar al 100% y requieren
+                aprobación de Vittro, con porcentaje y vigencia propios.
+              </li>
+            </ul>
+            <p className="mt-5 text-xs text-muted-foreground">
+              Versión {PARTNER_TERMS_VERSION}
+            </p>
           </div>
-        </section>
-        <section id="condiciones" className="mt-12 max-w-3xl scroll-mt-6">
-          <h2 className="text-2xl font-semibold">Condiciones del programa</h2>
-          <ul className="mt-5 list-disc space-y-3 pl-5 text-sm leading-relaxed text-muted-foreground">
-            <li>
-              El código se incorpora únicamente al registrar una barbería nueva. No se aplica a
-              altas anteriores ni a tu propia barbería.
-            </li>
-            <li>
-              El descuento es del 10% en la primera mensualidad pagada. Las siguientes se cobran al
-              precio vigente del plan.
-            </li>
-            <li>
-              Tu porcentaje se fija al crear el primer checkout y se calcula sobre ese primer pago
-              después del descuento, antes de los costos del procesador. No es una comisión
-              recurrente.
-            </li>
-            <li>
-              La comisión queda disponible 30 días después del cobro, si no hay devolución,
-              contracargo o incidencia pendiente. Las devoluciones posteriores se ajustan en el
-              saldo.
-            </li>
-            <li>
-              Los pagos son mensuales, revisados por Vittro y en pesos argentinos a una cuenta de
-              titularidad comprobada.
-            </li>
-            <li>
-              Instagram es opcional y requiere verificación oficial vigente para mejorar tu nivel
-              por seguidores. El progreso por barberías se conserva salvo fraude o reversión de
-              pagos.
-            </li>
-            <li>
-              Los convenios personalizados requieren aprobación de Vittro, con porcentaje y vigencia
-              propios.
-            </li>
-          </ul>
-          <p className="mt-5 text-xs text-muted-foreground">Versión {PARTNER_TERMS_VERSION}</p>
-        </section>
+        </details>
       </main>
     </div>
   );

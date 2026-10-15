@@ -74,7 +74,7 @@ async function scenario(browser, name, viewport, role) {
     if (url.pathname.endsWith('/functions/v1/partner-program')) {
       const { action } = route.request().postDataJSON();
       if (action === 'status')
-        return json({ enabled: true, instagramEnabled: false, termsVersion: '2026-10-14-v1' });
+        return json({ enabled: true, instagramEnabled: false, termsVersion: '2026-10-14-v2' });
       if (action === 'summary')
         return json({
           summary: {
@@ -163,8 +163,8 @@ async function scenario(browser, name, viewport, role) {
         role === 'admin'
           ? 'Aliados'
           : role
-            ? 'Mi código de aliado'
-            : 'Tu recomendación hace crecer a las barberías.',
+            ? 'Mi código de referidos'
+            : 'Generá ingresos con tu código de referidos.',
       exact: true,
     })
     .waitFor();
@@ -173,8 +173,20 @@ async function scenario(browser, name, viewport, role) {
     () => document.documentElement.scrollWidth > window.innerWidth,
   );
   assert.equal(overflow, false, `${name} overflows viewport`);
+  if (!role) {
+    assert.equal(await page.locator('#condiciones').evaluate(node => node.open),false);
+    await page.getByRole('button',{name:/Nivel 2/}).press('Enter');
+    assert.equal(await page.getByRole('button',{name:/Nivel 2/}).getAttribute('aria-pressed'),'true');
+    await page.locator('summary').press('Enter');
+    await page.waitForFunction(()=>document.querySelector('#condiciones').open);
+    await page.screenshot({path:path.join(output,`${name}-level-conditions.png`),fullPage:true});
+    await page.goto('http://127.0.0.1:8080/aliados#condiciones');
+    await page.waitForFunction(()=>document.querySelector('#condiciones')?.open);
+  }
   if (role === 'partner') {
-    assert.equal(await page.getByRole('button', { name: 'Conectar Instagram' }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: /Instagram/ }).count(), 0);
+    await page.getByRole('heading',{name:'Tu nivel por referidos'}).waitFor();
+    await page.getByText('Te faltan 15 barberías calificadas para el nivel 3 y una comisión del 30%.',{exact:true}).waitFor();
     await page.getByRole('button', { name: 'Datos de cobro' }).click();
     await page.getByRole('dialog').waitFor();
     await page.getByRole('button', { name: 'Guardar datos' }).click();
@@ -194,6 +206,23 @@ async function scenario(browser, name, viewport, role) {
   results.push({ scenario: name, viewport, overflow, errors, synthetic: true });
   await context.close();
 }
+async function emailScenario(browser,width) {
+  const context=await browser.newContext({viewport:{width,height:880}});
+  await context.route('**/*',route=>route.request().url().endsWith('/MagotipoAzul.png')
+    ? route.fulfill({contentType:'image/png',body:fs.readFileSync('public/MagotipoAzul.png')}) : route.abort());
+  const page=await context.newPage();
+  const html=fs.readFileSync('supabase/templates/magic-link.html','utf8');
+  assert.equal((html.match(/\{\{ \.ConfirmationURL \}\}/g)||[]).length,2);
+  const preview=html.replaceAll('{{ .ConfirmationURL }}','https://preview.invalid/continue');
+  fs.writeFileSync(path.join(output,'email-preview.html'),preview);
+  await page.setContent(preview,{waitUntil:'load'});
+  await page.getByRole('heading',{name:'Tu acceso a Vittro'}).waitFor();
+  assert.equal(await page.getByRole('link',{name:'Continuar en Vittro'}).getAttribute('href'),'https://preview.invalid/continue');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:path.join(output,`email-${width}.png`),fullPage:true});
+  results.push({scenario:`email-${width}`,viewport:{width,height:880},overflow:false,synthetic:true});
+  await context.close();
+}
 (async () => {
   const browser = await chromium.launch({
     headless: true,
@@ -211,6 +240,8 @@ async function scenario(browser, name, viewport, role) {
       await scenario(browser, `panel-${width}`, { width, height }, 'partner');
       await scenario(browser, `admin-${width}`, { width, height }, 'admin');
     }
+    await emailScenario(browser,680);
+    await emailScenario(browser,390);
     fs.writeFileSync(path.join(output, 'report.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify({ scenarios: results.length, passed: true, output }));
   } finally {

@@ -88,5 +88,23 @@
     "overflow": false,
     "errors": [],
     "synthetic": true
+  },
+  {
+    "scenario": "email-680",
+    "viewport": {
+      "width": 680,
+      "height": 880
+    },
+    "overflow": false,
+    "synthetic": true
+  },
+  {
+    "scenario": "email-390",
+    "viewport": {
+      "width": 390,
+      "height": 880
+    },
+    "overflow": false,
+    "synthetic": true
   }
 ]

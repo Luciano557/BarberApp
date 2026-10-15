@@ -1,5 +1,9 @@
 project_id = "azqpyfoobpovqosbayvz"
 
+[auth.email.template.magic_link]
+subject = "Tu acceso a Vittro"
+content_path = "./supabase/templates/magic-link.html"
+
 [functions.soft-delete-sucursal]
 verify_jwt = true
 [functions.update-team-member-access]

@@ -44,6 +44,24 @@ con cualquier acceso por enlace del proyecto. Se rediseña esa plantilla en espa
 con marca Vittro y CTA de ingreso genérica, conservando ConfirmationURL. No se
 envían emails de prueba a terceros ni se cambia SMTP, remitente o otras plantillas.
 
-Pendiente al cerrar la etapa lógica: build visual, preview/QA del correo,
-aplicación dirigida de SQL/Auth templates, deploy de funciones y frontend,
-verificación productiva y documentación de evidencia.
+Build visual cerrado y validado localmente: landing, panel, registro y CTA de
+Homepage usan “código de referidos”. El frasco tiene tres estados seleccionables
+en landing y avance real entre umbrales en panel; un convenio se comunica aparte
+del nivel automático. Details nativo conserva teclado/foco y abre por #condiciones.
+
+QA acotado, primera ronda sin defectos: 11 escenarios (landing/panel/Admin a
+390/768/1440 y correo a 390/680), sin overflow ni errores; interacción de niveles
+y desplegable por teclado, enlace directo y cifras de hasta diez dígitos. Siete
+pruebas nuevas de UI cubren progreso, convenio y disclosure. Build/lint focal
+aprobados. Capturas y reporte: `.impeccable/review/partners/`.
+
+El HTML versionado está en `supabase/templates/magic-link.html`, con tablas e
+inline styles para clientes de correo, logo público, fallback de fuente y enlace
+de respaldo. Tiene dos ConfirmationURL nativas y ningún enlace de autenticación
+fabricado. El preview usa preview.invalid. Auditoría Auth real: subject “Your Magic
+Link”, body de 105 caracteres, sin template URL externo; coincide con la captura.
+PATCH previsto solo sobre subject/content de Magic Link, conservando los demás
+campos de Auth. [Referencia oficial](https://supabase.com/docs/guides/auth/auth-email-templates).
+
+Pendiente de integración: aplicación dirigida de SQL/Auth template, deploy de
+funciones/frontend y verificación productiva. No se envían emails a terceros.
