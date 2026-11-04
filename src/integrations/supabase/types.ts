@@ -5120,6 +5120,7 @@ export type Database = {
       }
       tareas: {
         Row: {
+          accion_version: string
           asignado_a_id: string | null
           asignado_a_nombre: string | null
           assignment_scope: string
@@ -5135,6 +5136,9 @@ export type Database = {
           fecha_limite: string | null
           hora: string | null
           id: string
+          iniciada_at: string | null
+          iniciada_por_id: string | null
+          iniciada_por_nombre: string | null
           organization_id: string
           recurrencia_id: string | null
           recurrente: boolean | null
@@ -5150,6 +5154,7 @@ export type Database = {
           vencimiento_dias: number | null
         }
         Insert: {
+          accion_version?: string
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
           assignment_scope?: string
@@ -5165,6 +5170,9 @@ export type Database = {
           fecha_limite?: string | null
           hora?: string | null
           id?: string
+          iniciada_at?: string | null
+          iniciada_por_id?: string | null
+          iniciada_por_nombre?: string | null
           organization_id: string
           recurrencia_id?: string | null
           recurrente?: boolean | null
@@ -5180,6 +5188,7 @@ export type Database = {
           vencimiento_dias?: number | null
         }
         Update: {
+          accion_version?: string
           asignado_a_id?: string | null
           asignado_a_nombre?: string | null
           assignment_scope?: string
@@ -5195,6 +5204,9 @@ export type Database = {
           fecha_limite?: string | null
           hora?: string | null
           id?: string
+          iniciada_at?: string | null
+          iniciada_por_id?: string | null
+          iniciada_por_nombre?: string | null
           organization_id?: string
           recurrencia_id?: string | null
           recurrente?: boolean | null
@@ -7219,6 +7231,34 @@ export type Database = {
       sucursal_tiene_historial: {
         Args: { _sucursal_id: string }
         Returns: boolean
+      }
+      tareas_accion: {
+        Args: { p_accion: string; p_tarea: string; p_version: string }
+        Returns: Json
+      }
+      tareas_accion_pin: {
+        Args: {
+          p_accion: string
+          p_cuenta: string
+          p_pin_hash: string
+          p_tarea: string
+          p_version: string
+        }
+        Returns: Json
+      }
+      tareas_previstas: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: {
+          asignado_a_id: string
+          asignado_a_nombre: string
+          assignment_scope: string
+          descripcion: string
+          fecha: string
+          hora: string
+          recurrencia_id: string
+          sucursal_id: string
+          titulo: string
+        }[]
       }
       user_belongs_to_org: {
         Args: { _org_id: string; _user_id: string }
