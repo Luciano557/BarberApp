@@ -732,3 +732,9 @@ barbero se valida en las pruebas SQL y queda para el QA autenticado.
 3. Campana → tarea puntual con una notificación real; tarea eliminada y sin acceso.
 4. Prioridad con un onboarding pendiente y con un resumen mensual pendiente.
 5. Tablet real (táctil).
+
+## Incidente 2026-11-04 — progreso semanal sin cargar
+
+- Causa: las migraciones `20261014120000_tareas_acciones_controladas` y `20261015120000_tareas_aviso_semanal` estaban en el repo pero no aplicadas en producción; el frontend ya llamaba a `tareas_previstas`, `tareas_accion` y `tareas_aviso_semanal`.
+- Corrección: ambas aplicadas vía Lovable el 2026-11-04 (SECURITY DEFINER en `tareas_private.*` autorizado explícitamente). Verificado: funciones con EXECUTE para `authenticated`, 4 políticas `tareas_4a_*`, tabla de aviso creada; 56 tests de Tareas OK.
+- Regla: una migración marcada "no aplicar sin autorización" queda listada como pendiente en `ESTADO_ACTUAL.md` hasta aplicarse; no se publica frontend que dependa de ella antes.
