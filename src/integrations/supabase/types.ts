@@ -5266,6 +5266,51 @@ export type Database = {
           },
         ]
       }
+      tareas_aviso_semanal: {
+        Row: {
+          estado: string
+          momento: string
+          organization_id: string
+          pospuesto_hasta: string | null
+          semana: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          estado: string
+          momento: string
+          organization_id: string
+          pospuesto_hasta?: string | null
+          semana: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          estado?: string
+          momento?: string
+          organization_id?: string
+          pospuesto_hasta?: string | null
+          semana?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tareas_aviso_semanal_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tareas_aviso_semanal_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "platform_admin_organizations_v"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tareas_recurrentes: {
         Row: {
           activo: boolean
