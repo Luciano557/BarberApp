@@ -1,7 +1,8 @@
 # Programa de aliados
 
-Revisión v3 (2026-11-05): cuatro niveles y pulverizador de progreso; build local
-validado, publicación en curso. Evidencia: [ALIADOS_CUATRO_NIVELES.md](../ALIADOS_CUATRO_NIVELES.md).
+Revisión v3 (2026-11-05): cuatro niveles y pulverizador de progreso; publicada
+y habilitada, Vercel READY/production con dominio asignado y Auth/API comprobados.
+Evidencia: [ALIADOS_CUATRO_NIVELES.md](../ALIADOS_CUATRO_NIVELES.md).
 Revisión v2 histórica: [ALIADOS_NIVELES_REFERIDOS.md](../ALIADOS_NIVELES_REFERIDOS.md).
 
 Estado 2026-10-14: motor, datos/RLS y frontend publicados y habilitados en el
@@ -64,7 +65,14 @@ consultar la operación. No se realizan transferencias desde el software.
 
 ## Evidencia y pendientes
 
-`src/test/partner-domain.test.ts`: 34 casos aprobados; acceso/recuperación UI:
+Revisión v3: 47 Vitest dirigidas (36 dominio, ocho UI y tres Auth), 29 SQL,
+ocho Deno HTTP/HMAC, TypeScript completo, lint focal y build aprobados.
+11 escenarios visuales/teclado correctos. Regresión global 359/367, con los ocho
+fallos previos de Auth/organización documentados en PORTAL_CLIENTE_PUBLICACION.md;
+sin cambios en esos contextos. Producción: migración puntual séptima, API v6,
+rollback SQL y Auth/API nativos comprobados, alta reabierta y fixtures eliminados.
+
+Evidencia histórica v2: `src/test/partner-domain.test.ts`: 34 casos aprobados; acceso/recuperación UI:
 3 casos; `partner-program/index_test.ts`: 6 pruebas HTTP sin permisos de red.
 Build y lint focal aprobados; chequeo Deno de API, callback, worker, checkout y
 webhook. QA visual/interacción: 11 escenarios sintéticos (landing/panel/Admin en
@@ -75,7 +83,7 @@ Regresión de la revisión: 207 pruebas Vitest en 29 archivos y 32 Deno (24 de A
 existentes, seis del nuevo handler HTTP y dos de firmas del worker), aprobadas. `tsc -p
 tsconfig.app.json --noEmit` conserva los cinco errores preexistentes de
 abortSignal/readRetry documentados, sin errores en las superficies nuevas.
-Las seis migraciones pasan 27 pruebas PostgreSQL/PGlite: RLS, ACL, unicidad,
+En v2, las seis migraciones pasaron 27 pruebas PostgreSQL/PGlite: RLS, ACL, unicidad,
 snapshot, efectos recalculados, leases, reversiones, lotes y Storage restrictivo.
 Se agregó el orden real de GoTrue (INSERT y después app_metadata), nonce
 no falsificable/expiración/consumo, y se ajustó el entorno para que service_role solo

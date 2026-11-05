@@ -62,4 +62,40 @@ disclosure cerrado/direct link, sin errores ni overflow. Inspección conjunta
 desktop/mobile sin defectos; no hubo ronda de retoques. Evidencia local:
 `.impeccable/review/partners/` y `supabase/tests/partners-ui-qa.cjs`.
 
-Pendientes: publicación original/fork y aplicación puntual de migración/backend.
+Regresión general: 359/367 correctas en 43 archivos. Los ocho fallos siguen
+correspondiendo a AuthContext (5), OrganizationContext (2) y TenantDataIsolation
+(1), ya reproducidos en el original limpio y documentados en
+PORTAL_CLIENTE_PUBLICACION.md. No hay cambios de esta revisión en esos contextos.
+TypeScript completo de aplicación aprobado, sin errores.
+
+## Rollout
+
+Aplicada únicamente la séptima migración del programa, con registro explícito
+en schema_migrations, dentro de una transacción limitada a 30 segundos y guardas
+de source. Alta pausada durante rollout; billing y cron conservados. Validación
+productiva con rollback aprobada con términos v3: externa sin tenant, atribución
+con trial, descuento, checkout y privacidad; cero fixtures persistentes.
+
+Solo partner-program se redeplegó (v6 ACTIVE, verify_jwt=false con Auth explícita):
+su proyección usa el nuevo dominio y valida términos v3. Worker, checkout, webhook,
+callback y secrets no requerían cambios de ejecución. Nueve probes productivos
+pasaron con altas pausadas, incluidos Auth, origen, CORS y credencial de worker.
+
+Código en ambos main, original primero y fork después, SHA verificado
+d93b4908aac154e34fb2a0083ce19169c5afa68b, sin fuerza ni divergencia.
+Vercel `dpl_5k58bry2bkEn8ESjdh7i9WBe4QPe`: READY, production, aliases
+www.vittro.com.ar/vittro.com.ar y git source de ese mismo SHA. Navegador sobre
+la página pública: cuatro entradas 10/30/50/80, requisitos 0/5/10/20; selección
+del nivel 4 actualiza a 80% y llena el pulverizador. Condiciones cerradas.
+
+Alta reabierta con billing_ready=true. Prueba Auth/API nativa con términos v3:
+externa sin tenant/trial, login, adhesión idempotente, 10% inicial, código case
+insensitive, panel y bloqueos de Admin/datos bancarios. Cuenta e intención de
+prueba eliminadas. Los nueve probes se repitieron habilitados: código inexistente
+409 y status true/Instagram false. Un miembro real permanece, cero fixtures e
+intenciones de QA, cero funciones propias DEFINER. Cron activo y cinco respuestas
+worker 200 sin fallos en los últimos cinco minutos. Sin emails, cobros o
+transferencias de prueba. La validación financiera real pendiente del rollout
+original sigue documentada; las pruebas de pagos de esta revisión son sintéticas.
+
+El commit de cierre solo actualiza documentación y conserva el código verificado.
