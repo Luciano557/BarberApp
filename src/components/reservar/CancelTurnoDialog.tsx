@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRef, useState } from "react";
+import { mutatePortalFunction, portalErrorCode } from "./lib/portalRequests";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
+import { feedback } from "@/lib/feedback";
 import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface Props {
@@ -26,33 +26,27 @@ export const CancelTurnoDialog = ({ turno, telefono, open, onOpenChange, onCance
   const [motivo, setMotivo] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef(false);
   const handleCancel = async () => {
+    if (pending.current) return;
+    pending.current = true;
     setLoading(true);
+    setError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("cancel-turno", {
-        body: { turno_id: turno.id, motivo: motivo || null, telefono },
-      });
-
-      if (error || data?.error) {
-        if (data?.error === "time_limit") {
-          toast.error("Este turno ya no puede cancelarse.");
-          return;
-        }
-        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
-        return;
-      }
-
-      toast.success("Turno cancelado correctamente");
+      await mutatePortalFunction("cancel-turno", { turno_id: turno.id, motivo: motivo || null, telefono });
+      feedback.success("Turno cancelado correctamente");
       onCancelled();
-    } catch {
-      toast.error("Ocurrió un problema. Probá nuevamente.");
+    } catch (error) {
+      setError(portalErrorCode(error) === "time_limit" ? "Este turno ya no puede cancelarse." : "No pudimos cancelar el turno. Intentá de nuevo.");
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={next => { if (!pending.current) onOpenChange(next); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>¿Querés cancelar este turno?</AlertDialogTitle>
@@ -63,6 +57,7 @@ export const CancelTurnoDialog = ({ turno, telefono, open, onOpenChange, onCance
 
         <div className="py-2">
           <Textarea
+            aria-label="Motivo de cancelación (opcional)"
             placeholder="Motivo de cancelación (opcional)"
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
@@ -70,9 +65,11 @@ export const CancelTurnoDialog = ({ turno, telefono, open, onOpenChange, onCance
           />
         </div>
 
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Volver</AlertDialogCancel>
-          <AlertDialogAction onClick={handleCancel} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <AlertDialogAction onClick={event => { event.preventDefault(); void handleCancel(); }} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             {loading ? "Cancelando..." : "Sí, cancelar turno"}
           </AlertDialogAction>
         </AlertDialogFooter>

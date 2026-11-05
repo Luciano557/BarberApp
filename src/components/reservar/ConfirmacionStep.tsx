@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRef, useState } from "react";
+import { mutatePortalFunction, portalErrorCode } from "./lib/portalRequests";
 import type { BookingState } from "./BookingStepper";
 import type { OrgPublicData } from "@/pages/Reservar";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { feedback } from "@/lib/feedback";
 import { MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
 import { formatFechaLegible } from "@/lib/dateUtils";
 import { trackMetaEvent } from "@/lib/analytics/metaPixel";
@@ -17,19 +17,21 @@ interface Props {
 
 export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }: Props) => {
   const [loading, setLoading] = useState(false);
+  const pending = useRef(false);
 
   const handleConfirm = async () => {
+    if (pending.current) return;
     if (!booking.cliente) {
-      toast.error("Faltan tus datos. Volvé al paso anterior.");
+      feedback.error("Faltan tus datos. Volvé al paso anterior.");
       return;
     }
+    pending.current = true;
     setLoading(true);
     try {
       const { cliente } = booking;
       const nombreCompleto = [cliente.nombre, cliente.apellido].filter(Boolean).join(" ").trim();
 
-      const { data, error: fnError } = await supabase.functions.invoke("validate-turno", {
-        body: {
+      await mutatePortalFunction("validate-turno", {
           organization_id: orgData.organization.id,
           sucursal_id: booking.sucursalId,
           barbero_id: booking.barberoId,
@@ -42,45 +44,27 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           cliente_email: cliente.email,
           cliente_fecha_nacimiento: cliente.birth_date,
           eligio_barbero: booking.eligioBarbero,
-        },
-      });
+        });
 
-      if (fnError || data?.error) {
-        const code = data?.error;
-        if (code === "slot_taken") {
-          toast.error("Ese horario ya fue reservado. Elegí otro.");
-          onSlotTaken();
-          return;
-        }
-        if (code === "slot_too_soon") {
-          toast.error("Ese horario quedó muy cerca. Elegí otro.");
-          onSlotTaken();
-          return;
-        }
-        if (code === "outside_working_hours") {
-          toast.error("Ese horario ya no está disponible. Elegí otro.");
-          onSlotTaken();
-          return;
-        }
-        if (code === "slot_blocked") {
-          toast.error("Ese horario quedó bloqueado. Elegí otro.");
-          onSlotTaken();
-          return;
-        }
-        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
-        return;
-      }
-
-      toast.success(`¡Turno reservado, ${nombreCompleto || "listo"}!`);
+      feedback.success(`¡Turno reservado, ${nombreCompleto || "listo"}!`);
       trackMetaEvent(orgData.portal?.meta_pixel_id, 'Schedule', {
         content_name: booking.servicioNombre,
         value: booking.servicioPrecio,
         currency: 'ARS',
       });
       onConfirmed();
-    } catch {
-      toast.error("Ocurrió un problema. Probá nuevamente.");
+    } catch (error) {
+      const code = portalErrorCode(error);
+      const slotErrors: Record<string, string> = {
+        slot_taken: "Ese horario ya fue reservado. Elegí otro.",
+        slot_too_soon: "Ese horario quedó muy cerca. Elegí otro.",
+        outside_working_hours: "Ese horario ya no está disponible. Elegí otro.",
+        slot_blocked: "Ese horario quedó bloqueado. Elegí otro.",
+      };
+      feedback.error(code && slotErrors[code] ? slotErrors[code] : "No pudimos confirmar el turno. Revisá tu conexión e intentá de nuevo.");
+      if (code && slotErrors[code]) onSlotTaken();
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };

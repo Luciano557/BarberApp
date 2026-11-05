@@ -176,9 +176,12 @@ diferido) — eso es Fase 5, sigue pendiente, sin tocar acá.
 
 ## Portal de reservas — experiencia del cliente
 
-Ruta pública: `/:orgSlug/reservar`. Etapa visual del portal implementada y
-validada **localmente, sin publicación**. Se mantiene la identidad configurable
-de cada barbería y el recorrido existente de reserva y gestión por teléfono.
+Ruta pública: `/:orgSlug/reservar`. La intervención se dividió en un build
+visual y otro de comportamiento, ambos validados localmente. Se mantiene la
+identidad configurable de cada barbería. Estado de publicación y evidencia:
+[PORTAL_CLIENTE_PUBLICACION.md](../PORTAL_CLIENTE_PUBLICACION.md).
+
+### Etapa 1 — composición visual
 
 - **Servicios:** cada opción reserva el ancho principal al nombre; duración y
   precio comparten una segunda fila que puede reflowear. El importe usa
@@ -226,10 +229,50 @@ Validación de cierre:
   Usa los componentes reales con respuestas sintéticas de las funciones; no
   valida backend, RLS ni escrituras reales. Servidor de prueba detenido al cerrar.
 
-Pendiente para la etapa de comportamiento: conservar datos al retroceder,
-progreso según pasos efectivos, identificación progresiva por teléfono,
-recuperación de errores de lectura y revisión del flujo de reprogramación.
-El auto-scroll de horarios y la lógica de consultas no se cambiaron en este build.
+### Etapa 2 — comportamiento
+
+- **Volver conserva el trabajo:** navegar hacia atrás ya no borra selecciones.
+  Solo cambiar efectivamente sucursal, servicio o preferencia de profesional
+  invalida sus selecciones dependientes. El borrador de datos personales se
+  conserva montado mientras se recorre el formulario, incluso antes de enviarlo;
+  no se persiste en almacenamiento del navegador y se descarta al salir del flujo.
+- **Progreso real:** una única sucursal se resuelve automáticamente y muestra
+  cinco pasos; con más de una se muestran seis. Al volver a horarios se prefiere
+  la fecha elegida si continúa disponible. Elegir “Cualquiera disponible” sigue
+  consultando todos los profesionales al regresar, aunque un horario anterior
+  hubiese asignado uno concreto.
+- **Identificación progresiva:** primero teléfono; si hay coincidencia, se
+  confirma la identidad; si no la hay, se abre el registro con el teléfono
+  precargado. También se puede completar manualmente. Una búsqueda fallida
+  permite reintentar y no se interpreta como un cliente inexistente. Cambiar el
+  teléfono cancela la búsqueda anterior.
+- **Lecturas recuperables:** `usePortalRead` y `readPortalFunction` comparten la
+  política existente de retry transitorio, timeout y cancelación. Incluyen el
+  contexto completo de cada request en su clave local; una respuesta tardía de
+  otra fecha, organización o teléfono no sustituye la actual. Un fallo inicial
+  muestra `InlineReadError`; un refetch conserva el contenido y ofrece reintento.
+  Los horarios ya no fuerzan scroll al terminar de cargar.
+- **Mutaciones:** `mutatePortalFunction` interpreta también el cuerpo JSON de
+  los errores HTTP reales de Supabase. Confirmar, cancelar y reprogramar tienen
+  guardas contra doble envío y un único intento por acción. Los conflictos de
+  horario vuelven a disponibilidad; los errores técnicos no se muestran crudos.
+- **Reprogramación:** mantiene el profesional del turno original, como permite
+  el endpoint actual. No ofrece cambiarlo ni confirmar con un horario vacío.
+  Volver desde la confirmación regresa a horarios. La consulta conserva
+  `exclude_turno_id` y los scopes originales.
+- **Cancelación:** el diálogo permanece abierto si la operación falla y conserva
+  el motivo para reintentar; durante el envío bloquea su cierre.
+- **Calendario:** convierte cada extremo del turno desde la zona de la barbería
+  a UTC sin sumar también el offset del navegador. Cubierto con Buenos Aires
+  desde cuatro zonas de dispositivo y Madrid en invierno/verano.
+
+Validación de la segunda etapa: 38 pruebas dirigidas correctas, de las cuales
+25 son nuevas; TypeScript, ESLint de archivos modificados y build correctos.
+La suite global dio 344/352 correctas: los ocho fallos de Auth/organización se
+reprodujeron también en `origin/main` limpio (`87a647b4`). Navegador local con
+respuestas sintéticas: reserva, regreso/cambio de horario, identificación y
+reprogramación completados, sin errores de consola. Las validaciones de backend
+y escrituras reales no forman parte de este QA. Detalle en el registro de publicación.
 
 ## Horarios de trabajo
 

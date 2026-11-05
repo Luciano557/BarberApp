@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useRef, useState } from "react";
+import { mutatePortalFunction, portalErrorCode } from "./lib/portalRequests";
 import { FechaStep } from "./FechaStep";
 import { HorarioStep } from "./HorarioStep";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Check, CalendarDays, Clock, Scissors, User, MapPin } from "lucide-react";
-import { toast } from "sonner";
+import { feedback } from "@/lib/feedback";
 import { formatFechaLegible } from "@/lib/dateUtils";
 
 interface TurnoData {
@@ -37,54 +37,35 @@ export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
   const [nuevaHoraInicio, setNuevaHoraInicio] = useState("");
   const [nuevaHoraFin, setNuevaHoraFin] = useState("");
   const [loading, setLoading] = useState(false);
+  const pending = useRef(false);
 
   const handleConfirm = async () => {
+    if (pending.current) return;
+    if (!nuevaFecha || !nuevaHoraInicio || !nuevaHoraFin) {
+      feedback.error("Elegí una fecha y un horario antes de confirmar.");
+      setStep("fecha");
+      return;
+    }
+    pending.current = true;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("reschedule-turno", {
-        body: {
-          turno_id: turno.id,
-          nueva_fecha: nuevaFecha,
-          nueva_hora_inicio: nuevaHoraInicio,
-          telefono,
-        },
+      await mutatePortalFunction("reschedule-turno", {
+        turno_id: turno.id, nueva_fecha: nuevaFecha, nueva_hora_inicio: nuevaHoraInicio, telefono,
       });
-
-      if (error || data?.error) {
-        const code = data?.error;
-        if (code === "slot_taken") {
-          toast.error("Ese horario ya fue reservado. Elegí otro.");
-          setStep("horario");
-          return;
-        }
-        if (code === "slot_too_soon") {
-          toast.error("Ese horario quedó muy cerca. Elegí otro.");
-          setStep("horario");
-          return;
-        }
-        if (code === "outside_working_hours") {
-          toast.error("Ese horario ya no está disponible. Elegí otro.");
-          setStep("horario");
-          return;
-        }
-        if (code === "slot_blocked") {
-          toast.error("Ese horario quedó bloqueado. Elegí otro.");
-          setStep("horario");
-          return;
-        }
-        if (code === "modify_limit") {
-          toast.error(data?.message || "Este turno ya no puede modificarse.");
-          return;
-        }
-        toast.error(data?.message || data?.error || "Ocurrió un problema. Probá nuevamente.");
-        return;
-      }
-
-      toast.success("¡Turno reprogramado!");
+      feedback.success("¡Turno reprogramado!");
       setStep("done");
-    } catch {
-      toast.error("Ocurrió un problema. Probá nuevamente.");
+    } catch (error) {
+      const code = portalErrorCode(error);
+      if (code && ["slot_taken", "slot_too_soon", "outside_working_hours", "slot_blocked"].includes(code)) {
+        feedback.error("Ese horario ya no está disponible. Elegí otro.");
+        setNuevaHoraInicio("");
+        setNuevaHoraFin("");
+        setStep("horario");
+      } else {
+        feedback.error(code === "modify_limit" ? "Este turno ya no puede modificarse." : "No pudimos reprogramar el turno. Intentá de nuevo.");
+      }
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };
@@ -132,7 +113,7 @@ export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" onClick={step === "fecha" ? onBack : () => setStep("fecha")} className="gap-1">
+      <Button variant="ghost" size="sm" disabled={loading} onClick={step === "fecha" ? onBack : () => setStep(step === "confirming" ? "horario" : "fecha")} className="gap-1">
         <ChevronLeft className="h-4 w-4" /> Volver
       </Button>
 
@@ -153,6 +134,7 @@ export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
         <FechaStep
           value={nuevaFecha}
           onSelect={(fecha) => {
+            if (fecha !== nuevaFecha) { setNuevaHoraInicio(""); setNuevaHoraFin(""); }
             setNuevaFecha(fecha);
             setStep("horario");
           }}
@@ -173,7 +155,6 @@ export const RescheduleFlow = ({ turno, telefono, onDone, onBack }: Props) => {
             setStep("confirming");
           }}
           onChangeFecha={() => setStep("fecha")}
-          onChangeBarbero={() => {}}
         />
       )}
 

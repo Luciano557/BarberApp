@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { usePortalRead } from "@/components/reservar/hooks/usePortalRead";
+import { InlineReadError } from "@/components/ui/InlineReadError";
 import { BookingLanding, PortalDataView } from "@/components/reservar/BookingLanding";
 import { BookingStepper } from "@/components/reservar/BookingStepper";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,32 +19,12 @@ export interface OrgPublicData {
 
 const Reservar = () => {
   const { orgSlug } = useParams<{ orgSlug: string }>();
-  const [orgData, setOrgData] = useState<OrgPublicData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: orgData, loading, refetch } = usePortalRead<OrgPublicData>(
+    "get-org-public", { org_slug: orgSlug }, "No pudimos actualizar el portal.", !!orgSlug,
+  );
   const [mode, setMode] = useState<"landing" | "book" | "manage">("landing");
 
   useMetaPixel(orgData?.portal?.meta_pixel_id);
-
-  useEffect(() => {
-    const fetchOrg = async () => {
-      try {
-        const { data, error: fnError } = await supabase.functions.invoke("get-org-public", {
-          body: { org_slug: orgSlug },
-        });
-        if (fnError || data?.error) {
-          setError(data?.error || "No se encontró la organización");
-          return;
-        }
-        setOrgData(data);
-      } catch {
-        setError("Error de conexión");
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (orgSlug) fetchOrg();
-  }, [orgSlug]);
 
   // Espacio reservado para que el banner de cookies (fixed, bottom) nunca
   // tape contenido en el borde inferior — la altura real la publica
@@ -63,13 +44,10 @@ const Reservar = () => {
     );
   }
 
-  if (error || !orgData) {
+  if (!orgData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4" style={bannerPadding}>
-        <div className="text-center space-y-2">
-          <h1 className="text-xl font-semibold text-foreground">No encontrado</h1>
-          <p className="text-muted-foreground">{error || "No se pudo cargar la información"}</p>
-        </div>
+        <InlineReadError message="No pudimos cargar el portal de esta barbería." onRetry={refetch} bordered={false} />
         <CookieConsentBanner />
       </div>
     );
@@ -96,9 +74,11 @@ const Reservar = () => {
           </div>
         ) : (
           <BookingStepper
+            key={orgData.organization.id}
             orgData={orgData}
             mode={mode}
             onBackToLanding={() => setMode("landing")}
+            onBookNew={() => setMode("book")}
           />
         )}
       </div>

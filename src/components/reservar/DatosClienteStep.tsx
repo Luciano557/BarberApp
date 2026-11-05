@@ -1,105 +1,80 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { feedback } from "@/lib/feedback";
+import { ReadCancelledError } from "@/lib/readRetry";
 import { COUNTRIES, buildPhone } from "./lib/phone";
-import { supabase } from "@/integrations/supabase/client";
+import { readPortalFunction } from "./lib/portalRequests";
 import { UserCheck, Search } from "lucide-react";
 
 export interface ClienteData {
   nombre: string;
   apellido: string;
-  telefono: string; // already normalized like +54..
+  telefono: string;
   phone_country: string;
   email: string | null;
   birth_date: string | null;
 }
-
 interface Props {
   organizationId: string;
   initial?: Partial<ClienteData>;
   onSubmit: (cliente: ClienteData) => void;
 }
+interface LookupResult { found: boolean; cliente?: Omit<ClienteData, 'phone_country'> }
 
 export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) => {
-  // ===== Lookup state =====
-  const [lookupCountry, setLookupCountry] = useState("AR");
-  const [lookupPhone, setLookupPhone] = useState("");
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [matched, setMatched] = useState<ClienteData | null>(null);
-  const [notFound, setNotFound] = useState(false);
-
-  const lookupCountryObj = useMemo(
-    () => COUNTRIES.find((c) => c.code === lookupCountry) ?? COUNTRIES[0],
-    [lookupCountry],
-  );
-
-  const handleLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const fullPhone = buildPhone(lookupCountryObj.dial, lookupPhone);
-    if (!fullPhone) {
-      toast.error(
-        lookupCountryObj.code === "AR"
-          ? "Teléfono inválido. Ejemplo: 11 2516-2528."
-          : "Ingresá un teléfono válido.",
-      );
-      return;
-    }
-    setLookupLoading(true);
-    setNotFound(false);
-    setMatched(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("lookup-cliente-by-phone", {
-        body: { organization_id: organizationId, telefono: fullPhone },
-      });
-      if (error || data?.error) {
-        toast.error("No pudimos buscar tus datos. Intentá de nuevo.");
-        return;
-      }
-      if (data?.found) {
-        setMatched({
-          nombre: data.cliente.nombre || "",
-          apellido: data.cliente.apellido || "",
-          telefono: data.cliente.telefono || fullPhone,
-          phone_country: lookupCountryObj.code,
-          email: data.cliente.email || null,
-          birth_date: data.cliente.birth_date || null,
-        });
-      } else {
-        setNotFound(true);
-      }
-    } catch {
-      toast.error("Error de conexión.");
-    } finally {
-      setLookupLoading(false);
-    }
-  };
-
-  const handleConfirmMatch = () => {
-    if (!matched) return;
-    onSubmit(matched);
-  };
-
-  // ===== Register form state =====
+  const [stage, setStage] = useState<'lookup' | 'matched' | 'register'>(initial?.nombre ? 'register' : 'lookup');
   const [countryCode, setCountryCode] = useState(initial?.phone_country || "AR");
   const [nombre, setNombre] = useState(initial?.nombre || "");
   const [apellido, setApellido] = useState(initial?.apellido || "");
-  const [phoneLocal, setPhoneLocal] = useState("");
+  const [phoneLocal, setPhoneLocal] = useState(() => {
+    const phone = initial?.telefono || '';
+    if ((initial?.phone_country || 'AR') === 'AR') return phone.replace(/^\+549?/, '');
+    const dial = COUNTRIES.find(c => c.code === initial?.phone_country)?.dial || '';
+    return phone.startsWith(dial) ? phone.slice(dial.length) : phone;
+  });
   const [email, setEmail] = useState(initial?.email || "");
   const [birthDate, setBirthDate] = useState(initial?.birth_date || "");
+  const [matched, setMatched] = useState<ClienteData | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState(false);
+  const lookupController = useRef<AbortController | null>(null);
+  const country = useMemo(() => COUNTRIES.find(c => c.code === countryCode) ?? COUNTRIES[0], [countryCode]);
+  useEffect(() => () => lookupController.current?.abort(), []);
 
-  const country = useMemo(
-    () => COUNTRIES.find((c) => c.code === countryCode) ?? COUNTRIES[0],
-    [countryCode],
-  );
+  const cancelLookup = () => {
+    lookupController.current?.abort();
+    lookupController.current = null;
+    setLookupLoading(false);
+    setLookupError(false);
+  };
+  const handleLookup = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const phone = buildPhone(country.dial, phoneLocal);
+    if (!phone) return feedback.error(country.code === 'AR' ? 'Teléfono inválido. Ejemplo: 11 2516-2528.' : 'Ingresá un teléfono válido.');
+    cancelLookup();
+    const controller = new AbortController();
+    lookupController.current = controller;
+    setLookupLoading(true);
+    try {
+      const result = await readPortalFunction<LookupResult>('lookup-cliente-by-phone', {
+        organization_id: organizationId, telefono: phone,
+      }, controller.signal);
+      if (controller.signal.aborted) return;
+      if (result.found && result.cliente) {
+        setMatched({ ...result.cliente, telefono: result.cliente.telefono || phone, phone_country: countryCode });
+        setStage('matched');
+      } else {
+        setStage('register');
+      }
+    } catch (error) {
+      if (!controller.signal.aborted && !(error instanceof ReadCancelledError)) setLookupError(true);
+    } finally {
+      if (lookupController.current === controller) setLookupLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,17 +82,17 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
     const a = apellido.trim();
     const mail = email.trim();
 
-    if (!n) return toast.error("Ingresá tu nombre");
-    if (!a) return toast.error("Ingresá tu apellido");
+    if (!n) return feedback.error("Ingresá tu nombre");
+    if (!a) return feedback.error("Ingresá tu apellido");
     const fullPhone = buildPhone(country.dial, phoneLocal);
     if (!fullPhone) {
-      return toast.error(
+      return feedback.error(
         country.code === "AR"
           ? "Teléfono inválido. Ejemplo: 11 2516-2528."
           : "Ingresá un teléfono válido.",
       );
     }
-    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return toast.error("Ingresá un email válido");
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) return feedback.error("Ingresá un email válido");
 
     onSubmit({
       nombre: n,
@@ -129,108 +104,58 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
     });
   };
 
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
         <h2 className="text-lg font-medium text-foreground">Tus datos</h2>
         <p className="text-sm text-muted-foreground">
-          Si ya reservaste antes, buscá tus datos por teléfono. Si no, registrate abajo.
+          {stage === 'register' ? 'Completá tus datos para reservar.' : 'Ingresá tu teléfono para buscar tus datos.'}
         </p>
       </div>
 
-      {/* ===== Lookup block ===== */}
-      <div className="space-y-3 rounded-lg bg-muted/40 p-4">
-        <div className="space-y-0.5">
-          <h3 className="text-base font-medium text-foreground">¿Ya estás registrado?</h3>
-          <p className="text-sm text-muted-foreground">
-            Ingresá tu teléfono y te identificamos al instante.
-          </p>
-        </div>
-
-        {!matched ? (
-          <form onSubmit={handleLookup} className="space-y-3">
-            <Label htmlFor="booking-lookup-phone" className="sr-only">Teléfono para buscar tus datos</Label>
+      {stage === 'lookup' && (
+        <form onSubmit={handleLookup} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="booking-lookup-phone">Teléfono para buscar tus datos</Label>
             <div className="flex gap-2">
-              <Select value={lookupCountry} onValueChange={setLookupCountry}>
+              <Select value={countryCode} onValueChange={value => { cancelLookup(); setCountryCode(value); }}>
                 <SelectTrigger aria-label="Código de país para buscar tus datos" className="h-12 w-24 shrink-0 text-base">
-                  <SelectValue>{lookupCountryObj.dial}</SelectValue>
+                  <SelectValue>{country.dial}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  {COUNTRIES.map((c) => (
-                    <SelectItem key={c.code} value={c.code}>
-                      {c.name} ({c.dial})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                <SelectContent>{COUNTRIES.map(c => <SelectItem key={c.code} value={c.code}>{c.name} ({c.dial})</SelectItem>)}</SelectContent>
               </Select>
-              <Input
-                id="booking-lookup-phone"
-                type="tel"
-                inputMode="tel"
-                className="h-12 min-w-0 flex-1 text-base"
-                value={lookupPhone}
-                onChange={(e) => {
-                  setLookupPhone(e.target.value.replace(/[^\d\s-]/g, ""));
-                  setNotFound(false);
-                }}
-                placeholder={lookupCountryObj.placeholder}
-                autoComplete="tel-national"
-                maxLength={20}
-              />
-            </div>
-            <Button
-              type="submit"
-              variant="outline"
-              className="h-12 w-full gap-2"
-              disabled={lookupLoading}
-            >
-              <Search className="h-4 w-4" />
-              {lookupLoading ? "Buscando..." : "Buscar mis datos"}
-            </Button>
-            {notFound && (
-              <p className="text-sm text-muted-foreground">
-                No encontramos ese teléfono. Registrate abajo para reservar.
-              </p>
-            )}
-          </form>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3">
-              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <UserCheck className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Encontramos tu cuenta</p>
-                <p className="text-sm font-medium text-foreground break-words">
-                  {[matched.nombre, matched.apellido].filter(Boolean).join(" ")}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button className="flex-1 h-11" onClick={handleConfirmMatch}>
-                Sí, soy yo. Continuar
-              </Button>
-              <Button
-                variant="ghost"
-                className="flex-1 h-11"
-                onClick={() => {
-                  setMatched(null);
-                  setLookupPhone("");
-                }}
-              >
-                No soy yo
-              </Button>
+              <Input id="booking-lookup-phone" type="tel" inputMode="tel" className="h-12 min-w-0 flex-1 text-base"
+                value={phoneLocal} onChange={event => { cancelLookup(); setPhoneLocal(event.target.value.replace(/[^\d\s-]/g, '')); }}
+                placeholder={country.placeholder} autoComplete="tel-national" maxLength={20} />
             </div>
           </div>
-        )}
-      </div>
+          {lookupError && <p role="alert" className="text-sm text-destructive">No pudimos buscar tus datos. Reintentá o completalos abajo.</p>}
+          <Button type="submit" className="h-12 w-full gap-2" disabled={lookupLoading}>
+            <Search className="h-4 w-4" />{lookupLoading ? 'Buscando...' : lookupError ? 'Reintentar búsqueda' : 'Buscar mis datos'}
+          </Button>
+          <Button type="button" variant="ghost" className="h-12 w-full" onClick={() => { cancelLookup(); setStage('register'); }}>
+            Completar mis datos
+          </Button>
+        </form>
+      )}
 
-      {/* ===== Separator ===== */}
-      <h3 className="border-t border-border pt-5 text-base font-medium text-foreground">
-        O registrate por primera vez
-      </h3>
+      {stage === 'matched' && matched && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-4">
+            <UserCheck aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="text-sm text-muted-foreground">Encontramos tus datos</p>
+              <p className="break-words text-base font-medium">{matched.nombre} {matched.apellido}</p>
+            </div>
+          </div>
+          <Button className="h-12 w-full" onClick={() => onSubmit(matched)}>Sí, soy yo. Continuar</Button>
+          <Button variant="ghost" className="h-12 w-full" onClick={() => { setMatched(null); setStage('lookup'); }}>No soy yo</Button>
+        </div>
+      )}
 
-      {/* ===== Register form ===== */}
+      {stage === 'register' && <>
+        <Button type="button" variant="ghost" className="-ml-2 h-10" onClick={() => setStage('lookup')}>Volver a buscar por teléfono</Button>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
           <div className="space-y-1">
@@ -325,6 +250,7 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
           Continuar
         </Button>
       </form>
+      </>}
     </div>
   );
 };

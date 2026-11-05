@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { usePortalRead } from "./hooks/usePortalRead";
+import { InlineReadError } from "@/components/ui/InlineReadError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { formatFechaLegible } from "@/lib/dateUtils";
 import { formatMinutesToText } from "@/lib/formatMinutes";
 
 
-interface Turno {
+export interface Turno {
   id: string;
   fecha: string;
   hora_inicio: string;
@@ -40,29 +41,11 @@ interface Props {
 }
 
 export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNew }: Props) => {
-  const [turnos, setTurnos] = useState<Turno[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, refetch } = usePortalRead<{ turnos: Turno[] }>(
+    "get-my-turnos-by-phone", { organization_id: organizationId, telefono }, "No pudimos actualizar tus turnos.",
+  );
+  const turnos = data?.turnos ?? [];
   const [cancelTurno, setCancelTurno] = useState<Turno | null>(null);
-
-  const fetchTurnos = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("get-my-turnos-by-phone", {
-        body: { organization_id: organizationId, telefono },
-      });
-      if (!error && data?.turnos) {
-        setTurnos(data.turnos);
-      }
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTurnos();
-  }, [organizationId, telefono]);
 
   if (loading) {
     return (
@@ -73,6 +56,8 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
       </div>
     );
   }
+
+  if (error && !data) return <InlineReadError message="No pudimos cargar tus turnos." onRetry={refetch} bordered={false} />;
 
   if (turnos.length === 0) {
     return (
@@ -169,7 +154,7 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
           onOpenChange={(open) => !open && setCancelTurno(null)}
           onCancelled={() => {
             setCancelTurno(null);
-            fetchTurnos();
+            refetch();
           }}
         />
       )}

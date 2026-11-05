@@ -1,6 +1,20 @@
 # Estado actual — Vittro
 
-Última actualización: 2026-10-15
+Última actualización: 2026-11-05
+
+## Portal cliente de reservas — UI y comportamiento
+
+Dos builds separados, validados localmente: servicios y horarios legibles,
+resumen compacto, jerarquía de Mis turnos; conservación de selecciones/borrador,
+progreso efectivo, identificación progresiva por teléfono, lecturas cancelables
+con reintento, recuperación de conflictos y cancelación sin perder el motivo.
+Google Calendar conserva la hora de la barbería independientemente del navegador.
+
+Publicación autorizada y en preparación: original → fork → Vercel. No requiere
+migraciones, RLS ni cambios de Edge Functions. Evidencia y estado de despliegue:
+`docs/PORTAL_CLIENTE_PUBLICACION.md`; detalle: `docs/MODULOS/turnos-agenda.md`.
+38 pruebas dirigidas, TypeScript, lint dirigido y build correctos; suite global
+344/352, con ocho fallos preexistentes reproducidos en `origin/main` limpio.
 
 ## Programa de aliados — publicado y habilitado
 

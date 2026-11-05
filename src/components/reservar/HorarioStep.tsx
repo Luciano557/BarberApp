@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { usePortalRead } from "./hooks/usePortalRead";
+import { InlineReadError } from "@/components/ui/InlineReadError";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CalendarDays, UserRound, Check } from "lucide-react";
@@ -21,55 +22,21 @@ interface Props {
   excludeTurnoId?: string;
   onSelect: (horaInicio: string, horaFin: string, barberoId?: string, barberoNombre?: string) => void;
   onChangeFecha: () => void;
-  onChangeBarbero: () => void;
+  onChangeBarbero?: () => void;
 }
 
 export const HorarioStep = ({
   organizationId, sucursalId, servicioId, barberoId, fecha, excludeTurnoId,
   onSelect, onChangeFecha, onChangeBarbero,
 }: Props) => {
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const fetchSlots = async () => {
-      setLoading(true);
-      setError(null);
-      setSelectedSlot(null);
-      try {
-        const { data, error: fnError } = await supabase.functions.invoke("get-availability", {
-          body: {
-            organization_id: organizationId,
-            sucursal_id: sucursalId,
-            servicio_id: servicioId,
-            fecha,
-            barbero_id: barberoId,
-            exclude_turno_id: excludeTurnoId || undefined,
-          },
-        });
-        if (fnError || data?.error) {
-          setError(data?.error || "Error al consultar disponibilidad");
-          return;
-        }
-        setSlots(data.slots || []);
-      } catch {
-        setError("Error de conexión");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSlots();
-  }, [organizationId, sucursalId, servicioId, barberoId, fecha]);
-
-  // Scroll into view when slots load
-  useEffect(() => {
-    if (!loading && slots.length > 0 && gridRef.current) {
-      gridRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  }, [loading, slots]);
+  const { data, loading, error, refetch } = usePortalRead<{ slots: Slot[] }>(
+    "get-availability", {
+      organization_id: organizationId, sucursal_id: sucursalId, servicio_id: servicioId,
+      barbero_id: barberoId, fecha, exclude_turno_id: excludeTurnoId,
+    }, "No pudimos actualizar los horarios disponibles.",
+  );
+  const slots = data?.slots ?? [];
 
   if (loading) {
     return (
@@ -84,14 +51,7 @@ export const HorarioStep = ({
     );
   }
 
-  if (error) {
-    return (
-      <div className="text-center space-y-3 py-4">
-        <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
-        <p className="text-foreground font-medium">{error}</p>
-      </div>
-    );
-  }
+  if (error && !data) return <InlineReadError message="No pudimos cargar los horarios disponibles." onRetry={refetch} bordered={false} />;
 
   if (slots.length === 0) {
     return (
@@ -107,25 +67,17 @@ export const HorarioStep = ({
           <Button variant="outline" className="w-full gap-2 h-12" onClick={onChangeFecha}>
             <CalendarDays className="h-4 w-4" /> Probar otro día
           </Button>
-          <Button variant="outline" className="w-full gap-2 h-12" onClick={onChangeBarbero}>
+          {onChangeBarbero && <Button variant="outline" className="w-full gap-2 h-12" onClick={onChangeBarbero}>
             <UserRound className="h-4 w-4" /> Elegir otro barbero
-          </Button>
-          {barberoId && (
-            <Button
-              variant="outline"
-              className="w-full gap-2 h-12"
-              onClick={() => onSelect("", "", undefined, undefined)}
-            >
-              Probar con "Cualquiera disponible"
-            </Button>
-          )}
+          </Button>}
+
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3" ref={gridRef}>
+    <div className="space-y-3">
       <h2 className="text-lg font-semibold text-foreground">Elegí el horario</h2>
       <p className="text-sm text-muted-foreground">
         {slots.length} {slots.length === 1 ? "turno disponible" : "turnos disponibles"} para {formatFechaLegible(fecha)}

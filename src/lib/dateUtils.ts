@@ -202,22 +202,25 @@ export function buildGoogleCalendarUrl(params: {
 }): string {
   const { title, description, location, fecha, horaInicio, horaFin, timezone } = params;
 
-  // Parse local date+time
-  const startLocal = new Date(`${fecha}T${horaInicio}:00`);
-  const endLocal = new Date(`${fecha}T${horaFin}:00`);
-
-  // If we have a timezone, compute the offset and convert to UTC
-  if (timezone) {
-    const offsetStr = getTimezoneOffsetString(startLocal, timezone);
-    const match = offsetStr.match(/([+-])(\d{2}):(\d{2})/);
-    if (match) {
-      const sign = match[1] === '+' ? 1 : -1;
-      const offsetMinutes = sign * (parseInt(match[2]) * 60 + parseInt(match[3]));
-      // UTC = local - offset
-      startLocal.setMinutes(startLocal.getMinutes() - offsetMinutes);
-      endLocal.setMinutes(endLocal.getMinutes() - offsetMinutes);
+  const toInstant = (hora: string) => {
+    if (!timezone) return new Date(`${fecha}T${hora.slice(0, 5)}:00`);
+    // La fecha civil pertenece a la barbería. Parsearla en la zona del navegador
+    // y después restar el offset de la organización aplicaba dos conversiones.
+    const civilUtc = Date.parse(`${fecha}T${hora.slice(0, 5)}:00Z`);
+    let instant = civilUtc;
+    for (let i = 0; i < 3; i++) {
+      const offset = getTimezoneOffsetString(new Date(instant), timezone);
+      const match = offset.match(/([+-])(\d{2}):(\d{2})/);
+      if (!match) break;
+      const minutes = (match[1] === '+' ? 1 : -1) * (Number(match[2]) * 60 + Number(match[3]));
+      const next = civilUtc - minutes * 60_000;
+      if (next === instant) break;
+      instant = next;
     }
-  }
+    return new Date(instant);
+  };
+  const startLocal = toInstant(horaInicio);
+  const endLocal = toInstant(horaFin);
 
   const fmt = (d: Date) => {
     const y = d.getUTCFullYear();

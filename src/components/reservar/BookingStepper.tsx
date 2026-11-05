@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { OrgPublicData } from "@/pages/Reservar";
 import { SucursalStep } from "./SucursalStep";
 import { ServicioStep } from "./ServicioStep";
@@ -7,7 +7,7 @@ import { FechaHorarioStep } from "./FechaHorarioStep";
 import { DatosClienteStep, type ClienteData } from "./DatosClienteStep";
 import { ConfirmacionStep } from "./ConfirmacionStep";
 import { LookupTelefonoStep } from "./LookupTelefonoStep";
-import { MisTurnosStep } from "./MisTurnosStep";
+import { MisTurnosStep, type Turno } from "./MisTurnosStep";
 import { RescheduleFlow } from "./RescheduleFlow";
 import { BookingSummary } from "./BookingSummary";
 import { Button } from "@/components/ui/button";
@@ -36,12 +36,14 @@ interface Props {
   orgData: OrgPublicData;
   mode: "book" | "manage";
   onBackToLanding: () => void;
+  onBookNew: () => void;
 }
 
 const cardClasses =
   "min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6";
 
-export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
+export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Props) => {
+  const flowRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
   const [booking, setBooking] = useState<BookingState>({
     sucursalId: null,
@@ -61,7 +63,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
   // Manage mode state
   const [managePhone, setManagePhone] = useState<string | null>(null);
-  const [rescheduleTurno, setRescheduleTurno] = useState<any>(null);
+  const [rescheduleTurno, setRescheduleTurno] = useState<Turno | null>(null);
 
   useEffect(() => {
     if (mode === "book" && step === 0 && orgData.sucursales.length === 1) {
@@ -70,6 +72,10 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       setStep(1);
     }
   }, [step, orgData.sucursales, mode]);
+
+  useEffect(() => {
+    if (mode === "book") flowRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [step, mode]);
 
   // === MANAGE MODE ===
   if (mode === "manage") {
@@ -106,15 +112,17 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           organizationId={orgData.organization.id}
           telefono={managePhone}
           onReschedule={(turno) => setRescheduleTurno(turno)}
-          onBookNew={() => onBackToLanding()}
+          onBookNew={onBookNew}
         />
       </div>
     );
   }
 
   // === BOOK MODE ===
-  const totalSteps = 6;
-  const progress = ((step + 1) / totalSteps) * 100;
+  const skippedSteps = orgData.sucursales.length === 1 ? 1 : 0;
+  const totalSteps = STEP_LABELS.length - skippedSteps;
+  const currentStep = Math.max(1, step + 1 - skippedSteps);
+  const progress = (currentStep / totalSteps) * 100;
 
   const resetFieldsFromStep = (fromStep: number) => {
     setBooking((b) => {
@@ -123,18 +131,15 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
       if (fromStep <= 1) { updated.servicioId = null; updated.servicioNombre = ""; updated.servicioPrecio = 0; }
       if (fromStep <= 2) { updated.barberoId = null; updated.barberoNombre = ""; updated.eligioBarbero = false; }
       if (fromStep <= 3) { updated.fecha = ""; updated.horaInicio = ""; updated.horaFin = ""; }
-      if (fromStep <= 4) { updated.cliente = null; }
       return updated;
     });
   };
 
   const goBack = () => {
     if (step === 1 && orgData.sucursales.length === 1) {
-      resetFieldsFromStep(0);
       onBackToLanding();
     } else if (step > 0) {
       const newStep = step - 1;
-      resetFieldsFromStep(newStep);
       setStep(newStep);
     } else {
       onBackToLanding();
@@ -192,7 +197,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
   return (
     <div className={step < 5 ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" : "mx-auto grid max-w-2xl gap-6"}>
-      <div className={cardClasses}>
+      <div ref={flowRef} className={cardClasses}>
         <div className="mb-5 space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -202,7 +207,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
               <p className="mt-1 text-sm text-muted-foreground">Reservá tu turno</p>
             </div>
             <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium tabular-nums text-muted-foreground">
-              Paso {Math.min(step + 1, totalSteps)} de {totalSteps}
+              Paso {Math.min(currentStep, totalSteps)} de {totalSteps}
             </span>
           </div>
           <Progress value={progress} className="h-1.5" />
@@ -224,6 +229,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           <SucursalStep
             sucursales={orgData.sucursales}
             onSelect={(id, nombre) => {
+              if (id !== booking.sucursalId) resetFieldsFromStep(1);
               setBooking((b) => ({ ...b, sucursalId: id, sucursalNombre: nombre }));
               setStep(1);
             }}
@@ -233,6 +239,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           <ServicioStep
             servicios={orgData.servicios.filter((s) => s.sucursal_id === booking.sucursalId)}
             onSelect={(id, nombre, precio) => {
+              if (id !== booking.servicioId) resetFieldsFromStep(2);
               setBooking((b) => ({ ...b, servicioId: id, servicioNombre: nombre, servicioPrecio: precio }));
               setStep(2);
             }}
@@ -242,7 +249,10 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
           <BarberoStep
             barberos={orgData.barberos.filter((b) => b.sucursal_id === booking.sucursalId)}
             onSelect={(id, nombre) => {
-              setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible", eligioBarbero: id !== null }));
+              if (id !== (booking.eligioBarbero ? booking.barberoId : null) || !booking.barberoNombre) {
+                resetFieldsFromStep(3);
+                setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible", eligioBarbero: id !== null }));
+              }
               setStep(3);
             }}
           />
@@ -252,7 +262,8 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
             organizationId={orgData.organization.id}
             sucursalId={booking.sucursalId!}
             servicioId={booking.servicioId!}
-            barberoId={booking.barberoId}
+            barberoId={booking.eligioBarbero ? booking.barberoId : null}
+            initialFecha={booking.fecha}
             onSelect={(horaInicio, horaFin, fecha, barberoId, barberoNombre) => {
               setBooking((b) => ({
                 ...b,
@@ -265,12 +276,11 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
               setStep(4);
             }}
             onChangeBarbero={() => {
-              resetFieldsFromStep(2);
               setStep(2);
             }}
           />
         )}
-        {step === 4 && (
+        <div hidden={step !== 4}>
           <DatosClienteStep
             organizationId={orgData.organization.id}
             initial={booking.cliente ?? undefined}
@@ -279,7 +289,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
               setStep(5);
             }}
           />
-        )}
+        </div>
         {step === 5 && (
           <ConfirmacionStep
             booking={booking}
