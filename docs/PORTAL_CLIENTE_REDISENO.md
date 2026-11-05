@@ -79,5 +79,27 @@ ambos `resolved`; `.impeccable/review/portal-redesign/verdict.md`.
 
 ## Publicación
 
-Pendiente de ambos builds. El antecedente publicado queda en
-`PORTAL_CLIENTE_PUBLICACION.md`.
+Publicación verificada el 2026-11-05:
+
+- Build 1: `be4b59de8c4d0bb6d697ca1ec3a7b23f105b1a75`.
+- Build 2: `5492993304ada547258ebf1b18e813452686397c`.
+- Original `tellosebastian-git/pixel-perfect-replica`, después fork existente
+  `Luciano557/BarberApp`: ambos `main` comprobados con `ls-remote` en
+  `5492993304ada547258ebf1b18e813452686397c`. Avance normal, sin force push.
+- Vercel `barber-app`: deployment `dpl_9M1S5iXHx5kdRuvZfFDSeZwdTBQL`, Ready /
+  Production desde `main` del fork y el mismo SHA. Alias `www.vittro.com.ar`
+  consultado por separado y asignado a ese deployment.
+- [Portal real de Scissors](https://www.vittro.com.ar/scissors/reservar): portada
+  editorial con logo/imagen reales cargados, firma Vittro y contactos; navegación
+  servicio → profesional → fecha/hora → Tus datos. 17 horarios disponibles,
+  progreso 4/5 y teléfono como primera tarea. A 390 px, `scrollWidth=390` sin
+  desborde; entrada 0,22 s computada, consola sin errores. No se ingresaron
+  teléfonos ni se confirmó una reserva real.
+
+Capturas productivas locales: `production-desktop.png` y `production-mobile.png`
+en `.impeccable/review/portal-redesign/` (ignoradas por Git). Servidor sintético
+detenido. No hubo migraciones, cambios de RLS ni despliegues de Edge Functions.
+
+El cierre documental posterior conserva el código de aplicación y se publica
+también original → fork. La comprobación final de SHA, Ready y alias corresponde
+al commit documental más reciente. Antecedente: `PORTAL_CLIENTE_PUBLICACION.md`.

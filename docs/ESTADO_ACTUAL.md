@@ -9,7 +9,9 @@ editorial, catálogo abierto, comprobante y firma SVG de Vittro. Motion de
 avance/regreso y confirmación, con movimiento reducido. Lazy de rutas ajenas al
 portal: 72,0% menos JS gzip inicial sin cambiar providers. 50 pruebas dirigidas
 correctas; suite global 356/364 con los mismos ocho fallos previos de
-Auth/organización. Publicación en curso: `PORTAL_CLIENTE_REDISENO.md`.
+Auth/organización. Publicado original → fork → Vercel Ready / Production y
+verificado en el portal real a 390 px hasta Tus datos, sin errores de consola.
+Evidencia y límites: `PORTAL_CLIENTE_REDISENO.md`.
 
 Dos builds separados, validados localmente: servicios y horarios legibles,
 resumen compacto, jerarquía de Mis turnos; conservación de selecciones/borrador,

@@ -184,7 +184,8 @@ identidad configurable de cada barbería. Estado de publicación y evidencia:
 
 ### Rediseño actual — identidad, comprobante y movimiento
 
-Build posterior autorizado el 2026-11-05, separado en carga inicial y visual.
+Build posterior autorizado el 2026-11-05, separado en carga inicial y visual,
+publicado y verificado en producción en esa fecha.
 Landing editorial: portada real amplia + nombre/acciones; en teléfono, portada
 horizontal y logo superpuesto. Dentro del flujo, identidad compacta, catálogo
 de filas abiertas, resumen tipo comprobante y fecha/hora prominentes al confirmar.
