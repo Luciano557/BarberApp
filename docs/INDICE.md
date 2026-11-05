@@ -61,7 +61,8 @@ la dejó obsoleta.
   backend/frontend publicados y habilitados por excepción autorizada; evidencia
   en `docs/ALIADOS_PRODUCCION.md`. Contrato: `docs/ALIADOS_LOVABLE_ENTREGA.md`.
   Niveles solo por referidos, frasco de progreso y correo de acceso rediseñado:
-  `docs/ALIADOS_NIVELES_REFERIDOS.md`. Recepción financiera real pendiente;
+  `docs/ALIADOS_NIVELES_REFERIDOS.md`. Cuatro niveles 10/30/50/80% y pulverizador,
+  publicados y habilitados: `docs/ALIADOS_CUATRO_NIVELES.md`. Recepción financiera real pendiente;
   no confundir QA sintético con pagos reales.
 
 - [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
