@@ -42,5 +42,24 @@ un convenio al 25% también se conserva. No se conectan proveedores ni dinero re
 
 ## Etapa visual e integración
 
-Pendientes: pulverizador y cuatro niveles en landing/panel, validación visual,
-publicación original/fork y aplicación puntual de migración/backend.
+Pulverizador SVG geométrico, con boquilla/gatillo y cuatro marcas. Llenado en
+cuartos en la exploración ilustrativa de landing, e interpolación entre umbrales
+reales en panel. El porcentaje no se usa como número de nivel. Todos los datos
+siguen escritos y el SVG es redundante para lectores de pantalla; el explorador
+anuncia la selección y conserva botones nativos/teclado. Movimiento reducido
+desactiva la transición breve del líquido. Sin imágenes externas o dependencias.
+
+Landing comunica 10–80%, presenta las cuatro entradas y conserva las condiciones
+plegadas por defecto, ahora v3. Convenios y cifras de ingreso siguen separados
+del progreso automático. Correo y recorrido de alta no cambian.
+
+Revisión con Impeccable y React Best Practices. Pruebas dirigidas: 47 Vitest
+(36 dominio, ocho UI de niveles/disclosure y tres de Auth), ocho Deno HTTP/HMAC,
+build Vite y ESLint focal correctos. QA Playwright: 11 escenarios sintéticos
+con tráfico remoto interceptado (landing/panel/Admin a 390/768/1440 y correo
+a 390/680). Selección de los cuatro niveles por teclado, progreso hacia 50%,
+disclosure cerrado/direct link, sin errores ni overflow. Inspección conjunta
+desktop/mobile sin defectos; no hubo ronda de retoques. Evidencia local:
+`.impeccable/review/partners/` y `supabase/tests/partners-ui-qa.cjs`.
+
+Pendientes: publicación original/fork y aplicación puntual de migración/backend.

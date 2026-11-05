@@ -1,17 +1,19 @@
 # Programa de aliados
 
-Revisión v2: niveles exclusivamente por referidos y comunicación para amigos
-y comunidades. Seguimiento y evidencia: [ALIADOS_NIVELES_REFERIDOS.md](../ALIADOS_NIVELES_REFERIDOS.md).
+Revisión v3 (2026-11-05): cuatro niveles y pulverizador de progreso; build local
+validado, publicación en curso. Evidencia: [ALIADOS_CUATRO_NIVELES.md](../ALIADOS_CUATRO_NIVELES.md).
+Revisión v2 histórica: [ALIADOS_NIVELES_REFERIDOS.md](../ALIADOS_NIVELES_REFERIDOS.md).
 
 Estado 2026-10-14: motor, datos/RLS y frontend publicados y habilitados en el
 proyecto operativo con excepción directa autorizada. Alta abierta y worker
 periódico activo. Instagram retirado del programa. Evidencia del primer rollout
 de rollout: [ALIADOS_PRODUCCION.md](../ALIADOS_PRODUCCION.md).
 
-Reglas: 10/20/30% del primer cobro después del descuento, antes de costos de
+Reglas: 10/30/50/80% del primer cobro después del descuento, antes de costos de
 procesador; 10% introductorio para la barbería solo con código en signup. Dos
 mensualidades distintas aprobadas califican una organización, una sola vez.
-Nivel 1: 10%; nivel 2: 20% con 5 calificadas; nivel 3: 30% con 20 calificadas.
+Nivel 1: 10%; nivel 2: 30% con 5 calificadas; nivel 3: 50% con 10;
+nivel 4: 80% con 20. Snapshots anteriores conservan su tasa y versión.
 Convenio vigente 1–100% prevalece. Hold 30 días; revisión y pago mensual humanos.
 
 `partner-domain.ts`: reglas sin entorno, centavos exactos, tiers/expiración,
@@ -35,7 +37,7 @@ superficies y sus drawers completado antes de publicar; reporte versionado,
 capturas locales. La validación financiera continúa en la etapa de lógica.
 
 Homepage enlaza `/aliados`, que explica beneficios y condiciones versión
-2026-10-14-v2. `/aliados/panel` se monta fuera de TenantProviders: usa la sesión
+2026-11-05-v3. `/aliados/panel` se monta fuera de TenantProviders: usa la sesión
 Auth compartida para owners, pero no exige organización a creadores externos.
 Alta externa pasa por Edge y Auth admin con account_kind protegido; una intención
 privada de un uso permite al trigger reconocerla antes de que GoTrue actualice
@@ -51,7 +53,7 @@ transacción de alta; esta prevalidación no sustituye esa comprobación.
 Código inválido muestra error inline. No existe acción para atribuir después.
 
 El panel usa únicamente PartnerSummary: totales y comisiones anónimas, cuenta
-enmascarada, niveles y progreso en un frasco de loción; ningún nombre/email/dato de una
+enmascarada, cuatro niveles y progreso en un pulverizador; ningún nombre/email/dato de una
 barbería referida. Formularios de código/cobro son DrawerForm con RHF/Zod.
 
 Admin usa su sesión aislada y `/admin/aliados`, paginación servidor, drawers

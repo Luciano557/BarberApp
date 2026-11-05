@@ -74,14 +74,14 @@ async function scenario(browser, name, viewport, role) {
     if (url.pathname.endsWith('/functions/v1/partner-program')) {
       const { action } = route.request().postDataJSON();
       if (action === 'status')
-        return json({ enabled: true, instagramEnabled: false, termsVersion: '2026-10-14-v2' });
+        return json({ enabled: true, instagramEnabled: false, termsVersion: '2026-11-05-v3' });
       if (action === 'summary')
         return json({
           summary: {
             id: userId,
             name: 'Aliado de prueba',
             code: 'BARBERCREADOR12345678',
-            tier: { percent: 20, source: 'results', qualifiedOrganizations: 5, nextGoal: 20 },
+            tier: { percent: 30, source: 'results', qualifiedOrganizations: 5, nextGoal: 10 },
             registrations: 17,
             pendingCents: 9999999900,
             availableCents: 123456789000,
@@ -175,8 +175,11 @@ async function scenario(browser, name, viewport, role) {
   assert.equal(overflow, false, `${name} overflows viewport`);
   if (!role) {
     assert.equal(await page.locator('#condiciones').evaluate(node => node.open),false);
-    await page.getByRole('button',{name:/Nivel 2/}).press('Enter');
-    assert.equal(await page.getByRole('button',{name:/Nivel 2/}).getAttribute('aria-pressed'),'true');
+    assert.equal(await page.getByRole('button',{name:/Nivel [1-4]/}).count(),4);
+    for(const level of [2,3,4]) {
+      await page.getByRole('button',{name:new RegExp(`Nivel ${level}`)}).press('Enter');
+      assert.equal(await page.getByRole('button',{name:new RegExp(`Nivel ${level}`)}).getAttribute('aria-pressed'),'true');
+    }
     await page.locator('summary').press('Enter');
     await page.waitForFunction(()=>document.querySelector('#condiciones').open);
     await page.screenshot({path:path.join(output,`${name}-level-conditions.png`),fullPage:true});
@@ -186,7 +189,7 @@ async function scenario(browser, name, viewport, role) {
   if (role === 'partner') {
     assert.equal(await page.getByRole('button', { name: /Instagram/ }).count(), 0);
     await page.getByRole('heading',{name:'Tu nivel por referidos'}).waitFor();
-    await page.getByText('Te faltan 15 barberías calificadas para el nivel 3 y una comisión del 30%.',{exact:true}).waitFor();
+    await page.getByText('Te faltan 5 barberías calificadas para el nivel 3 y una comisión del 50%.',{exact:true}).waitFor();
     await page.getByRole('button', { name: 'Datos de cobro' }).click();
     await page.getByRole('dialog').waitFor();
     await page.getByRole('button', { name: 'Guardar datos' }).click();

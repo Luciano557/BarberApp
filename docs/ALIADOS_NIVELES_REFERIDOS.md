@@ -1,5 +1,8 @@
 # Aliados — niveles por referidos y comunicación de ingresos
 
+Revisión histórica v2. Escala vigente y evidencia de v3 (2026-11-05):
+[ALIADOS_CUATRO_NIVELES.md](ALIADOS_CUATRO_NIVELES.md).
+
 Solicitud del usuario del 2026-10-14: presentar la comisión como subida de niveles,
 usar un elemento gráfico de barbería, quitar seguidores de Instagram, dirigirse
 tanto a quien recomienda a sus amigos como a un creador con comunidad, ocultar

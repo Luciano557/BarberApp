@@ -80,7 +80,7 @@ export default function Partners() {
                   Tu ingreso por cada referido
                 </dt>
                 <dd className="mt-2 text-3xl font-semibold tabular-nums">
-                  10% a 30% de comisión
+                  10% a 80% de comisión
                 </dd>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Del primer pago después del descuento. Subís de nivel a medida
@@ -168,8 +168,8 @@ export default function Partners() {
                 siguientes se cobran al precio vigente del plan.
               </li>
               <li>
-                Los niveles automáticos son 10% al crear tu código, 20% con 5
-                barberías calificadas y 30% con 20. Se califica cada barbería
+                Los niveles automáticos son 10% al crear tu código, 30% con 5
+                barberías calificadas, 50% con 10 y 80% con 20. Se califica cada barbería
                 una sola vez tras dos mensualidades distintas pagadas, sin
                 reversión. El progreso se conserva salvo fraude o reversión.
               </li>

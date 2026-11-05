@@ -1,5 +1,20 @@
 # Decisiones de arquitectura y criterio — Vittro
 
+## 2026-11-05 — aliados: cuatro niveles por resultados
+
+El usuario fija 10/30/50/80% con 0/5/10/20 barberías calificadas. Se conserva
+la definición de calificación, comisión sobre el primer cobro y prioridad de
+convenios. Las cotizaciones/snapshots financieros previos conservan tasa y versión;
+las nuevas condiciones usan v3. PARTNER_LEVELS comparte escala entre API/UI y
+SQL refleja esos mismos umbrales. No se deduce nivel dividiendo la comisión.
+
+El usuario pidió un elemento más reconocible de barbería: pulverizador SVG con
+boquilla/gatillo, que se llena para mostrar el avance. Conserva tokens/Inter y
+números escritos; el panel muestra avance real y la landing permite explorarlo.
+Lógica y visual se construyeron por separado. Migración INVOKER puntual dentro
+de la autorización directa del mismo programa, sin tocar Auth/RLS ni DEFINER.
+Evidencia: `ALIADOS_CUATRO_NIVELES.md`.
+
 ## 2026-11-05 — portal cliente: identidad de barbería y carga de rutas
 
 El usuario eligió barbería protagonista y Vittro como firma, aprobó rediseño
