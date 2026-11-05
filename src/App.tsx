@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { FinanceDemoToaster } from "@/components/financeDemo/FinanceDemoToaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,17 +12,36 @@ import { SucursalProvider } from "@/contexts/SucursalContext";
 import { ActionPinGateProvider } from "@/components/ActionPinGate";
 import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Homepage from "./pages/Homepage";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword";
-import VerifyEmail from "./pages/VerifyEmail";
-import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 import Reservar from "./pages/Reservar";
-import AdminApp from "@/admin/AdminApp";
-import Partners from './pages/Partners';
-import PartnerPanel from './pages/PartnerPanel';
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDelayedVisible } from "@/hooks/useDelayedVisible";
+
+// El portal es una entrada pública: no descarga el código de la operación
+// interna, marketing y administración hasta que se navega a esas rutas.
+const Homepage = lazy(() => import("./pages/Homepage"));
+const Index = lazy(() => import("./pages/Index"));
+const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const AdminApp = lazy(() => import("@/admin/AdminApp"));
+const Partners = lazy(() => import("./pages/Partners"));
+const PartnerPanel = lazy(() => import("./pages/PartnerPanel"));
+
+function RoutePending() {
+  const visible = useDelayedVisible(true);
+  return (
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-8" role="status" aria-label="Cargando página">
+      {visible && (
+        <>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-40 w-full" />
+        </>
+      )}
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -63,6 +83,7 @@ const App = () => (
     <TooltipProvider>
       <BrowserRouter>
         <AppToaster />
+        <Suspense fallback={<RoutePending />}>
         <Routes>
           <Route path="/aliados" element={<Partners />} />
           <Route path="/aliados/panel" element={<PartnerPanel />} />
@@ -93,6 +114,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

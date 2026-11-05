@@ -4,6 +4,11 @@
 
 ## Portal cliente de reservas — UI y comportamiento
 
+Rediseño posterior aprobado con publicación directa: barbería protagonista,
+Vittro como firma y movimiento con bajo costo. Primer build validado localmente:
+lazy de rutas ajenas al portal, 71,9% menos JS gzip de entrada sin cambiar los
+providers. Visual y publicación pendientes: `PORTAL_CLIENTE_REDISENO.md`.
+
 Dos builds separados, validados localmente: servicios y horarios legibles,
 resumen compacto, jerarquía de Mis turnos; conservación de selecciones/borrador,
 progreso efectivo, identificación progresiva por teléfono, lecturas cancelables
