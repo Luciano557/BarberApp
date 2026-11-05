@@ -28,7 +28,7 @@ async function command(action,actor=null,input={}) {
   });
 }
 const mutate = (action, actor, input) => command(action,actor,{requestId:randomUUID(),reason:'Motivo de prueba sintético',...input});
-async function enroll(actor,code){ return command('enroll',actor,{code,country:'AR',termsVersion:'2026-10-14-v2'}); }
+async function enroll(actor,code){ return command('enroll',actor,{code,country:'AR',termsVersion:'2026-11-05-v3'}); }
 const denied = (promise,code) => assert.rejects(promise,error=>error.message.includes(code));
 async function quoteFor(actor,plan='basico'){
   const {organization_id:organizationId}=await scalar('SELECT organization_id FROM profiles WHERE id=$1',[actor]);
@@ -100,7 +100,7 @@ try {
     REVOKE UPDATE ON auth.users FROM service_role;
     INSERT INTO subscription_plans(code,name,amount_ars,sort_order) VALUES('basico','Basico',30000,1),('premium','Premium',50000,2);
   `);
-  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql','20261014130400_partner_identity_intent.sql','20261014230000_partner_referral_levels.sql']) {
+  for (const file of ['20261014130000_partner_program.sql','20261014130100_partner_auth.sql','20261014130200_partner_checkout_storage.sql','20261014130300_partner_auth_lock.sql','20261014130400_partner_identity_intent.sql','20261014230000_partner_referral_levels.sql','20261105180000_partner_four_levels.sql']) {
     await db.transaction(tx=>read(`supabase/migrations/${file}`).then(sql=>tx.exec(sql)));
   }
   await test('new functions are invoker and all 20 tables have RLS',async()=>{
@@ -307,6 +307,48 @@ try {
       assert.equal((await tx.query("SELECT count(*)::int n FROM storage.objects WHERE bucket_id='partner-payout-receipts'")).rows[0].n,1);
       assert.equal((await tx.query("UPDATE storage.objects SET name='overwrite.pdf' WHERE bucket_id='partner-payout-receipts' RETURNING name")).rows.length,0);
     });
+  });
+  await test('four referral levels use qualified shops once, with exact thresholds and reversals',async()=>{
+    const tierActor=await user(); const tierPartner=await enroll(tierActor,'FOURLEVELS');
+    const shops=[];
+    for(let index=0;index<20;index++) {
+      const shop=await user('owner',{referral_code:'FOURLEVELS'});
+      const {organization_id}=await scalar('SELECT organization_id FROM profiles WHERE id=$1',[shop]);
+      shops.push(organization_id);
+    }
+    // Registrations alone never qualify. Payment-cycle reconciliation is covered above.
+    for(const [count,rate] of [[0,10],[4,10],[5,30],[9,30],[10,50],[19,50],[20,80]]) {
+      await db.query('UPDATE partner_referrals SET qualified=organization_id=ANY($1::uuid[]) WHERE partner_id=$2',[shops.slice(0,count),tierPartner.id]);
+      assert.equal((await scalar('SELECT partner_rate($1) rate',[tierPartner.id])).rate,rate);
+    }
+    await db.query('UPDATE partner_referrals SET qualified=false WHERE organization_id=$1',[shops[19]]);
+    assert.equal((await scalar('SELECT partner_rate($1) rate',[tierPartner.id])).rate,50);
+    await denied(command('enroll',tierActor,{code:'FOURLEVELS',country:'AR',termsVersion:'2026-10-14-v2'}),'CAPABILITY_NOT_READY');
+    assert.equal((await scalar('SELECT terms_version FROM partners WHERE id=$1',[tierPartner.id])).terms_version,'2026-11-05-v3');
+  });
+  await test('the v2 to v3 migration preserves accepted terms, frozen checkouts and agreements',async()=>{
+    const legacyActor=await user(); const legacy=await enroll(legacyActor,'LEGACYRATE');
+    const legacyOwner=await user('owner',{referral_code:'LEGACYRATE'});
+    const intent=await quoteFor(legacyOwner);
+    const previous=await read('supabase/migrations/20261014230000_partner_referral_levels.sql');
+    const previousFunction=name=>previous.match(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${name}\\([\\s\\S]*?\\$function\\$;`))[0];
+    await db.transaction(async tx=>{
+      await tx.query("UPDATE partners SET terms_version='2026-10-14-v2' WHERE id=$1",[legacy.id]);
+      await tx.query("UPDATE partner_checkout_quotes SET percent=20,terms_version='2026-10-14-v2' WHERE id=$1",[intent.quote.id]);
+      await tx.query("UPDATE partner_referrals SET percent_snapshot=20,snapshot_terms='2026-10-14-v2' WHERE organization_id=$1",[intent.organizationId]);
+      await tx.query("INSERT INTO partner_agreements(partner_id,percent,starts_at,ends_at,reason,actor_id) VALUES($1,25,'2026-01-01','2099-01-01','Legacy custom agreement',$2)",[legacy.id,admin]);
+      await tx.exec(previousFunction('partner_program_command')+previousFunction('partner_rate'));
+      await tx.exec(await read('supabase/migrations/20261105180000_partner_four_levels.sql'));
+      assert.equal((await tx.query('SELECT terms_version FROM partners WHERE id=$1',[legacy.id])).rows[0].terms_version,'2026-10-14-v2');
+      assert.equal((await tx.query('SELECT partner_rate($1) rate',[legacy.id])).rows[0].rate,25);
+      await tx.exec('SET LOCAL ROLE service_role');
+      const response=(await tx.query('SELECT partner_program_command(1,$1,$2,$3) result',['prepare_checkout',legacyOwner,JSON.stringify({organizationId:intent.organizationId,planCode:'basico',catalogAmountArs:intent.plan.amount_ars,priceVersion:intent.plan.price_version,planUpdatedAt:intent.plan.stamp})])).rows[0].result;
+      assert.equal(response.quote.percent,20);assert.equal(response.quote.termsVersion,'2026-10-14-v2');
+    });
+    const boundLegacy=await finalize(intent);
+    assert.equal((await scalar('SELECT percent_snapshot FROM partner_referrals WHERE organization_id=$1',[boundLegacy.organizationId])).percent_snapshot,20);
+    const legacyPayment=await payment(boundLegacy);await observe(legacyPayment);
+    assert.equal(Number((await scalar('SELECT amount_cents FROM partner_commissions WHERE organization_id=$1',[boundLegacy.organizationId])).amount_cents),540000);
   });
   console.log(`${passed} SQL tests passed; no production connection used.`);
 } finally { await db.close(); }

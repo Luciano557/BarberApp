@@ -68,12 +68,16 @@ describe('partner tier rules', () => {
   it.each([
     [0, 10],
     [4, 10],
-    [5, 20],
-    [19, 20],
-    [20, 30],
-    [100, 30],
-  ])('qualifies %s retained organizations at %s%%', (qualifiedOrganizations, percent) => {
-    expect(partnerTier({ qualifiedOrganizations }, now).percent).toBe(percent);
+    [5, 30, 10],
+    [9, 30, 10],
+    [10, 50, 20],
+    [19, 50, 20],
+    [20, 80, null],
+    [100, 80, null],
+  ])('qualifies %s retained organizations at %s%%', (qualifiedOrganizations, percent, nextGoal) => {
+    expect(partnerTier({ qualifiedOrganizations }, now)).toMatchObject({
+      percent, nextGoal: nextGoal === undefined ? 5 : nextGoal,
+    });
   });
   it.each([
     [9999, 10],
@@ -89,7 +93,7 @@ describe('partner tier rules', () => {
     expect(
       partnerTier({ qualifiedOrganizations: 5, instagram: instagram(50_000, PARTNER_HOLD_MS) }, now)
         .percent,
-    ).toBe(20);
+    ).toBe(30);
     expect(
       partnerTier(
         { qualifiedOrganizations: 0, instagram: instagram(50_000, PARTNER_HOLD_MS - 1) },
@@ -115,7 +119,7 @@ describe('partner tier rules', () => {
       suspended: false,
     };
     expect(partnerTier({ qualifiedOrganizations: 20, agreement }, now).source).toBe('agreement');
-    expect(partnerTier({ qualifiedOrganizations: 20, agreement }, now + 1).percent).toBe(30);
+    expect(partnerTier({ qualifiedOrganizations: 20, agreement }, now + 1).percent).toBe(80);
     expect(
       partnerTier({ qualifiedOrganizations: 20, agreement: { ...agreement, suspended: true } }, now)
         .source,

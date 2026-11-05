@@ -1,8 +1,14 @@
 /** Environment-free rules shared by the API and its executable contract tests. */
-export const PARTNER_TERMS_VERSION = '2026-10-14-v2';
+export const PARTNER_TERMS_VERSION = '2026-11-05-v3';
 export const PARTNER_CONTRACT_VERSION = 1;
 export const PARTNER_HOLD_MS = 30 * 24 * 60 * 60 * 1000;
-export type PartnerRate = 10 | 20 | 30;
+export const PARTNER_LEVELS = [
+  { level: 1, minimumQualified: 0, percent: 10 },
+  { level: 2, minimumQualified: 5, percent: 30 },
+  { level: 3, minimumQualified: 10, percent: 50 },
+  { level: 4, minimumQualified: 20, percent: 80 },
+] as const;
+export type PartnerRate = (typeof PARTNER_LEVELS)[number]['percent'];
 export type CommissionStatus = 'pending' | 'available' | 'held' | 'paid' | 'reversed';
 
 export interface PartnerAgreement {
@@ -92,7 +98,10 @@ export function partnerTier(
   const count = input.qualifiedOrganizations;
   if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(nowMs))
     throw new Error('INVALID_TIER_INPUT');
-  const results: PartnerRate = count >= 20 ? 30 : count >= 5 ? 20 : 10;
+  let automatic: (typeof PARTNER_LEVELS)[number] = PARTNER_LEVELS[0];
+  for (const level of PARTNER_LEVELS) {
+    if (count >= level.minimumQualified) automatic = level;
+  }
   const agreement = input.agreement;
   if (
     agreement &&
@@ -110,12 +119,11 @@ export function partnerTier(
       nextGoal: null,
     };
   }
-  const percent = results;
   return {
-    percent,
+    percent: automatic.percent,
     source: count >= 5 ? 'results' : 'initial',
     qualifiedOrganizations: count,
-    nextGoal: percent >= 30 ? null : percent === 20 ? 20 : 5,
+    nextGoal: PARTNER_LEVELS.find((level) => level.minimumQualified > count)?.minimumQualified ?? null,
   };
 }
 
