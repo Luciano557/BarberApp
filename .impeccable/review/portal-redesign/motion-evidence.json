@@ -1,0 +1,24 @@
+{
+  "confirmationMotion": {
+    "animation": "portal-step-forward",
+    "duration": "0.22s",
+    "parent": "portal-stage"
+  },
+  "checkMotion": {
+    "animation": "portal-check",
+    "duration": "0.36s",
+    "node": "path"
+  },
+  "belowBreakpoint": {
+    "aside": "none",
+    "columns": "640px",
+    "scroll": 1023,
+    "width": 1023
+  },
+  "aboveBreakpoint": {
+    "aside": "block",
+    "columns": "578.562px 320px",
+    "scroll": 1024,
+    "width": 1024
+  }
+}

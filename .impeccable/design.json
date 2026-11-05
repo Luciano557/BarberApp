@@ -19,6 +19,8 @@
       "status-indigo": { "role": "secondary", "displayName": "Índigo", "canonical": "hsl(243 75% 59%)", "tonalRamp": ["hsl(243 60% 45%)", "hsl(243 75% 59%)", "hsl(243 75% 96%)"] }
     },
     "typographyMeta": {
+      "portal-name": {"displayName": "Portal: nombre de barbería", "purpose": "Solo portal público: escala editorial en Expanded; 42px en Medium y 36px en Compact. No sustituye PageHeader de Operate."},
+      "portal-task": {"displayName": "Portal: tarea", "purpose": "Títulos de los pasos de reserva y de gestión del cliente final; no altera los títulos de card de Operate."},
       "headline": { "displayName": "Headline", "purpose": "Título de página; solo dentro de PageHeader." },
       "title": { "displayName": "Title (card)", "purpose": "Título de card en reposo. font-medium a propósito: muchas cards conviven." },
       "title-overlay": { "displayName": "Title (overlay)", "purpose": "Título de Dialog/DrawerForm/Sheet. font-semibold a propósito: tarea única enfocada." },
@@ -31,6 +33,26 @@
       { "name": "modal", "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", "purpose": "Dialogs, sheets, DrawerForm, toasts (shadow-lg)." }
     ],
     "motion": [
+      {
+        "name": "portal-step",
+        "value": "220ms var(--ease-out-quint)",
+        "purpose": "Entrada del paso desde translateX(12px) al avanzar y -12px al volver. Confirmación se monta al activarse; Datos conserva su montaje y borrador. Sin animación con prefers-reduced-motion."
+      },
+      {
+        "name": "portal-check",
+        "value": "360ms var(--ease-out-quint)",
+        "purpose": "Dibujo del path del check de confirmación: stroke-dashoffset de 24 a 0. Sin animación con prefers-reduced-motion."
+      },
+      {
+        "name": "portal-stamp",
+        "value": "420ms var(--ease-out-quint)",
+        "purpose": "Sello de éxito: scale(.8) rotate(-8deg), scale(1.04) rotate(2deg), reposo. Una vez por confirmación, sin loops; movimiento reducido conserva el resultado estático."
+      },
+      {
+        "name": "portal-feedback",
+        "value": "180ms",
+        "purpose": "Fondo de fila, flecha y acción primaria de portada. Hover de movimiento solo con hover:hover y pointer:fine; se suprime con movimiento reducido."
+      },
       { "name": "ease-out-quint", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Entradas y transiciones de estado. Curva default del sistema." },
       { "name": "ease-in-quint", "value": "cubic-bezier(0.4, 0, 1, 1)", "purpose": "Salidas (overlays que se cierran, elementos que se van)." },
       { "name": "duration-micro", "value": "140ms-220ms", "purpose": "Micro-feedback y transiciones de estado." },
@@ -45,6 +67,37 @@
     ]
   },
   "components": [
+    {
+      "name": "Portal: acción primaria de entrada",
+      "kind": "button",
+      "refersTo": "portal-landing-primary",
+      "description": "Acento de la barbería y texto contrastado por getPortalThemeStyle; escala exclusiva de portada del portal.",
+      "html": "<button class=\"ds-portal-primary\">Reservar mi cita</button>",
+      "css": ".ds-portal-primary { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 54px; padding: 8px 16px; background: hsl(var(--primary, 224 43% 20%)); color: hsl(var(--primary-foreground, 0 0% 100%)); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 500; border: none; border-radius: 10px; cursor: pointer; transition: background-color 180ms, transform 180ms var(--ease-out-quint, cubic-bezier(.23,1,.32,1)); } .ds-portal-primary:hover { background: hsl(var(--primary, 224 43% 20%) / .9); } .ds-portal-primary:focus-visible { outline: 2px solid hsl(var(--ring, 224 43% 30%)); outline-offset: 4px; } .ds-portal-primary:active { transform: scale(.97); } @media (hover:hover) and (pointer:fine) { .ds-portal-primary:hover { transform: translateY(-2px); } } @media (prefers-reduced-motion:reduce) { .ds-portal-primary { transition: none; } .ds-portal-primary:hover, .ds-portal-primary:active { transform: none; } }"
+    },
+    {
+      "name": "Portal: acción secundaria de entrada",
+      "kind": "button",
+      "refersTo": "portal-landing-outline",
+      "description": "Gestión de cita con el contorno del núcleo y la escala de la portada pública.",
+      "html": "<button class=\"ds-portal-outline\">Modificar mi cita</button>",
+      "css": ".ds-portal-outline { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 54px; padding: 8px 16px; background: hsl(var(--background, 0 0% 100%)); color: hsl(var(--foreground, 232 75% 14%)); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 16px; font-weight: 500; border: 1px solid hsl(var(--input, 232 30% 88%)); border-radius: 10px; cursor: pointer; transition: background-color 150ms ease-out, transform 150ms ease-out; } .ds-portal-outline:hover { background: hsl(var(--accent, 231 80% 95%)); } .ds-portal-outline:focus-visible { outline: 2px solid hsl(var(--ring, 224 43% 30%)); outline-offset: 4px; } .ds-portal-outline:active { transform: scale(.97); } @media (prefers-reduced-motion:reduce) { .ds-portal-outline { transition: none; } .ds-portal-outline:active { transform: none; } }"
+    },
+    {
+      "name": "Portal: catálogo abierto",
+      "kind": "custom",
+      "description": "Fila de servicio con precio legible, reflow de texto y separadores; sin card por opción.",
+      "html": "<div class=\"ds-portal-catalog\"><button class=\"ds-portal-choice\"><span class=\"ds-portal-choice-body\"><span class=\"ds-portal-choice-name\">Corte clásico</span><span class=\"ds-portal-choice-meta\">30 min</span><span class=\"ds-portal-choice-price\">$15.000</span></span><svg class=\"ds-portal-choice-arrow\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button></div>",
+      "css": ".ds-portal-catalog { border-top: 1px solid hsl(var(--border, 232 30% 90%)); } .ds-portal-choice { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 80px; padding: 22px 8px; text-align: left; background: transparent; color: hsl(var(--foreground, 232 75% 14%)); border: 0; border-bottom: 1px solid hsl(var(--border, 232 30% 90%)); font-family: Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color 180ms; } .ds-portal-choice-body { flex: 1; min-width: 0; } .ds-portal-choice-name { display: block; font-size: 16px; font-weight: 500; line-height: 1.45; overflow-wrap: anywhere; } .ds-portal-choice-meta { display: block; margin-top: 6px; color: hsl(var(--muted-foreground, 232 20% 38%)); font-size: 14px; } .ds-portal-choice-price { display: block; margin-top: 8px; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; } .ds-portal-choice-arrow { width: 18px; height: 18px; flex-shrink: 0; color: hsl(var(--muted-foreground, 232 20% 38%)); transition: transform 180ms var(--ease-out-quint, cubic-bezier(.23,1,.32,1)); } .ds-portal-choice:focus-visible { outline: 2px solid hsl(var(--ring, 224 43% 30%)); outline-offset: 4px; } @media (hover:hover) and (pointer:fine) { .ds-portal-choice:hover { background: hsl(var(--muted, 231 80% 97%) / .5); } .ds-portal-choice:hover .ds-portal-choice-arrow { transform: translateX(3px); } } @media (prefers-reduced-motion:reduce) { .ds-portal-choice, .ds-portal-choice-arrow { transition: none; } .ds-portal-choice:hover .ds-portal-choice-arrow { transform: none; } }"
+    },
+    {
+      "name": "Portal: comprobante de reserva",
+      "kind": "card",
+      "refersTo": "portal-ticket",
+      "description": "Resumen lateral completo en Expanded, revisión y éxito; superficie plana con total y números tabulares.",
+      "html": "<aside class=\"ds-portal-ticket\" aria-label=\"Resumen de tu reserva\"><h2 class=\"ds-portal-ticket-title\">Tu reserva</h2><dl><div class=\"ds-portal-ticket-row\"><dt>Servicio</dt><dd>Corte clásico</dd></div><div class=\"ds-portal-ticket-row\"><dt>Hora</dt><dd>10:00 – 10:30</dd></div></dl><div class=\"ds-portal-ticket-total\"><span>Total</span><strong>$15.000</strong></div></aside>",
+      "css": ".ds-portal-ticket { min-width: 0; padding: 24px; background: hsl(var(--muted, 231 80% 97%) / .55); color: hsl(var(--foreground, 232 75% 14%)); border: 1px solid hsl(var(--border, 232 30% 90%)); border-radius: 12px; font-family: Inter, ui-sans-serif, system-ui, sans-serif; } .ds-portal-ticket-title { margin: 0 0 24px; font-size: 18px; font-weight: 500; } .ds-portal-ticket-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; padding-block: 9px; align-items: baseline; } .ds-portal-ticket-row dt { font-size: 12px; color: hsl(var(--muted-foreground, 232 20% 38%)); } .ds-portal-ticket-row dd { margin: 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; } .ds-portal-ticket-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-top: 20px; padding-top: 20px; border-top: 1px dashed hsl(var(--border, 232 30% 90%)); } .ds-portal-ticket-total span { font-size: 14px; color: hsl(var(--muted-foreground, 232 20% 38%)); } .ds-portal-ticket-total strong { max-width: 100%; font-size: 24px; font-weight: 600; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }"
+    },
     {
       "name": "Botón primario",
       "kind": "button",
@@ -123,6 +176,21 @@
       "Patrones repetidos con nombre: la consistencia es la forma de la confianza."
     ],
     "rules": [
+      {
+        "name": "The Portal Identity Rule",
+        "body": "En el portal público, el acento configurado por la barbería reemplaza `--primary` dentro de su contenedor; no crea una nueva paleta global. `getPortalThemeStyle` calcula luminancia en sRGB lineal y elige tinta negra o blanca sobre el primario. Para marcas claras usa Ink en el foco y en la tinta de acento (`--portal-accent-ink`), manteniendo el color elegido en los fondos. Sin un color válido, hereda el tema del núcleo. Los neutros siguen siendo Paper, Ink, Ink Muted, Mist y Hairline.",
+        "section": "colors"
+      },
+      {
+        "name": "Portal público — barbería protagonista, Vittro como firma",
+        "body": "La portada, el logo, el nombre y el acento pertenecen a cada barbería. El portal conserva Inter y los neutros del núcleo, con una composición editorial más amplia y una jerarquía propia para elegir y confirmar un turno. Esta excepción de superficie no cambia la escala ni la densidad de Operate. Vittro aparece como firma vectorial pequeña y secundaria.",
+        "section": "overview"
+      },
+      {
+        "name": "Portal público — foco",
+        "body": "Excepción local explícita al ring de Operate: outline de 2px con offset de 4px, usando el `--ring` contrastado del portal. No reemplaza el patrón de foco de la app interna.",
+        "section": "components"
+      },
       { "name": "La regla del chip", "body": "El chip de ícono en el header de una card comunica qué podés hacer: bg-primary/10 + text-primary = se edita acá; bg-muted + text-muted-foreground = atajo o información. El criterio es '¿se edita acá?', nunca importancia ni peligrosidad.", "section": "colors" },
       { "name": "La regla del estado con token", "body": "Todo color de estado de UI sale de las familias --status-* o de --destructive/--success. Clases directas de Tailwind (green-*, emerald-*, amber-*) están prohibidas en la app interna.", "section": "colors" },
       { "name": "Neutros por superficie", "body": "La homepage puede usar su propia escala neutra como expresividad Persuade mientras el navy ancle las acciones; la app interna y Auth usan exclusivamente los neutros del sistema.", "section": "colors" },
@@ -143,6 +211,8 @@
       { "name": "Grid bidimensional (Agenda)", "body": "Cuando tanto la posición horizontal como la vertical contienen información (Agenda: barbero/día × hora), no se resuelve reflowendo a una columna. Contrato: ancho mínimo por columna medido con ResizeObserver sobre el contenedor real (Día: 160px, multi-día: 128px) — crece si sobra espacio, nunca baja del mínimo; si no entra, scroll horizontal local con header/body sincronizados; Semana conserva siempre 7 columnas. Detalle en docs/MODULOS/turnos-agenda.md.", "section": "layout" }
     ],
     "dos": [
+      "Do conservar la identidad de la barbería como protagonista del portal y Vittro como firma vectorial secundaria.",
+      "Do consumir los cortes compartidos `sm` y `lg` desde Tailwind para la composición del portal; permitir reflow de nombres, servicios e importes a 320px.",
       "Do usar focus-visible:ring-2 ring-ring como único patrón de foco.",
       "Do contratar el área táctil por capacidad de puntero: pointer:coarse → ~44px objetivo / 40px piso (visual puede seguir en 28–32px si el hit-area se amplía); pointer:fine puede conservar más densidad.",
       "Do detectar capacidades de puntero (hover, pointer, any-pointer) para decisiones de interacción — nunca inferirlas del ancho.",
@@ -153,6 +223,7 @@
       "Do gatear todo skeleton con useDelayedVisible(isLoading) — sin delay, una carga de 80ms produce un parpadeo peor que la espera."
     ],
     "donts": [
+      "Don't trasladar la escala editorial ni los radios específicos del portal público a Operate.",
       "Don't usar clases de color directas de Tailwind en la app interna — todo estado y neutro sale de tokens.",
       "Don't escribir variantes dark: nuevas — dark está congelado.",
       "Don't usar overflow:hidden en wrappers con sticky — usar overflow:clip.",

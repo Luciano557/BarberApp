@@ -4,10 +4,12 @@
 
 ## Portal cliente de reservas — UI y comportamiento
 
-Rediseño posterior aprobado con publicación directa: barbería protagonista,
-Vittro como firma y movimiento con bajo costo. Primer build validado localmente:
-lazy de rutas ajenas al portal, 71,9% menos JS gzip de entrada sin cambiar los
-providers. Visual y publicación pendientes: `PORTAL_CLIENTE_REDISENO.md`.
+Rediseño posterior implementado y validado: barbería protagonista, portada
+editorial, catálogo abierto, comprobante y firma SVG de Vittro. Motion de
+avance/regreso y confirmación, con movimiento reducido. Lazy de rutas ajenas al
+portal: 72,0% menos JS gzip inicial sin cambiar providers. 50 pruebas dirigidas
+correctas; suite global 356/364 con los mismos ocho fallos previos de
+Auth/organización. Publicación en curso: `PORTAL_CLIENTE_REDISENO.md`.
 
 Dos builds separados, validados localmente: servicios y horarios legibles,
 resumen compacto, jerarquía de Mis turnos; conservación de selecciones/borrador,
@@ -1299,8 +1301,8 @@ con esta fase la convivencia de los dos modelos quedó más nítida, no
 resuelta: Logo/portada es instantáneo por decisión de producto, las otras 3
 secciones son diferidas por Editar/Guardar; sigue siendo una decisión de
 producto pendiente, no técnica), Fase 6 (cajas nativas al componente
-compartido). El h2 anidado dentro de la vista previa (BookingLanding)
-sigue sin resolver — requiere tocar el componente del portal público real.
+compartido). La vista previa respeta `headingLevel="h2"` con y sin portada desde
+el rediseño del portal cliente del 2026-11-05.
 Deriva conocida sin resolver: el `<Skeleton>` de carga inicial de Compartir
 tu portal sigue espejando el layout apilado anterior a las pestañas
 Link/QR — ver `MODULOS/turnos-agenda.md`.

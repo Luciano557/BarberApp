@@ -30,12 +30,14 @@ export function hexToHslString(hex: string): string | null {
 /**
  * Pick black or white foreground based on luminance.
  */
-function pickForeground(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
+function luminance(hex: string): number {
+  const linear = (offset: number) => {
+    const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  const r = linear(1), g = linear(3), b = linear(5);
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.6 ? '0 0% 10%' : '0 0% 100%';
+  return lum;
 }
 
 /**
@@ -51,10 +53,12 @@ export function getPortalThemeStyle(primaryHex: string | null | undefined): Reac
   const hex = primaryHex as string;
   const hsl = hexToHslString(hex);
   if (!hsl) return {};
+  const lightBrand = luminance(hex) > 0.179;
   return {
-    ['--primary' as any]: hsl,
-    ['--primary-foreground' as any]: pickForeground(hex),
-    ['--ring' as any]: hsl,
-    ['--portal-primary' as any]: hex,
-  };
+    '--primary': hsl,
+    '--primary-foreground': lightBrand ? '0 0% 0%' : '0 0% 100%',
+    '--ring': lightBrand ? '232 75% 14%' : hsl,
+    '--portal-accent-ink': lightBrand ? '232 75% 14%' : hsl,
+    '--portal-primary': hex,
+  } as React.CSSProperties;
 }

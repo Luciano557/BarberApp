@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getPortalThemeStyle } from "@/components/reservar/lib/portalTheme";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import { useMetaPixel } from "@/hooks/useMetaPixel";
+import { PortalIdentity } from "@/components/reservar/PortalIdentity";
+import { VittroSignature } from "@/components/reservar/VittroSignature";
 
 export interface OrgPublicData {
   organization: { id: string; name: string; logo_url: string | null; timezone: string | null };
@@ -33,11 +35,18 @@ const Reservar = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40" style={bannerPadding}>
-        <div className="space-y-4 w-full max-w-md px-4">
-          <Skeleton className="h-8 w-48 mx-auto" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+      <div className="portal portal-page min-h-screen bg-background" style={bannerPadding} role="status" aria-label="Cargando portal de reservas">
+        <div className="portal-shell">
+          <div className="portal-landing">
+            <Skeleton className="portal-landing__visual" />
+            <div className="portal-landing__content space-y-6">
+              <Skeleton className="h-[72px] w-[72px] rounded-full" />
+              <Skeleton className="h-14 w-3/4" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-[54px] w-full" />
+              <Skeleton className="h-[54px] w-full" />
+            </div>
+          </div>
         </div>
         <CookieConsentBanner />
       </div>
@@ -57,11 +66,9 @@ const Reservar = () => {
   const sinReservables = orgData.sucursales.length === 0 || orgData.servicios.length === 0;
 
   return (
-    <div style={{ ...themeStyle, ...bannerPadding }} className="min-h-screen bg-muted/40">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+    <div style={{ ...themeStyle, ...bannerPadding }} className="portal portal-page min-h-screen bg-background">
+      <main className="portal-shell">
         {mode === "landing" ? (
-          <div className="mx-auto max-w-md">
-            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm sm:p-8">
               <BookingLanding
                 orgName={orgData.organization.name}
                 fallbackLogo={orgData.organization.logo_url}
@@ -70,9 +77,9 @@ const Reservar = () => {
                 onManage={() => setMode("manage")}
                 emptyMessage={sinReservables ? "No hay servicios disponibles para reservar en este momento." : undefined}
               />
-            </div>
-          </div>
         ) : (
+          <>
+          <PortalIdentity orgName={orgData.organization.name} logo={orgData.portal?.logo_url || orgData.organization.logo_url} />
           <BookingStepper
             key={orgData.organization.id}
             orgData={orgData}
@@ -80,8 +87,10 @@ const Reservar = () => {
             onBackToLanding={() => setMode("landing")}
             onBookNew={() => setMode("book")}
           />
+          <footer className="portal-footer"><VittroSignature /></footer>
+          </>
         )}
-      </div>
+      </main>
       <CookieConsentBanner />
     </div>
   );

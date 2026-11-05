@@ -1,27 +1,28 @@
 interface VittroMarkProps {
   className?: string;
+  variant?: "full" | "wordmark";
 }
 
 /**
  * Isologo + wordmark de Vittro. `fill="currentColor"`: el color lo define
  * quien lo usa vía className (ej. `text-primary`), no está hardcodeado.
  */
-export function VittroMark({ className }: VittroMarkProps) {
+export function VittroMark({ className, variant = "full" }: VittroMarkProps) {
   return (
     <svg
-      viewBox="0 0 1080 1300"
+      viewBox={variant === "wordmark" ? "0 1060 1080 240" : "0 0 1080 1300"}
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
-      <path
+      {variant === "full" && <path
         fill="currentColor"
         d="M660.9765625,702.5949707c18.1674194-61.0582886-74.2577515-161.6077271-35.0374146-265.6768799
 			l-0.196228-0.2980347l110.8433228-294.1054688l28.2668457-75.0064011C775.6248779,38.9215012,802.9796143,20,833.5287476,20H1075
 			L659.4938354,1033.4477539H637.819397l-32.8786621-141.0108643
 			C627.9307251,814.3995361,652.2835693,731.8031006,660.9765625,702.5949707z M609.3781128,1033.4477539L289.3716125,20.8231487
 			H106.4655914c-52.1726837,0-87.6825256,52.9031525-67.9233398,101.1908646l373.0113831,911.4337158H609.3781128z"
-      />
+      />}
       <path
         fill="currentColor"
         d="M169.9599915,1216.4276123c3.6334686-12.2116699-14.8515625-32.3216553-7.0074921-53.135376

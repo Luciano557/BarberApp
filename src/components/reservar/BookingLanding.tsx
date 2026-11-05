@@ -1,7 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { CalendarPlus, Settings } from "lucide-react";
-import { isValidHex } from "@/hooks/usePortalConfig";
 import { getPortalIcon } from "./lib/portalIcons";
+import { getPortalThemeStyle } from "./lib/portalTheme";
+import { PortalAvatar, PortalCover } from "./PortalIdentity";
+import { VittroSignature } from "./VittroSignature";
+import "./portal.css";
 
 export interface PortalLandingLink {
   label: string;
@@ -28,197 +31,63 @@ interface Props {
   onStart?: () => void;
   onManage: () => void;
   emptyMessage?: string;
-  /** 'h2' cuando se embebe en una pantalla que ya tiene su propio h1 (ej. la
-      vista previa dentro de Configuración). Default 'h1' para el portal
-      público real, donde este es el único heading de nivel superior. */
-  headingLevel?: 'h1' | 'h2';
+  headingLevel?: "h1" | "h2";
 }
 
 export const buildDefaultPortalDescription = (orgName: string) =>
   `Bienvenido al portal de reservas de ${orgName}. Reservá tu turno o gestioná tu cita de forma simple.`;
 
-const clampPos = (n: number | null | undefined) => {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return 50;
-  return Math.max(0, Math.min(100, n));
-};
-
-const clampZoom = (n: number | null | undefined) => {
-  if (typeof n !== 'number' || !Number.isFinite(n)) return 1;
-  return Math.max(1, Math.min(3, n));
-};
-
-export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage, emptyMessage, headingLevel = 'h1' }: Props) => {
+export const BookingLanding = ({ orgName, fallbackLogo, portal, onStart, onManage, emptyMessage, headingLevel = "h1" }: Props) => {
   const NameHeading = headingLevel;
   const logo = portal?.logo_url || fallbackLogo || null;
-  const cover = portal?.cover_url || null;
-  const description = portal?.description?.trim() || buildDefaultPortalDescription(orgName);
   const links = (portal?.links ?? []).slice(0, 4);
-  const posX = clampPos(portal?.cover_position_x);
-  const posY = clampPos(portal?.cover_position_y);
-  const zoom = clampZoom(portal?.cover_zoom);
-
-  const primary = isValidHex(portal?.primary_color) ? portal!.primary_color! : null;
-  const containerStyle = primary
-    ? ({ ['--portal-primary' as any]: primary } as React.CSSProperties)
-    : undefined;
-
-  const initials = orgName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join('') || 'V';
-
-  const Avatar = ({ className = '' }: { className?: string }) => (
-    <div
-      className={`h-24 w-24 rounded-full bg-card overflow-hidden flex items-center justify-center ring-4 ring-card shadow-lg ${className}`}
-    >
-      {logo ? (
-        <img src={logo} alt={`Logo de ${orgName}`} className="h-full w-full object-cover" />
-      ) : (
-        <div className="h-full w-full bg-muted flex items-center justify-center">
-          <span className="text-3xl font-semibold text-muted-foreground">{initials}</span>
-        </div>
-      )}
-    </div>
-  );
 
   return (
-    <div style={containerStyle} className="flex flex-col">
-      {cover ? (
-        <>
-          {/* Cover header — wrapper externo sin overflow para que el avatar no se corte */}
-          <div className="relative -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 h-[140px]">
-            {/* Capa interna con clipping solo para la foto y el degradado */}
-            <div className="absolute inset-0 overflow-hidden">
-              <img
-                src={cover}
-                alt=""
-                className="absolute inset-0 z-0 h-full w-full object-cover select-none pointer-events-none"
-                style={{
-                  objectPosition: `${posX}% ${posY}%`,
-                  transform: `scale(${zoom})`,
-                  transformOrigin: `${posX}% ${posY}%`,
-                }}
-                draggable={false}
-              />
-              <div className="absolute inset-x-0 bottom-0 z-10 h-2/3 bg-gradient-to-b from-transparent to-card" />
-            </div>
-            {/* Avatar fuera del clipping, superpuesto al borde inferior */}
-            <div className="absolute left-1/2 bottom-0 z-20 -translate-x-1/2 translate-y-1/2">
-              <Avatar />
-            </div>
+    <div className={`portal portal-landing${headingLevel === "h2" ? " portal-preview" : ""}`} style={getPortalThemeStyle(portal?.primary_color)}>
+      <div className="portal-landing__visual">
+        {portal?.cover_url ? <PortalCover portal={portal} /> : (
+          <div className="portal-landing__monogram" aria-hidden="true">
+            <PortalAvatar orgName={orgName} logo={logo} />
           </div>
-
-          {/* Cuerpo */}
-          <div className="flex flex-col items-center gap-5 text-center pt-14">
-            <div className="space-y-1.5 px-2">
-              <NameHeading className="text-2xl font-semibold text-foreground">{orgName}</NameHeading>
-              <p className="text-sm text-muted-foreground max-w-xs mx-auto whitespace-pre-line">
-                {description}
-              </p>
-            </div>
-            <Actions
-              primary={primary}
-              onStart={onStart}
-              onManage={onManage}
-              links={links}
-              emptyMessage={emptyMessage}
-            />
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-col items-center gap-5 text-center pt-2">
-          <Avatar />
-          <div className="space-y-1.5 px-2">
-            <h1 className="text-2xl font-semibold text-foreground">{orgName}</h1>
-            <p className="text-sm text-muted-foreground max-w-xs mx-auto whitespace-pre-line">
-              {description}
-            </p>
-          </div>
-          <Actions
-            primary={primary}
-            onStart={onStart}
-            onManage={onManage}
-            links={links}
-            emptyMessage={emptyMessage}
-          />
-        </div>
-      )}
-    </div>
-  );
-};
-
-function Actions({
-  primary,
-  onStart,
-  onManage,
-  links,
-  emptyMessage,
-}: {
-  primary: string | null;
-  onStart?: () => void;
-  onManage: () => void;
-  links: PortalLandingLink[];
-  emptyMessage?: string;
-}) {
-  return (
-    <>
-      <div className="w-full max-w-sm space-y-3">
-        {emptyMessage ? (
-          <div className="rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
-            {emptyMessage}
-          </div>
-        ) : (
-          <Button
-            onClick={onStart}
-            className="w-full h-12 text-base font-medium"
-            style={primary ? { backgroundColor: 'var(--portal-primary)', color: '#fff', borderColor: 'transparent' } : undefined}
-          >
-            <CalendarPlus className="h-5 w-5 mr-2" />
-            Reservar mi cita
-          </Button>
         )}
-
-        <Button
-          onClick={onManage}
-          variant="outline"
-          className="w-full h-12 text-base font-medium"
-          style={primary ? { borderColor: 'var(--portal-primary)', color: 'var(--portal-primary)' } : undefined}
-        >
-          <Settings className="h-5 w-5 mr-2" />
-          Modificar mi cita
-        </Button>
       </div>
+      <div className="portal-landing__content">
+        <div className="portal-landing__identity">
+          <PortalAvatar orgName={orgName} logo={logo} />
+          <NameHeading className="portal-landing__name">{orgName}</NameHeading>
+          <p className="portal-landing__description">
+            {portal?.description?.trim() || buildDefaultPortalDescription(orgName)}
+          </p>
+        </div>
 
-      {links.length > 0 && (
-        <div className="w-full max-w-sm pt-1">
-          <div className="flex items-start justify-center gap-3 flex-wrap">
-            {links.map((l, idx) => {
-              const Icon = getPortalIcon(l.icon);
+        <div className="portal-landing__actions">
+          {emptyMessage ? (
+            <p className="rounded-xl bg-muted p-4 text-sm text-muted-foreground">{emptyMessage}</p>
+          ) : (
+            <Button onClick={onStart} className="portal-landing__primary w-full gap-3 text-base">
+              <CalendarPlus className="h-5 w-5" aria-hidden="true" /> Reservar mi cita
+            </Button>
+          )}
+          <Button onClick={onManage} variant="outline" className="w-full gap-3 text-base">
+            <Settings className="h-5 w-5" aria-hidden="true" /> Modificar mi cita
+          </Button>
+        </div>
+
+        {links.length > 0 && (
+          <nav aria-label={`Redes y contacto de ${orgName}`} className="portal-landing__links">
+            {links.map((link, index) => {
+              const Icon = getPortalIcon(link.icon);
               return (
-                <a
-                  key={`${l.url}-${idx}`}
-                  href={l.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex flex-col items-center gap-1.5 w-16"
-                  title={l.label}
-                >
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-card text-foreground transition-colors group-hover:border-primary group-hover:text-primary">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span className="text-[11px] text-muted-foreground truncate max-w-full leading-tight">
-                    {l.label}
-                  </span>
+                <a key={`${link.url}-${index}`} href={link.url} target="_blank" rel="noopener noreferrer">
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>{link.label}</span>
                 </a>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      <p className="text-xs text-muted-foreground pt-3">Powered by Vittro</p>
-    </>
+          </nav>
+        )}
+        <VittroSignature />
+      </div>
+    </div>
   );
-}
+};

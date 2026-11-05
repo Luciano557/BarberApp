@@ -76,7 +76,7 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
         <p className="text-sm text-muted-foreground">Revisá los datos antes de reservar.</p>
       </div>
 
-      <div className="space-y-4 border-y border-border py-5">
+      <div className="portal-confirmation space-y-4 py-5">
         <div className="flex items-center gap-3">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="min-w-0 break-words text-sm text-foreground">{booking.sucursalNombre}</span>

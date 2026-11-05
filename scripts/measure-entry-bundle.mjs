@@ -19,4 +19,8 @@ const sizes = files.map(file => {
   const bytes = fs.readFileSync(path.join(root, file));
   return { file, bytes: bytes.length, gzip: gzipSync(bytes, { level: 9 }).length };
 });
-process.stdout.write(JSON.stringify({ entry, files: sizes, js_bytes: sizes.reduce((n, s) => n + s.bytes, 0), js_gzip: sizes.reduce((n, s) => n + s.gzip, 0) }, null, 2) + '\n');
+const css = [...new Set([...seen].flatMap(key => manifest[key].css || []))].map(file => {
+  const bytes = fs.readFileSync(path.join(root, file));
+  return { file, bytes: bytes.length, gzip: gzipSync(bytes, { level: 9 }).length };
+});
+process.stdout.write(JSON.stringify({ entry, files: sizes, js_bytes: sizes.reduce((n, s) => n + s.bytes, 0), js_gzip: sizes.reduce((n, s) => n + s.gzip, 0), css, css_bytes: css.reduce((n, s) => n + s.bytes, 0), css_gzip: css.reduce((n, s) => n + s.gzip, 0) }, null, 2) + '\n');

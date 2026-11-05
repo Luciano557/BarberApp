@@ -76,7 +76,7 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
       <h2 className="text-lg font-medium text-foreground">Mis turnos</h2>
 
       {turnos.map((turno) => (
-        <Card key={turno.id} className="min-w-0 shadow-none">
+        <Card key={turno.id} className="portal-record min-w-0 shadow-none">
           <CardContent className="space-y-4 p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <h3 className="break-words text-base font-medium text-foreground">{formatFechaLegible(turno.fecha)}</h3>

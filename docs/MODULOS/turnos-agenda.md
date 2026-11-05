@@ -182,7 +182,29 @@ el 2026-11-05. Se mantiene la
 identidad configurable de cada barbería. Estado de publicación y evidencia:
 [PORTAL_CLIENTE_PUBLICACION.md](../PORTAL_CLIENTE_PUBLICACION.md).
 
-### Etapa 1 — composición visual
+### Rediseño actual — identidad, comprobante y movimiento
+
+Build posterior autorizado el 2026-11-05, separado en carga inicial y visual.
+Landing editorial: portada real amplia + nombre/acciones; en teléfono, portada
+horizontal y logo superpuesto. Dentro del flujo, identidad compacta, catálogo
+de filas abiertas, resumen tipo comprobante y fecha/hora prominentes al confirmar.
+Vittro firma con su wordmark SVG. La preview reutiliza la composición de teléfono
+y respeta `headingLevel="h2"` también sin portada.
+
+CSS acotado a `.portal`, Inter y neutros existentes, color de cada barbería como
+dato. Contraste sRGB lineal para texto de acción y foco/tinta seguros con marcas
+claras. Breakpoints de la fuente compartida (`screen(sm)`, `screen(lg)`).
+Avance/regreso 220 ms, sello de confirmación 420 ms y trazo 360 ms; reduce motion
+suprime las transformaciones. El borrador de datos conserva su montaje. Se retiró
+la medición/animación de altura del resumen; no se agregaron dependencias.
+
+Las rutas ajenas al portal se difieren con React.lazy, sin mover los providers
+ni guardas. JS inicial gzip: 913.397 → 255.612 B (72,0% menos; no es medición de
+LCP). 50 pruebas dirigidas, TypeScript, lint sin errores y build correctos.
+Suite global: 356/364, mismos ocho fallos previos de Auth/organización.
+Evidencia visual y publicación: [PORTAL_CLIENTE_REDISENO.md](../PORTAL_CLIENTE_REDISENO.md).
+
+### Etapa 1 — composición visual anterior
 
 - **Servicios:** cada opción reserva el ancho principal al nombre; duración y
   precio comparten una segunda fila que puede reflowear. El importe usa

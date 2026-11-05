@@ -66,7 +66,7 @@ la dejó obsoleta.
 
 - [x] `admin.md` — Centro de administración de plataforma, seguridad, métricas y precios
 - [x] `acceso-tenant.md` — Restauración de sesión, carga del contexto tenant y recuperación de fallos
-- [x] `turnos-agenda.md` — Configuración de reservas, Portal público, experiencia del cliente al reservar y gestionar turnos (UI y comportamiento publicados y verificados: `PORTAL_CLIENTE_PUBLICACION.md`), Horarios de trabajo
+- [x] `turnos-agenda.md` — Configuración de reservas, Portal público, experiencia del cliente al reservar y gestionar turnos (`PORTAL_CLIENTE_PUBLICACION.md`; rediseño y carga inicial: `PORTAL_CLIENTE_REDISENO.md`), Horarios de trabajo
 - [x] `notificaciones.md` — Modelo evento/entrega, autorización, productores, permisos de funciones y cómo agregar eventos (Etapa 1 de seguridad, aplicada en Supabase el 2026-10-12; Etapa 2 suma `_notif_barbero_users` y el evento `tarea_automatica_pausada`; BUILD 4C, local: campana → tarea puntual y preferencia “Resumen semanal de Tareas”, que no llega a la campana)
 - [ ] Cobrar
 - [x] Finanzas — `finanzas.md` (modo ficticio implementado, uso, límites y validación; no implica auditoría completa del módulo)

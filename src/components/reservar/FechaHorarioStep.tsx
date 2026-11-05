@@ -136,7 +136,7 @@ export const FechaHorarioStep = ({
     }
 
     return (
-      <div className="space-y-3">
+      <div className="portal-slots space-y-3">
         <div className="space-y-1">
           <h3 className="text-base font-medium text-foreground first-letter:uppercase">
             {format(new Date(fecha + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
@@ -229,7 +229,7 @@ export const FechaHorarioStep = ({
           mobile angosto (sin overflow-x-auto ni wrap, eso se propagaba como
           scroll horizontal de página) — mismo día, misma cantidad, solo dejan
           de pedir más ancho del que hay. */}
-      <div className="flex gap-2">
+      <div className="portal-dates flex gap-2">
         {loadingStrip
           ? [...Array(5)].map((_, i) => (
               <Skeleton key={i} className="h-16 flex-1 min-w-0 rounded-lg" />
@@ -244,7 +244,7 @@ export const FechaHorarioStep = ({
                   aria-label={format(d.date, "EEEE d 'de' MMMM", { locale: es })}
                   onClick={() => setFecha(d.dateStr)}
                   className={cn(
-                    "flex h-16 flex-1 min-w-0 flex-col items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "portal-date flex h-16 flex-1 min-w-0 flex-col items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     active
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "bg-muted/50 text-foreground hover:bg-accent"

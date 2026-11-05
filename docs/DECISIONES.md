@@ -1,5 +1,19 @@
 # Decisiones de arquitectura y criterio — Vittro
 
+## 2026-11-05 — portal cliente: identidad de barbería y carga de rutas
+
+El usuario eligió barbería protagonista y Vittro como firma, aprobó rediseño
+editorial/movimiento y publicación directa. Portada/logo configurados son la
+materia visual; no se agregan fotos genéricas, fuentes ni dependencias de motion.
+La composición y escala son una excepción acotada al portal, registrada en
+DESIGN.md; Operate conserva su sistema. El comprobante y la continuidad entre
+pasos aportan identidad sin cambiar contratos ni validaciones de reservas.
+
+La mejora de carga se construyó por separado: React.lazy difiere rutas ajenas
+al portal manteniendo providers/guardas. El criterio de comparación es el grafo
+estático del entry Vite comprimido, no una promesa de LCP. Detalle y evidencia:
+`PORTAL_CLIENTE_REDISENO.md`.
+
 ## 2026-10-15 — BUILD 4C: aviso semanal al entrar, un aviso por entrada y navegación a la tarea
 
 - **Repositorio normal sin reescribir historia.** 4A + 4B se commitearon en el worktree de `.codex` y se integraron en

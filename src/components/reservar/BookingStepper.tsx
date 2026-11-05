@@ -11,7 +11,7 @@ import { MisTurnosStep, type Turno } from "./MisTurnosStep";
 import { RescheduleFlow } from "./RescheduleFlow";
 import { BookingSummary } from "./BookingSummary";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, Check, CalendarPlus, ArrowLeft, MapPin, Scissors, User, CalendarDays, Clock } from "lucide-react";
+import { ChevronLeft, Check, CalendarPlus, ArrowLeft, MapPin, Scissors, User } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { formatFechaLegible, buildGoogleCalendarUrl } from "@/lib/dateUtils";
 
@@ -39,8 +39,7 @@ interface Props {
   onBookNew: () => void;
 }
 
-const cardClasses =
-  "min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6";
+const cardClasses = "portal-manage";
 
 export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Props) => {
   const flowRef = useRef<HTMLDivElement>(null);
@@ -60,6 +59,11 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
     cliente: null,
   });
   const [confirmed, setConfirmed] = useState(false);
+  const [motionDirection, setMotionDirection] = useState("forward");
+  const goToStep = (nextStep: number) => {
+    setMotionDirection(nextStep < step ? "back" : "forward");
+    setStep(nextStep);
+  };
 
   // Manage mode state
   const [managePhone, setManagePhone] = useState<string | null>(null);
@@ -94,7 +98,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
 
     if (!managePhone) {
       return (
-        <div className={`mx-auto max-w-md ${cardClasses}`}>
+        <div className={`portal-manage--lookup ${cardClasses}`}>
           <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 h-10 gap-1">
             <ChevronLeft className="h-4 w-4" /> Volver
           </Button>
@@ -140,7 +144,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
       onBackToLanding();
     } else if (step > 0) {
       const newStep = step - 1;
-      setStep(newStep);
+      goToStep(newStep);
     } else {
       onBackToLanding();
     }
@@ -160,22 +164,21 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
     });
 
     return (
-      <div className={`mx-auto max-w-md ${cardClasses}`}>
-        <div className="text-center space-y-5 py-2 animate-in fade-in zoom-in-95 duration-300">
-          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-            <Check className="h-8 w-8 text-primary" />
+      <div className="portal-success">
+        <div className="text-center space-y-5 py-2">
+          <div className="portal-success__mark">
+            <Check className="h-8 w-8" aria-hidden="true" />
           </div>
           <div className="space-y-1">
             <h2 className="text-xl font-semibold tracking-tight text-foreground">¡Turno confirmado!</h2>
             <p className="text-sm text-muted-foreground">Te esperamos.</p>
           </div>
 
-          <div className="rounded-xl border border-border/60 bg-muted/40 p-4 text-left space-y-3">
+          <div className="portal-ticket portal-success__details space-y-3">
+            <div className="portal-success__when"><p className="text-sm text-muted-foreground">{formatFechaLegible(booking.fecha)}</p><strong>{booking.horaInicio} <span className="text-base font-normal text-muted-foreground">- {booking.horaFin}</span></strong></div>
             <DetailRow icon={<MapPin className="h-4 w-4" />} value={booking.sucursalNombre} />
             <DetailRow icon={<Scissors className="h-4 w-4" />} value={booking.servicioNombre} />
             <DetailRow icon={<User className="h-4 w-4" />} value={booking.barberoNombre} />
-            <DetailRow icon={<CalendarDays className="h-4 w-4" />} value={formatFechaLegible(booking.fecha)} />
-            <DetailRow icon={<Clock className="h-4 w-4" />} value={`${booking.horaInicio} - ${booking.horaFin}`} />
           </div>
 
           <div className="space-y-2">
@@ -196,42 +199,26 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
   }
 
   return (
-    <div className={step < 5 ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" : "mx-auto grid max-w-2xl gap-6"}>
-      <div ref={flowRef} className={cardClasses}>
-        <div className="mb-5 space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="break-words text-xl font-semibold tracking-tight text-foreground">
-                {orgData.organization.name}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">Reservá tu turno</p>
-            </div>
-            <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium tabular-nums text-muted-foreground">
-              Paso {Math.min(currentStep, totalSteps)} de {totalSteps}
-            </span>
+    <div className={step < 5 ? "portal-flow" : "portal-flow portal-flow--final"}>
+      <div ref={flowRef} className="portal-flow__main">
+        <div className="portal-flow__progress">
+          <div className="portal-flow__toolbar">
+            <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2 h-10 gap-1 text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Volver
+            </Button>
+            <span className="text-xs font-medium tabular-nums text-muted-foreground">Paso {Math.min(currentStep, totalSteps)} de {totalSteps}</span>
           </div>
-          <Progress value={progress} className="h-1.5" />
+          <Progress value={progress} className="portal-progress h-1" aria-label={`Progreso: paso ${currentStep} de ${totalSteps}`} />
         </div>
-
-        <div className="mb-4">
-          <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2 h-10 gap-1 text-muted-foreground hover:text-foreground">
-            <ChevronLeft className="h-4 w-4" /> Volver
-          </Button>
-        </div>
-
-        {step < 5 && (
-          <div className="mb-6 lg:hidden">
-            <BookingSummary booking={booking} stepLabel={stepLabel} variant="chip" />
-          </div>
-        )}
-
+        {step < 5 && <div className="portal-ticket__mobile"><BookingSummary booking={booking} stepLabel={stepLabel} variant="chip" /></div>}
+        <div key={step} className="portal-stage" data-direction={motionDirection}>
         {step === 0 && (
           <SucursalStep
             sucursales={orgData.sucursales}
             onSelect={(id, nombre) => {
               if (id !== booking.sucursalId) resetFieldsFromStep(1);
               setBooking((b) => ({ ...b, sucursalId: id, sucursalNombre: nombre }));
-              setStep(1);
+              goToStep(1);
             }}
           />
         )}
@@ -241,7 +228,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
             onSelect={(id, nombre, precio) => {
               if (id !== booking.servicioId) resetFieldsFromStep(2);
               setBooking((b) => ({ ...b, servicioId: id, servicioNombre: nombre, servicioPrecio: precio }));
-              setStep(2);
+              goToStep(2);
             }}
           />
         )}
@@ -253,7 +240,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
                 resetFieldsFromStep(3);
                 setBooking((b) => ({ ...b, barberoId: id, barberoNombre: nombre || "Cualquiera disponible", eligioBarbero: id !== null }));
               }
-              setStep(3);
+              goToStep(3);
             }}
           />
         )}
@@ -273,44 +260,40 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding, onBookNew }: Pr
                 barberoId: barberoId || b.barberoId,
                 barberoNombre: barberoNombre || b.barberoNombre,
               }));
-              setStep(4);
+              goToStep(4);
             }}
             onChangeBarbero={() => {
-              setStep(2);
+              goToStep(2);
             }}
           />
         )}
-        <div hidden={step !== 4}>
+        </div>
+        <div hidden={step !== 4} className="portal-stage" data-direction={motionDirection}>
           <DatosClienteStep
             organizationId={orgData.organization.id}
             initial={booking.cliente ?? undefined}
             onSubmit={(cliente) => {
               setBooking((b) => ({ ...b, cliente }));
-              setStep(5);
+              goToStep(5);
             }}
           />
         </div>
         {step === 5 && (
+          <div className="portal-stage" data-direction={motionDirection}>
           <ConfirmacionStep
             booking={booking}
             orgData={orgData}
             onConfirmed={() => setConfirmed(true)}
             onSlotTaken={() => {
               resetFieldsFromStep(3);
-              setStep(3);
+              goToStep(3);
             }}
           />
+          </div>
         )}
       </div>
 
-      {step < 5 && (
-        <div className="hidden lg:block">
-          <div className="sticky top-6">
-            <BookingSummary booking={booking} stepLabel={stepLabel} />
-            <p className="mt-3 text-center text-xs text-muted-foreground">Powered by Vittro</p>
-          </div>
-        </div>
-      )}
+      {step < 5 && <div className="portal-flow__aside"><BookingSummary booking={booking} stepLabel={stepLabel} /></div>}
     </div>
   );
 };

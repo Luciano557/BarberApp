@@ -16,7 +16,7 @@ export function PortalPreview({ orgName, fallbackLogo, portal, emptyMessage }: P
           <div className="h-1 w-16 rounded-full bg-muted-foreground/30" />
         </div>
         <div className="max-h-[640px] overflow-y-auto">
-          <div className="p-6 sm:p-8">
+          <div>
             <BookingLanding
               orgName={orgName}
               fallbackLogo={fallbackLogo}

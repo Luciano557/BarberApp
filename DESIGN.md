@@ -43,12 +43,26 @@ typography:
     fontSize: "0.75rem"
     fontWeight: 500
     lineHeight: 1.35
+  portal-name:
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "clamp(40px, 5vw, 68px)"
+    fontWeight: 600
+    lineHeight: 1.04
+    letterSpacing: "-0.04em"
+  portal-task:
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "clamp(25px, 3vw, 32px)"
+    fontWeight: 600
+    lineHeight: 1.2
+    letterSpacing: "-0.03em"
 rounded:
   sm: "4px"
   md: "6px"
   lg: "8px"
   tile: "10px"
   container: "12px"
+  portal-action: "10px"
+  portal-cover: "16px"
 spacing:
   xs: "4px"
   sm: "8px"
@@ -84,6 +98,22 @@ components:
     rounded: "{rounded.lg}"
     height: "40px"
     padding: "8px 12px"
+  portal-landing-primary:
+    backgroundColor: "hsl(var(--primary))"
+    textColor: "hsl(var(--primary-foreground))"
+    rounded: "{rounded.portal-action}"
+    height: "54px"
+    padding: "8px 16px"
+  portal-landing-outline:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.portal-action}"
+    height: "54px"
+    padding: "8px 16px"
+  portal-ticket:
+    backgroundColor: "hsl(var(--muted) / 0.55)"
+    rounded: "{rounded.container}"
+    padding: "24px"
 ---
 
 # Design System: Vittro
@@ -121,6 +151,13 @@ actual de valores propios es un gap conocido (ver DESIGN_BACKLOG), no un sistema
 paralelo válido. Admin comparte el lenguaje visual de Operate, pero su shell y
 sesión son deliberadamente propios: nunca reutiliza navegación ni contexto tenant.
 
+**Portal público — barbería protagonista, Vittro como firma.** La portada, el
+logo, el nombre y el acento pertenecen a cada barbería. El portal conserva Inter
+y los neutros del núcleo, con una composición editorial más amplia y una
+jerarquía propia para elegir y confirmar un turno. Esta excepción de superficie
+no cambia la escala ni la densidad de Operate. Vittro aparece como firma
+vectorial pequeña y secundaria.
+
 **Key Characteristics:**
 - Denso donde se escanea, legible donde se lee; nada compite con la tarea.
 - Navy como única voz de marca; el color de estado habla por semántica, no por decoración.
@@ -149,6 +186,14 @@ Seis familias, cada una con tres tokens: `--status-X` (acento/dot), `--status-X-
 ### Colores que son dato, no UI
 Excepción nombrada del sistema: los colores elegidos por el usuario (o que representan una entidad suya) viven como valores literales, no como tokens — colores de marcas de productos, de líneas/categorías, y el color del portal de cada barbería.
 
+**The Portal Identity Rule.** En el portal público, el acento configurado por la
+barbería reemplaza `--primary` dentro de su contenedor; no crea una nueva paleta
+global. `getPortalThemeStyle` calcula luminancia en sRGB lineal y elige tinta
+negra o blanca sobre el primario. Para marcas claras usa Ink en el foco y en la
+tinta de acento (`--portal-accent-ink`), manteniendo el color elegido en los
+fondos. Sin un color válido, hereda el tema del núcleo. Los neutros siguen
+siendo Paper, Ink, Ink Muted, Mist y Hairline.
+
 ### Color de turnos en Agenda
 El color principal de cada turno sale de la **línea/categoría del servicio**: `lineas.color` es dato persistido, elegido por el dueño desde Configuración. `servicios` no tiene color propio — hereda el de su línea. `barberos` no tiene color persistido en absoluto.
 
@@ -175,6 +220,16 @@ El color principal de cada turno sale de la **línea/categoría del servicio**: 
 - **Label** (500, 12px / `text-xs`): labels, metadata, celdas densas, descripciones cortas de campo.
 - **Micro** (600, 10px): badges, contadores, section labels uppercase del sidebar y la etiqueta compacta de cada ítem del riel de navegación en Medium (ver Components → Navigation → Sidebar). Nada de texto de producto por debajo de 10px.
 
+**Excepción nombrada — escala editorial del portal público.** Los roles
+`portal-name` y `portal-task` del frontmatter pertenecen solo a reservas. El
+nombre usa la escala fluida en Expanded; en Medium queda en 42px y en Compact
+en 36px. Los títulos de paso y gestión usan `portal-task`; la identidad compacta
+del flujo usa 22px, y la confirmación y su hora principal 32px. La descripción
+de portada usa 15px, interlínea 1.65 y ancho máximo 44ch. El catálogo distingue
+nombre (16px, 500), metadata (14px) y precio (18px, 600); el comprobante conserva
+labels de 12px, valores de 14px y total de 24px con números tabulares. Estos
+roles no sustituyen `PageHeader`, títulos de card ni la escala de Operate.
+
 ### Named Rules
 **La regla de densidad legible.** 12px es válido donde el usuario **escanea** (tablas, listas densas, metadata, labels). 14px es el mínimo donde el usuario **lee** (descripciones, mensajes, explicaciones, empty states). La prioridad es densidad útil, no densidad máxima.
 
@@ -188,7 +243,7 @@ El color principal de cada turno sale de la **línea/categoría del servicio**: 
 
 - **Contenedor de las superficies Operate:** `max-w-7xl` centrado con padding lateral responsivo (`px-4 sm:px-6 md:px-8`). Excepción única: la Agenda usa ancho completo. Admin aplica el mismo ancho dentro de su shell propio.
 - **Grid bidimensional (Agenda, C7.7):** una grilla donde tanto la posición horizontal (columna) como la vertical (hora) contienen información no se resuelve reflowendo a una sola columna — la posición es el dato. Contrato: cada columna (barbero en Día, día en 3 días/Semana) tiene un ancho mínimo usable, medido con el contenido real (no un breakpoint) vía `ResizeObserver` sobre el contenedor propio — la columna crece si sobra espacio, nunca baja del mínimo; si el conjunto no entra, scroll horizontal local con header y body sincronizados, nunca se reduce la cantidad de columnas (Semana siempre son 7 días). Detalle de implementación y el valor medido de cada mínimo en `docs/MODULOS/turnos-agenda.md`.
-- **Densidad por superficie:** la app interna y Admin son densos y escaneables; la homepage respira como landing; el portal es una columna angosta centrada (max-w-md en landing de reserva).
+- **Densidad por superficie:** la app interna y Admin son densos y escaneables; la homepage respira como landing. **Excepción nombrada — composición editorial del portal público:** en Expanded, contenedor centrado de hasta 1120px con gutter total de 64px y dos regiones de portada/identidad-acciones (1.05fr / 1fr); el flujo usa tarea flexible + comprobante lateral de 320px, sticky a 24px. En Compact/Medium pasa a una columna de hasta 640px y gutter total de 40px; en Compact el gutter total es 32px. La portada horizontal mide 260px en Medium y 208px en Compact, con avatar superpuesto; el resumen lateral se sustituye por contexto compacto antes del paso. Confirmación y gestión se centran hasta 640px; consulta por teléfono y éxito hasta 480px. La portada amplia y esta escala pertenecen solo al portal cliente final.
 - **Modos de ventana (Compact / Medium / Expanded):** el viewport decide **solo** cuestiones globales — navegación persistente vs. colapsada, regiones principales, shell, distribución macro. **Compact** < 640px · **Medium** 640–1023px · **Expanded** ≥ 1024px. Sus fronteras coinciden con `sm` (640) y `lg` (1024) de Tailwind; `md` (768), `xl` (1280) y `2xl` (1536) siguen existiendo como utilities normales para decisiones **dentro** de una región (una segunda columna, un cambio tipográfico) — no son un cuarto modo de ventana ni deciden shell. Los modos de producto y las utilities técnicas de Tailwind no son la misma cosa: `768px` deja de significar simultáneamente "mobile", "desktop", "tablet" y "cambio de shell" — cada bullet de este documento que decide algo por ancho dice explícitamente si habla de un modo de ventana o de una utility puntual.
 - **Fuente única de breakpoints:** `sm`/`md`/`lg`/`xl`/`2xl` (640/768/1024/1280/1536, los defaults de Tailwind, sin cambios) se declaran una sola vez en `src/lib/breakpoints.ts` y `tailwind.config.ts` los consume desde ahí — nunca se vuelven a escribir a mano en un segundo lugar. El layout se decide mediante CSS. JavaScript puede **leer** las mismas fronteras compartidas (vía `useWindowMode()`, `src/hooks/use-window-mode.ts`) únicamente cuando una API no pueda expresar ese comportamiento mediante CSS (hoy: `side`/`align` de Radix en `NotificationsBell`, el filtro de pasos de onboarding, el cierre automático del drawer de `AppSidebar` al tocar un ítem en Compact, la presentación Popover/Drawer de los pickers de fecha/hora). El ancho, la posición y la visibilidad del shell en sí (drawer/riel/sidebar persistente, hamburguesa, scrim, toggle) son puramente CSS — `useWindowMode()` nunca decide esas clases. JavaScript también puede **medir** el ancho real de su propio contenedor (`ResizeObserver`, `clientWidth`/`scrollWidth`) para responder "¿esto entra?" — no es lo mismo que leer un modo de ventana, porque depende del contenido, no de un umbral fijo. Lo único que JS nunca puede hacer es inventar un número de corte propio, hardcodeado, que no salga de `src/lib/breakpoints.ts`.
 - **Resolución de layout, en este orden — `layout intrínseco → medición del contenedor → container query → media query`:** (1) **intrínseco** primero — `auto-fit`/`minmax`, `flex-wrap`, `min-w-0`, tamaños fluidos — resuelve la mayoría de los casos sin ninguna query; (2) **medición del contenedor** cuando la pregunta depende del contenido real ("¿esto entra?") y no de un umbral conocido; (3) **container query** solo cuando existe un cambio de **composición** (no solo cuántas columnas entran) dependiente de un umbral fijo del contenedor, y lo anterior no alcanza — el proyecto no instala `@tailwindcss/container-queries` hasta que un caso real lo demuestre; (4) **media query** solo para shell, navegación global, regiones principales y macro-layout de ventana (los modos de arriba). No resumir esta secuencia de otra manera en ningún otro lugar del documento.
@@ -210,14 +265,27 @@ Sistema de sombras de **tres niveles**, con la escala default de Tailwind (decis
 
 La elevación responde a jerarquía de capa, no a importancia del contenido. El patrón correcto para cards interactivas es reposo `shadow-sm` → `hover:shadow-md` con `transition-shadow`. No existen sombras decorativas mayores (`shadow-xl`/`2xl` no forman parte del vocabulario).
 
+El portal público usa profundidad plana en su catálogo y comprobante: líneas
+hairline, fondo Mist translúcido y separadores discontinuos para el total y la
+confirmación. La portada obtiene presencia del recurso real de la barbería y
+su escala, sin añadir sombras ni material simulado.
+
 ## Shapes
 
-**Tres radios, tres roles — y nada más:**
+**Radios del núcleo — tres roles:**
 
 - **Controles** (`--radius` = 8px, `rounded-lg`): botones, inputs, chips de header, ítems de nav. Los derivados `md` (6px) y `sm` (4px) salen del mismo token.
 - **Contenedores** (12px, `rounded-xl`): cards, dialogs, drawers, sheets. La jerarquía visual entre "un control" y "una superficie" depende de esta diferencia — no colapsarlos.
 - **Tile de identidad** (`--radius-tile` = 10px): exclusivo del tile cuadrado ~40×40 de marca (logo del sidebar, ícono de PageHeader, tiles del resumen mensual). Es identidad, no un tercer radio genérico: prohibido fuera de ese rol. (El token está definido acá; su creación en CSS y la migración de los usos literales está en el backlog.)
 - `rounded-full` para pills, dots y avatares.
+
+**Excepción nombrada — formas del portal público.** La portada usa
+`portal-cover`; ambas acciones de entrada usan `portal-action`. Son radios
+específicos de esta superficie, independientes del tile de identidad de
+Operate. Comprobantes, registros de gestión y la opción de barbero disponible
+conservan el radio de contenedor del núcleo. El catálogo usa filas abiertas,
+sin encerrar cada opción en una card. Portada y avatares recortan sus imágenes
+con `overflow:clip`.
 
 **Bordes:** hairline de 1px con `--border`/`--input`. Sin radios arbitrarios nuevos sin función clara.
 
@@ -234,6 +302,36 @@ La elevación responde a jerarquía de capa, no a importancia del contenido. El 
 - **Título:** `text-lg font-medium` (ver Typography). Chip de header según la regla del chip.
 - **Padding interno:** `p-6` (header `pb-4`).
 - **Interactivas:** `hover:shadow-md transition-shadow`.
+
+### Portal público — identidad, catálogo y comprobante
+
+- **Identidad real:** `BookingLanding` y `PortalIdentity` comparten logo o
+  iniciales de la barbería. La portada usa la imagen y el encuadre configurados;
+  si falta, muestra avatar/iniciales sobre el primario. La geometría se reserva
+  antes de cargar las imágenes. `VittroSignature` usa el wordmark vectorial
+  existente (54×15px), acompañado de «Reservas con» a 12px y área de 44px.
+- **Acciones de entrada:** ambas ocupan todo el ancho, usan 16px de texto y los
+  tokens `portal-landing-primary`/`portal-landing-outline`. La acción primaria
+  conserva hover de color y asciende 2px solo con hover real y puntero fino;
+  gestión mantiene el contorno del núcleo. Los links de contacto envuelven y
+  tienen altura mínima de 44px.
+- **Catálogo abierto:** filas de ancho completo, altura mínima de 80px, padding
+  de 22px por 8px y separadores Hairline. El texto crece y reflowea; el precio
+  usa números tabulares. Con hover real y puntero fino, fondo Mist al 50% y
+  flecha desplazada 3px. La opción «cualquiera disponible» es una superficie
+  de apoyo, no una nueva jerarquía de cards.
+- **Comprobante:** `BookingSummary` usa el token `portal-ticket`, borde Hairline,
+  label/valor en columnas y total separado por línea discontinua; en Compact
+  reduce el padding a 20px. El total puede envolver. En Compact/Medium se
+  muestra el contexto compacto; la revisión y el éxito conservan los datos
+  completos del turno. Fecha/hora son el foco del éxito, con calendario e inicio
+  como acciones siguientes.
+- **Foco:** excepción local explícita al ring de Operate: outline de 2px con
+  offset de 4px, usando el `--ring` contrastado del portal. No reemplaza el
+  patrón de foco de la app interna.
+- **Vista previa:** `PortalPreview` reutiliza la portada real en composición
+  de teléfono, independiente del viewport del operador; el nombre es un `h2`
+  y la portada va al ras del marco, sin promover ese radio cero al portal real.
 
 ### Datos operativos — MetricGroup, RecordRow, Registro vs. Tabla comparativa (C7.5)
 
@@ -373,11 +471,19 @@ Trigger canónico: `h-7 w-7 rounded-md border-[0.5px] border-border` que abre `D
 - **Duraciones:** 140–220ms para micro-feedback y transiciones de estado; hasta ~420ms solo en secuencias de hito.
 - **Vocabulario existente:** `item-in`, `pop-in`, `value-change`, `step-in-forward/back`, `overlay-show/hide`, `confirm-*` — reusar antes de inventar.
 - **`prefers-reduced-motion` es global y obligatorio** para toda animación nueva.
+- **Portal público:** entrada de paso de 220ms con `--ease-out-quint`, desde
+  12px a la derecha al avanzar y a la izquierda al volver. Confirmación se
+  monta al activarse para ejecutar su entrada; Datos permanece montado para
+  conservar el borrador. Éxito usa sello de 420ms y dibujo del `path` del check
+  de 360ms. Sin loops, librerías nuevas ni medición de altura; movimiento
+  reducido suprime estas animaciones, transiciones y transformaciones.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** usar `focus-visible:ring-2 ring-ring` como único patrón de foco — visible para teclado, silencioso para mouse.
+- **Do** usar `focus-visible:ring-2 ring-ring` en el núcleo — visible para teclado, silencioso para mouse. El portal público aplica la excepción de outline contrastado documentada en Components.
+- **Do** conservar la identidad de la barbería como protagonista del portal y Vittro como firma vectorial secundaria.
+- **Do** consumir los cortes compartidos `sm` y `lg` desde Tailwind para la composición del portal; permitir reflow de nombres, servicios e importes a 320px.
 - **Do** contratar el área táctil por capacidad de puntero, no por tamaño visual. En `pointer: coarse`: ~44px de área interactiva como objetivo en acciones principales/frecuentes, 40px como piso recomendado — el control puede seguir midiendo 28–32px visualmente si el hit-area se amplía sin alterar la composición (la utilidad `.hit-area-expand` de `src/index.css`, no-op en `pointer: fine`, existe para eso — C7.1 la define, no migra consumidores). Controles secundarios: por frecuencia, importancia, densidad y contexto, no un tamaño universal. En `pointer: fine` puede conservarse mayor densidad visual/interactiva cuando sea apropiado.
 - **Do** detectar capacidades de puntero (`hover`, `pointer`, `any-pointer`) para decisiones de interacción — nunca inferirlas del ancho (mobile = touch, desktop = mouse, tablet = hover son inferencias inválidas). Ejemplo real: la acción de renombrar terminal de `MpDevicesConfig.tsx` usaba `sm:opacity-0 sm:group-hover:opacity-100` (invisible por defecto en tablet táctil ≥640px, sin hover real que la revele) — corregido a `[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100` (arbitrary variant de Tailwind, sin dependencias nuevas): visible siempre por defecto, se reduce a hover-reveal solo donde el hover realmente existe.
 - **Do** reservar la expresividad para hitos del negocio (cobro registrado, cierre de caja completado, turno creado): animación breve, memorable, nunca bloqueante — feedback reforzado, no decoración.
@@ -392,6 +498,7 @@ Trigger canónico: `h-7 w-7 rounded-md border-[0.5px] border-border` que abre `D
 - **Don't** usar `overflow:hidden` en wrappers que contienen `sticky` — usar `overflow:clip`. Tampoco usar `overflow-x-hidden`/`overflow-clip`/`overflow-hidden` como estrategia responsive general: solo son válidos sobre contenido cuyo ancho ya está garantizado (ver Layout → "Overflow y reflow").
 - **Don't** usar hover como único mecanismo para revelar o ejecutar una acción interactiva — puede enriquecer un elemento ya accesible, nunca ser la única forma de descubrirlo.
 - **Don't** introducir radios, sombras, easings o z-index fuera de los vocabularios definidos.
+- **Don't** trasladar la escala editorial ni los radios específicos del portal público a Operate.
 - **Don't** montar un segundo sistema de toasts, tabs con contador propio, o cualquier duplicado de un patrón canónico existente.
 - **Don't** usar el patrón rico de empty state en vacíos de filtro, ni la línea seca en primeras-veces de sección.
 - **Don't** deshabilitar el zoom del navegador (`maximum-scale`) para esconder problemas tipográficos.
