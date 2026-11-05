@@ -88,24 +88,22 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-base font-semibold text-foreground">Confirmá tu turno</h2>
-        <p className="text-xs text-muted-foreground">Revisá los datos antes de reservar.</p>
+        <h2 className="text-lg font-medium text-foreground">Confirmá tu turno</h2>
+        <p className="text-sm text-muted-foreground">Revisá los datos antes de reservar.</p>
       </div>
 
-      <div className="rounded-xl border border-border/60 bg-muted/40 p-4 space-y-3">
+      <div className="space-y-4 border-y border-border py-5">
         <div className="flex items-center gap-3">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm text-foreground">{booking.sucursalNombre}</span>
+          <span className="min-w-0 break-words text-sm text-foreground">{booking.sucursalNombre}</span>
         </div>
         <div className="flex items-center gap-3">
           <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm text-foreground">
-            {booking.servicioNombre} — <span className="font-medium text-primary">${booking.servicioPrecio.toLocaleString("es-AR")}</span>
-          </span>
+          <span className="min-w-0 break-words text-sm text-foreground">{booking.servicioNombre}</span>
         </div>
         <div className="flex items-center gap-3">
           <User className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm text-foreground">{booking.barberoNombre}</span>
+          <span className="min-w-0 break-words text-sm text-foreground">{booking.barberoNombre}</span>
         </div>
         <div className="flex items-center gap-3">
           <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -115,6 +113,11 @@ export const ConfirmacionStep = ({ booking, orgData, onConfirmed, onSlotTaken }:
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="text-sm text-foreground">{booking.horaInicio} - {booking.horaFin}</span>
         </div>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-1">
+        <span className="text-sm text-muted-foreground">Total</span>
+        <span className="max-w-full break-words text-2xl font-semibold tabular-nums text-foreground">${booking.servicioPrecio.toLocaleString("es-AR")}</span>
       </div>
 
       <Button className="w-full h-12 text-base font-semibold" onClick={handleConfirm} disabled={loading}>

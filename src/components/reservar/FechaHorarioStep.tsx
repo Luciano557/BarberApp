@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar } from "@/components/ui/calendar";
 import { AlertCircle, UserRound, Check, CalendarIcon } from "lucide-react";
@@ -193,9 +193,9 @@ export const FechaHorarioStep = ({
 
     if (loading) {
       return (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-md" />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,80px),1fr))] gap-2">
+          {[...Array(9)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
           ))}
         </div>
       );
@@ -230,31 +230,38 @@ export const FechaHorarioStep = ({
     }
 
     return (
-      <div ref={slotsRef} className="space-y-2">
-        <p className="text-sm text-muted-foreground">
-          {slots.length} {slots.length === 1 ? "turno disponible" : "turnos disponibles"}
-        </p>
-        {slots.map((slot) => {
-          const isSelected = selectedSlot === slot.hora_inicio;
-          return (
-            <Button
-              key={slot.hora_inicio}
-              variant={isSelected ? "default" : "outline"}
-              className={cn(
-                "w-full h-12 text-base font-medium justify-start transition-colors",
-                isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-              )}
-              onClick={() => {
-                setSelectedSlot(slot.hora_inicio);
-                const b = slot.barberos[0];
-                onSelect(slot.hora_inicio, slot.hora_fin, fecha, b?.id, b?.nombre);
-              }}
-            >
-              {isSelected && <Check className="h-4 w-4 mr-2" />}
-              {slot.hora_inicio}
-            </Button>
-          );
-        })}
+      <div ref={slotsRef} className="space-y-3">
+        <div className="space-y-1">
+          <h3 className="text-base font-medium text-foreground first-letter:uppercase">
+            {format(new Date(fecha + "T12:00:00"), "EEEE d 'de' MMMM", { locale: es })}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {slots.length} {slots.length === 1 ? "turno disponible" : "turnos disponibles"}
+          </p>
+        </div>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,80px),1fr))] gap-2">
+          {slots.map((slot) => {
+            const isSelected = selectedSlot === slot.hora_inicio;
+            return (
+              <Button
+                key={slot.hora_inicio}
+                variant={isSelected ? "default" : "outline"}
+                className={cn(
+                  "h-12 min-w-0 px-2 text-base font-medium tabular-nums transition-colors",
+                  isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                )}
+                onClick={() => {
+                  setSelectedSlot(slot.hora_inicio);
+                  const b = slot.barberos[0];
+                  onSelect(slot.hora_inicio, slot.hora_fin, fecha, b?.id, b?.nombre);
+                }}
+              >
+                {isSelected && <Check className="h-4 w-4 mr-2" />}
+                {slot.hora_inicio}
+              </Button>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -264,7 +271,7 @@ export const FechaHorarioStep = ({
     return (
       <div className="space-y-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-foreground">Elegí fecha y horario</h2>
+          <h2 className="text-lg font-medium text-foreground">Elegí fecha y horario</h2>
         </div>
         <div className="space-y-4 py-4">
           <div className="text-center space-y-2">
@@ -290,15 +297,18 @@ export const FechaHorarioStep = ({
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 min-w-0">
-          <h2 className="text-base font-semibold text-foreground">Elegí fecha y horario</h2>
+          <h2 className="text-lg font-medium text-foreground">Elegí fecha y horario</h2>
           {monthLabel && (
-            <p className="text-xs text-muted-foreground capitalize">{monthLabel}</p>
+            <p className="text-sm text-muted-foreground first-letter:uppercase">{monthLabel}</p>
           )}
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="shrink-0 gap-1.5"
+          className="h-10 shrink-0 gap-1.5 px-3"
+          aria-label="Ver más fechas"
+          aria-expanded={showCalendar}
+          aria-controls="booking-calendar"
           onClick={() => setShowCalendar((v) => !v)}
         >
           <CalendarIcon className="h-3.5 w-3.5" />
@@ -314,23 +324,26 @@ export const FechaHorarioStep = ({
       <div className="flex gap-2">
         {loadingStrip
           ? [...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-16 flex-1 min-w-0 rounded-xl" />
+              <Skeleton key={i} className="h-16 flex-1 min-w-0 rounded-lg" />
             ))
           : stripDays.map((d) => {
               const active = d.dateStr === fecha;
               return (
                 <button
                   key={d.dateStr}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={format(d.date, "EEEE d 'de' MMMM", { locale: es })}
                   onClick={() => setFecha(d.dateStr)}
                   className={cn(
-                    "flex h-16 flex-1 min-w-0 flex-col items-center justify-center rounded-xl text-sm font-medium transition-colors",
+                    "flex h-16 flex-1 min-w-0 flex-col items-center justify-center rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     active
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "bg-muted/50 text-foreground hover:bg-accent"
                   )}
                 >
                   <span className="text-base font-semibold leading-tight">{d.dayNum}</span>
-                  <span className="text-[11px] capitalize leading-tight mt-0.5">{d.dayName}</span>
+                  <span className="mt-1 text-xs capitalize leading-tight">{d.dayName}</span>
                 </button>
               );
             })}
@@ -338,7 +351,7 @@ export const FechaHorarioStep = ({
 
       {/* Calendar inline */}
       {showCalendar && (
-        <div className="rounded-xl border border-border bg-card p-2">
+        <div id="booking-calendar" className="rounded-lg border border-border bg-card">
           <Calendar
             mode="single"
             selected={fecha ? new Date(fecha + "T12:00:00") : undefined}
@@ -349,6 +362,16 @@ export const FechaHorarioStep = ({
               dayStatusMap.get(toDateStr(date)) === false
             }
             locale={es}
+            className="w-full p-2"
+            classNames={{
+              months: "flex w-full flex-col",
+              month: "w-full space-y-4",
+              caption: "relative flex min-h-10 items-center justify-center px-12",
+              nav_button: cn(buttonVariants({ variant: "outline" }), "h-10 w-10 bg-transparent p-0"),
+              head_cell: "min-w-0 flex-1 text-xs font-normal text-muted-foreground",
+              cell: "relative min-w-0 flex-1 p-0 text-center text-sm focus-within:z-20",
+              day: cn(buttonVariants({ variant: "ghost" }), "h-10 w-full min-w-0 p-0 font-normal aria-selected:opacity-100"),
+            }}
           />
         </div>
       )}

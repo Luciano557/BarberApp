@@ -42,7 +42,7 @@ export const LookupTelefonoStep = ({ onLookup }: Props) => {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">Buscar mis turnos</h2>
+        <h2 className="text-lg font-medium text-foreground">Buscar mis turnos</h2>
         <p className="text-sm text-muted-foreground">
           Ingresá el teléfono con el que reservaste.
         </p>
@@ -53,7 +53,7 @@ export const LookupTelefonoStep = ({ onLookup }: Props) => {
           <Label htmlFor="lookup-phone">Teléfono</Label>
           <div className="flex gap-2">
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="h-12 w-[110px] text-base">
+              <SelectTrigger aria-label="Código de país del teléfono" className="h-12 w-24 shrink-0 text-base">
                 <SelectValue>{country.dial}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -68,7 +68,7 @@ export const LookupTelefonoStep = ({ onLookup }: Props) => {
               id="lookup-phone"
               type="tel"
               inputMode="tel"
-              className="h-12 text-base flex-1"
+              className="h-12 min-w-0 flex-1 text-base"
               value={phoneLocal}
               onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d\s-]/g, ""))}
               placeholder={country.placeholder}

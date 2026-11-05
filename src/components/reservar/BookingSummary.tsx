@@ -19,11 +19,11 @@ interface RowProps {
 
 const Row = ({ icon, label, value, accent }: RowProps) => (
   <div className="flex items-start gap-3">
-    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
+    <div className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true">
       {icon}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-xs font-medium text-muted-foreground">
         {label}
       </p>
       <p
@@ -48,11 +48,11 @@ const FullSummary = ({ booking, stepLabel }: { booking: BookingState; stepLabel?
     booking.horaInicio;
 
   return (
-    <aside className="rounded-2xl border border-border/60 bg-muted/40 p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Tu reserva</h3>
+    <aside className="rounded-xl border border-border bg-card p-5">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-medium text-foreground">Tu reserva</h2>
         {stepLabel && (
-          <span className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
             {stepLabel}
           </span>
         )}
@@ -69,9 +69,9 @@ const FullSummary = ({ booking, stepLabel }: { booking: BookingState; stepLabel?
           value={booking.horaInicio ? `${booking.horaInicio}${booking.horaFin ? ` – ${booking.horaFin}` : ""}` : null}
         />
         {booking.servicioPrecio > 0 && (
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-border/60 bg-background px-3 py-2">
-            <span className="text-xs font-medium text-muted-foreground">Total</span>
-            <span className="text-sm font-semibold text-primary">
+          <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border pt-4">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <span className="max-w-full break-words text-lg font-semibold tabular-nums text-foreground">
               ${booking.servicioPrecio.toLocaleString("es-AR")}
             </span>
           </div>
@@ -79,7 +79,7 @@ const FullSummary = ({ booking, stepLabel }: { booking: BookingState; stepLabel?
       </div>
 
       {!hasAny && (
-        <p className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+        <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
           <Sparkles className="h-3 w-3" />
           Empezá eligiendo una sucursal.
         </p>
@@ -101,7 +101,7 @@ const ChipSummary = ({ booking }: { booking: BookingState }) => {
 
   if (parts.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/40 px-3.5 py-3 text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 border-b border-border pb-4 text-sm text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 shrink-0" />
         Elegí una sucursal para empezar.
       </div>
@@ -111,14 +111,14 @@ const ChipSummary = ({ booking }: { booking: BookingState }) => {
   return (
     <p
       aria-label={`Tu reserva: ${parts.join(", ")}`}
-      className="overflow-hidden rounded-xl border border-border/60 bg-muted/40 px-3.5 py-3 text-sm leading-snug break-words"
+      className="break-words border-b border-border pb-4 text-sm leading-relaxed"
     >
       {parts.map((value, i) => {
         const isLast = i === parts.length - 1;
         return (
           <Fragment key={i}>
             {i > 0 && (
-              <span aria-hidden className="text-muted-foreground/40">
+              <span aria-hidden className="text-muted-foreground">
                 {" › "}
               </span>
             )}

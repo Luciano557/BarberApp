@@ -4,9 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, Clock, MapPin, Scissors, User, RefreshCw, X, CalendarPlus } from "lucide-react";
+import { Clock, MapPin, Scissors, User, RefreshCw, X, CalendarPlus } from "lucide-react";
 import { CancelTurnoDialog } from "./CancelTurnoDialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatFechaLegible } from "@/lib/dateUtils";
 import { formatMinutesToText } from "@/lib/formatMinutes";
 
@@ -88,104 +87,92 @@ export const MisTurnosStep = ({ organizationId, telefono, onReschedule, onBookNe
   }
 
   return (
-    <TooltipProvider>
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Mis turnos</h2>
+    <div className="space-y-4">
+      <h2 className="text-lg font-medium text-foreground">Mis turnos</h2>
 
-        {turnos.map((turno) => (
-          <Card key={turno.id}>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Badge variant={turno.estado === "confirmado" ? "default" : "secondary"}>
-                  {turno.estado === "confirmado" ? "Confirmado" : "Pendiente"}
-                </Badge>
+      {turnos.map((turno) => (
+        <Card key={turno.id} className="min-w-0 shadow-none">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h3 className="break-words text-base font-medium text-foreground">{formatFechaLegible(turno.fecha)}</h3>
+              <Badge variant="secondary" className={turno.estado === "confirmado" ? "bg-status-success-bg text-status-success-foreground" : undefined}>
+                {turno.estado === "confirmado" ? "Confirmado" : "Pendiente"}
+              </Badge>
+            </div>
+
+            <p className="flex flex-wrap items-baseline gap-x-2 text-2xl font-semibold tabular-nums text-foreground">
+              <span>{turno.hora_inicio}</span>
+              <span className="text-base font-normal text-muted-foreground">– {turno.hora_fin}</span>
+            </p>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="min-w-0 break-words font-medium text-foreground">{turno.servicio_nombre}</span>
               </div>
-
-              <div className="space-y-2 text-sm">
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="break-words text-foreground">{turno.sucursal_nombre}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Scissors className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="break-words text-foreground">{turno.servicio_nombre} — ${turno.servicio_precio?.toLocaleString()}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="break-words text-foreground">{turno.barbero_nombre}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="break-words text-foreground">{formatFechaLegible(turno.fecha)}</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="break-words text-foreground">{turno.hora_inicio} - {turno.hora_fin}</span>
-                </div>
+              <div className="flex items-start gap-2">
+                <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="min-w-0 break-words text-foreground">{turno.barbero_nombre}</span>
               </div>
-
-              <div className="flex flex-col gap-2 pt-2 sm:flex-row">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="w-full sm:flex-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-1 h-10"
-                        disabled={!turno.puede_reprogramar}
-                        onClick={() => onReschedule(turno)}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Reprogramar
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!turno.puede_reprogramar && (
-                    <TooltipContent>
-                      <p>Solo podés reprogramar con al menos {formatMinutesToText(turno.modificacion_limite_min)} de anticipación</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="w-full sm:flex-1">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full gap-1 h-10"
-                        disabled={!turno.puede_cancelar}
-                        onClick={() => setCancelTurno(turno)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Cancelar
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  {!turno.puede_cancelar && (
-                    <TooltipContent>
-                      <p>Solo podés cancelar con al menos {formatMinutesToText(turno.cancelacion_limite_min)} de anticipación</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="min-w-0 break-words text-foreground">{turno.sucursal_nombre}</span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-foreground">{formatMinutesToText(turno.servicio_duracion)}</span>
+              </div>
+            </div>
 
-        {cancelTurno && (
-          <CancelTurnoDialog
-            turno={cancelTurno}
-            telefono={telefono}
-            open={!!cancelTurno}
-            onOpenChange={(open) => !open && setCancelTurno(null)}
-            onCancelled={() => {
-              setCancelTurno(null);
-              fetchTurnos();
-            }}
-          />
-        )}
-      </div>
-    </TooltipProvider>
+            <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-border pt-4">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="max-w-full break-words text-base font-semibold tabular-nums text-foreground">${turno.servicio_precio?.toLocaleString("es-AR")}</span>
+            </div>
+
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,144px),1fr))] gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 w-full gap-2 px-3"
+                disabled={!turno.puede_reprogramar}
+                onClick={() => onReschedule(turno)}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reprogramar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-12 w-full gap-2 px-3 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                disabled={!turno.puede_cancelar}
+                onClick={() => setCancelTurno(turno)}
+              >
+                <X className="h-3.5 w-3.5" />
+                Cancelar
+              </Button>
+            </div>
+            {!turno.puede_reprogramar && (
+              <p className="text-sm text-muted-foreground">Solo podés reprogramar con al menos {formatMinutesToText(turno.modificacion_limite_min)} de anticipación.</p>
+            )}
+            {!turno.puede_cancelar && (
+              <p className="text-sm text-muted-foreground">Solo podés cancelar con al menos {formatMinutesToText(turno.cancelacion_limite_min)} de anticipación.</p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+
+      {cancelTurno && (
+        <CancelTurnoDialog
+          turno={cancelTurno}
+          telefono={telefono}
+          open={!!cancelTurno}
+          onOpenChange={(open) => !open && setCancelTurno(null)}
+          onCancelled={() => {
+            setCancelTurno(null);
+            fetchTurnos();
+          }}
+        />
+      )}
+    </div>
   );
 };

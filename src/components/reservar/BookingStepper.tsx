@@ -39,7 +39,7 @@ interface Props {
 }
 
 const cardClasses =
-  "rounded-2xl border border-border/60 bg-card p-5 sm:p-6 shadow-sm";
+  "min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6";
 
 export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   const [step, setStep] = useState(0);
@@ -89,7 +89,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
     if (!managePhone) {
       return (
         <div className={`mx-auto max-w-md ${cardClasses}`}>
-          <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 gap-1">
+          <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 h-10 gap-1">
             <ChevronLeft className="h-4 w-4" /> Volver
           </Button>
           <LookupTelefonoStep onLookup={(tel) => setManagePhone(tel)} />
@@ -99,7 +99,7 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
 
     return (
       <div className={`mx-auto max-w-2xl ${cardClasses}`}>
-        <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 gap-1">
+        <Button variant="ghost" size="sm" onClick={onBackToLanding} className="mb-3 -ml-2 h-10 gap-1">
           <ChevronLeft className="h-4 w-4" /> Volver
         </Button>
         <MisTurnosStep
@@ -191,17 +191,17 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className={step < 5 ? "grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]" : "mx-auto grid max-w-2xl gap-6"}>
       <div className={cardClasses}>
         <div className="mb-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="break-words text-xl font-semibold tracking-tight text-foreground">
                 {orgData.organization.name}
               </h1>
-              <p className="text-xs text-muted-foreground">Reservá tu turno</p>
+              <p className="mt-1 text-sm text-muted-foreground">Reservá tu turno</p>
             </div>
-            <span className="rounded-full border border-border/60 bg-muted/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-xs font-medium tabular-nums text-muted-foreground">
               Paso {Math.min(step + 1, totalSteps)} de {totalSteps}
             </span>
           </div>
@@ -209,14 +209,16 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         </div>
 
         <div className="mb-4">
-          <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2 gap-1 text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" size="sm" onClick={goBack} className="-ml-2 h-10 gap-1 text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-4 w-4" /> Volver
           </Button>
         </div>
 
-        <div className="mb-5 lg:hidden">
-          <BookingSummary booking={booking} stepLabel={stepLabel} variant={step <= 3 ? "chip" : "full"} />
-        </div>
+        {step < 5 && (
+          <div className="mb-6 lg:hidden">
+            <BookingSummary booking={booking} stepLabel={stepLabel} variant="chip" />
+          </div>
+        )}
 
         {step === 0 && (
           <SucursalStep
@@ -291,12 +293,14 @@ export const BookingStepper = ({ orgData, mode, onBackToLanding }: Props) => {
         )}
       </div>
 
-      <div className="hidden lg:block">
-        <div className="sticky top-6">
-          <BookingSummary booking={booking} stepLabel={stepLabel} />
-          <p className="mt-3 text-center text-[11px] text-muted-foreground">Powered by Vittro</p>
+      {step < 5 && (
+        <div className="hidden lg:block">
+          <div className="sticky top-6">
+            <BookingSummary booking={booking} stepLabel={stepLabel} />
+            <p className="mt-3 text-center text-xs text-muted-foreground">Powered by Vittro</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

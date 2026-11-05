@@ -174,6 +174,63 @@ ni persistencia.
 Dos modelos de guardado sin señal visual que los distinga (instantáneo vs.
 diferido) — eso es Fase 5, sigue pendiente, sin tocar acá.
 
+## Portal de reservas — experiencia del cliente
+
+Ruta pública: `/:orgSlug/reservar`. Etapa visual del portal implementada y
+validada **localmente, sin publicación**. Se mantiene la identidad configurable
+de cada barbería y el recorrido existente de reserva y gestión por teléfono.
+
+- **Servicios:** cada opción reserva el ancho principal al nombre; duración y
+  precio comparten una segunda fila que puede reflowear. El importe usa
+  `tabular-nums`, formato `es-AR` y texto de primer plano para seguir siendo
+  legible independientemente del color de la barbería.
+- **Fecha y horario:** grilla intrínseca de horarios con celdas de al menos
+  80px cuando hay espacio, controles de 48px de alto y fecha completa junto
+  a los resultados. La tira conserva sus cinco fechas y expone nombre completo
+  y estado seleccionado a tecnologías de asistencia. El calendario adapta sus
+  siete columnas al contenedor, sin modificar las restricciones de fechas.
+- **Resumen:** compacto durante los pasos previos a confirmar en Compact y
+  Medium; lateral en Expanded. La confirmación final tiene una sola revisión
+  de la reserva, centrada, con total separado: ya no duplica el resumen.
+- **Datos:** búsqueda por teléfono y registro conservan sus condiciones y
+  campos. Se agrupan nombre/apellido y email/nacimiento en pares que pasan a
+  una columna cuando no caben. Teléfonos con `min-w-0`, campos de 16px y
+  nombres accesibles para la búsqueda y los selectores de país.
+- **Mis turnos:** fecha y horario encabezan cada registro; servicio, profesional,
+  sucursal, duración y total quedan debajo. Reprogramar y cancelar mantienen
+  sus callbacks y condiciones `puede_*`. Las restricciones se leen inline,
+  también con touch, y la cancelación conserva el diálogo de confirmación
+  existente. Su botón de entrada usa outline con texto destructivo.
+
+Archivos: `src/components/reservar/{BookingStepper,BookingSummary,ServicioStep,
+SucursalStep,BarberoStep,FechaHorarioStep,DatosClienteStep,LookupTelefonoStep,
+ConfirmacionStep,MisTurnosStep}.tsx`.
+
+Validación de cierre:
+
+- TypeScript: `node node_modules/typescript/bin/tsc --noEmit -p tsconfig.app.json`,
+  sin errores. Build: `node node_modules/vite/bin/vite.js build`, correcto;
+  conserva los avisos generales de bundle grande, importación mixta del cliente
+  Supabase y Browserslist antiguo.
+- Revisión del diff y comparación AST contra `HEAD`: llamadas de estado,
+  callbacks y `supabase.functions.invoke` conservadas en los diez componentes.
+- ESLint dirigido: sin hallazgos nuevos. El `any` de `rescheduleTurno` y los
+  avisos de dependencias de efectos en `FechaHorarioStep`/`MisTurnosStep`
+  también aparecen al revisar esos archivos desde `HEAD`.
+- Navegador local: 320, 360, 390, 768 y 1280px; servicios con nombres largos
+  y sin espacios, `$99.999.999`, 17 horarios, calendario a 320px, identificación
+  con coincidencia, registro manual, confirmación, turnos confirmados/pendientes
+  y acciones deshabilitadas. Sin overflow horizontal en los casos medidos;
+  navegación con Enter/Tab y foco visible comprobados.
+- El arnés descartable vive en `%TEMP%/vittro-portal-visual-6d3844726a8d440d8252409e214dd40d/`.
+  Usa los componentes reales con respuestas sintéticas de las funciones; no
+  valida backend, RLS ni escrituras reales. Servidor de prueba detenido al cerrar.
+
+Pendiente para la etapa de comportamiento: conservar datos al retroceder,
+progreso según pasos efectivos, identificación progresiva por teléfono,
+recuperación de errores de lectura y revisión del flujo de reprogramación.
+El auto-scroll de horarios y la lógica de consultas no se cambiaron en este build.
+
 ## Horarios de trabajo
 
 Ya no vive en este módulo — ver Mi Negocio → ficha de Sucursal →

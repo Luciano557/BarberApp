@@ -132,26 +132,27 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">Tus datos</h2>
+        <h2 className="text-lg font-medium text-foreground">Tus datos</h2>
         <p className="text-sm text-muted-foreground">
           Si ya reservaste antes, buscá tus datos por teléfono. Si no, registrate abajo.
         </p>
       </div>
 
       {/* ===== Lookup block ===== */}
-      <div className="rounded-xl border border-border/60 bg-muted/30 p-4 space-y-3">
+      <div className="space-y-3 rounded-lg bg-muted/40 p-4">
         <div className="space-y-0.5">
-          <h3 className="text-sm font-semibold text-foreground">¿Ya estás registrado?</h3>
-          <p className="text-xs text-muted-foreground">
+          <h3 className="text-base font-medium text-foreground">¿Ya estás registrado?</h3>
+          <p className="text-sm text-muted-foreground">
             Ingresá tu teléfono y te identificamos al instante.
           </p>
         </div>
 
         {!matched ? (
           <form onSubmit={handleLookup} className="space-y-3">
+            <Label htmlFor="booking-lookup-phone" className="sr-only">Teléfono para buscar tus datos</Label>
             <div className="flex gap-2">
               <Select value={lookupCountry} onValueChange={setLookupCountry}>
-                <SelectTrigger className="h-11 w-[100px] text-sm">
+                <SelectTrigger aria-label="Código de país para buscar tus datos" className="h-12 w-24 shrink-0 text-base">
                   <SelectValue>{lookupCountryObj.dial}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -163,9 +164,10 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
                 </SelectContent>
               </Select>
               <Input
+                id="booking-lookup-phone"
                 type="tel"
                 inputMode="tel"
-                className="h-11 text-base flex-1"
+                className="h-12 min-w-0 flex-1 text-base"
                 value={lookupPhone}
                 onChange={(e) => {
                   setLookupPhone(e.target.value.replace(/[^\d\s-]/g, ""));
@@ -179,14 +181,14 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
             <Button
               type="submit"
               variant="outline"
-              className="w-full h-11 gap-2"
+              className="h-12 w-full gap-2"
               disabled={lookupLoading}
             >
               <Search className="h-4 w-4" />
               {lookupLoading ? "Buscando..." : "Buscar mis datos"}
             </Button>
             {notFound && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 No encontramos ese teléfono. Registrate abajo para reservar.
               </p>
             )}
@@ -224,52 +226,47 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
       </div>
 
       {/* ===== Separator ===== */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border/60" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-card px-3 text-xs uppercase tracking-wide text-muted-foreground">
-            o registrate por primera vez
-          </span>
-        </div>
-      </div>
+      <h3 className="border-t border-border pt-5 text-base font-medium text-foreground">
+        O registrate por primera vez
+      </h3>
 
       {/* ===== Register form ===== */}
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="space-y-1">
-          <Label htmlFor="nombre">Nombre *</Label>
-          <Input
-            id="nombre"
-            className="h-12 text-base"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Tu nombre"
-            autoComplete="given-name"
-            maxLength={80}
-            required
-          />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="nombre">Nombre *</Label>
+            <Input
+              id="nombre"
+              className="h-12 text-base"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Tu nombre"
+              autoComplete="given-name"
+              maxLength={80}
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="apellido">Apellido *</Label>
+            <Input
+              id="apellido"
+              className="h-12 text-base"
+              value={apellido}
+              onChange={(e) => setApellido(e.target.value)}
+              placeholder="Tu apellido"
+              autoComplete="family-name"
+              maxLength={80}
+              required
+            />
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="apellido">Apellido *</Label>
-          <Input
-            id="apellido"
-            className="h-12 text-base"
-            value={apellido}
-            onChange={(e) => setApellido(e.target.value)}
-            placeholder="Tu apellido"
-            autoComplete="family-name"
-            maxLength={80}
-            required
-          />
-        </div>
-
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="phone">Teléfono *</Label>
           <div className="flex gap-2">
             <Select value={countryCode} onValueChange={setCountryCode}>
-              <SelectTrigger className="h-12 w-[110px] text-base">
+              <SelectTrigger aria-label="Código de país del teléfono" className="h-12 w-24 shrink-0 text-base">
                 <SelectValue>{country.dial}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -284,7 +281,7 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
               id="phone"
               type="tel"
               inputMode="tel"
-              className="h-12 text-base flex-1"
+              className="h-12 min-w-0 flex-1 text-base"
               value={phoneLocal}
               onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d\s-]/g, ""))}
               placeholder={country.placeholder}
@@ -295,34 +292,36 @@ export const DatosClienteStep = ({ organizationId, initial, onSubmit }: Props) =
           </div>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="email">Email (opcional)</Label>
-          <Input
-            id="email"
-            type="email"
-            inputMode="email"
-            className="h-12 text-base"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@email.com"
-            autoComplete="email"
-            maxLength={120}
-          />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="email">Email (opcional)</Label>
+            <Input
+              id="email"
+              type="email"
+              inputMode="email"
+              className="h-12 text-base"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@email.com"
+              autoComplete="email"
+              maxLength={120}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="birthDate">Fecha de nacimiento (opcional)</Label>
+            <Input
+              id="birthDate"
+              type="date"
+              className="h-12 text-base"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              autoComplete="bday"
+            />
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="birthDate">Fecha de nacimiento (opcional)</Label>
-          <Input
-            id="birthDate"
-            type="date"
-            className="h-12 text-base"
-            value={birthDate}
-            onChange={(e) => setBirthDate(e.target.value)}
-            autoComplete="bday"
-          />
-        </div>
-
-        <Button type="submit" className="w-full h-12 text-base">
+        <Button type="submit" className="mt-2 h-12 w-full text-base">
           Continuar
         </Button>
       </form>
