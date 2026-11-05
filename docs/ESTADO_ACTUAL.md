@@ -10,8 +10,9 @@ progreso efectivo, identificación progresiva por teléfono, lecturas cancelable
 con reintento, recuperación de conflictos y cancelación sin perder el motivo.
 Google Calendar conserva la hora de la barbería independientemente del navegador.
 
-Publicación autorizada y en preparación: original → fork → Vercel. No requiere
-migraciones, RLS ni cambios de Edge Functions. Evidencia y estado de despliegue:
+Publicados ambos builds: original → fork → Vercel Ready / Production,
+con el dominio asignado y el portal real comprobado hasta datos. No se ejecutaron
+migraciones, cambios de RLS ni despliegues de Edge Functions. Evidencia:
 `docs/PORTAL_CLIENTE_PUBLICACION.md`; detalle: `docs/MODULOS/turnos-agenda.md`.
 38 pruebas dirigidas, TypeScript, lint dirigido y build correctos; suite global
 344/352, con ocho fallos preexistentes reproducidos en `origin/main` limpio.

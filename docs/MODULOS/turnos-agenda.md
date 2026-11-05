@@ -177,7 +177,8 @@ diferido) — eso es Fase 5, sigue pendiente, sin tocar acá.
 ## Portal de reservas — experiencia del cliente
 
 Ruta pública: `/:orgSlug/reservar`. La intervención se dividió en un build
-visual y otro de comportamiento, ambos validados localmente. Se mantiene la
+visual y otro de comportamiento, ambos publicados y verificados en producción
+el 2026-11-05. Se mantiene la
 identidad configurable de cada barbería. Estado de publicación y evidencia:
 [PORTAL_CLIENTE_PUBLICACION.md](../PORTAL_CLIENTE_PUBLICACION.md).
 

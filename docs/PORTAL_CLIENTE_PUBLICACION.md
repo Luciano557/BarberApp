@@ -1,7 +1,7 @@
 # Portal cliente — validación y publicación
 
 Solicitud del usuario: completar la segunda etapa y publicar ambas en producción.
-Fecha: 2026-11-05. Estado: código validado; publicación todavía no verificada.
+Fecha: 2026-11-05. Estado: publicado en producción y verificado en el portal real.
 
 ## Alcance
 
@@ -53,5 +53,26 @@ Proyecto confirmado por el conector Vercel: `barber-app`,
 Antes de publicar, el original estaba en `87a647b4` y el fork en `d12c2066`;
 el fork es ancestro del original (11 commits detrás), sin divergencia.
 La sincronización conserva esos commits existentes y no ejecuta migraciones.
-Se verificará cada SHA remoto en el orden de `docs/FLUJO_PUBLICACION.md` y luego
-el despliegue Ready/Production con el dominio asignado y la lectura del portal.
+Se verificó cada SHA remoto en el orden de `docs/FLUJO_PUBLICACION.md`.
+
+## Resultado comprobado
+
+- Código publicado primero en el original y luego en el fork:
+  `42e71a8e3867733fe8dac2893f9b45425e16db24`. Ambos `ls-remote` coincidieron.
+- Vercel `dpl_4Tgamdttds1trms6ybUxchdbn6bw`: Ready / Production, desde `main`
+  de `Luciano557/BarberApp`, con ese mismo SHA. El alias `www.vittro.com.ar`
+  apuntó a ese deployment, sin error de asignación.
+- [Portal real de Scissors](https://www.vittro.com.ar/scissors/reservar):
+  entrada → servicio → profesional → fecha/horario → datos. Se verificaron
+  progreso 1/5, opciones de servicio con precio/duración, 17 horarios en grilla,
+  fecha seleccionada y teléfono como primera tarea del formulario. A 390px,
+  `scrollWidth === clientWidth` (375px útiles con scrollbar), sin errores de
+  consola. No se ingresaron teléfonos ni se confirmó ninguna reserva real.
+- El cierre documental posterior mantiene el mismo código de aplicación y se
+  sincroniza también original → fork; la verificación final de SHA y Ready
+  corresponde al commit documental más reciente.
+
+El servidor sintético fue detenido. El worktree limpio de baseline permanece en
+`%TEMP%/vittro-portal-baseline-e55a07d5b2074cc3be47931c1964dcb0/`: la revisión
+automática bloqueó por política el borrado de su junction `node_modules`.
+Se dejó intacto; no forma parte de los repositorios publicados.
